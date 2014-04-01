@@ -16,3 +16,6 @@ tmp
 .yardoc
 _yardoc
 doc/
+
+log/*.log
+spec/dummy/log/*.log

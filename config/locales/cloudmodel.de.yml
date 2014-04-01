@@ -1,0 +1,191 @@
+de:
+  cloud_model/guest/state:
+    undefined: Nicht Definiert
+    no_state: Ohne Status
+    running: Läuft
+    blocked: Blockiert
+    paused: Pausiert
+    shutdown: Ausschaltend
+    shutoff: Ausgeschaltet
+    crashed: Abgestürzt
+    suspended: Ruhezustand
+    
+  cloud_model/guest/deploy_state:
+    not_started: Nicht beauftragt
+    pending: Geplant
+    running: Wird installiert
+    finished: Abgeschlossen
+    failed: Fehlgeschlagen
+  
+  cloud_model/host/deploy_state:
+    not_started: Nicht beauftragt
+    pending: Geplant
+    running: Wird installiert
+    booting: Wird gestartet
+    finished: Abgeschlossen
+    failed: Fehlgeschlagen
+    
+  mongoid:
+    errors:
+      messages:
+        format: "has to be a number optional followed by K, M, G, T or KiB, MiB, GiB, TiB"
+        repo_not_found: nicht gefunden oder nicht zugreifbar
+        branch_not_pulled: nicht gefunden oder nicht ladbar
+        bundle_failed: Packen des Gemfiles fehlgeschlagen
+        building_assets_failed: erstellen fehlgeschlagen
+        
+    models:
+      cloud_model/host: 
+        one: Hostrechner
+        other: Hostrechner
+      cloud_model/guest:
+        one: Gastsystem
+        other: Gastsysteme
+      cloud_model/address:
+        one: Adresse/Subnetz
+        other: Adressen/Subnetze
+      cloud_model/volume_group:
+        one: Logische Laufwerksgruppe
+        other: Logische Laufwerksgruppen
+      cloud_model/logical_volume:
+        one: Logisches Laufwerk
+        other: Logische Laufwerke
+      cloud_model/guest_volume:
+        one: Gastlaufwerk
+        other: Gastlaufwerke
+      cloud_model/certificate:
+        one: Zertifikat
+        other: Zertifikate
+      cloud_model/web_image:
+        one: Web Image
+        other: Web Images
+      cloud_model/war_image:
+        one: WAR Image
+        other: WAR Images      
+      cloud_model/services/base:
+        one: Dienst
+        other: Dienste
+      cloud_model/services/mongodb:
+        one: MongoDB-Dienst
+        other: MongoDB-Dienste
+      cloud_model/services/nginx:
+        one: Nginx-Dienst
+        other: Nginx-Dienste        
+      cloud_model/services/redis:
+        one: Redis-Dienst
+        other: Redis-Dienste
+      cloud_model/services/ssh:
+        one: SSH-Dienst
+        other: SSH-Dienste        
+      cloud_model/services/tomcat:
+        one: Tomcat-Dienst
+        other: Tomcat-Dienste
+    attributes:
+      cloud_model/address:
+        ip: IP Adresse
+        subnet: CIDR Suffix
+        gateway: Gateway IP
+        network: Netzwerk Adresse
+        netmask: Subnetz Maske
+        broadcast: Broadcast Adresse
+      cloud_model/host:
+        name: Hostname
+        tinc_public_key: Öffentlicher VPN Schlüssel
+        primary_address: Primäre Adresse
+        private_network: VPN Netzwerk
+        addresses: Adressen/Subnetze
+        guests: Gastsysteme
+        volume_groups: Logische Laufwerksgruppen
+        deploy_state: Installationsstatus
+      cloud_model/guest:
+        name: Hostname
+        host: Hostrechner
+        address: Netzwerkadresse
+        services: Dienste
+        private_address: VPN-Adresse
+        external_address: Externe Adresse
+        memory_size: RAM
+        memory_used: RAM benutzt
+        cpu_count: CPUs
+        cpu_time: Prozessornutzung
+        root_volume: Systemlaufwerk
+        guest_volumes: Andere Laufwerke
+        state: Status
+        deploy_state: Installationsstatus
+      cloud_model/volume_group:
+        name: Gruppenname
+        device: Gerät
+        disk_space: Größe
+        available_space: Verfügbare Größe
+        logical_volumes: Logische Laufwerke
+        uuid: UUID
+        attr: Attribute
+        device: Gerät
+      cloud_model/logical_volume:
+        name: Laufwerksname
+        disk_space: Laufwerksgröße
+        disk_format: Laufwerksformatierung   
+        volume_group: Laufwerksgruppe
+        exists?: Vorhanden
+        uuid: UUID
+        attr: Attribute
+        device: Gerät
+        used_in_guest: Benutzt in Gast
+      cloud_model/guest_volume:
+        mount_point: Einhängpunkt
+        writeable: Beschreibbar?
+      cloud_model/certificate:
+        name: Name
+        ca: Zertifizierungsstelle
+        key: Privater Schlüssel
+        crt: Öffentlicher Schlüssel
+        valid_thru: Gültig bis
+      cloud_model/web_image:
+        name: Name
+        git_server: GIT Server
+        git_repo: GIT Repository
+        git_branch: GIT Branch
+        git_commit: GIT Commit
+        updated_at: Letztes Update
+        has_assets: Assets erzeugen?
+        file_size: Packetgröße
+        has_mongodb: MongoDB verwenden?
+        has_resta: RESTA verwenden?
+        has_redis: Redis verwenden?
+      cloud_model/war_image:
+        name: Name
+        file: WAR Image Datei
+        file_size: Packetgröße
+        file_upload: Upload WAR Image
+      cloud_model/services/base:
+        name: Dienstname
+        port: Dienstport
+        public_service: Öffentlicher Dienst?
+        _type: Dienstart
+      cloud_model/services/nginx:
+        port: HTTP Port
+        ssl: HTTPS-Verschlüsselung
+        ssl_supported: HTTPS unterstützen
+        ssl_only: Nur HTTPS nutzen
+        ssl_enforce: Auf HTTPS umleiten
+        ssl_port: HTTPS Port
+        ssl_cert: SSL Zertifikat
+
+        passenger: Passenger/Rack Dienst
+        passenger_supported: Rack unterstützen
+        passenger_env: Rails-Umgebung
+
+        deployment: Projekt deployen
+        capistrano_supported: Capistrano unterstützen
+      
+        deploy_web_image: Web Image installieren
+      
+        deploy_mongodb_host: MongoDB Host
+        deploy_mongodb_port: MongoDB Port
+        deploy_mongodb_database: MongoDB Datenbank
+      
+        deploy_redis_host: Redis Host
+        deploy_redis_port: Redis Port
+      cloud_model/services/tomcat:
+        deployment: Projekt deployen
+        deploy_war_image: WAR Image installieren
