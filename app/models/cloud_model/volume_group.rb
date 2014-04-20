@@ -8,14 +8,16 @@ module CloudModel
     has_many :logical_volumes, class_name: "CloudModel::LogicalVolume", inverse_of: :volume_group
     
     field :name, type: String
-    field :device, type: String
+    field :disk_device, type: String
     field :disk_space, type: Integer
     
     accept_size_strings_for :disk_space
     
     validates :name, presence: true, uniqueness: { scope: :host }, format: {with: /\A[a-z0-9]+\z/}
-    validates :device, presence: true, uniqueness: { scope: :host }
-    validates :disk_space, presence: true
+    validates :disk_device, presence: true, uniqueness: { scope: :host }, format: {with: /\A[a-z0-9]+\z/}
+    #validates :disk_space, presence: true
+    
+    after_create :apply_create
     
     def available_space
       disk_space - logical_volumes.sum(:disk_space)
@@ -33,9 +35,13 @@ module CloudModel
       host.list_real_volume_groups[name.to_sym]
     end
     
+    def exec command
+      host.exec command
+    end
+    
     def list_real_volumes
       begin
-        result = host.ssh_connection.exec "lvs --separator ';' --units b --nosuffix --all -o lv_all #{name.shellescape}"
+        success, result = exec "lvs --separator ';' --units b --nosuffix --all -o lv_all #{name.shellescape}"
         volume_groups = {}
     
         lines = result.split("\n")
@@ -56,6 +62,11 @@ module CloudModel
         return volume_groups
       rescue
       end
+    end
+    
+    def apply_create
+      exec "pvcreate /dev/#{disk_device.shellescape}" || raise('Failed to create virtual space')
+      exec "vgcreate #{name.shellescape} /dev/#{disk_device.shellescape}" || raise('Failed to create lvm volume group')
     end
   end
 end

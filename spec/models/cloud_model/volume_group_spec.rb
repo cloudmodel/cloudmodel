@@ -10,15 +10,13 @@ describe CloudModel::VolumeGroup do
   
   it { should have_field(:name).of_type String }
   it { should have_field(:disk_space).of_type(Integer) }
-  it { should have_field(:device).of_type(String) }
+  it { should have_field(:disk_device).of_type(String) }
   
   it { should validate_presence_of(:name) }
   it { should validate_uniqueness_of(:name).scoped_to(:host) }
   it { should validate_format_of(:name).to_allow("vg0").not_to_allow("Test VG") }
 
-  it { should validate_presence_of(:disk_space) }
-  it { should validate_presence_of(:device) }
-  it { should validate_uniqueness_of(:device).scoped_to(:host) }
+  it { should validate_presence_of(:disk_device) }
   
   context 'disk_space=' do
     it 'should parse input as size string' do
@@ -33,7 +31,7 @@ describe CloudModel::VolumeGroup do
     it 'should calculate available space' do
       subject.disk_space = '20 KiB'
       subject.name = 'vg0'
-      subject.device = '/dev/md0'
+      subject.disk_device = 'md0'
       
       subject.logical_volumes.should_receive(:sum).with(:disk_space).and_return(8192)
       
@@ -75,28 +73,36 @@ describe CloudModel::VolumeGroup do
     end
   end
   
+  context 'exec' do
+    it 'should pass thru to host exec' do
+      host = CloudModel::Host.new
+      subject.host = host
+      host.should_receive(:exec).with('command').and_return [true, 'success']
+      expect(subject.exec 'command').to eq [true, 'success']
+    end
+  end
+  
   context 'list_real_volumes' do
-    let(:ssh_connection) { double 'SSHConnection' }
-    
     before do
       subject.name = 'vg0'
       subject.host = Factory :host
-      subject.host.stub(:ssh_connection).and_return ssh_connection
     end
 
     it 'should call vgs on host' do
-      ssh_connection.should_receive(:exec).with('lvs --separator \';\' --units b --nosuffix --all -o lv_all vg0').and_return(
+      subject.should_receive(:exec).with('lvs --separator \';\' --units b --nosuffix --all -o lv_all vg0').and_return([
+        true,
         "  LV UUID;LV\n" +
         "  Fw3rsa-rFwR-cwF4-ceOn-Tc4r-dwdf-5m2nn2k;root\n"
-      )
+      ])
       subject.list_real_volumes
     end
     
     it 'should parse return value of vgs' do
-      ssh_connection.should_receive(:exec).with('lvs --separator \';\' --units b --nosuffix --all -o lv_all vg0').and_return(
+      subject.should_receive(:exec).with('lvs --separator \';\' --units b --nosuffix --all -o lv_all vg0').and_return([
+        true,
         "  LV UUID;LV;Path;Attr;Active;Maj;Min;Rahead;KMaj;KMin;KRahead;LSize;MSize;#Seg;Origin;OSize;Data%;Snap%;Meta%;Cpy%Sync;Cpy%Sync;Mismatches;SyncAction;WBehind;MinSync;MaxSync;Move;Convert;Log;Data;Meta;Pool;LV Tags;LProfile;Time;Host;Modules\n" +
         "  Fw3rsa-rFwR-cwF4-ceOn-Tc4r-dwdf-5m2nn2k;root;/dev/vg0/root;-wi-a-----;active;-1;-1;auto;253;7;131072;10737418240;;1;;;;;;;;;;;;;;;;;;;;;2010-09-08 19:03:51 +0200;srv01;\n"
-      )
+      ])
 
       expect(subject.list_real_volumes).to eq({
         :root=>{

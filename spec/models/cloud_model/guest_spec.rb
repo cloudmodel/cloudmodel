@@ -198,42 +198,43 @@ describe CloudModel::Guest do
     end
   end
   
+  context 'exec' do
+    it 'should pass thru to host exec' do
+      host = CloudModel::Host.new
+      subject.host = host
+      host.should_receive(:exec).with('command').and_return [true, 'success']
+      expect(subject.exec 'command').to eq [true, 'success']
+    end
+  end
+  
   context 'virsh' do
     it 'should build valid virsh command for our guest and send it via SSH to host' do
       subject.name = 'my_guest'
       subject.host = CloudModel::Host.new
-      ssh_connection = double 'SSHConnection', exec: '--- dom info ---' 
-      subject.host.stub(:ssh_connection) { ssh_connection }
-      ssh_connection.should_receive(:exec).with('/usr/bin/virsh dominfo my_guest')
+      subject.should_receive(:exec).with('/usr/bin/virsh dominfo my_guest').and_return [true, '--- dom info ---']
       expect(subject.virsh('dominfo')).to eq '--- dom info ---'
     end
 
     it 'should should accept an option' do
       subject.name = 'my_guest'
       subject.host = CloudModel::Host.new
-      ssh_connection = double 'SSHConnection', exec: '--- success ---' 
-      subject.host.stub(:ssh_connection) { ssh_connection }
-      ssh_connection.should_receive(:exec).with('/usr/bin/virsh autostart --disable my_guest')
+      subject.should_receive(:exec).with('/usr/bin/virsh autostart --disable my_guest').and_return [true, '--- success ---']
       expect(subject.virsh('autostart', 'disable')).to eq '--- success ---'
     end
 
     it 'should should accept multiple options' do
       subject.name = 'my_guest'
       subject.host = CloudModel::Host.new
-      ssh_connection = double 'SSHConnection', exec: '--- success ---' 
-      subject.host.stub(:ssh_connection) { ssh_connection }
-      ssh_connection.should_receive(:exec).with('/usr/bin/virsh autostart --disable --debug my_guest')
+      subject.should_receive(:exec).with('/usr/bin/virsh autostart --disable --debug my_guest').and_return [true, '--- success ---']
       expect(subject.virsh('autostart', ['disable', 'debug'])).to eq '--- success ---'     
     end
 
     it 'should should shell escape the name of the guest' do
       subject.name = 'my_guest;rm -rf /'
       subject.host = CloudModel::Host.new
-      ssh_connection = double 'SSHConnection', exec: '--- success ---' 
-      subject.host.stub(:ssh_connection) { ssh_connection }
       
       subject.name.should_receive(:shellescape).and_return 'my_guest\\;rm\\ -rf\\ /'
-      ssh_connection.should_receive(:exec).with('/usr/bin/virsh autostart my_guest\\;rm\\ -rf\\ /')
+      subject.should_receive(:exec).with('/usr/bin/virsh autostart my_guest\\;rm\\ -rf\\ /').and_return [true, '--- success ---']
       
       expect(subject.virsh('autostart')).to eq '--- success ---'     
     end
@@ -241,12 +242,10 @@ describe CloudModel::Guest do
     it 'should should shell escape the virsh command' do
       subject.name = 'my_guest'
       subject.host = CloudModel::Host.new
-      ssh_connection = double 'SSHConnection', exec: '--- success ---' 
-      subject.host.stub(:ssh_connection) { ssh_connection }
       
       command = 'autostart;rm -rf /'
       command.should_receive(:shellescape).and_return 'autostart\\;rm\\ -rf\\ /'
-      ssh_connection.should_receive(:exec).with('/usr/bin/virsh autostart\\;rm\\ -rf\\ / my_guest')
+      subject.should_receive(:exec).with('/usr/bin/virsh autostart\\;rm\\ -rf\\ / my_guest').and_return [true, '--- success ---']
       
       expect(subject.virsh(command)).to eq '--- success ---'           
     end
@@ -254,17 +253,13 @@ describe CloudModel::Guest do
     it 'should should shell escape options of the command' do
       subject.name = 'my_guest'
       subject.host = CloudModel::Host.new
-      ssh_connection = double 'SSHConnection', exec: '--- success ---' 
-      subject.host.stub(:ssh_connection) { ssh_connection }
       
       option = 'disable;rm -rf /;'
       option.should_receive(:shellescape).and_return 'disable\\;rm\\ -rf\\ /\\;'
-      ssh_connection.should_receive(:exec).with('/usr/bin/virsh autostart --disable\\;rm\\ -rf\\ /\\; my_guest')
+      subject.should_receive(:exec).with('/usr/bin/virsh autostart --disable\\;rm\\ -rf\\ /\\; my_guest').and_return [true, '--- success ---']
       
       expect(subject.virsh('autostart', option)).to eq '--- success ---'     
     end
-
-    
   end
   
   context 'deployable?' do
@@ -341,15 +336,15 @@ describe CloudModel::Guest do
   end
   
   context '#redeploy' do
-    let(:ssh_connection) { double 'SSHConnection', exec: "" }
+    let(:ssh_connection) { double 'SSHConnection', exec!: "" }
     
     before do
       CloudModel::Host.any_instance.stub(:ssh_connection).and_return ssh_connection
     end    
     
-    let!(:guest1) { Factory :guest }
-    let!(:guest2) { Factory :guest }
-    let!(:guest3) { Factory :guest }
+    let!(:guest1) { Factory :guest, name: 'g1', private_address: '10.42.0.23' }
+    let!(:guest2) { Factory :guest, name: 'g2', private_address: '10.42.0.25' }
+    let!(:guest3) { Factory :guest, name: 'g3', private_address: '10.42.0.4' }
     
     it 'should call rake cloudmodel:host:deploy_many with list of guest ids' do  
       CloudModel.should_receive(:call_rake).with('cloudmodel:guest:redeploy_many', guest_ids: [guest1.id, guest3.id].map(&:to_s))
@@ -500,7 +495,7 @@ describe CloudModel::Guest do
       subject.stop
     end
     
-    it 'should start domain' do
+    it 'should stop domain' do
       subject.stub(:virsh)
       subject.should_receive(:virsh).with('shutdown')
       subject.stop
@@ -514,6 +509,34 @@ describe CloudModel::Guest do
     it 'should return false if error occures' do
       subject.stub(:virsh).and_raise 'Oops'
       expect(subject.stop).to eq false
+    end
+  end
+  
+  context 'define' do
+    pending
+  end
+  
+  context 'undefine' do
+    it 'should disables autostart state for domain' do
+      subject.stub(:virsh)
+      subject.should_receive(:virsh).with('autostart', 'disable')
+      subject.stop
+    end
+    
+    it 'should undefine domain' do
+      subject.stub(:virsh)
+      subject.should_receive(:virsh).with('undefine')
+      subject.undefine
+    end
+    
+    it 'should return true if no error occures' do
+      subject.stub(:virsh)
+      expect(subject.undefine).to eq true
+    end
+
+    it 'should return false if error occures' do
+      subject.stub(:virsh).and_raise 'Oops'
+      expect(subject.undefine).to eq false
     end
   end
   

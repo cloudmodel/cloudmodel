@@ -1,0 +1,8 @@
+Address = <%= host.primary_address.ip %>
+Subnet = <%= host.private_network %>
+
+Cipher = blowfish
+Digest = sha1
+IndirectData = yes
+
+<%= raw host.tinc_public_key %>

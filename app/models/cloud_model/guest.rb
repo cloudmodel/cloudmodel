@@ -111,13 +111,22 @@ module CloudModel
       name
     end
     
+    def exec command
+      host.exec command
+    end
+    
     def virsh cmd, options = []
       option_string = ''
       options = [options] if options.is_a? String
       options.each do |option|
         option_string = "#{option_string}--#{option.shellescape} "
       end
-      host.ssh_connection.exec("/usr/bin/virsh #{cmd.shellescape} #{option_string}#{name.shellescape}")
+      success, data = exec("/usr/bin/virsh #{cmd.shellescape} #{option_string}#{name.shellescape}")
+      if success 
+        return data
+      else
+        return false
+      end
     end 
     
     def self.deploy_state_id_for deploy_state
@@ -229,6 +238,22 @@ module CloudModel
       begin
         virsh 'shutdown'
         virsh 'autostart', 'disable'
+        return true
+      rescue
+        return false
+      end
+    end
+    
+    def define
+      xml = render("/guests/config/lxc.xml", guest: self)
+      # ToDo: Write xml file
+      # ToDo: call virsh to define guest from xml
+    end
+    
+    def undefine
+      begin
+        virsh 'shutdown'
+        virsh 'undefine'
         return true
       rescue
         return false

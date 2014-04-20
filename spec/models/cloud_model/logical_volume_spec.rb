@@ -3,6 +3,10 @@
 require 'spec_helper'
 
 describe CloudModel::LogicalVolume do
+  before do
+    CloudModel::VolumeGroup.any_instance.stub(:apply_create).and_return true
+  end
+  
   it { expect(subject).to be_timestamped_document }  
 
   it { expect(subject).to have_field(:name).of_type String }
@@ -68,40 +72,46 @@ describe CloudModel::LogicalVolume do
     end
   end
   
-  context 'apply' do
-    let(:ssh_connection) { double 'SSHConnection' }
-    
-    before do
-      subject.volume_group = Factory.build :volume_group
-      subject.volume_group.host.stub(:ssh_connection).and_return ssh_connection
-      subject.name = 'test_lv'
+  context 'exec' do
+    it 'should pass thru to host exec' do
+      host = CloudModel::Host.new
+      subject.volume_group = CloudModel::VolumeGroup.new name: 'test-group', host: host
+      host.should_receive(:exec).with('command').and_return [true, 'success']
+      expect(subject.exec 'command').to eq [true, 'success']
     end
-    
+  end
+  
+  context 'apply' do  
+    subject { CloudModel::LogicalVolume.new volume_group: Factory(:volume_group, name: 'vg0') }
+     
     it 'should be called after safe' do
+      subject.name = 'test_lv'
       subject.should_receive(:apply).and_return true
       subject.save!
     end
     
     it 'should create and format a new LV if not exists' do
+      subject.name = 'test_lv'
       subject.stub(:real_info).and_return nil
       subject.volume_group.stub(:device).and_return('/vg42')
       subject.stub(:device).and_return('/vg42/lv23')
       subject.disk_space = 2048
       
-      ssh_connection.should_receive(:exec).with('lvcreate -L 2048b -n test_lv /vg42').and_return('')
-      ssh_connection.should_receive(:exec).with('mkfs.ext4 /vg42/lv23').and_return('')
+      subject.should_receive(:exec).with('lvcreate -L 2048b -n test_lv /vg42').and_return(true, '')
+      subject.should_receive(:exec).with('mkfs.ext4 /vg42/lv23').and_return(true, '')
       
       subject.apply
     end
     
     it 'should escape on create mode' do
+      subject.name = 'test_lv'
       subject.stub(:real_info).and_return nil
       subject.volume_group.stub(:device).and_return('/;rm -rf;')
       subject.stub(:device).and_return(';mkfs /dev/sda;')
       subject.disk_space = ';halt;'
       
-      ssh_connection.should_receive(:exec).with('lvcreate -L 10737418240b -n test_lv /\\;rm\\ -rf\\;').and_return('')
-      ssh_connection.should_receive(:exec).with('mkfs.ext4 \\;mkfs\\ /dev/sda\\;').and_return('')
+      subject.should_receive(:exec).with('lvcreate -L 10737418240b -n test_lv /\\;rm\\ -rf\\;').and_return(true, '')
+      subject.should_receive(:exec).with('mkfs.ext4 \\;mkfs\\ /dev/sda\\;').and_return(true, '')
       
       subject.apply
     end
@@ -112,8 +122,8 @@ describe CloudModel::LogicalVolume do
       subject.stub(:device).and_return('/vg42/lv23')
       subject.disk_space = 2048
     
-      ssh_connection.should_receive(:exec).with('e2fsck -f /vg42/lv23 && resize2fs /vg42/lv23 2K').and_return('')
-      ssh_connection.should_receive(:exec).with('lvreduce /vg42/lv23 --size 2048b -f').and_return('')
+      subject.should_receive(:exec).with('e2fsck -f /vg42/lv23 && resize2fs /vg42/lv23 2K').and_return(true, '')
+      subject.should_receive(:exec).with('lvreduce /vg42/lv23 --size 2048b -f').and_return(true, '')
       
       subject.apply
     end
@@ -124,8 +134,8 @@ describe CloudModel::LogicalVolume do
       subject.stub(:device).and_return(';mkfs /dev/sda;')
       subject.disk_space = 1024
     
-      ssh_connection.should_receive(:exec).with('e2fsck -f \\;mkfs\\ /dev/sda\\; && resize2fs \\;mkfs\\ /dev/sda\\; 1K').and_return('')
-      ssh_connection.should_receive(:exec).with('lvreduce \\;mkfs\\ /dev/sda\\; --size 1024b -f').and_return('')
+      subject.should_receive(:exec).with('e2fsck -f \\;mkfs\\ /dev/sda\\; && resize2fs \\;mkfs\\ /dev/sda\\; 1K').and_return(true, '')
+      subject.should_receive(:exec).with('lvreduce \\;mkfs\\ /dev/sda\\; --size 1024b -f').and_return(true, '')
       
       subject.apply
     end
@@ -136,8 +146,8 @@ describe CloudModel::LogicalVolume do
       subject.stub(:device).and_return('/vg42/lv23')
       subject.disk_space = 2048
     
-      ssh_connection.should_receive(:exec).with('lvextend /vg42/lv23 --size 2048b').and_return('')
-      ssh_connection.should_receive(:exec).with('resize2fs /vg42/lv23').and_return('')
+      subject.should_receive(:exec).with('lvextend /vg42/lv23 --size 2048b').and_return(true, '')
+      subject.should_receive(:exec).with('resize2fs /vg42/lv23').and_return(true, '')
       
       subject.apply
     end
@@ -148,8 +158,8 @@ describe CloudModel::LogicalVolume do
       subject.stub(:device).and_return(';mkfs /dev/sda;')
       subject.disk_space = ';halt;'
     
-      ssh_connection.should_receive(:exec).with('lvextend \\;mkfs\\ /dev/sda\\; --size 10737418240b').and_return('')
-      ssh_connection.should_receive(:exec).with('resize2fs \\;mkfs\\ /dev/sda\\;').and_return('')
+      subject.should_receive(:exec).with('lvextend \\;mkfs\\ /dev/sda\\; --size 10737418240b').and_return(true, '')
+      subject.should_receive(:exec).with('resize2fs \\;mkfs\\ /dev/sda\\;').and_return(true, '')
       
       subject.apply
     end
@@ -160,20 +170,13 @@ describe CloudModel::LogicalVolume do
       subject.stub(:device).and_return('/vg42/lv23')
       subject.disk_space = 2048
     
-      ssh_connection.should_not_receive(:exec)
+      subject.should_not_receive(:exec)
       
       subject.apply
     end
   end
   
   context 'apply_destroy' do
-    let(:ssh_connection) { double 'SSHConnection' }
-    
-    before do
-      subject.volume_group = Factory.build :volume_group
-      subject.volume_group.host.stub(:ssh_connection).and_return ssh_connection
-    end
-    
     it 'should be called before destroy' do
       subject.should_receive(:apply_destroy).and_return true
       subject.destroy
@@ -183,7 +186,7 @@ describe CloudModel::LogicalVolume do
       subject.stub(:real_info).and_return({info: true})
       subject.stub(:device).and_return('/vg42/lv23')
       
-      ssh_connection.should_receive(:exec).with('lvremove -f /vg42/lv23').and_return('')
+      subject.should_receive(:exec).with('lvremove -f /vg42/lv23').and_return(true, '')
       
       subject.apply_destroy
     end
@@ -192,16 +195,42 @@ describe CloudModel::LogicalVolume do
       subject.stub(:real_info).and_return({info: true})
       subject.stub(:device).and_return('; rm -rf /;')
 
-      ssh_connection.should_receive(:exec).with('lvremove -f \\;\\ rm\\ -rf\\ /\\;').and_return('')
+      subject.should_receive(:exec).with('lvremove -f \\;\\ rm\\ -rf\\ /\\;').and_return(true, '')
       
       subject.apply_destroy
     end
     
     it 'should not call ssh if device not found in real_info' do
       subject.stub(:real_info).and_return nil
-      ssh_connection.should_not_receive(:exec)
+      subject.should_not_receive(:exec)
       
       subject.apply_destroy
     end
+  end
+  
+  context 'mount' do
+    it 'should call mount on the host connected by volume_group' do
+      host = Factory :host
+      subject.volume_group = Factory :volume_group, host: host, name: 'vg0'
+      subject.name = 'test'
+      subject.disk_format = 'ext4'
+      ssh_connection = double 'SSHConnection', exec: '--- dom info ---'
+      host.should_receive(:exec).with('mkdir -p /mnt/test && mount -t ext4 -o noatime /dev/vg0/test /mnt/test').and_return [true, 'mounted']
+      
+      expect(subject.mount '/mnt/test').to eq [true, 'mounted']
+    end
+    
+    it 'should escape parameters on call' do
+      host = Factory :host
+      subject.volume_group = Factory :volume_group, host: host
+      subject.volume_group.stub(:device).and_return '/dev/vg0; rm -rf /;'
+      subject.stub(:name).and_return 'test; reboot;'
+      subject.disk_format = 'ext4; do evil;'
+      ssh_connection = double 'SSHConnection', exec: '--- dom info ---'
+      host.should_receive(:exec).with('mkdir -p /mnt/test\\;\\ cat\\ /dev/random\\ /dev/sda\\; && mount -t ext4\\;\\ do\\ evil\\; -o noatime /dev/vg0\\;\\ rm\\ -rf\\ /\\;/test\\;\\ reboot\\; /mnt/test\\;\\ cat\\ /dev/random\\ /dev/sda\\;').and_return [true, 'mounted']
+      
+      subject.mount '/mnt/test; cat /dev/random /dev/sda;'
+    end
+    
   end
 end

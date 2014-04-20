@@ -1,4 +1,5 @@
 require 'net/ssh'
+require 'net/sftp'
 
 module CloudModel
   class Host
@@ -8,6 +9,7 @@ module CloudModel
   
     field :name, type: String
     field :tinc_public_key, type: String
+    field :initial_root_pw, type: String
 
     enum_field :stage, values: {
       0x00 => :pending,
@@ -121,12 +123,97 @@ module CloudModel
     end
     
     def ssh_connection
-      @ssh_connection ||= Net::SSH.start(primary_address.ip, "root")
+      @ssh_connection ||= if initial_root_pw
+        Net::SSH.start(primary_address.ip, "root",
+          password: initial_root_pw, 
+          paranoid: false
+        )
+      else  
+        Net::SSH.start(private_network.list_ips.first, "root",
+          keys: ["#{CloudModel.config.data_directory}/keys/id_rsa"],
+          keys_only: true,
+          password: ''
+        )        
+      end
+    end
+    
+    def exec command
+      Rails.logger.debug "EXEC: #{command}"
+      
+      stdout_data = ''
+      stderr_data = {}
+      exit_status = nil
+      exit_signal = nil
+      #puts command
+      
+      # Close SFTP channel as it would break the ssh loop
+      ssh_connection.sftp.close_channel
+      ssh_connection.instance_variable_set('@sftp', nil)
+      
+      ssh_connection.open_channel do |channel|
+        channel.exec(command) do |ch, success|
+          unless success
+            abort "FAILED: couldn't execute command (ssh.channel.exec)"
+          end
+          channel.on_data do |ch,data|
+            #puts "  stdout: #{data}"
+            stdout_data += data
+          end
+
+          channel.on_extended_data do |ch,type,data|
+            #puts "  stderr (#{type}): #{data}"
+            stderr_data[type] ||= ''
+            stderr_data[type] += data
+          end
+
+          channel.on_request("exit-status") do |ch,data|
+            #puts "  exit-status: #{data}"
+            exit_status = data.read_long
+          end
+
+          channel.on_request("exit-signal") do |ch, data|
+            #puts "  exit-signal: #{data}"
+            exit_signal = data.read_long
+          end
+        end
+      end
+      ssh_connection.loop
+      
+      success = exit_status == 0      
+      Rails.logger.debug [success, stdout_data, stderr_data, exit_status, exit_signal]
+      return [success, stdout_data]
+    end
+
+    def exec! command, message
+      success, data = exec command
+
+      unless success
+        raise "#{message}: #{data}"
+      end
+      data
+    end
+    
+    def boot_fs_mounted? root=''
+      exec('mount')[1].match(/on #{root}\/boot type/)
+    end
+    
+    def mount_boot_fs root=''
+      # Don't mount /boot if already mounted!
+      if boot_fs_mounted? root
+        return true
+      else
+        success, data = exec "mount /dev/md127 #{root}/boot"
+        unless success
+          success, data = exec "mount /dev/md/rescue:127 #{root}/boot"
+        end
+        
+        return success
+      end
     end
     
     def list_real_volume_groups
-      begin
-        result = ssh_connection.exec "vgs --separator ';' --units b --all --nosuffix -o vg_all"
+      #begin
+        success, result = exec "vgs --separator ';' --units b --all --nosuffix -o vg_all"
         volume_groups = {}
     
         lines = result.split("\n")
@@ -144,8 +231,8 @@ module CloudModel
         end
 
         return volume_groups
-      rescue
-      end
+        #rescue
+        #end
     end
     
     def deployable?

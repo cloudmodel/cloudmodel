@@ -1,0 +1,34 @@
+dns_domain_lo="core"
+
+modules=( "iproute2" )
+
+
+brctl_br0="
+setfd 0
+sethello 30
+stp on
+"
+
+dns_servers="
+8.8.8.8
+8.8.4.4
+213.133.100.100
+213.133.98.98
+213.133.99.99
+" 
+
+config_eth0="
+<%= host.primary_address %>
+<% host.addresses.each do |address| -%>
+
+<% address.list_ips.each do |ip| -%>
+<%= ip %>/<%= address.subnet %>
+<% end -%>
+<% end -%>
+"
+
+routes_eth0="
+fe80::1 dev br0
+default via fe80::1 dev br0
+default gw <%= host.primary_address.gateway %>
+"

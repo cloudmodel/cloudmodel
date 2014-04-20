@@ -1,0 +1,10 @@
+Name = <%=raw host.name.downcase %>
+AddressFamily = ipv4
+BindToInterface = eth0
+<% (CloudModel::Host.where(:tinc_public_key.ne => nil) - [host]).map{|h| h.name.downcase}.each do |name| -%>
+ConnectTo = <%= name %>
+<% end-%>
+Device = /dev/net/tun
+Mode = router
+KeyExpire = 3600
+PrivateKeyFile = /etc/tinc/vpn/rsa_key.priv

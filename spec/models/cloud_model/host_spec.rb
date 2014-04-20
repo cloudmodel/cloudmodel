@@ -6,6 +6,7 @@ describe CloudModel::Host do
   it { expect(subject).to be_timestamped_document }  
   it { expect(subject).to have_field(:name).of_type String }
   it { expect(subject).to have_field(:tinc_public_key).of_type String }
+  it { expect(subject).to have_field(:initial_root_pw).of_type String }
   
   it { expect(subject).to have_enum(:stage).with_values(
     0x00 => :pending,
@@ -365,6 +366,97 @@ describe CloudModel::Host do
     end
   end
   
+  context 'exec' do
+    it 'should call exec on ssh_connection' do
+      ssh_connection = double 'SSHConnection', exec: '--- dom info ---'
+      subject.should_receive(:ssh_connection).and_return ssh_connection
+      ssh_connection.should_receive(:exec!).with('command').and_yield(nil, :stderr, 'error occured')
+      subject.exec 'command'
+    end
+    
+    it 'should return success false if exec on ssh_connection fails' do
+      ssh_connection = double 'SSHConnection', exec: '--- dom info ---'
+      subject.should_receive(:ssh_connection).and_return ssh_connection
+      ssh_connection.should_receive(:exec!).with('command').and_yield(nil, :stdio, 'ok')
+      expect(subject.exec 'command').to eq [true, "ok"]
+    end
+    
+    it 'should return success false if exec on ssh_connection fails' do
+      ssh_connection = double 'SSHConnection', exec: '--- dom info ---'
+      subject.should_receive(:ssh_connection).and_return ssh_connection
+      ssh_connection.should_receive(:exec!).with('command').and_yield(nil, :stderr, 'error occured')
+      expect(subject.exec 'command').to eq [false, "error occured"]
+    end
+  end
+  
+  context 'exec!' do
+    it 'should call exec with same command' do
+      subject.should_receive(:exec).with('command').and_return [true, 'true']
+      expect(subject.exec! 'command', 'message').to eq 'true'
+    end
+    
+    it 'should raise error with given message if exec fails' do
+      subject.should_receive(:exec).with('command').and_return [false, 'An error occured']
+      expect { subject.exec! 'command', 'message' }.to raise_error(RuntimeError, 'message: An error occured')
+    end
+  end
+  
+  context 'boot_fs_mounted?' do
+    it 'should return true if /boot is mounted' do
+      subject.should_receive(:exec).with('mount').and_return [
+        true, 
+        "rootfs on / type rootfs (rw)\n" +
+        "/dev/md126 on /boot type ext2 (rw,noatime)" +
+        "proc on /proc type proc (rw,relatime)\n" +
+        "udev on /dev type devtmpfs (rw,nosuid,relatime,size=10240k,nr_inodes=8144813,mode=755)\n"
+      ]
+      expect(subject.boot_fs_mounted?).to be_true
+    end
+    
+    it 'should return false if /boot is not mounted' do
+      subject.should_receive(:exec).with('mount').and_return [
+        true, 
+        "rootfs on / type rootfs (rw)\n" +
+        "proc on /proc type proc (rw,relatime)\n" +
+        "udev on /dev type devtmpfs (rw,nosuid,relatime,size=10240k,nr_inodes=8144813,mode=755)\n"
+      ]
+      expect(subject.boot_fs_mounted?).to be_false
+    end
+    
+  end
+  
+  context 'mount_boot_fs' do
+    it 'should call mount if not mounted' do
+      subject.stub(:boot_fs_mounted?).and_return false
+        
+      subject.should_receive(:exec).with('mount "/dev/md127" /boot').and_return [true, 'success']
+      expect(subject.mount_boot_fs).to be_true
+    end
+
+    it 'should not call mount if mounted' do
+      subject.stub(:boot_fs_mounted?).and_return true
+        
+      subject.should_not_receive(:exec).with('mount "/dev/md127" /boot')
+      expect(subject.mount_boot_fs).to be_true
+    end
+    
+    it 'should fallback to rescue device if mount fails' do
+      subject.stub(:boot_fs_mounted?).and_return false
+        
+      subject.should_receive(:exec).with('mount "/dev/md127" /boot').and_return [false, 'fail']
+      subject.should_receive(:exec).with('mount "/dev/md/rescue:127" /boot').and_return [true, 'success']
+      expect(subject.mount_boot_fs).to be_true
+    end
+    
+    it 'should raise error if mount fails' do
+      subject.stub(:boot_fs_mounted?).and_return false
+        
+      subject.should_receive(:exec).with('mount "/dev/md127" /boot').and_return [false, 'fail']
+      subject.should_receive(:exec).with('mount "/dev/md/rescue:127" /boot').and_return [false, 'fail']
+      expect(subject.mount_boot_fs).to be_false
+    end
+  end
+  
   context 'list_real_volume_groups' do
     let(:ssh_connection) { double 'SSHConnection' }
     
@@ -373,7 +465,7 @@ describe CloudModel::Host do
     end
 
     it 'should call vgs on host' do
-      ssh_connection.should_receive(:exec).with('vgs --separator \';\' --units b --all --nosuffix -o vg_all').and_return(
+      ssh_connection.should_receive(:exec!).with('vgs --separator \';\' --units b --all --nosuffix -o vg_all').and_return(
         "  Fmt;VG UUID;VG\n" +
         "  lvm2;4jM5nB-lV98-rFwR-4fWc-cwF4-dwdf-Fw3rsa;vg0\n"
       )
@@ -381,10 +473,11 @@ describe CloudModel::Host do
     end
     
     it 'should parse return value of vgs' do
-      ssh_connection.should_receive(:exec).with('vgs --separator \';\' --units b --all --nosuffix -o vg_all').and_return(
+      subject.should_receive(:exec).with('vgs --separator \';\' --units b --all --nosuffix -o vg_all').and_return([
+        true,
         "  Fmt;VG UUID;VG;Attr;VSize;VFree;SYS ID;Ext;#Ext;Free;MaxLV;MaxPV;#PV;#LV;#SN;Seq;VG Tags;VProfile;#VMda;#VMdaUse;VMdaFree;VMdaSize;#VMdaCps\n" +
         "  lvm2;4jM5nB-lV98-rFwR-4fWc-cwF4-dwdf-Fw3rsa;vg0;wz--n-;2965960130560;2746916798464;;4194304;707140;654916;0;0;1;16;0;41;;;1;1;90112;192512;unmanaged\n"
-      )
+      ])
       expect(subject.list_real_volume_groups).to eq({
         vg0: {
           fmt: 'lvm2', 
