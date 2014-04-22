@@ -244,12 +244,6 @@ module CloudModel
       end
     end
     
-    def define
-      xml = render("/guests/config/lxc.xml", guest: self)
-      # ToDo: Write xml file
-      # ToDo: call virsh to define guest from xml
-    end
-    
     def undefine
       begin
         virsh 'shutdown'

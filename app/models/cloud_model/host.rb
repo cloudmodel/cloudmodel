@@ -137,6 +137,14 @@ module CloudModel
       end
     end
     
+    def sync_inst_images
+      # TODO: make work with initial root pw
+      ssh_address = initial_root_pw ? primary_address.ip : private_network.list_ips.first
+      command = "rsync -avz -e 'ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' #{CloudModel.config.data_directory.shellescape}/inst/ root@#{ssh_address}:/inst"
+      Rails.logger.debug command
+      `#{command}`
+    end
+    
     def exec command
       Rails.logger.debug "EXEC: #{command}"
       

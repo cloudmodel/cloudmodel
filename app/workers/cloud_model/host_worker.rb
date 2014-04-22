@@ -52,10 +52,6 @@ module CloudModel
       @host.exec! cmd, "Failed to build tar #{dst}"
     end
     
-    def mkdir_p path
-      @host.exec! "mkdir -p #{path.shellescape}", "Failed to make directory #{path}"
-    end
-  
     def create_image
       #
       # Create boot image
@@ -108,57 +104,8 @@ module CloudModel
       # Configure firewall
       #
       
-      rules = {
-        @host.primary_address.ip  => {
-          'interface' => 'eth0',
-          'services' => {
-            'ssh' => {
-              'port' => 22
-            },
-            'tinc-tcp' => {
-              'port' => 655,
-              'proto' => 'tcp'
-            },
-            'tinc-udp' => {
-              'port' => 655,
-              'proto' => 'udp'
-            }
-          }
-        }
-      }
+      CloudModel::FirewallWorker.new(@host).write_init_script root: root
     
-      @host.addresses.each do |address|
-        address.list_ips.each do |ip|
-          rules[ip] = {
-            'interface' => 'eth0',
-            'services' => {}
-          }
-        
-          if guest = @host.guests.where(external_address: ip).first
-            rules[ip]['nat'] = guest.private_address
-          
-            services = guest.services.where(public_service: true).to_a
-            services.each do |service|
-              rules[ip]['services']["#{service.kind}"] ||= {}
-              rules[ip]['services']["#{service.kind}"]['port'] ||= []
-              rules[ip]['services']["#{service.kind}"]['port'] << service.port
-    
-              if service.try :ssl_port and service.try :ssl_supported
-                rules[ip]['services']["#{service.kind}s"] ||= {}
-                rules[ip]['services']["#{service.kind}s"]['port'] ||= []
-                rules[ip]['services']["#{service.kind}s"]['port'] << service.ssl_port
-              end
-            end
-          end
-        end
-      end
-      
-      init_script = CloudModel::FirewallWorker.new(rules).init_script
-    
-      mkdir_p "#{root}/etc/init.d/"
-      @host.ssh_connection.sftp.file.open("#{root}/etc/init.d/cloudmodel", 'w', 0700) do |f|
-        f.puts init_script
-      end
       @host.exec! "ln -sf /etc/init.d/cloudmodel #{root}/etc/runlevels/default/", 'failed to add firewall to autostart'     
     end
 
@@ -383,6 +330,8 @@ module CloudModel
     end
 
     def deploy
+      return false unless @host.deploy_state == :pending
+      
       @host.update_attribute :deploy_state, :running
       
       begin
@@ -447,6 +396,7 @@ module CloudModel
         # The rest is quite similar to redeploy
         #  
         
+        @host.sync_inst_images
         make_deploy_root
         make_keys
         config_deploy_root
@@ -459,9 +409,12 @@ module CloudModel
     end
 
     def redeploy
+      return false unless @host.deploy_state == :pending
+      
       @host.update_attribute :deploy_state, :running
       
       begin
+        @host.sync_inst_images
         make_deploy_root
         copy_keys
         config_deploy_root         

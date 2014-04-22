@@ -7,12 +7,12 @@ depend() {
 
 start() {
   ebegin "Starting CloudModel"
-  <%= firewall_worker.start_script %>
+    <%=raw firewall_worker.start_script %>
   eend $?
 }
 
 stop() {
   ebegin "Stopping CloudModel"
-  <%= firewall_worker.stop_script %>
+    <%=raw firewall_worker.stop_script %>
   eend $?
 }

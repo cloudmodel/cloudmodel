@@ -1,6 +1,52 @@
 module CloudModel
   class FirewallWorker < BaseWorker
-    def initialize(rules)
+    def initialize(host)
+      @host = host
+      
+      rules = {
+        @host.primary_address.ip  => {
+          'interface' => 'eth0',
+          'services' => {
+            'ssh' => {
+              'port' => 22
+            },
+            'tinc-tcp' => {
+              'port' => 655,
+              'proto' => 'tcp'
+            },
+            'tinc-udp' => {
+              'port' => 655,
+              'proto' => 'udp'
+            }
+          }
+        }
+      }
+    
+      @host.addresses.each do |address|
+        address.list_ips.each do |ip|
+          rules[ip] = {
+            'interface' => 'eth0',
+            'services' => {}
+          }
+        
+          if guest = @host.guests.where(external_address: ip).first
+            rules[ip]['nat'] = guest.private_address
+          
+            services = guest.services.where(public_service: true).to_a
+            services.each do |service|
+              rules[ip]['services']["#{service.kind}"] ||= {}
+              rules[ip]['services']["#{service.kind}"]['port'] ||= []
+              rules[ip]['services']["#{service.kind}"]['port'] << service.port
+    
+              if service.try :ssl_port and service.try :ssl_supported
+                rules[ip]['services']["#{service.kind}s"] ||= {}
+                rules[ip]['services']["#{service.kind}s"]['port'] ||= []
+                rules[ip]['services']["#{service.kind}s"]['port'] << service.ssl_port
+              end
+            end
+          end
+        end
+      end
       @rules = rules
     end
     
@@ -149,12 +195,18 @@ module CloudModel
     def stop_script(options = {})
       commands = []
       iptables_bins.each do |iptables|
-        # ['-F', '-t nat -F', '-X SSH_ATTACKED', '-X SSH_CHECK'].each do |attrs|
-        ['-F', '-X SSH_ATTACKED', '-X SSH_CHECK'].each do |attrs|
+        # ['-F', '-t nat -F'].each do |attrs|
+        ['-F'].each do |attrs|
           commands << "#{iptables} #{attrs}"
         end
+        
+        if ssh_deep_inspect?
+          ['-X SSH_ATTACKED', '-X SSH_CHECK'].each do |attrs|
+            commands << "#{iptables} #{attrs} || echo 'Failed to run: #{iptables} #{attrs}'"
+          end
+        end
       end  
-      commands * "\n"
+      commands * "\n    "
     end
 
     def list_script(options = {})
@@ -162,7 +214,7 @@ module CloudModel
       iptables_bins.each do |iptables|
         commands << "#{iptables} -L"
       end  
-      commands * "\n"
+      commands * "\n    "
     end
 
     def start_script(options = {})
@@ -208,7 +260,7 @@ module CloudModel
           commands << "#{iptables} -A SSH_CHECK -m recent --set --name SSH"
           commands << "#{iptables} -A SSH_CHECK -m recent --update --seconds 60 --hitcount 4 --rttl --name SSH -j SSH_ATTACKED"
           # Define SSH_ATTACKED chain
-          commands << "#{iptables} -A SSH_ATTACKED -j LOG --log-prefix \"SSH attack: \" --log-level 7"
+          commands << "#{iptables} -A SSH_ATTACKED -j LOG --log-prefix 'SSH attack: ' --log-level 7"
           commands << "#{iptables} -A SSH_ATTACKED -j REJECT"
         end
       end
@@ -225,11 +277,19 @@ module CloudModel
         commands << "#{ip4tables_bin} -A OUTPUT -o #{interface} -p icmp --icmp-type timestamp-reply -j DROP"
       end
   
-      commands * "\n"
+      commands * "\n    "
     end
     
     def init_script      
       render("/cloud_model/host/etc/init.d/cloudmodel", firewall_worker: self)
+    end
+    
+    def write_init_script options = {root: ''}
+      root = options[:root] || ''
+      mkdir_p "#{root}/etc/init.d/"
+      @host.ssh_connection.sftp.file.open("#{root}/etc/init.d/cloudmodel", 'w', 0700) do |f|
+        f.puts init_script
+      end
     end
   end
 end

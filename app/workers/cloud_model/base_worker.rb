@@ -7,5 +7,9 @@ module CloudModel
       av.view_paths = ActionController::Base.view_paths
       av.render(template: template, locals: locals)
     end
+    
+    def mkdir_p path
+      @host.exec! "mkdir -p #{path.shellescape}", "Failed to make directory #{path}"
+    end
   end
 end
