@@ -55,7 +55,7 @@ namespace :cloudmodel do
       end
       
       guests_by_hosts.each do |host_id, guest_ids|
-        # ToDo: Multithread redeploy (thread per host)
+        # TODO: Multithread redeploy (thread per host)
         @guest_worker = CloudGuestWorker.new SpCloud::Guest.find(guest_id)
         @guest_worker.redeploy
       end

@@ -12,7 +12,6 @@ describe CloudModel::WebImage do
   it { expect(subject).to have_field(:git_commit).of_type String }
   it { expect(subject).to have_field(:has_assets).of_type(Mongoid::Boolean).with_default_value_of false }
   it { expect(subject).to have_field(:has_mongodb).of_type(Mongoid::Boolean).with_default_value_of false }
-  it { expect(subject).to have_field(:has_resta).of_type(Mongoid::Boolean).with_default_value_of false }
   it { expect(subject).to have_field(:has_redis).of_type(Mongoid::Boolean).with_default_value_of false }
 
   it { expect(subject).to belong_to(:file).of_type Mongoid::GridFS::Fs::File }

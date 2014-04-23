@@ -150,7 +150,6 @@ de:
         has_assets: Assets erzeugen?
         file_size: Packetgröße
         has_mongodb: MongoDB verwenden?
-        has_resta: RESTA verwenden?
         has_redis: Redis verwenden?
       cloud_model/war_image:
         name: Name

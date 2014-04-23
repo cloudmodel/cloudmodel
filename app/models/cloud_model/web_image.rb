@@ -22,7 +22,6 @@ module CloudModel
     field :git_commit, type: String
     field :has_assets, type: Mongoid::Boolean, default: false
     field :has_mongodb, type: Mongoid::Boolean, default: false    
-    field :has_resta, type: Mongoid::Boolean, default: false    
     field :has_redis, type: Mongoid::Boolean, default: false    
 
     belongs_to :file, class_name: "Mongoid::GridFS::Fs::File"

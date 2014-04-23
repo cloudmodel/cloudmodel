@@ -1,0 +1,6 @@
+<%= model.passenger_env %>:
+  sessions:
+    default:
+      hosts: 
+        - <%= model.deploy_mongodb_host %>:<%= model.deploy_mongodb_port %>
+      database: <%= model.deploy_mongodb_database %>

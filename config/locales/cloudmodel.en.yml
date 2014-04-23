@@ -150,7 +150,6 @@ en:
         has_assets: Compile Assets?
         file_size: Package Size
         has_mongodb: Uses MongoDB?
-        has_resta: Uses RESTA?
         has_redis: Uses Redis?
       cloud_model/war_image:
         name: Name

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Context docBase="<%= worker.interpolate_value manifest[:war_file] %>" debug="0" crossContext="true">
+  <% manifest[:env].each do |key,values| -%>
+  <Environment name="<%= key %>" <%= (values.map{|k,v| "#{k}=\"#{worker.interpolate_value v}\""} * ' ').html_safe %>/>
+  <% end -%>
+</Context>
