@@ -131,7 +131,7 @@ module CloudModel
         # Generate xml file in /etc/libvirt/lxc/
         #
         
-        @host.ssh_connection.sftp.file.open("#{root}/etc/libvirt/lxc/#{guest.name}.xml", 'w', permissions: 0600) do |f|
+        @host.ssh_connection.sftp.file.open("#{root}/etc/libvirt/lxc/#{guest.name}.xml", 'w', 0600) do |f|
           f.puts render("/cloud_model/host/etc/libvirt/lxc/guest.xml", guest: guest)
         end
 
@@ -139,7 +139,7 @@ module CloudModel
         # Link maschine to /etc/libvirt/lxc/autostart/
         #
         
-        @host.ssh_connection.symlink "/etc/libvirt/lxc/#{guest.name}.xml", "#{root}/etc/libvirt/lxc/autostart/#{guest.name}.xml"
+        @host.ssh_connection.sftp.symlink! "/etc/libvirt/lxc/#{guest.name}.xml", "#{root}/etc/libvirt/lxc/autostart/#{guest.name}.xml"
         
         #
         # Make dir for vm root
@@ -421,6 +421,7 @@ module CloudModel
         boot_deploy_root
       rescue Exception => e
         @host.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
+        raise e
         return false
       end    
     end
