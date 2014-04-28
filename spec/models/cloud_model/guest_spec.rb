@@ -211,21 +211,21 @@ describe CloudModel::Guest do
     it 'should build valid virsh command for our guest and send it via SSH to host' do
       subject.name = 'my_guest'
       subject.host = CloudModel::Host.new
-      subject.should_receive(:exec).with('/usr/bin/virsh dominfo my_guest').and_return [true, '--- dom info ---']
+      subject.should_receive(:exec).with('LANG=en.UTF-8 /usr/bin/virsh dominfo my_guest').and_return [true, '--- dom info ---']
       expect(subject.virsh('dominfo')).to eq '--- dom info ---'
     end
 
     it 'should should accept an option' do
       subject.name = 'my_guest'
       subject.host = CloudModel::Host.new
-      subject.should_receive(:exec).with('/usr/bin/virsh autostart --disable my_guest').and_return [true, '--- success ---']
+      subject.should_receive(:exec).with('LANG=en.UTF-8 /usr/bin/virsh autostart --disable my_guest').and_return [true, '--- success ---']
       expect(subject.virsh('autostart', 'disable')).to eq '--- success ---'
     end
 
     it 'should should accept multiple options' do
       subject.name = 'my_guest'
       subject.host = CloudModel::Host.new
-      subject.should_receive(:exec).with('/usr/bin/virsh autostart --disable --debug my_guest').and_return [true, '--- success ---']
+      subject.should_receive(:exec).with('LANG=en.UTF-8 /usr/bin/virsh autostart --disable --debug my_guest').and_return [true, '--- success ---']
       expect(subject.virsh('autostart', ['disable', 'debug'])).to eq '--- success ---'     
     end
 
@@ -234,7 +234,7 @@ describe CloudModel::Guest do
       subject.host = CloudModel::Host.new
       
       subject.name.should_receive(:shellescape).and_return 'my_guest\\;rm\\ -rf\\ /'
-      subject.should_receive(:exec).with('/usr/bin/virsh autostart my_guest\\;rm\\ -rf\\ /').and_return [true, '--- success ---']
+      subject.should_receive(:exec).with('LANG=en.UTF-8 /usr/bin/virsh autostart my_guest\\;rm\\ -rf\\ /').and_return [true, '--- success ---']
       
       expect(subject.virsh('autostart')).to eq '--- success ---'     
     end
@@ -245,7 +245,7 @@ describe CloudModel::Guest do
       
       command = 'autostart;rm -rf /'
       command.should_receive(:shellescape).and_return 'autostart\\;rm\\ -rf\\ /'
-      subject.should_receive(:exec).with('/usr/bin/virsh autostart\\;rm\\ -rf\\ / my_guest').and_return [true, '--- success ---']
+      subject.should_receive(:exec).with('LANG=en.UTF-8 /usr/bin/virsh autostart\\;rm\\ -rf\\ / my_guest').and_return [true, '--- success ---']
       
       expect(subject.virsh(command)).to eq '--- success ---'           
     end
@@ -256,7 +256,7 @@ describe CloudModel::Guest do
       
       option = 'disable;rm -rf /;'
       option.should_receive(:shellescape).and_return 'disable\\;rm\\ -rf\\ /\\;'
-      subject.should_receive(:exec).with('/usr/bin/virsh autostart --disable\\;rm\\ -rf\\ /\\; my_guest').and_return [true, '--- success ---']
+      subject.should_receive(:exec).with('LANG=en.UTF-8 /usr/bin/virsh autostart --disable\\;rm\\ -rf\\ /\\; my_guest').and_return [true, '--- success ---']
       
       expect(subject.virsh('autostart', option)).to eq '--- success ---'     
     end

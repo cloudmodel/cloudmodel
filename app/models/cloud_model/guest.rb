@@ -121,7 +121,7 @@ module CloudModel
       options.each do |option|
         option_string = "#{option_string}--#{option.shellescape} "
       end
-      success, data = exec("/usr/bin/virsh #{cmd.shellescape} #{option_string}#{name.shellescape}")
+      success, data = exec("LANG=en.UTF-8 /usr/bin/virsh #{cmd.shellescape} #{option_string}#{name.shellescape}")
       if success 
         return data
       else
