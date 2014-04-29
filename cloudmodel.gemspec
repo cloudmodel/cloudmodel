@@ -7,7 +7,7 @@ require "cloud_model/version"
 Gem::Specification.new do |s|
   s.name        = "cloudmodel"
   s.version     = CloudModel::VERSION
-  s.authors     = ["Sven Brönstrup"]
+  s.authors     = ["Sven G. Broenstrup (StarPeak)"]
   s.email       = ["info@cloud-model.org"]
   s.homepage    = "http://cloud-model.org/"
   s.summary     = "Ruby on Rails ActiveModel representation of common cloud admin tasks."
