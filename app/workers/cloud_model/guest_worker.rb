@@ -243,6 +243,7 @@ module CloudModel
       @host.ssh_connection.sftp.file.open("/inst/tmp/#{@guest.name}.xml", 'w', 0600) do |f|
         f.puts render("/cloud_model/host/etc/libvirt/lxc/guest.xml", guest: @guest)
       end
+      puts "    Define VM with virsh"
       @host.exec "virsh define /inst/tmp/#{@guest.name.shellescape}.xml"
     end
   end

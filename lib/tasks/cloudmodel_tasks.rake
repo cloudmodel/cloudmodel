@@ -1,7 +1,7 @@
 namespace :cloudmodel do
   namespace :host do
     task :load_host do
-      @host_worker = CloudModel::HostWorker.new CloudModel::Guest.find(ENV['HOST_ID'])
+      @host_worker = CloudModel::HostWorker.new CloudModel::Host.find(ENV['HOST_ID'])
     end
     
     desc "Deploy host"
