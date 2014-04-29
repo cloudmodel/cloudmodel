@@ -218,7 +218,7 @@ module CloudModel
 
       @guest.services.each do |service|
         begin
-          service_worker = "ServiceWorkers::#{service.class.model_name.element.camelcase}".constantize.new @guest, service
+          service_worker = "CloudModel::Services::#{service.class.model_name.element.camelcase}Worker".constantize.new @guest, service
   
           service_worker.write_config
           service_worker.auto_start
