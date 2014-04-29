@@ -1,7 +1,7 @@
 namespace :cloudmodel do
   namespace :host do
     task :load_host do
-      @host_worker = CloudModel::HostWorker.new SpCloud::Guest.find(ENV['HOST_ID'])
+      @host_worker = CloudModel::HostWorker.new CloudModel::Guest.find(ENV['HOST_ID'])
     end
     
     desc "Deploy host"
@@ -27,7 +27,7 @@ namespace :cloudmodel do
   
   namespace :guest do
     task :load_guest do
-      @guest_worker = CloudModel::GuestWorker.new SpCloud::Guest.find(ENV['GUEST_ID'])
+      @guest_worker = CloudModel::GuestWorker.new CloudModel::Guest.find(ENV['GUEST_ID'])
     end
     
     desc "Deploy guest with id given as guest_id"
@@ -56,7 +56,7 @@ namespace :cloudmodel do
       
       guests_by_hosts.each do |host_id, guest_ids|
         # TODO: Multithread redeploy (thread per host)
-        @guest_worker = CloudGuestWorker.new SpCloud::Guest.find(guest_id)
+        @guest_worker = CloudGuestWorker.new CloudModel::Guest.find(guest_id)
         @guest_worker.redeploy
       end
     end
