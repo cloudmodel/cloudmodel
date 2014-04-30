@@ -220,7 +220,7 @@ module CloudModel
     end
     
     def list_real_volume_groups
-      #begin
+      begin
         success, result = exec "vgs --separator ';' --units b --all --nosuffix -o vg_all"
         volume_groups = {}
     
@@ -239,8 +239,10 @@ module CloudModel
         end
 
         return volume_groups
-        #rescue
-        #end
+      rescue Exception => e
+        CloudModel.log_exception e
+        return false
+      end
     end
     
     def deployable?
@@ -256,8 +258,9 @@ module CloudModel
       
       begin
         CloudModel::call_rake 'cloudmodel:host:deploy', host_id: id
-      rescue
+      rescue Exception => e
         update_attributes deploy_state: :failed, deploy_last_issue: 'Unable to enqueue job! Try again later.'
+        CloudModel.log_exception e
       end
     end
     
@@ -270,8 +273,9 @@ module CloudModel
       
       begin
         CloudModel::call_rake 'cloudmodel:host:redeploy', host_id: id
-      rescue
+      rescue Exception => e
         update_attributes deploy_state: :failed, deploy_last_issue: 'Unable to enqueue job! Try again later.'
+        CloudModel.log_exception e
       end
     end
   end

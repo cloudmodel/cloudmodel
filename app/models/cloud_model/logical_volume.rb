@@ -74,7 +74,9 @@ module CloudModel
           Rails.logger.debug "Make FS"
           exec "mkfs.#{disk_format.shellescape} #{device.shellescape}"     
         end
-      rescue
+      rescue Exception => e
+        CloudModel.log_exception e
+        return false
       end
     end
     
@@ -85,7 +87,9 @@ module CloudModel
         if data
           exec "lvremove -f #{device.shellescape}"
         end
-      rescue
+      rescue Exception => e
+        CloudModel.log_exception e
+        return false
       end
     end
     

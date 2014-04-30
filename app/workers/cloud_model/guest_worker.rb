@@ -36,8 +36,7 @@ module CloudModel
         return true
       rescue Exception => e
         @guest.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
-        Rails.logger.error "uncaught #{e.class} exception while handling connection: #{e.message}"
-        Rails.logger.error "Stack trace:\n#{e.backtrace.map {|l| "  #{l}\n"}.join}"
+        CloudModel.log_exception e
         return false
       end
     end
@@ -95,8 +94,7 @@ module CloudModel
         return true
       rescue Exception => e
         @guest.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
-        Rails.logger.error "uncaught #{e.class} exception while handling connection: #{e.message}"
-        Rails.logger.error "Stack trace:\n#{e.backtrace.map {|l| "  #{l}\n"}.join}"
+        CloudModel.log_exception e
         return false
       end
     end
@@ -172,7 +170,8 @@ module CloudModel
           f.puts "config_eth0=\"#{@guest.private_address}/#{@host.private_network.subnet}\"\n\n"
           f.puts "routes_eth0=\"default gw #{@host.private_network.gateway}\""
         end
-      rescue
+      rescue Exception => e
+        CloudModel.log_exception e
         raise "Failed to configure network!"
       end
 
@@ -181,7 +180,8 @@ module CloudModel
         @host.ssh_connection.sftp.file.open("#{@guest.deploy_path}/etc/conf.d/hostname", 'w') do |f|
           f.puts "hostname=\"#{@guest.name}\""
         end
-      rescue
+      rescue Exception => e
+        CloudModel.log_exception e
         raise "Failed to configure hostname!"
       end
 
@@ -194,7 +194,8 @@ module CloudModel
             f.puts "#{"%-15s" % guest.private_address} #{guest.name} #{guest.external_hostname}" 
           end
         end
-      rescue
+      rescue Exception => e
+        CloudModel.log_exception e
         raise "Failed to configure hosts file!"
       end
     
@@ -222,7 +223,8 @@ module CloudModel
   
           service_worker.write_config
           service_worker.auto_start
-          rescue
+          rescue Exception => e
+            CloudModel.log_exception e
             raise "Failed to configure service #{service.name}"
           end
       end

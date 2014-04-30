@@ -15,6 +15,7 @@ module CloudModel
         begin
           run_with_clean_env "Cloning", "git clone #{@web_image.git_server}:#{@web_image.git_repo} #{@web_image.build_path}/current"
         rescue Exception => e
+          CloudModel.log_exception e
           errors.add :git_repo, :repo_not_found
           system "rm -rf #{@web_image.build_path}/current"
           return false
@@ -28,13 +29,15 @@ module CloudModel
       begin 
         run_with_clean_env "Pulling", git_script
       rescue ExecutionException => e
+        CloudModel.log_exception e
         errors.add :git_branch, :branch_not_pulled
         return false
       end
       
       begin
         self.git_commit = run_with_clean_env "Get Version", "cd #{@web_image.build_path}/current && git log | head -1 | sed s/'commit '//"
-      rescue
+      rescue Exception => e
+        CloudModel.log_exception e
         self.git_commit = "failed to get commit hash"
       end
       
@@ -45,6 +48,7 @@ module CloudModel
       begin
         run_with_clean_env "Bundling", "cd #{@web_image.build_path}/current && bundle install --gemfile #{@web_image.build_path}/current/Gemfile --path ../shared/bundle --deployment --without development test"
       rescue ExecutionException => e
+        CloudModel.log_exception e
         errors.add :base, :bundle_failed
         system "rm -rf #{@web_image.build_gem_home}"
         
@@ -60,6 +64,7 @@ module CloudModel
       
         run_within_build_env "Building Assets", "cd #{@web_image.build_path}/current && bundle exec rake RAILS_ENV=production RAILS_GROUPS=assets assets:precompile"
       rescue ExecutionException => e
+        CloudModel.log_exception e
         errors.add :has_assets, :building_assets_failed
         system "rm -rf #{@web_image.build_path}/current/public/assets"
         return false
@@ -72,6 +77,7 @@ module CloudModel
       begin
         run_within_build_env "Packaging", "tar -cpjf #{@web_image.build_path}-building.tar.bz2 --directory #{@web_image.build_path} --exclude={'.git','./current/.gitignore','./current/tmp/**/*','./current/log/**/*','./spec','./features','.rspec','.gitkeep','./shared/bundle/#{Bundler.ruby_scope}/cache','./shared/bundle/#{Bundler.ruby_scope}/doc'} ."
       rescue ExecutionException => e
+        CloudModel.log_exception e
         errors.add :base, :packaging_failed
         return false
       end

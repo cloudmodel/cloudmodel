@@ -14,4 +14,8 @@ module CloudModel
     config.configure(&block)
   end
 
+  def self.log_exception e
+    Rails.logger.error "CloudModel: uncaught #{e.class} exception while handling connection: #{e.message}"
+    Rails.logger.error "Stack trace:\n#{e.backtrace.map {|l| "  #{l}\n"}.join}"
+  end
 end

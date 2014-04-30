@@ -403,7 +403,7 @@ module CloudModel
         boot_deploy_root
       rescue Exception => e
         @host.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
-        raise e
+        CloudModel.log_exception e
         return false
       end
     end
@@ -421,7 +421,7 @@ module CloudModel
         boot_deploy_root
       rescue Exception => e
         @host.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
-        raise e
+        CloudModel.log_exception e
         return false
       end    
     end

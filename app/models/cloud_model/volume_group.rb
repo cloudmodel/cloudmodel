@@ -60,7 +60,9 @@ module CloudModel
         end
       
         return volume_groups
-      rescue
+      rescue Exception => e
+        CloudModel.log_exception e
+        return false
       end
     end
     

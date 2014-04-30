@@ -29,7 +29,8 @@ module CloudModel
         define_method "#{field}=" do |size|
           begin
             self[field] = accept_size_string_parser size         
-          rescue
+          rescue Exception => e
+            CloudModel.log_exception e
             errors.add field, :format
           end
         end
