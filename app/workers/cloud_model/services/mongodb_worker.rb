@@ -10,6 +10,10 @@ module CloudModel
         end
       
         @host.exec "chown -R 101:root #{@guest.deploy_path.shellescape}#{target.shellescape}"
+        log_dir_path = "#{@guest.deploy_path}/var/log/mongodb/"
+        mkdir_p log_dir_path
+        @host.exec "chmod -R 2770 #{log_dir_path}"
+        @host.exec "chown -R 101:root #{log_dir_path}"
       end
     end
   end
