@@ -28,7 +28,8 @@ module CloudModel
         ssh_target = File.expand_path("var/www/.ssh", @guest.deploy_path)
         @host.exec "rm -rf #{ssh_target.shellescape}"
         #@host.exec! "cp -ra /inst/ssh/client_keys #{ssh_target}", "Failed to copy www client keys"
-        @host.ssh_connection.sftp.file.open(ssh_target, 'w') do |f|
+        mkdir_p ssh_target
+        @host.ssh_connection.sftp.file.open("#{ssh_target}/authorized_keys", 'w') do |f|
           f.write CloudModel::SshPubKey.all.to_a * "\n"
         end
   
