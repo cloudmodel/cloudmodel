@@ -8,16 +8,16 @@ module CloudModel
         @host.ssh_connection.sftp.file.open("/tmp/temp.tar", 'wb') do |f| 
           f.write @model.deploy_war_image.file.data
         end
-        
+      
         @host.exec "mkdir -p #{@guest.deploy_path}#{target}/data && cd #{@guest.deploy_path}#{target} && tar xjpf /tmp/temp.tar"
-      
+    
         # Read manifest
-      
+    
         @host.ssh_connection.sftp.file.open( "#{@guest.deploy_path}#{target}/manifest.yml") do |f|
           manifest = YAML.load(f.read)
         end
+        
         Rails.logger.debug "    Write tomcat config"
-      
         @host.ssh_connection.sftp.file.open(File.expand_path("etc/tomcat-7/server.xml", @guest.deploy_path), 'w') do |f|
           f.write render("/cloud_model/guest/etc/tomcat-7/server.xml", guest: @guest, model: @model)
         end

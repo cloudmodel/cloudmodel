@@ -224,6 +224,7 @@ module CloudModel
           service_worker.auto_start
         rescue Exception => e
           CloudModel.log_exception e
+          pp service
           raise "Failed to configure service #{service.name}"
         end
       end

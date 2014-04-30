@@ -12,26 +12,32 @@ module CloudModel
         ssh_host_key_source = "/inst/hosts_by_ip/#{@guest.private_address}/etc/ssh"
       
       
-        FileUtils.mkdir_p ssh_host_key_source
+        mkdir_p ssh_host_key_source
         %w(dsa ecdsa rsa).each do |type|
           key_file = "#{ssh_host_key_source}/ssh_host_#{type}_key"
-          unless File.exists?(key_file)
-            `ssh-keygen -t #{type} -f "#{key_file}" -N ''`
+          begin
+            @host.ssh_connection.sftp.lstat! key_file
+          rescue Net::SFTP::StatusException => e
+            @host.exec! "ssh-keygen -t #{type} -f #{key_file.shellescape} -N ''", 'Failed to generate host keys'
           end
         end
       
-        FileUtils.cp_r "#{ssh_host_key_source}", ssh_host_key_target
+        @host.exec! "cp -ra #{ssh_host_key_source.shellescape} #{ssh_host_key_target.shellescape}", "Failed to copy host keys"        
       
         # Copy over client ssh files
         ssh_target = File.expand_path("var/www/.ssh", @guest.deploy_path)
-        FileUtils.rm_r ssh_target
-        FileUtils.cp_r '/inst/ssh/client_keys', ssh_target
-        FileUtils.chown_R 'www', 'www', ssh_target
+        @host.exec "rm -rf #{ssh_target.shellescape}"
+        #@host.exec! "cp -ra /inst/ssh/client_keys #{ssh_target}", "Failed to copy www client keys"
+        @host.ssh_connection.sftp.file.open(ssh_target, 'w') do |f|
+          f.write CloudModel::SshPubKey.all.to_a * "\n"
+        end
+  
+        @host.exec! "chown -R www:www #{ssh_target.shellescape}", "Failed to change owner of www client keys to user www"
       end
     
       def auto_start
         Rails.logger.debug "    Add SSH to runlevel default"
-        `ln -sf /etc/init.d/sshd #{@guest.deploy_path}/etc/runlevels/default/`
+        @host.exec "ln -sf /etc/init.d/sshd #{@guest.deploy_path}/etc/runlevels/default/"
       end
     end
   end
