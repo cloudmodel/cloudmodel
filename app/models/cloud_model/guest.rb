@@ -243,6 +243,15 @@ module CloudModel
       end
     end
     
+    def stop! options = {}
+      stop
+      timeout = options[:timeout] || 600
+      while state != -1 and timeout > 0 do
+        sleep 0.1
+        timeout -= 1
+      end
+    end
+    
     def undefine
       begin
         # Return true if the domain is not defined before
@@ -251,7 +260,7 @@ module CloudModel
         end
         
         # If not started shutdown will fail, but if it fails the undefine will fail anyway
-        virsh('shutdown') 
+        stop!
         return virsh('undefine')
       rescue
         return false
