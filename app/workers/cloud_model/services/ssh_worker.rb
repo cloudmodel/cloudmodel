@@ -1,6 +1,6 @@
 module CloudModel
   module Services
-    class SshWorker < BaseWorker
+    class SshWorker < CloudModel::Services::BaseWorker
       def write_config
         Rails.logger.debug "    Write SSH config"
         @host.ssh_connection.sftp.file.open(File.expand_path("etc/ssh/sshd_config", @guest.deploy_path), 'w') do |f|

@@ -1,6 +1,6 @@
 module CloudModel
   module Services
-    class RedisWorker < BaseWorker
+    class RedisWorker < CloudModel::Services::BaseWorker
       def write_config
         Rails.logger.debug "    Write nginx config"
         @host.ssh_connection.sftp.file.open(File.expand_path("etc/redis.conf", @guest.deploy_path), 'w') do |f|

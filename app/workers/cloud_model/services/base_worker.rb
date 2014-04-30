@@ -7,6 +7,14 @@ module CloudModel
         @host = @guest.host
         @model = model
       end
+      
+      def guest
+        @guest
+      end
+      
+      def host
+        @host
+      end
   
       def write_config
       end

@@ -1,6 +1,6 @@
 module CloudModel
   module Services
-    class NginxWorker < BaseWorker
+    class NginxWorker < CloudModel::Services::BaseWorker
       def write_config
         Rails.logger.debug "    Write nginx config"
         @host.ssh_connection.sftp.file.open(File.expand_path("etc/nginx/nginx.conf", @guest.deploy_path), 'w') do |f|

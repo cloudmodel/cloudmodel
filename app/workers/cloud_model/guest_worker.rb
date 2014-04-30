@@ -215,18 +215,17 @@ module CloudModel
 
     def config_services
       puts "    Handle and config Services"
-      guest_blackice_services = {}
-
       @guest.services.each do |service|
         begin
-          service_worker = "CloudModel::Services::#{service.class.model_name.element.camelcase}Worker".constantize.new @guest, service
+          service_worker_class = "CloudModel::Services::#{service.class.model_name.element.camelcase}Worker".constantize
+          service_worker = service_worker_class.new @guest, service
   
           service_worker.write_config
           service_worker.auto_start
-          rescue Exception => e
-            CloudModel.log_exception e
-            raise "Failed to configure service #{service.name}"
-          end
+        rescue Exception => e
+          CloudModel.log_exception e
+          raise "Failed to configure service #{service.name}"
+        end
       end
     end
 

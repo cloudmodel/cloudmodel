@@ -1,6 +1,6 @@
 module CloudModel
   module Services
-    class TomcatWorker < BaseWorker
+    class TomcatWorker < CloudModel::Services::BaseWorker
       def write_config
         target = "/var/tomcat"
       

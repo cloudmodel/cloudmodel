@@ -1,6 +1,6 @@
 module CloudModel
   module Services
-    class MongodbWorker < BaseWorker
+    class MongodbWorker < CloudModel::Services::BaseWorker
       def write_config
         target = '/var/lib/mongodb'
       
