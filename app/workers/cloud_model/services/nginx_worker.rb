@@ -32,9 +32,9 @@ module CloudModel
           mkdir_p "#{@guest.deploy_path}#{@model.www_root}/current"
         
           Rails.logger.debug "    Deploy WebImage #{@model.deploy_web_image.name} to #{@guest.deploy_path}#{@model.www_root}"
-          @host.ssh_connection.sftp.file.open("/tmp/temp.tar", 'wb') do |f|
-            f.write @model.deploy_web_image.file_model.data
-          end
+          io = StringIO.new(@model.deploy_web_image.file_model.data)
+          @host.ssh_connection.sftp.upload!(io, "/tmp/temp.tar")
+          
           @host.exec "cd #{@guest.deploy_path}#{@model.www_root} && tar xpf /tmp/temp.tar"
         
           if @model.deploy_web_image.has_mongodb?

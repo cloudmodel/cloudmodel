@@ -8,7 +8,7 @@ module CloudModel
               
         Rails.logger.debug "    Deploy WAR Image #{@model.deploy_war_image.name} to #{@guest.deploy_path}#{target}"
         io = StringIO.new( @model.deploy_war_image.file.data)
-        #@host.ssh_connection.sftp.upload!(io, "/tmp/temp.tar")
+        @host.ssh_connection.sftp.upload!(io, "/tmp/temp.tar")
               
         @host.exec "mkdir -p #{target.shellescape}/data && cd #{target.shellescape} && tar xjpf /tmp/temp.tar"
             
