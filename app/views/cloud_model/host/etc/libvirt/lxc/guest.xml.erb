@@ -1,6 +1,8 @@
 <domain type='lxc'>
   <name><%= guest.name %></name>
+<% unless defined? skip_uuid -%>
   <uuid><%= guest.uuid %></uuid>
+<% end -%>
   <memory unit="KiB"><%= (guest.memory_size / 1024).to_i %></memory>
   <currentMemory unit="KiB"><%= (guest.memory_size / 1024).to_i %></currentMemory>
   <vcpu placement='static'><%= guest.cpu_count %></vcpu>

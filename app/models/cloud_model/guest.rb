@@ -229,9 +229,7 @@ module CloudModel
     
     def start
       begin
-        virsh 'autostart'
-        virsh 'start'
-        return true
+        return virsh('autostart') && virsh('start')
       rescue
         return false
       end
@@ -239,9 +237,7 @@ module CloudModel
     
     def stop
       begin
-        virsh 'shutdown'
-        virsh 'autostart', 'disable'
-        return true
+        return virsh('shutdown') && virsh('autostart', 'disable')
       rescue
         return false
       end
@@ -249,9 +245,14 @@ module CloudModel
     
     def undefine
       begin
-        virsh 'shutdown'
-        virsh 'undefine'
-        return true
+        # Return true if the domain is not defined before
+        if STATES[state] == :undefined
+          return true
+        end
+        
+        # If not started shutdown will fail, but if it fails the undefine will fail anyway
+        virsh('shutdown') 
+        return virsh('undefine')
       rescue
         return false
       end

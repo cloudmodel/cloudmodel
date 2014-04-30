@@ -30,7 +30,7 @@ module CloudModel
         config_firewall
 
         define_guest
-        @guest.start
+        @guest.start || raise("Failed to start VM")
         @guest.update_attribute :deploy_state, :finished
         
         return true
@@ -74,14 +74,14 @@ module CloudModel
     
         write_fstab
 
-        @guest.undefine
+        @guest.undefine || raise("Failed to undefine guest")
     
         umount_all
         mount_root_fs
         mount_all
 
         define_guest
-        @guest.start
+        @guest.start || raise("Failed to start guest")
     
         puts "    Destroy old root LV #{old_volume.name}"
         @host.exec "lvremove -f #{old_volume.device}"
@@ -218,6 +218,7 @@ module CloudModel
       puts "    Handle and config Services"
       @guest.services.each do |service|
         begin
+          puts "      #{service.class.model_name.element.camelcase} '#{service.name}'"
           service_worker_class = "CloudModel::Services::#{service.class.model_name.element.camelcase}Worker".constantize
           service_worker = service_worker_class.new @guest, service
   
@@ -225,7 +226,7 @@ module CloudModel
           service_worker.auto_start
         rescue Exception => e
           CloudModel.log_exception e
-          raise "Failed to configure service #{service.name}"
+          raise "Failed to configure service #{service.class.model_name.element.camelcase} '#{service.name}'"
         end
       end
     end
@@ -243,10 +244,10 @@ module CloudModel
 
       mkdir_p '/inst/tmp'
       @host.ssh_connection.sftp.file.open("/inst/tmp/#{@guest.name}.xml", 'w', 0600) do |f|
-        f.puts render("/cloud_model/host/etc/libvirt/lxc/guest.xml", guest: @guest)
+        f.puts render("/cloud_model/host/etc/libvirt/lxc/guest.xml", guest: @guest, skip_uuid: true)
       end
       puts "    Define VM with virsh"
-      @host.exec "virsh define /inst/tmp/#{@guest.name.shellescape}.xml"
+      @host.exec! "virsh define /inst/tmp/#{@guest.name.shellescape}.xml", "Failed to define guest '#{@guest.name.shellescape}'"
     end
   end
 end
