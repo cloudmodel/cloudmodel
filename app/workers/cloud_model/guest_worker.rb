@@ -151,6 +151,7 @@ module CloudModel
 
     def mount_root_fs 
       puts "    Mount System FS"
+      @host.exec "umount #{@guest.deploy_path}"
       @host.exec! "mkdir -p #{@guest.deploy_path} && mount -t #{@guest.deploy_volume.disk_format} -o noatime #{@guest.deploy_volume.device} #{@guest.deploy_path}", "Failed to mount root volume!"
     end
 
@@ -224,7 +225,6 @@ module CloudModel
           service_worker.auto_start
         rescue Exception => e
           CloudModel.log_exception e
-          pp service
           raise "Failed to configure service #{service.name}"
         end
       end
