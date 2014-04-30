@@ -1,17 +1,20 @@
+require 'stringio'
+require 'securerandom'
+
 module CloudModel
   module Services
     class NginxWorker < CloudModel::Services::BaseWorker
       def write_config
-        Rails.logger.debug "    Write nginx config"
+        puts "        Write nginx config"
         @host.ssh_connection.sftp.file.open(File.expand_path("etc/nginx/nginx.conf", @guest.deploy_path), 'w') do |f|
           f.write render("/cloud_model/guest/etc/nginx/nginx.conf", guest: @guest, model: @model)
         end
       
-        Rails.logger.debug "    Make nginx root"
+        puts "        Make nginx root"
         mkdir_p "#{@guest.deploy_path}#{@model.www_root}"
       
         if @model.ssl_supported?
-          Rails.logger.debug "    Copy SSL files"
+          puts "    Copy SSL files"
           ssl_base_dir = File.expand_path("etc/nginx/ssl", @guest.deploy_path)
           mkdir_p ssl_base_dir
         
@@ -31,12 +34,13 @@ module CloudModel
         if @model.deploy_web_image
           mkdir_p "#{@guest.deploy_path}#{@model.www_root}/current"
         
-          Rails.logger.debug "    Deploy WebImage #{@model.deploy_web_image.name} to #{@guest.deploy_path}#{@model.www_root}"
+          puts "    Deploy WebImage #{@model.deploy_web_image.name} to #{@guest.deploy_path}#{@model.www_root}"
+          temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
           io = StringIO.new(@model.deploy_web_image.file_model.data)
-          @host.ssh_connection.sftp.upload!(io, "/tmp/temp.tar")
+          @host.ssh_connection.sftp.upload!(io, temp_file_name)
+          @host.exec "cd #{@guest.deploy_path}#{@model.www_root} && tar xpf #{temp_file_name}"
+          @host.ssh_connection.sftp.remove!(temp_file_name)
           
-          @host.exec "cd #{@guest.deploy_path}#{@model.www_root} && tar xpf /tmp/temp.tar"
-        
           if @model.deploy_web_image.has_mongodb?
             @host.ssh_connection.sftp.file.open("#{@guest.deploy_path}#{@model.www_root}/current/config/mongoid.yml", 'w') do |f|
               f.write render("/cloud_model/web_image/mongoid.yml", guest: @guest, model: @model)
@@ -55,7 +59,7 @@ module CloudModel
       end
     
       def auto_start
-        Rails.logger.debug "    Add Nginx to runlevel default"
+        puts "        Add Nginx to runlevel default"
         @host.exec "ln -sf /etc/init.d/sp-nginx #{@guest.deploy_path}/etc/runlevels/default/"
         # TODO: Resolve dependencies
         # Services::Ssh.new(@host, @options).write_config

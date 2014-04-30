@@ -20,7 +20,7 @@ module CloudModel
       end
   
       def auto_start
-        Rails.logger.debug "    Add #{@model.class.model_name.human} to runlevel default"
+        puts "        Add #{@model.class.model_name.human} to runlevel default"
         @host.exec "ln -sf /etc/init.d/#{@model.class.model_name.element.shellescape} #{@guest.deploy_path.shellescape}/etc/runlevels/default/"
       end
       

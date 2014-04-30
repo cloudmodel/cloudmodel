@@ -60,8 +60,6 @@ module CloudModel
     
         umount_all
     
-        puts @guest.root_volume.device
-    
         old_volume = @guest.root_volume
         @guest.root_volume = @guest.deploy_volume
     

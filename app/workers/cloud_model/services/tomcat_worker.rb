@@ -1,16 +1,19 @@
 require 'stringio'
+require 'securerandom'
 
 module CloudModel
   module Services
     class TomcatWorker < CloudModel::Services::BaseWorker
       def write_config
-        target = File.expand_path("/var/tomcat", @guest.deploy_path) 
+        target = "#{@guest.deploy_path}/var/tomcat" 
               
-        Rails.logger.debug "    Deploy WAR Image #{@model.deploy_war_image.name} to #{@guest.deploy_path}#{target}"
-        io = StringIO.new( @model.deploy_war_image.file.data)
-        @host.ssh_connection.sftp.upload!(io, "/tmp/temp.tar")
-              
-        @host.exec "mkdir -p #{target.shellescape}/data && cd #{target.shellescape} && tar xjpf /tmp/temp.tar"
+        puts "        Deploy WAR Image #{@model.deploy_war_image.name} to #{@guest.deploy_path}#{target}"
+        temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
+        io = StringIO.new(@model.deploy_war_image.file.data)
+        @host.ssh_connection.sftp.upload!(io, temp_file_name)     
+        mkdir_p target
+        @host.exec "cd #{target.shellescape} && tar xjpf #{temp_file_name}"
+        @host.ssh_connection.sftp.remove!(temp_file_name)
             
         # Read manifest
         manifest = ''
@@ -18,7 +21,7 @@ module CloudModel
           manifest = YAML.load(f.read)
         end
         
-        Rails.logger.debug "    Write tomcat config"
+        puts "        Write tomcat config"
         @host.ssh_connection.sftp.file.open(File.expand_path("etc/tomcat-7/server.xml", @guest.deploy_path), 'w') do |f|
           f.write render("/cloud_model/guest/etc/tomcat-7/server.xml", guest: @guest, model: @model)
         end
@@ -31,7 +34,7 @@ module CloudModel
           f.write render("/cloud_model/guest/etc/tomcat-7/servlet.xml", manifest: manifest, worker: self, guest: @guest, model: @model)
         end
               
-        @host.exec "chown -R 265:265 #{target}"
+        @host.exec "chown -R 265:265 #{target.shellescape}"
       end
     
       def interpolate_value(value)
@@ -39,8 +42,8 @@ module CloudModel
       end
     
       def auto_start
-        Rails.logger.debug "    Add Tomcat to runlevel default"
-        @host.exec "ln -sf /etc/init.d/tomcat-7 #{@guest.deploy_path}/etc/runlevels/default/"
+        puts "        Add Tomcat to runlevel default"
+        @host.exec "ln -sf /etc/init.d/tomcat-7 #{@guest.deploy_path.shellescape}/etc/runlevels/default/"
       end
     end
   end

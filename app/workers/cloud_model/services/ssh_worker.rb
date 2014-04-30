@@ -2,7 +2,7 @@ module CloudModel
   module Services
     class SshWorker < CloudModel::Services::BaseWorker
       def write_config
-        Rails.logger.debug "    Write SSH config"
+        puts "        Write SSH config"
         @host.ssh_connection.sftp.file.open(File.expand_path("etc/ssh/sshd_config", @guest.deploy_path), 'w') do |f|
           f.write render("/cloud_model/guest/etc/ssh/sshd_config", guest: @guest, model: @model)
         end
@@ -36,7 +36,7 @@ module CloudModel
       end
     
       def auto_start
-        Rails.logger.debug "    Add SSH to runlevel default"
+        puts "        Add SSH to runlevel default"
         @host.exec "ln -sf /etc/init.d/sshd #{@guest.deploy_path}/etc/runlevels/default/"
       end
     end
