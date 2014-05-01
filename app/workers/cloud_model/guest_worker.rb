@@ -15,7 +15,7 @@ module CloudModel
     end
   
     def deploy
-      return false unless [:pending, :not_started].include? @guest.deploy_state    
+      return false unless [:pending, :not_started, :failed].include? @guest.deploy_state    
       @guest.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       begin
@@ -42,7 +42,7 @@ module CloudModel
     end
   
     def redeploy
-      return false unless [:pending, :not_started].include? @guest.deploy_state 
+      return false unless [:pending, :not_started, :failed].include? @guest.deploy_state 
       @guest.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       begin
