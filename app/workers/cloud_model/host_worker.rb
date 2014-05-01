@@ -332,7 +332,7 @@ module CloudModel
     def deploy
       return false unless @host.deploy_state == :pending
       
-      @host.update_attribute :deploy_state, :running
+      @host.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       begin
         #
@@ -411,7 +411,7 @@ module CloudModel
     def redeploy
       return false unless @host.deploy_state == :pending
       
-      @host.update_attribute :deploy_state, :running
+      @host.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       begin
         @host.sync_inst_images

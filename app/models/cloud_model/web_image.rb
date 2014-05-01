@@ -12,8 +12,9 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::UsedInGuestsAs
+    include CloudModel::ENumFields
     
-    before_save :build
+    before_save :checkout_git
     
     field :name, type: String
     field :git_server, type: String
@@ -23,6 +24,16 @@ module CloudModel
     field :has_assets, type: Mongoid::Boolean, default: false
     field :has_mongodb, type: Mongoid::Boolean, default: false    
     field :has_redis, type: Mongoid::Boolean, default: false    
+    
+    enum_field :build_state, values: {
+      0x00 => :pending,
+      0x01 => :running,
+      0xf0 => :finished,
+      0xf1 => :failed,
+      0xff => :not_started
+    }, default: :not_started
+    
+    field :build_last_issue, type: String
 
     belongs_to :file, class_name: "Mongoid::GridFS::Fs::File"
     
@@ -38,11 +49,7 @@ module CloudModel
     end
     
     def build_path 
-      @build_path ||= if Rails.env.development? or Rails.env.test?
-        "/tmp/build/#{id}"
-      else
-        Rails.root.join('..', '..', 'shared', 'build', id).to_s
-      end
+      Rails.root.join('data', 'build', 'web_images', id).to_s
     end
     
     def build_gem_home
@@ -52,6 +59,16 @@ module CloudModel
     def build_gemfile
       "#{build_path}/current/Gemfile"
     end
+    
+    def build
+      begin
+        CloudModel::call_rake 'cloudmodel:web_image:build', web_image_id: id
+      rescue Exception => e
+        update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
+        CloudModel.log_exception e
+      end
+    end
+    
   end
 end
   

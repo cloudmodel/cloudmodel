@@ -34,9 +34,9 @@ module CloudModel
         if @model.deploy_web_image
           mkdir_p "#{@guest.deploy_path}#{@model.www_root}/current"
         
-          puts "    Deploy WebImage #{@model.deploy_web_image.name} to #{@guest.deploy_path}#{@model.www_root}"
+          puts "        Deploy WebImage #{@model.deploy_web_image.name} to #{@guest.deploy_path}#{@model.www_root}"
           temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
-          io = StringIO.new(@model.deploy_web_image.file_model.data)
+          io = StringIO.new(@model.deploy_web_image.file.data)
           @host.ssh_connection.sftp.upload!(io, temp_file_name)
           @host.exec "cd #{@guest.deploy_path}#{@model.www_root} && tar xpf #{temp_file_name}"
           @host.ssh_connection.sftp.remove!(temp_file_name)

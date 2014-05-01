@@ -16,7 +16,7 @@ module CloudModel
   
     def deploy
       return false unless [:pending, :not_started].include? @guest.deploy_state    
-      @guest.update_attribute :deploy_state, :running
+      @guest.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       begin
         mk_root_fs
@@ -43,7 +43,7 @@ module CloudModel
   
     def redeploy
       return false unless [:pending, :not_started].include? @guest.deploy_state 
-      @guest.update_attributes deploy_state: :running
+      @guest.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       begin
         @guest.deploy_path = "/vm/build/#{@guest.name}"

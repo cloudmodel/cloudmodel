@@ -61,4 +61,16 @@ namespace :cloudmodel do
       end
     end
   end
+  
+  namespace :web_image do
+    task :load_web_image do
+      @web_image_worker = CloudModel::WebImageWorker.new CloudModel::WebImage.find(ENV['WEB_IMAGE_ID'])
+    end
+    
+    desc "Build WebImage"
+    task :build => [:environment, :load_web_image] do
+      @web_image_worker.build
+    end
+  end
+  
 end
