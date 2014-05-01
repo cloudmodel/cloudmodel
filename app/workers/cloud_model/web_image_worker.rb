@@ -6,7 +6,7 @@ module CloudModel
     end
     
     def checkout_git        
-      unless File.directory?(build_path)
+      unless File.directory?(@web_image.build_path)
         unless system "mkdir -p #{@web_image.build_path.shellescape}"
           raise "Could not make checkout directory '#{@web_image.build_path}'"
           return false
@@ -35,10 +35,10 @@ module CloudModel
       end
       
       begin
-        self.git_commit = run_with_clean_env "Get Version", "cd #{@web_image.build_path}/current && git log | head -1 | sed s/'commit '//"
+        @web_image.update_attribute :git_commit, run_with_clean_env("Get Version", "cd #{@web_image.build_path}/current && git log | head -1 | sed s/'commit '//")
       rescue Exception => e
         CloudModel.log_exception e
-        self.git_commit = "failed to get commit hash"
+        @web_image.update_attribute :git_commit,  "failed to get commit hash"
       end
       
       return true

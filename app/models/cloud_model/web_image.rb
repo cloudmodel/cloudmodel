@@ -13,9 +13,7 @@ module CloudModel
     include Mongoid::Timestamps
     include CloudModel::UsedInGuestsAs
     include CloudModel::ENumFields
-    
-    before_save :checkout_git
-    
+        
     field :name, type: String
     field :git_server, type: String
     field :git_repo, type: String
@@ -59,6 +57,7 @@ module CloudModel
     def build_gemfile
       "#{build_path}/current/Gemfile"
     end
+    
     
     def build
       begin
