@@ -24,7 +24,14 @@ en:
     booting: Booting
     finished: Finished
     failed: Failed to deploy
-  
+
+  cloud_model/web_image/build_state:
+    not_started: Not started
+    pending: Scheduled for execution
+    running: Building
+    finished: Finished
+    failed: Failed to deploy
+      
   mongoid:
     errors:
       messages:
@@ -97,6 +104,7 @@ en:
         guests: Guest Systems
         volume_groups: Logical Volume Groups
         deploy_state: Deploy State
+        deploy_last_issue: Last Deploy Issue
       cloud_model/guest:
         name: Host Name
         host: Hardware Host
@@ -112,6 +120,7 @@ en:
         guest_volumes: Other Volumes
         state: State
         deploy_state: Deploy State
+        deploy_last_issue: Last Deploy Issue
       cloud_model/volume_group:
         name: Group Name
         device: Device
@@ -151,6 +160,8 @@ en:
         file_size: Package Size
         has_mongodb: Uses MongoDB?
         has_redis: Uses Redis?
+        build_state: Build State
+        build_last_issue: Last Build Issue
       cloud_model/war_image:
         name: Name
         file: WAR Image File

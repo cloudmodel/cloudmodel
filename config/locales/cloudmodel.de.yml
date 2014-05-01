@@ -25,6 +25,13 @@ de:
     finished: Abgeschlossen
     failed: Fehlgeschlagen
     
+  cloud_model/web_image/build_state:
+    not_started: Nicht beauftragt
+    pending: Geplant
+    running: Wird erstellt
+    finished: Abgeschlossen
+    failed: Fehlgeschlagen
+  
   mongoid:
     errors:
       messages:
@@ -97,6 +104,7 @@ de:
         guests: Gastsysteme
         volume_groups: Logische Laufwerksgruppen
         deploy_state: Installationsstatus
+        deploy_last_issue: Letztes Problem bei der Installation
       cloud_model/guest:
         name: Hostname
         host: Hostrechner
@@ -112,6 +120,7 @@ de:
         guest_volumes: Andere Laufwerke
         state: Status
         deploy_state: Installationsstatus
+        deploy_last_issue: Letztes Problem bei der Installation
       cloud_model/volume_group:
         name: Gruppenname
         device: Gerät
@@ -151,6 +160,8 @@ de:
         file_size: Packetgröße
         has_mongodb: MongoDB verwenden?
         has_redis: Redis verwenden?
+        build_state: Erstellungsstatus
+        build_last_issue: Letztes Problem bei der Erstellung
       cloud_model/war_image:
         name: Name
         file: WAR Image Datei
