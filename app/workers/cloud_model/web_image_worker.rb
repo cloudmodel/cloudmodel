@@ -61,7 +61,7 @@ module CloudModel
       begin
         system "rm -rf #{@web_image.build_path.shellescape}/current/public/assets"
         
-        run_with_clean_env "Building Assets", "cd #{@web_image.build_path.shellescape}/current && bundle exec rake RAILS_ENV=production RAILS_GROUPS=assets assets:precompile"
+        run_with_clean_env "Building Assets", "cd #{@web_image.build_path.shellescape}/current && #{CloudModel.config.bundle_command} exec rake RAILS_ENV=production RAILS_GROUPS=assets assets:precompile"
       rescue ExecutionException => e
         CloudModel.log_exception e
         @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to build assets.'      

@@ -1,6 +1,6 @@
 module CloudModel
   class Config 
-    attr_writer :data_directory
+    attr_writer :data_directory, :bundle_command
     
     def initialize(&block) 
       configure(&block) if block_given?
@@ -14,6 +14,14 @@ module CloudModel
     
     def data_directory
       @data_directory || "#{Rails.root}/data"
+    end
+    
+    def bundle_command
+      @bundle_command || if Rails.env.test? or Rails.env.development?
+        'bundle'        
+      else
+        'PATH=/bin:/sbin:/usr/bin /usr/local/bin/bundle' 
+      end
     end
   end
 end
