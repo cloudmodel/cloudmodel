@@ -409,7 +409,7 @@ module CloudModel
     end
 
     def redeploy
-      return false @host.deploy_state == :pending
+      return false unless @host.deploy_state == :pending
       
       @host.update_attributes deploy_state: :running, deploy_last_issue: nil
       

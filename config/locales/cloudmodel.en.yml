@@ -29,8 +29,13 @@ en:
     not_started: Not started
     pending: Scheduled for execution
     running: Building
+    checking_out: Checking out
+    bundling: Loading libraries
+    building_assets: Building assets
+    packaging: Packaging 
+    storing: Storing data
     finished: Finished
-    failed: Failed to deploy
+    failed: Failed to build
       
   mongoid:
     errors:

@@ -29,6 +29,11 @@ de:
     not_started: Nicht beauftragt
     pending: Geplant
     running: Wird erstellt
+    checking_out: Wird ausgecheckt
+    bundling: Bibliliotheken werdem geladen
+    building_assets: Assets werden erstellen
+    packaging: Packet wird erstellen 
+    storing: Daten sichern
     finished: Abgeschlossen
     failed: Fehlgeschlagen
   

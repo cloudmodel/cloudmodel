@@ -61,7 +61,7 @@ module CloudModel
       begin
         system "rm -rf #{@web_image.build_path.shellescape}/current/public/assets"
         
-        run_within_build_env "Building Assets", "cd #{@web_image.build_path.shellescape}/current && bundle exec rake RAILS_ENV=production RAILS_GROUPS=assets assets:precompile"
+        run_with_clean_env "Building Assets", "cd #{@web_image.build_path.shellescape}/current && bundle exec rake RAILS_ENV=production RAILS_GROUPS=assets assets:precompile"
       rescue ExecutionException => e
         CloudModel.log_exception e
         @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to build assets.'      
@@ -91,24 +91,29 @@ module CloudModel
        
        
       begin 
+        @web_image.update_attributes build_state: :checking_out
         unless checkout_git
           return false
         end
         
+        @web_image.update_attributes build_state: :bundling
         unless bundle_image
           return false
         end
 
         if @web_image.has_assets 
+          @web_image.update_attributes build_state: :building_assets
           unless build_assets
             return false
           end
         end
       
+        @web_image.update_attributes build_state: :packaging
         unless package_build
           return false
         end
 
+        @web_image.update_attributes build_state: :storing
         old_file_id = @web_image.file_id
         file = Mongoid::GridFs.put("#{@web_image.build_path}.tar.bz2")
         @web_image.update_attribute :file_id, file.id

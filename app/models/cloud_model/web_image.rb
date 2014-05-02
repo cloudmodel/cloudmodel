@@ -26,6 +26,11 @@ module CloudModel
     enum_field :build_state, values: {
       0x00 => :pending,
       0x01 => :running,
+      0x02 => :checking_out,
+      0x03 => :bundling,
+      0x04 => :building_assets,
+      0x05 => :packaging,
+      0x06 => :storing,
       0xf0 => :finished,
       0xf1 => :failed,
       0xff => :not_started
