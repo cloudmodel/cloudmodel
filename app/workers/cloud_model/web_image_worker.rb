@@ -86,7 +86,7 @@ module CloudModel
     end
     
     def build     
-      return false unless [:pending, :not_started, :failed].include? @web_image.build_state 
+      return false unless @web_image.build_state == :pending
       @web_image.update_attributes build_state: :running, build_last_issue: nil    
        
        

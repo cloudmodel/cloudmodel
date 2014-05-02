@@ -330,7 +330,7 @@ module CloudModel
     end
 
     def deploy
-      return false unless [:pending, :not_started, :failed].include? @host.deploy_state
+      return false unless @host.deploy_state == :pending
       
       @host.update_attributes deploy_state: :running, deploy_last_issue: nil
       
@@ -409,7 +409,7 @@ module CloudModel
     end
 
     def redeploy
-      return false unless [:pending, :not_started, :failed].include? @host.deploy_state
+      return false @host.deploy_state == :pending
       
       @host.update_attributes deploy_state: :running, deploy_last_issue: nil
       
