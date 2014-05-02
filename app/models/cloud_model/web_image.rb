@@ -58,8 +58,33 @@ module CloudModel
       "#{build_path}/current/Gemfile"
     end
     
+    def self.build_state_id_for build_state
+      enum_fields[:build_state][:values].invert[build_state]
+    end
     
-    def build
+    def self.buildable_build_states
+      [:finished, :failed, :not_started]
+    end
+    
+    def self.buildable_build_state_ids
+      buildable_build_states.map{|s| build_state_id_for s}
+    end
+    
+    def buildable?
+      self.class.buildable_build_states.include? build_state
+    end
+    
+    def self.buildable?
+      where :build_state_id.in => buildable_build_state_ids
+    end
+    
+    def build(options = {})
+      unless buildable? or options[:force]
+        return false
+      end
+      
+      update_attribute :build_state, :pending
+
       begin
         CloudModel::call_rake 'cloudmodel:web_image:build', web_image_id: id
       rescue Exception => e
