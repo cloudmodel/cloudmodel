@@ -46,7 +46,7 @@ module CloudModel
     
     def bundle_image
       begin
-        run_with_clean_env "Bundling", "cd #{@web_image.build_path.shellescape}/current && bundle install --gemfile #{@web_image.build_path.shellescape}/current/Gemfile --path ../shared/bundle --deployment --without development test"
+        run_with_clean_env "Bundling", "cd #{@web_image.build_path.shellescape}/current && #{CloudModel.config.bundle_command} install --gemfile #{@web_image.build_path.shellescape}/current/Gemfile --path ../shared/bundle --deployment --without development test"
       rescue ExecutionException => e
         CloudModel.log_exception e
         @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to build image.'      
