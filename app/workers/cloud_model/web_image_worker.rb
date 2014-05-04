@@ -118,7 +118,7 @@ module CloudModel
         file = Mongoid::GridFs.put("#{@web_image.build_path}.tar.bz2")
         @web_image.update_attribute :file_id, file.id
         Mongoid::GridFs.delete old_file_id if old_file_id
-      rescue Exeception => e
+      rescue Exception => e
         CloudModel.log_exception e
         @web_image.update_attributes build_state: :failed, build_last_issue: "#{e}"      
       end
@@ -145,7 +145,17 @@ module CloudModel
     end
     
     def run_with_clean_env step, command
-      Bundler.with_clean_env do
+      # Bundler.with_clean_env do
+      #   run_step step, command
+      # end
+      Bundler.with_original_env do
+        ENV.delete_if { | k, _ | k[0, 7] == "BUNDLE_" } 
+        ENV["BUNDLE_GEMFILE"] = "#{@web_image.build_path}/current/Gemfile"
+        ENV["PATH"] += ':/usr/local/bin'
+        ENV["RUBYLIB"] = nil
+        if ENV.has_key?("RUBYOPT")
+          ENV["RUBYOPT"] = ENV["RUBYOPT"].sub("-rbundler/setup", "")
+        end
         run_step step, command
       end
     end
