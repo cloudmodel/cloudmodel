@@ -43,21 +43,23 @@ namespace :cloudmodel do
     desc "Redeploy many guest with ids given as guest_ids"
     task :redeploy_many => [:environment] do
       guests_by_hosts = {}
-      ids = JSON.parse(ENV['GUEST_IDS'])
+      ids = ENV['GUEST_IDS'].split('\ ')
       
       CloudModel::Guest.where(:id.in => ids).to_a.each do |guest|
-        if guest.deployable?
+        if guest.deploy_state == :pending
           guests_by_hosts[guest.host_id] ||= []
           guests_by_hosts[guest.host_id] << guest
-        
-          guest.update_attribute :deploy_state, :pending
         end
       end
       
-      guests_by_hosts.each do |host_id, guest_ids|
+      guests_by_hosts.each do |host_id, guests|
         # TODO: Multithread redeploy (thread per host)
-        @guest_worker = CloudGuestWorker.new CloudModel::Guest.find(guest_id)
-        @guest_worker.redeploy
+        puts "** Deploy on Host #{host_id}"
+        guests.each do |guest|
+          puts "=> Redeploy Guest '#{guest.name}'"
+          @guest_worker = CloudModel::GuestWorker.new guest
+          @guest_worker.redeploy
+        end
       end
     end
   end

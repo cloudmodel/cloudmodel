@@ -188,7 +188,7 @@ module CloudModel
       criteria.update_all deploy_state_id: deploy_state_id_for(:pending)
       
       begin
-        CloudModel::call_rake 'cloudmodel:guest:redeploy_many', guest_ids: valid_ids
+        CloudModel::call_rake 'cloudmodel:guest:redeploy_many', guest_ids: valid_ids * ' '
       rescue Exception => e
         criteria.update_all deploy_state_id: deploy_state_id_for(:failed), deploy_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
