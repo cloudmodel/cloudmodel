@@ -52,7 +52,7 @@ module CloudModel
     end
     
     def build_path 
-      Rails.root.join('data', 'build', 'web_images', id).to_s
+      Pathname.new(CloudModel.config.data_directory).join('build', 'web_images', id).to_s
     end
     
     def build_gem_home

@@ -429,30 +429,30 @@ describe CloudModel::Host do
     it 'should call mount if not mounted' do
       subject.stub(:boot_fs_mounted?).and_return false
         
-      subject.should_receive(:exec).with('mount "/dev/md127" /boot').and_return [true, 'success']
+      subject.should_receive(:exec).with('mount /dev/md127 /boot').and_return [true, 'success']
       expect(subject.mount_boot_fs).to be_true
     end
 
     it 'should not call mount if mounted' do
       subject.stub(:boot_fs_mounted?).and_return true
         
-      subject.should_not_receive(:exec).with('mount "/dev/md127" /boot')
+      subject.should_not_receive(:exec).with('mount /dev/md127 /boot')
       expect(subject.mount_boot_fs).to be_true
     end
     
     it 'should fallback to rescue device if mount fails' do
       subject.stub(:boot_fs_mounted?).and_return false
         
-      subject.should_receive(:exec).with('mount "/dev/md127" /boot').and_return [false, 'fail']
-      subject.should_receive(:exec).with('mount "/dev/md/rescue:127" /boot').and_return [true, 'success']
+      subject.should_receive(:exec).with('mount /dev/md127 /boot').and_return [false, 'fail']
+      subject.should_receive(:exec).with('mount /dev/md/rescue:127 /boot').and_return [true, 'success']
       expect(subject.mount_boot_fs).to be_true
     end
     
     it 'should raise error if mount fails' do
       subject.stub(:boot_fs_mounted?).and_return false
         
-      subject.should_receive(:exec).with('mount "/dev/md127" /boot').and_return [false, 'fail']
-      subject.should_receive(:exec).with('mount "/dev/md/rescue:127" /boot').and_return [false, 'fail']
+      subject.should_receive(:exec).with('mount /dev/md127 /boot').and_return [false, 'fail']
+      subject.should_receive(:exec).with('mount /dev/md/rescue:127 /boot').and_return [false, 'fail']
       expect(subject.mount_boot_fs).to be_false
     end
   end
@@ -465,7 +465,7 @@ describe CloudModel::Host do
     end
 
     it 'should call vgs on host' do
-      ssh_connection.should_receive(:exec!).with('vgs --separator \';\' --units b --all --nosuffix -o vg_all').and_return(
+      subject.should_receive(:exec).with('vgs --separator \';\' --units b --all --nosuffix -o vg_all').and_return(
         "  Fmt;VG UUID;VG\n" +
         "  lvm2;4jM5nB-lV98-rFwR-4fWc-cwF4-dwdf-Fw3rsa;vg0\n"
       )

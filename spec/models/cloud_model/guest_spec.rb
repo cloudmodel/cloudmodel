@@ -336,10 +336,8 @@ describe CloudModel::Guest do
   end
   
   context '#redeploy' do
-    let(:ssh_connection) { double 'SSHConnection', exec!: "" }
-    
     before do
-      CloudModel::Host.any_instance.stub(:ssh_connection).and_return ssh_connection
+      CloudModel::Host.any_instance.stub(:exec).and_return [true, '']
     end    
     
     let!(:guest1) { Factory :guest, name: 'g1', private_address: '10.42.0.23' }
@@ -347,7 +345,7 @@ describe CloudModel::Guest do
     let!(:guest3) { Factory :guest, name: 'g3', private_address: '10.42.0.4' }
     
     it 'should call rake cloudmodel:host:deploy_many with list of guest ids' do  
-      CloudModel.should_receive(:call_rake).with('cloudmodel:guest:redeploy_many', guest_ids: [guest1.id, guest3.id].map(&:to_s))
+      CloudModel.should_receive(:call_rake).with('cloudmodel:guest:redeploy_many', guest_ids: "#{guest1.id} #{guest3.id}")
       CloudModel::Guest.redeploy ['2600', guest1.id.to_s, guest3.id]
 
       expect(guest1.reload.deploy_state).to eq :pending
@@ -356,7 +354,7 @@ describe CloudModel::Guest do
     end 
     
     it 'should add an error if call_rake excepts' do
-      CloudModel.stub(:call_rake).with('cloudmodel:guest:redeploy_many', guest_ids: [guest1.id, guest3.id].map(&:to_s)).and_raise 'ERROR 42'
+      CloudModel.stub(:call_rake).with('cloudmodel:guest:redeploy_many', guest_ids: [guest1.id, guest3.id] * '').and_raise 'ERROR 42'
       CloudModel::Guest.redeploy ['2600', guest1.id.to_s, guest3.id]
       expect(guest1.reload.deploy_state).to eq :failed
       expect(guest1.deploy_last_issue).to eq 'Unable to enqueue job! Try again later.'
@@ -466,19 +464,19 @@ describe CloudModel::Guest do
   
   context 'start' do
     it 'should enables autostart state for domain' do
-      subject.stub(:virsh)
-      subject.should_receive(:virsh).with('autostart')
+      subject.stub(:virsh).and_return true
+      subject.should_receive(:virsh).with('autostart').and_return true
       subject.start
     end
     
     it 'should start domain' do
-      subject.stub(:virsh)
-      subject.should_receive(:virsh).with('start')
+      subject.stub(:virsh).and_return true
+      subject.should_receive(:virsh).with('start').and_return true
       subject.start
     end
     
     it 'should return true if no error occures' do
-      subject.stub(:virsh)
+      subject.stub(:virsh).and_return true
       expect(subject.start).to eq true
     end
 
@@ -490,19 +488,19 @@ describe CloudModel::Guest do
   
   context 'stop' do
     it 'should disables autostart state for domain' do
-      subject.stub(:virsh)
-      subject.should_receive(:virsh).with('autostart', 'disable')
+      subject.stub(:virsh).and_return true
+      subject.should_receive(:virsh).with('autostart', 'disable').and_return true
       subject.stop
     end
     
     it 'should stop domain' do
-      subject.stub(:virsh)
-      subject.should_receive(:virsh).with('shutdown')
+      subject.stub(:virsh).and_return true
+      subject.should_receive(:virsh).with('shutdown').and_return true
       subject.stop
     end
     
     it 'should return true if no error occures' do
-      subject.stub(:virsh)
+      subject.stub(:virsh).and_return true
       expect(subject.stop).to eq true
     end
 
@@ -516,25 +514,25 @@ describe CloudModel::Guest do
     pending
   end
   
-  context 'undefine' do
-    it 'should disables autostart state for domain' do
-      subject.stub(:virsh)
-      subject.should_receive(:virsh).with('autostart', 'disable')
-      subject.stop
-    end
-    
-    it 'should undefine domain' do
-      subject.stub(:virsh)
-      subject.should_receive(:virsh).with('undefine')
+  context 'undefine' do    
+    it 'should stop and undefine domain' do
+      subject.stub(:virsh).and_return true
+      subject.stub(:state).and_return 1
+      subject.should_receive(:stop!)
+      subject.should_receive(:virsh).with('undefine').and_return true
       subject.undefine
     end
     
     it 'should return true if no error occures' do
-      subject.stub(:virsh)
+      subject.stub(:state).and_return 1
+      subject.should_receive(:stop!)
+      subject.stub(:virsh).and_return true
       expect(subject.undefine).to eq true
     end
 
     it 'should return false if error occures' do
+      subject.stub(:state).and_return 1
+      subject.should_receive(:stop!)
       subject.stub(:virsh).and_raise 'Oops'
       expect(subject.undefine).to eq false
     end

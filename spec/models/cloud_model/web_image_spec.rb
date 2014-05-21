@@ -58,16 +58,11 @@ describe CloudModel::WebImage do
     end
   end
 
-  context 'build_path' do
-    it 'should build in /tmp/build for test env' do
-      expect(subject.build_path).to eq "/tmp/build/#{subject.id}"
-    end
-    
-    it 'should build in ./shared/build relative to Rails root for production' do
-      Rails.env.stub(:test?).and_return false
-      Rails.stub(:root).and_return Pathname.new '/my_home/rails_project/releases/current'
+  context 'build_path' do   
+    it 'should build in CloudModel data_directory' do
+      CloudModel.config.stub(:data_directory).and_return Pathname.new '/my_home/rails_project/data'
       
-      expect(subject.build_path).to eq "/my_home/rails_project/shared/build/#{subject.id}"
+      expect(subject.build_path).to eq "/my_home/rails_project/data/build/web_images/#{subject.id}"
     end
   end
 

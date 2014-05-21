@@ -97,7 +97,7 @@ describe CloudModel::LogicalVolume do
       subject.stub(:device).and_return('/vg42/lv23')
       subject.disk_space = 2048
       
-      subject.should_receive(:exec).with('lvcreate -L 2048b -n test_lv /vg42').and_return(true, '')
+      subject.should_receive(:exec).with('lvcreate -L 2048b -n test_lv /vg42').once.and_return(true, '')
       subject.should_receive(:exec).with('mkfs.ext4 /vg42/lv23').and_return(true, '')
       
       subject.apply
@@ -215,9 +215,10 @@ describe CloudModel::LogicalVolume do
       subject.name = 'test'
       subject.disk_format = 'ext4'
       ssh_connection = double 'SSHConnection', exec: '--- dom info ---'
+      subject.should_receive(:mounted_on?).with('/mnt/test').and_return false
       host.should_receive(:exec).with('mkdir -p /mnt/test && mount -t ext4 -o noatime /dev/vg0/test /mnt/test').and_return [true, 'mounted']
       
-      expect(subject.mount '/mnt/test').to eq [true, 'mounted']
+      expect(subject.mount '/mnt/test').to eq true
     end
     
     it 'should escape parameters on call' do
@@ -227,6 +228,7 @@ describe CloudModel::LogicalVolume do
       subject.stub(:name).and_return 'test; reboot;'
       subject.disk_format = 'ext4; do evil;'
       ssh_connection = double 'SSHConnection', exec: '--- dom info ---'
+      subject.should_receive(:mounted_on?).with('/mnt/test; cat /dev/random /dev/sda;').and_return false
       host.should_receive(:exec).with('mkdir -p /mnt/test\\;\\ cat\\ /dev/random\\ /dev/sda\\; && mount -t ext4\\;\\ do\\ evil\\; -o noatime /dev/vg0\\;\\ rm\\ -rf\\ /\\;/test\\;\\ reboot\\; /mnt/test\\;\\ cat\\ /dev/random\\ /dev/sda\\;').and_return [true, 'mounted']
       
       subject.mount '/mnt/test; cat /dev/random /dev/sda;'
