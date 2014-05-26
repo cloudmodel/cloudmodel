@@ -148,6 +148,7 @@ de:
       cloud_model/guest_volume:
         mount_point: Einhängpunkt
         writeable: Beschreibbar?
+        has_backups: Laufwerkdaten sichern?
       cloud_model/certificate:
         name: Name
         ca: Zertifizierungsstelle
@@ -176,6 +177,7 @@ de:
         name: Dienstname
         port: Dienstport
         public_service: Öffentlicher Dienst?
+        has_backups: Dienstdaten sichern?
         _type: Dienstart
       cloud_model/services/nginx:
         port: HTTP Port

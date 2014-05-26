@@ -148,6 +148,7 @@ en:
       cloud_model/guest_volume:
         mount_point: Mountpoint
         writeable: Writeable?
+        has_backups: Backup Volume Data?
       cloud_model/certificate:
         name: Name
         ca: Certificate Authority
@@ -176,6 +177,7 @@ en:
         name: Service Name
         port: Service Port
         public_service: Public Service?
+        has_backups: Backup Service Data?
         _type: Service Type
       cloud_model/services/nginx:
         port: HTTP Port
