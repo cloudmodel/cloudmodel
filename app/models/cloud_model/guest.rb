@@ -267,6 +267,20 @@ module CloudModel
       end
     end
     
+    def backup
+      success = true
+      
+      guest_volumes.where(has_backups: true).each do |volume|
+        Rails.logger.debug "V #{volume.mount_point}: #{success &&= volume.backup}" 
+      end
+
+      services.where(has_backups: true).each do |service|
+        Rails.logger.debug "S #{service._type}: #{success &&= service.backup}" 
+      end      
+      
+      success
+    end
+    
     private  
     def set_root_volume_name
       root_volume.name = "#{name}-root-#{Time.now.strftime "%Y%m%d%H%M%S"}" unless root_volume.name
