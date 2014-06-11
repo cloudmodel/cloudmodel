@@ -247,5 +247,136 @@ module CloudModel
       puts "    Define VM with virsh"
       @host.exec! "virsh define /inst/tmp/#{@guest.name.shellescape}.xml", "Failed to define guest '#{@guest.name.shellescape}'"
     end
+    
+    def build_image      
+      return false unless @guest.build_state == :pending
+      
+      build_dir = '/vm/build/guest'
+ 
+      @guest.update_attributes build_state: :running, build_last_issue: nil
+
+      begin
+        #
+        # Create and mount build root if necessary
+        #
+        unless @host.mounted_at? build_dir
+          # begin
+          #   build_lv = CloudModel::LogicalVolume.find_by(name: 'build-host')
+          # rescue 
+          #   build_lv = CloudModel::LogicalVolume.create! name: 'build-host', disk_space: "32G", volume_group: @host.volume_groups.first
+          # end
+          build_lv = CloudModel::LogicalVolume.find_or_create_by! name: 'build-guest', disk_space: "32G", volume_group: @host.volume_groups.first
+          build_lv.apply
+          unless build_lv.mount build_dir
+            raise 'Failed to mount build partition'
+          end
+        end
+
+        if false
+          # Find latest stage 3 image on gentoo mirror
+          gentoo_release_path = 'releases/amd64/autobuilds/'
+          gentoo_stage3_info = 'latest-stage3-amd64-hardened+nomultilib.txt'
+          gentoo_stage3_file = Net::HTTP.get(URI.parse("#{CloudModel.config.gentoo_mirrors.first}#{gentoo_release_path}#{gentoo_stage3_info}")).lines.last.strip.shellescape
+        
+          # Download and unpack stage 3
+          @host.exec! "curl #{CloudModel.config.gentoo_mirrors.first}#{gentoo_release_path}#{gentoo_stage3_file} -o #{build_dir}/stage3.tar.bz2", 'Could not load stage 3 file'
+          # TODO: Check checksum of stage3 file
+          @host.exec! "cd #{build_dir} && tar xjpf stage3.tar.bz2", 'Failed to unpack stage 3 file'
+        
+          @host.ssh_connection.sftp.remove "#{build_dir}/stage3.tar.bz2"
+        end
+        
+        @host.exec "rm -f #{build_dir}/etc/mtab && ln -sf /proc/self/mounts #{build_dir}/etc/mtab"
+        
+        # Configure gentoo parameters
+        render_to_remote "/cloud_model/guest/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, host: @host, guest: @guest
+        render_to_remote "/cloud_model/guest/etc/portage/package.accept_keywords", "#{build_dir}/etc/portage/package.accept_keywords", 0600, host: @host, guest: @guest
+        render_to_remote "/cloud_model/guest/etc/portage/package.use", "#{build_dir}/etc/portage/package.use", 0600, host: @host, guest: @guest
+ 
+        # Copy dns configuration
+        @host.exec! "cp -L /etc/resolv.conf #{build_dir}/etc/", 'Failed to copy resolv.conf'
+        
+        # Prepare chroot by loop mounting some important devices
+        unless @host.mounted_at? "#{build_dir}/proc"
+          @host.exec! "mount -t proc none #{build_dir}/proc", 'Failed to mount proc to build system'
+        end
+        unless @host.mounted_at? "#{build_dir}/sys"
+          @host.exec! "mount --rbind /sys #{build_dir}/sys", 'Failed to mount sys to build system'
+        end
+        unless @host.mounted_at? "#{build_dir}/dev"
+          @host.exec! "mount --rbind /dev #{build_dir}/dev", 'Failed to mount dev to build system'
+        end
+        
+        # Update system software
+        mkdir_p "#{build_dir}/usr/portage"
+        if false
+          chroot! build_dir, "emerge-webrsync", 'Failed to sync portage'
+          chroot! build_dir, "emerge --sync --quiet", 'Failed to sync portage'
+          chroot! build_dir, "emerge --oneshot portage", 'Failed to merge new portage'
+          chroot! build_dir, "emerge --update --newuse --deep --with-bdeps=y @world", 'Failed to update system packages'
+          chroot! build_dir, "emerge --depclean", 'Failed to clean up after updating system'
+        end
+        
+        if true
+          # Install guest packages
+          packages = %w(
+            app-portage/gentoolkit
+            sys-apps/systemd
+            sys-apps/dbus
+            sys-kernel/linux-headers
+            sys-apps/kmod
+            sys-apps/iproute2
+          )
+          
+          # MongoDB
+          packages += %w(
+            dev-db/mongodb
+          )
+          
+          # TODO: nginx+passenger ebuild or other merging 
+          # # NGINX \w passenger
+          # packages += %w(
+          #   www-servers/nginx
+          # )
+          packages += %w(
+            dev-lang/ruby
+          )
+          
+          # Redis
+          packages += %w(
+            dev-db/redis
+          )
+          
+          # SSH
+          packages += %w(
+            net-misc/openssh
+          )
+
+          # Tomcat
+          packages += %w(
+            dev-java/icedtea-bin
+            www-servers/tomcat
+          )
+          
+          chroot! build_dir, "emerge --update --newuse --deep --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
+        end
+                
+        render_to_remote "/cloud_model/guest/etc/systemd/system/network@.service", "#{build_dir}/etc/systemd/system/network@.service"
+        chroot build_dir, "ln -s /usr/lib/systemd/system/network@.service /etc/systemd/system/multi-user.target.wants/network@eth0.service"
+        
+        render_to_remote "/cloud_model/guest/etc/systemd/system/mongodb.service", "#{build_dir}/etc/systemd/system/mongodb.service"
+        render_to_remote "/cloud_model/guest/etc/systemd/system/redis.service", "#{build_dir}/etc/systemd/system/redis.service"
+        render_to_remote "/cloud_model/guest/etc/systemd/system/sshd.service", "#{build_dir}/etc/systemd/system/sshd.service"
+        
+        render_to_remote "/cloud_model/support/etc/locale.conf", "#{build_dir}/etc/locale.conf", host: @guest
+        render_to_remote "/cloud_model/support/etc/vconsole.conf", "#{build_dir}/etc/vconsole.conf", host: @guest
+        
+        @guest.update_attributes build_state: :finished
+      rescue Exception => e
+        CloudModel.log_exception e
+        @guest.update_attributes build_state: :failed, build_last_issue: "#{e}"
+        return false    
+      end
+    end
   end
 end
