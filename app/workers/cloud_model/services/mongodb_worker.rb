@@ -5,8 +5,8 @@ module CloudModel
         target = '/var/lib/mongodb'
       
         puts "        Write mongodb config"
-        @host.ssh_connection.sftp.file.open(File.expand_path("etc/conf.d/mongodb", @guest.deploy_path), 'w') do |f|
-          f.write render("/cloud_model/guest/etc/conf.d/mongodb", guest: @guest, model: @model)
+        @host.ssh_connection.sftp.file.open(File.expand_path("etc/mongodb.conf", @guest.deploy_path), 'w') do |f|
+          f.write render("/cloud_model/guest/etc/mongodb.conf", guest: @guest, model: @model)
         end
       
         @host.exec "chown -R 101:root #{@guest.deploy_path.shellescape}#{target.shellescape}"
