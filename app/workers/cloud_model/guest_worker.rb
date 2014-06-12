@@ -13,7 +13,33 @@ module CloudModel
     def guest
       @guest
     end
-  
+    
+    def create_image
+      #
+      # Create guest image
+      #
+
+      build_tar '.', "/inst/guest.tar", one_file_system: true, exclude: [
+        './etc/udev/rules.d/70-persistent-net.rules',
+        './tmp/*',
+        './var/tmp/*',
+        './var/cache/*',
+        './var/log/*',
+        './usr/share/man',
+        './usr/share/doc',
+        './usr/portage'
+      ], C: @guest.base_path
+
+      #
+      # Download file to local /inst
+      #
+
+      `mkdir -p #{CloudModel.config.data_directory.shellescape}/inst`
+      @host.ssh_connection.sftp.download! "/inst/guest.tar", "#{CloudModel.config.data_directory}/inst/guest.tar"
+
+      return true
+    end
+      
     def deploy
       return false unless @guest.deploy_state == :pending  
       @guest.update_attributes deploy_state: :running, deploy_last_issue: nil
