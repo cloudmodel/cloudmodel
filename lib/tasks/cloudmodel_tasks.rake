@@ -62,6 +62,23 @@ namespace :cloudmodel do
         end
       end
     end
+    
+    desc "Backup guest"
+    task :backup => [:environment, :load_guest] do
+      @guest.backup
+    end
+    
+    desc "Backup all guest"
+    task :backup_all => [:environment] do
+      CloudModel::Guest.all.each do |guest|
+        guest.backup
+      end
+    end    
+    
+    desc "Build guest image"
+    task :build_image => [:environment, :load_guest] do
+      @guest_worker.build_image
+    end
   end
   
   namespace :web_image do

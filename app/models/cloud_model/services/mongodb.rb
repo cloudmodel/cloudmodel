@@ -23,6 +23,7 @@ module CloudModel
         if $?.success? and File.exists? "#{backup_directory}/#{timestamp}"
           FileUtils.rm_f "#{backup_directory}/latest"
           FileUtils.ln_s "#{backup_directory}/#{timestamp}", "#{backup_directory}/latest"
+          cleanup_backups
           
           return true
         else
