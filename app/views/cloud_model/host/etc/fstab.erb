@@ -39,7 +39,13 @@ shm			/dev/shm	tmpfs		nodev,nosuid,noexec	0 0
 # BEGIN SpCloud <%= guest.name %>
 <%= "%-31s" % guest.root_volume.device %> <%= "%-31s" % guest.base_path %> <%= "%-9s" % guest.root_volume.disk_format %> noatime  0 0
 <%- guest.guest_volumes.each do |volume| -%>
+<%- if volume.logical_volume.blank? -%>
+<%- puts "Missing logical_volume for #{volume.mount_point}" -%>
+<%- elsif volume.logical_volume.volume_group.blank? -%>
+<%- puts "Missing volume_group for #{volume.mount_point}" -%>
+<%- else -%>
 <%= "%-31s" % volume.logical_volume.device %> <%= "%-31s" % "#{guest.base_path}/#{volume.mount_point}" %> <%= "%-9s" % volume.logical_volume.disk_format %> noatime  0 0
+<%- end -%>
 <%- end -%>
 # END SpCloud <%= guest.name %>
 <%- end %>

@@ -1,6 +1,7 @@
 require 'fileutils'
 require 'net/http'
 require 'net/sftp'
+require 'securerandom'
 
 module CloudModel
   class HostWorker < BaseWorker
@@ -17,60 +18,24 @@ module CloudModel
       "/mnt/root-#{@timestamp}"
     end
     
-    def local_exec command
-      Rails.logger.debug "LOKAL EXEC: #{command}"
-      result = `#{command}`
-      Rails.logger.debug "    #{result}"
-      result
-    end
-  
-    def build_tar_bz2 src, dst, options = {}
-      def parse_param param, value
-        params = ''
-      
-        if value == true
-          params << "--#{param} "
-        elsif value.class == Array
-          value.each do |i|
-            params << parse_param(param, i)
-          end
-        else
-          params << "--#{param}=#{value.shellescape} "
-        end
-      
-        params
-      end
-        
-      cmd = "tar cjf #{dst.shellescape} "
-
-      options.each do |k,v|
-        param = k.to_s.gsub('_', '-').shellescape
-      
-        cmd << parse_param(param, v)
-      end
-      cmd << "#{src.shellescape}"
-      @host.exec! cmd, "Failed to build tar #{dst}"
-    end
-    
     def create_image
       #
       # Create boot image
       #
       
       @host.mount_boot_fs
-      build_tar_bz2 '/boot', "/inst/boot.tar.bz2", one_file_system: true
+      build_tar '/boot', "/inst/boot.tar.bz2", :j, one_file_system: true
       @host.exec 'umount /boot'
     
       #
       # Create root image
       #
       
-      build_tar_bz2 '/', "/inst/root.tar.bz2", one_file_system: true, exclude: [
+      build_tar '/', "/inst/root.tar.bz2", :j, one_file_system: true, exclude: [
         '/etc/udev/rules.d/70-persistent-net.rules',
         '/tmp/*',
         '/var/tmp/*',
         '/var/cache/*',
-        '/usr/portage/distfiles/*',
         '/var/log/*',
         '/inst/*', 
         '/vm/*',
@@ -78,16 +43,18 @@ module CloudModel
         '/etc/tinc/vpn/*',
         '/usr/share/man',
         '/usr/share/doc',
-        '/usr/portage'
-      ]
+        '/usr/portage/*'
+        ] C: '/vm/build/host'
     
       #
       # Download files to local /inst
       #
       
-      `mkdir -p #{CloudModel.config.data_directory.shellescape}/inst`
-      @host.ssh_connection.sftp.download! "/inst/boot.tar.bz2", "#{CloudModel.config.data_directory}/inst/boot.tar.bz2"
-      @host.ssh_connection.sftp.download! "/inst/root.tar.bz2", "#{CloudModel.config.data_directory}/inst/root.tar.bz2"
+      unless CloudModel.config.skip_sync_images
+        `mkdir -p #{CloudModel.config.data_directory.shellescape}/inst`
+        @host.ssh_connection.sftp.download! "/inst/boot.tar.bz2", "#{CloudModel.config.data_directory}/inst/boot.tar.bz2"
+        @host.ssh_connection.sftp.download! "/inst/root.tar.bz2", "#{CloudModel.config.data_directory}/inst/root.tar.bz2"
+      end
       
       return true
     end
@@ -149,41 +116,14 @@ module CloudModel
       end
     end
   
-    def boot_deploy_root
+    def boot_deploy_root options={}
       @host.mount_boot_fs
     
       #
       # Populate boot partition with Image
       #
-
-      #@host.ssh_connection.sftp.upload! "#{CloudModel.config.data_directory}/inst/boot.tar.bz2", "/inst/boot.tar.bz2"
       @host.exec! "cd / && tar xjpf /inst/boot.tar.bz2", "Failed to unpack boot image!"
     
-      #
-      # Create grub bootstrap script
-      #
-      
-      grub_script = "
-      #!/bin/bash
-
-      function die {
-         echo $@
-         exit 1
-      }
-
-      env-update
-      source /etc/profile
-      grub2-install /dev/sda || die 'Failed to install grub on sda'
-      grub2-mkconfig -o /boot/grub/grub.cfg || die 'Failed to config grub'
-      grub2-install /dev/sdb || die 'Failed to install grub on sda'
-      echo 'Boot init done'
-      "
-    
-      print '.'
-      @host.ssh_connection.sftp.file.open("#{root}/root/init_boot.sh", 'w', 0775) do |f|
-        f.puts grub_script
-      end
-      print '.'
       #
       # chroot to execute grub bootstrap script
       #
@@ -200,12 +140,12 @@ module CloudModel
       unless @host.mount_boot_fs root
         raise "Failed to mount /boot to chroot"
       end
-      print '.'
-      @host.exec! "chroot #{root} /root/init_boot.sh", "Failed to write boot config"
-
-      @host.ssh_connection.sftp.remove! "#{root}/root/init_boot.sh"
+      
+      chroot! root, "grub2-install /dev/sda", 'Failed to install grub on sda'
+      chroot! root, "grub2-mkconfig -o /boot/grub/grub.cfg", 'Failed to config grub'
+      chroot! root, "grub2-install /dev/sdb", 'Failed to install grub on sda'
   
-      unless @debug      
+      unless options[:no_reboot]      
         @host.update_attribute :deploy_state, :booting
         
         #
@@ -264,8 +204,6 @@ module CloudModel
       #
       # Populate deploy root with system image
       #
-      
-      #@host.ssh_connection.sftp.upload! "#{CloudModel.config.data_directory}/inst/root.tar.bz2", "/inst/root.tar.bz2"
       @host.exec! "cd #{root} && tar xjpf /inst/root.tar.bz2", "Failed to unpack system image!"
     
       mkdir_p "#{root}/inst"
@@ -402,8 +340,8 @@ module CloudModel
         config_deploy_root
         boot_deploy_root
       rescue Exception => e
-        @host.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
         CloudModel.log_exception e
+        @host.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
         return false
       end
     end
@@ -420,10 +358,129 @@ module CloudModel
         config_deploy_root         
         boot_deploy_root
       rescue Exception => e
-        @host.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
         CloudModel.log_exception e
+        @host.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
         return false
       end    
+    end
+    
+    def build_image      
+      return false unless @host.build_state == :pending
+      
+      build_dir = '/vm/build/host'
+ 
+      @host.update_attributes build_state: :running, build_last_issue: nil
+
+      begin
+        gentoo_mirrors = [
+          'http://linux.rz.ruhr-uni-bochum.de/download/gentoo-mirror/',
+          'http://ftp.fi.muni.cz/pub/linux/gentoo/',
+          'http://ftp-stud.fht-esslingen.de/pub/Mirrors/gentoo/',
+          'http://mirror.netcologne.de/gentoo/'
+        ]
+        
+        #
+        # Create and mount build root if necessary
+        #
+        unless @host.mounted_at? build_dir
+          # begin
+          #   build_lv = CloudModel::LogicalVolume.find_by(name: 'build-host')
+          # rescue 
+          #   build_lv = CloudModel::LogicalVolume.create! name: 'build-host', disk_space: "32G", volume_group: @host.volume_groups.first
+          # end
+          build_lv = CloudModel::LogicalVolume.find_or_create_by! name: 'build-host', disk_space: "32G", volume_group: @host.volume_groups.first
+          build_lv.apply
+          unless build_lv.mount build_dir
+            raise 'Failed to mount build partition'
+          end
+        end
+
+        if true
+          # Find latest stage 3 image on gentoo mirror
+          gentoo_release_path = 'releases/amd64/autobuilds/'
+          gentoo_stage3_info = 'latest-stage3-amd64-hardened+nomultilib.txt'
+          gentoo_stage3_file = Net::HTTP.get(URI.parse("#{CloudModel.config.gentoo_mirrors.first}#{gentoo_release_path}#{gentoo_stage3_info}")).lines.last.strip.shellescape
+        
+          # Download and unpack stage 3
+          @host.exec! "curl #{CloudModel.config.gentoo_mirrors.first}#{gentoo_release_path}#{gentoo_stage3_file} -o #{build_dir}/stage3.tar.bz2", 'Could not load stage 3 file'
+          # TODO: Check checksum of stage3 file
+          @host.exec! "cd #{build_dir} && tar xjpf stage3.tar.bz2", 'Failed to unpack stage 3 file'
+        
+          @host.ssh_connection.sftp.remove! "#{build_dir}/stage3.tar.bz2"
+        end
+        
+        # Configure gentoo parameters
+        render_to_remote "/cloud_model/host/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, host: @host, mirrors: gentoo_mirrors
+        render_to_remote "/cloud_model/host/etc/portage/package.accept_keywords", "#{build_dir}/etc/portage/package.accept_keywords", 0600, host: @host, mirrors: gentoo_mirrors
+        render_to_remote "/cloud_model/host/etc/portage/package.use", "#{build_dir}/etc/portage/package.use", 0600, host: @host, mirrors: gentoo_mirrors
+        render_to_remote "/cloud_model/host/etc/genkernel.conf", "#{build_dir}/etc/genkernel.conf", host: @host
+        mkdir_p "#{build_dir}/etc/cloud_model"
+        render_to_remote "/cloud_model/host/etc/cloud_model/kernel.config", "#{build_dir}/etc/cloud_model/kernel.config", host: @host
+        
+        # Copy dns configuration
+        @host.exec! "cp -L /etc/resolv.conf #{build_dir}/etc/", 'Failed to copy resolv.conf'
+        
+        # Prepare chroot by loop mounting some important devices
+        unless @host.mounted_at? "#{build_dir}/proc"
+          @host.exec! "mount -t proc none #{build_dir}/proc", 'Failed to mount proc to build system'
+        end
+        unless @host.mounted_at? "#{build_dir}/sys"
+          @host.exec! "mount --rbind /sys #{build_dir}/sys", 'Failed to mount sys to build system'
+        end
+        unless @host.mounted_at? "#{build_dir}/dev"
+          @host.exec! "mount --rbind /dev #{build_dir}/dev", 'Failed to mount dev to build system'
+        end
+        unless @host.mount_boot_fs build_dir
+          raise "Failed to mount /boot to build system"
+        end
+        
+        # Write script to be run in build chroot
+        mkdir_p "#{build_dir}/usr/portage"
+        if true
+          chroot! build_dir, "emerge-webrsync", 'Failed to sync portage'
+          chroot! build_dir, "emerge --sync --quiet", 'Failed to sync portage'
+          chroot! build_dir, "emerge --oneshot portage", 'Failed to merge new portage'
+          chroot! build_dir, "emerge --update --newuse --deep --with-bdeps=y @world", 'Failed to update system packages'
+          chroot! build_dir, "emerge --depclean", 'Failed to clean up after updating system'
+
+          packages = %w(
+            app-portage/mirrorselect
+            app-portage/gentoolkit
+            sys-kernel/gentoo-sources
+            sys-kernel/genkernel
+            sys-apps/gptfdisk
+            sys-apps/systemd
+            sys-apps/dbus
+            sys-kernel/linux-headers
+            sys-apps/kmod
+            sys-fs/lvm2
+            sys-fs/mdadm
+            net-firewall/iptables
+            sys-apps/iproute2
+            net-misc/openssh
+            net-misc/tinc
+            app-emulation/lxc
+            app-emulation/libvirt
+          )
+          chroot! build_dir, "emerge --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
+        end
+        # Kernel config
+        # Set default kernel (had a broken link after unpacking, so let's go sure)
+        chroot! build_dir, "eselect kernel set 1", 'Failed to select kernel sources'
+        chroot! build_dir, "genkernel --kernel-config=/etc/cloud_model/kernel.config all", 'Failed to merge kernel'
+                
+        
+        
+        @host.update_attributes build_state: :finished
+      rescue Exception => e
+        CloudModel.log_exception e
+        @host.update_attributes build_state: :failed, build_last_issue: "#{e}"
+        return false    
+      end
+    end
+    
+    def update_image
+      raise 'should update system; not yet implemented'
     end
   end
 end

@@ -21,7 +21,7 @@ module CloudModel
   
       def auto_start
         puts "        Add #{@model.class.model_name.human} to runlevel default"
-        @host.exec "ln -sf /etc/init.d/#{@model.class.model_name.element.shellescape} #{@guest.deploy_path.shellescape}/etc/runlevels/default/"
+        @host.exec "ln -sf /etc/systemd/system/#{@model.class.model_name.element.shellescape}.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
       end
       
     end

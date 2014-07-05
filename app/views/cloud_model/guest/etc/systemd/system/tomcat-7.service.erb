@@ -1,0 +1,13 @@
+[Unit]
+Description=Tomcat 7 servlet container
+After=network.target
+
+[Service]
+User=tomcat
+Group=tomcat
+ExecStart=/usr/sbin/tomcat-7 start
+ExecStop=/usr/sbin/tomcat-7 stop
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

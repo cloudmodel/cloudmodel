@@ -38,7 +38,7 @@ module CloudModel
     
       def auto_start
         puts "        Add SSH to runlevel default"
-        @host.exec "ln -sf /etc/init.d/sshd #{@guest.deploy_path}/etc/runlevels/default/"
+        @host.exec "ln -sf /etc/systemd/system/sshd.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
       end
     end
   end

@@ -22,6 +22,7 @@ module CloudModel
         end
         
         puts "        Write tomcat config"
+        mkdir_p File.expand_path("etc/tomcat-7/Catalina/localhost", @guest.deploy_path) 
         @host.ssh_connection.sftp.file.open(File.expand_path("etc/tomcat-7/server.xml", @guest.deploy_path), 'w') do |f|
           f.write render("/cloud_model/guest/etc/tomcat-7/server.xml", guest: @guest, model: @model)
         end
@@ -43,7 +44,7 @@ module CloudModel
     
       def auto_start
         puts "        Add Tomcat to runlevel default"
-        @host.exec "ln -sf /etc/init.d/tomcat-7 #{@guest.deploy_path.shellescape}/etc/runlevels/default/"
+        @host.exec "ln -sf /etc/systemd/system/tomcat-7.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
       end
     end
   end

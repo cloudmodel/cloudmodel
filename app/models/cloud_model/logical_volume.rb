@@ -74,6 +74,8 @@ module CloudModel
           Rails.logger.debug "Make FS"
           exec "mkfs.#{disk_format.shellescape} #{device.shellescape}"     
         end
+        
+        return true
       rescue Exception => e
         CloudModel.log_exception e
         return false

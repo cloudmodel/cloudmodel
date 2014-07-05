@@ -1,0 +1,7 @@
+<%= render '/cloud_model/support/make.conf', host: host %>
+
+RUBY_TARGETS="ruby21"
+
+USE="-X -cups -minimal -gnome -gtk -kde -qt4 -consolekit -alsa -pulseaudi -openvz -qemu -apache bindist selinux mmx sse sse2 nptl nptlonly cpudetection ipv6 systemd vde ruby ruby_targets_ruby21 dbus"
+NGINX_MODULES_HTTP="spdy passenger status flv browser autoindex rewrite proxy xslt dav gzip fastcgi" 
+NGINX_MODULES_MAIL="imap smtp" 

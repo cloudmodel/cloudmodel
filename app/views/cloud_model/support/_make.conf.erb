@@ -1,0 +1,20 @@
+CFLAGS="-march=core2 -msse4 -msse4.1 -msse4.2 -mcx16 -msahf -O2 -pipe"
+CXXFLAGS="${CFLAGS}"
+
+# WARNING: Changing your CHOST is not something that should be done lightly.
+# Please consult http://www.gentoo.org/doc/en/change-chost.xml before changing.
+CHOST="x86_64-pc-linux-gnu"
+# These are the USE flags that were used in addition to what is provided by the
+# profile used for building.
+USE="bindist mmx sse sse2"
+PORTDIR="/usr/portage"
+#PORTDIR_OVERLAY="/usr/local/portage"
+DISTDIR="${PORTDIR}/distfiles"
+PKGDIR="${PORTDIR}/packages"
+
+MAKEOPTS="-j<%= host.cpu_count + 1 %>"
+PORTAGE_NICENESS="19"
+EMERGE_DEFAULT_OPTS="--jobs=6 --load-average=<%= host.cpu_count %> --keep-going --autounmask=n"
+FEATURES="parallel-fetch"
+
+GENTOO_MIRRORS="<%= CloudModel.config.gentoo_mirrors * ' ' %>"

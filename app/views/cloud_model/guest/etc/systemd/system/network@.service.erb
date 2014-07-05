@@ -1,0 +1,19 @@
+[Unit]
+Description=Network connectivity (%i)
+Wants=network.target
+Before=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=/etc/conf.d/network@%i
+
+ExecStart=/bin/ip link set dev %i up
+ExecStart=/bin/ip addr add ${address}/${netmask} broadcast ${broadcast} dev %i
+ExecStart=/bin/sh -c 'test -n ${gateway} && /bin/ip route add default via ${gateway}'
+
+ExecStop=/bin/ip addr flush dev %i
+ExecStop=/bin/ip link set dev %i down
+
+[Install]
+WantedBy=multi-user.target

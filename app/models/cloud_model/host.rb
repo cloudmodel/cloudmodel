@@ -10,6 +10,7 @@ module CloudModel
     field :name, type: String
     field :tinc_public_key, type: String
     field :initial_root_pw, type: String
+    field :cpu_count, type: Integer, default: -1
 
     enum_field :stage, values: {
       0x00 => :pending,
@@ -26,8 +27,18 @@ module CloudModel
       0xf1 => :failed,
       0xff => :not_started
     }, default: :not_started
-    
+
     field :deploy_last_issue, type: String
+     
+    enum_field :build_state, values: {
+      0x00 => :pending,
+      0x01 => :running,
+      0xf0 => :finished,
+      0xf1 => :failed,
+      0xff => :not_started
+    }, default: :not_started
+    
+    field :build_last_issue, type: String
     
     has_many :guests, class_name: "CloudModel::Guest", inverse_of: :host
     embeds_many :addresses, class_name: "CloudModel::Address", inverse_of: :host do
@@ -55,6 +66,15 @@ module CloudModel
     validates :name, presence: true, uniqueness: true, format: {with: /\A[a-z0-9\-_]+\z/}
     validates :primary_address, presence: true
     validates :private_network, presence: true    
+   
+    def cpu_count_with_get_info
+     if cpu_count_without_get_info < 0
+       success, result = exec 'grep processor.*:\ [0-9] /proc/cpuinfo | wc -l'
+       self.cpu_count = result.to_i
+     end 
+     cpu_count_without_get_info
+    end
+    alias_method_chain :cpu_count, :get_info
    
     def default_root_volume_group
       volume_groups.first
@@ -138,6 +158,10 @@ module CloudModel
     end
     
     def sync_inst_images
+      if CloudModel.config.skip_sync_images
+        return true
+      end
+      
       # TODO: make work with initial root pw
       ssh_address = initial_root_pw ? primary_address.ip : private_network.list_ips.first
       command = "rsync -avz -e 'ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' #{CloudModel.config.data_directory.shellescape}/inst/ root@#{ssh_address}:/inst"
@@ -189,7 +213,13 @@ module CloudModel
       
       success = exit_status == 0      
       Rails.logger.debug [success, stdout_data, stderr_data, exit_status, exit_signal]
-      return [success, stdout_data]
+      
+      stdout = stdout_data
+      unless success
+        stdout += stderr_data.values * "\n"
+      end
+      
+      return [success, stdout]
     end
 
     def exec! command, message
@@ -201,8 +231,12 @@ module CloudModel
       data
     end
     
+    def mounted_at? mountpoint, root=''
+      exec('mount')[1].match(/on #{root}#{mountpoint} type/)
+    end
+    
     def boot_fs_mounted? root=''
-      exec('mount')[1].match(/on #{root}\/boot type/)
+      mounted_at? '/boot', root
     end
     
     def mount_boot_fs root=''
@@ -210,7 +244,7 @@ module CloudModel
       if boot_fs_mounted? root
         return true
       else
-        success, data = exec "mount /dev/md127 #{root}/boot"
+        success, data = exec "mkdir -p #{root}/boot && mount /dev/md127 #{root}/boot"
         unless success
           success, data = exec "mount /dev/md/rescue:127 #{root}/boot"
         end
@@ -278,5 +312,24 @@ module CloudModel
         CloudModel.log_exception e
       end
     end
+    
+    def buildable?
+      [:finished, :failed, :not_started].include? build_state
+    end
+    
+    def build(options = {})
+      unless buildable? or options[:force]
+        return false
+      end
+      
+      update_attribute :build_state, :pending
+      
+      begin
+        CloudModel::call_rake 'cloudmodel:host:build_image', host_id: id
+      rescue Exception => e
+        update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
+        CloudModel.log_exception e
+      end
+    end  
   end
 end

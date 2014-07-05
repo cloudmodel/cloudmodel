@@ -1,4 +1,9 @@
 namespace :cloudmodel do
+  desc "Backup marked services and volumes"
+  task :backup do
+    CloudModel::Guest.all.map{|guest| guest.backup}
+  end
+  
   namespace :host do
     task :load_host do
       @host_worker = CloudModel::HostWorker.new CloudModel::Host.find(ENV['HOST_ID'])
@@ -12,6 +17,11 @@ namespace :cloudmodel do
     desc "Redeploy host"
     task :redeploy => [:environment, :load_host] do
       @host_worker.redeploy
+    end
+    
+    desc "Build host image"
+    task :build_image => [:environment, :load_host] do
+      @host_worker.build_image
     end
     
     desc "Update tinc host files"
@@ -68,6 +78,8 @@ namespace :cloudmodel do
       @guest.backup
     end
     
+    # Perfect for call by crontab
+    # bash -c 'cd /var/www/rails/current && RAILS_ENV=production /usr/local/bin/bundle exec rake cloudmodel:guest:backup_all'
     desc "Backup all guest"
     task :backup_all => [:environment] do
       CloudModel::Guest.all.each do |guest|

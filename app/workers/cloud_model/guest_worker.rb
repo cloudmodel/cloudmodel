@@ -27,16 +27,18 @@ module CloudModel
         './var/log/*',
         './usr/share/man',
         './usr/share/doc',
-        './usr/portage'
-      ], C: @guest.base_path
+        './usr/portage/*'
+      ], C: '/vm/build/guest'
 
       #
       # Download file to local /inst
       #
 
-      `mkdir -p #{CloudModel.config.data_directory.shellescape}/inst`
-      @host.ssh_connection.sftp.download! "/inst/guest.tar", "#{CloudModel.config.data_directory}/inst/guest.tar"
-
+      unless CloudModel.config.skip_sync_images
+        `mkdir -p #{CloudModel.config.data_directory.shellescape}/inst`
+        @host.ssh_connection.sftp.download! "/inst/guest.tar", "#{CloudModel.config.data_directory}/inst/guest.tar"
+      end
+      
       return true
     end
       
@@ -188,23 +190,18 @@ module CloudModel
       puts "  Prepare VM"
 
       # Setup Net
-      puts "    Write network config"
       begin
-        @host.ssh_connection.sftp.file.open("#{@guest.deploy_path}/etc/conf.d/net", 'w') do |f|
-          f.puts "dns_servers=\"\n8.8.8.8\n8.8.4.4\n213.133.100.100\n213.133.98.98\n213.133.99.99\n\"\n\n"
-          f.puts "config_eth0=\"#{@guest.private_address}/#{@host.private_network.subnet}\"\n\n"
-          f.puts "routes_eth0=\"default gw #{@host.private_network.gateway}\""
-        end
+        puts "    Write network config"      
+        render_to_remote "/cloud_model/guest/etc/conf.d/network", "#{@guest.deploy_path}/etc/conf.d/network@eth0", host: @host, guest: @guest
       rescue Exception => e
         CloudModel.log_exception e
         raise "Failed to configure network!"
       end
-
+      
       begin
         puts "    Write hostname"
-        @host.ssh_connection.sftp.file.open("#{@guest.deploy_path}/etc/conf.d/hostname", 'w') do |f|
-          f.puts "hostname=\"#{@guest.name}\""
-        end
+        render_to_remote "/cloud_model/support/etc/hostname", "#{@guest.deploy_path}/etc/hostname", host: @guest
+        render_to_remote "/cloud_model/support/etc/machine_info", "#{@guest.deploy_path}/etc/machine-info", host: @guest     
       rescue Exception => e
         CloudModel.log_exception e
         raise "Failed to configure hostname!"
@@ -228,9 +225,9 @@ module CloudModel
         puts "    Append prompt to profile file"
         @host.ssh_connection.sftp.file.open("#{@guest.deploy_path}/etc/profile", "a") do |f|
           f.puts "if [[ ${EUID} == 0 ]] ; then"
-          f.puts "\tPS1='\\[\\033[01;31m\\]#{@guest.name}\\[\\033[01;34m\\] \\W \\$\\[\\033[00m\\] '"
+          f.puts "\tPS1='\\[\\033[01;31m\\]#{@guest.name.shellescape}\\[\\033[01;34m\\] \\W \\$\\[\\033[00m\\] '"
           f.puts "else"
-          f.puts "\tPS1='\\[\\033[01;32m\\]\\u@#{@guest.name}\\[\\033[01;34m\\] \\w \\$\\[\\033[00m\\] '"
+          f.puts "\tPS1='\\[\\033[01;32m\\]\\u@#{@guest.name.shellescape}\\[\\033[01;34m\\] \\w \\$\\[\\033[00m\\] '"
           f.puts "fi"
         end
       rescue
@@ -280,25 +277,25 @@ module CloudModel
       build_dir = '/vm/build/guest'
  
       @guest.update_attributes build_state: :running, build_last_issue: nil
-
+      
       begin
         #
         # Create and mount build root if necessary
         #
         unless @host.mounted_at? build_dir
-          # begin
-          #   build_lv = CloudModel::LogicalVolume.find_by(name: 'build-host')
-          # rescue 
-          #   build_lv = CloudModel::LogicalVolume.create! name: 'build-host', disk_space: "32G", volume_group: @host.volume_groups.first
-          # end
-          build_lv = CloudModel::LogicalVolume.find_or_create_by! name: 'build-guest', disk_space: "32G", volume_group: @host.volume_groups.first
+          begin
+            build_lv = CloudModel::LogicalVolume.find_by(name: 'build-guest')
+          rescue 
+            build_lv = CloudModel::LogicalVolume.create! name: 'build-guest', disk_space: "32G", volume_group: @host.volume_groups.first
+          end
+
           build_lv.apply
           unless build_lv.mount build_dir
             raise 'Failed to mount build partition'
           end
         end
 
-        if false
+        if true
           # Find latest stage 3 image on gentoo mirror
           gentoo_release_path = 'releases/amd64/autobuilds/'
           gentoo_stage3_info = 'latest-stage3-amd64-hardened+nomultilib.txt'
@@ -309,7 +306,7 @@ module CloudModel
           # TODO: Check checksum of stage3 file
           @host.exec! "cd #{build_dir} && tar xjpf stage3.tar.bz2", 'Failed to unpack stage 3 file'
         
-          @host.ssh_connection.sftp.remove "#{build_dir}/stage3.tar.bz2"
+          @host.ssh_connection.sftp.remove! "#{build_dir}/stage3.tar.bz2"
         end
         
         @host.exec "rm -f #{build_dir}/etc/mtab && ln -sf /proc/self/mounts #{build_dir}/etc/mtab"
@@ -335,7 +332,7 @@ module CloudModel
         
         # Update system software
         mkdir_p "#{build_dir}/usr/portage"
-        if false
+        if true
           chroot! build_dir, "emerge-webrsync", 'Failed to sync portage'
           chroot! build_dir, "emerge --sync --quiet", 'Failed to sync portage'
           chroot! build_dir, "emerge --oneshot portage", 'Failed to merge new portage'
@@ -366,6 +363,7 @@ module CloudModel
           # )
           packages += %w(
             dev-lang/ruby
+            net-misc/curl
           )
           
           # Redis
@@ -384,18 +382,30 @@ module CloudModel
             www-servers/tomcat
           )
           
-          chroot! build_dir, "emerge --update --newuse --deep --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
+          #chroot! build_dir, "emerge --update --newuse --deep --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
+          chroot! build_dir, "emerge --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
+          chroot! build_dir, "/usr/share/tomcat-7/gentoo/tomcat-instance-manager.bash --create"
+        end
+        
+        if true
+          chroot! build_dir, render("/cloud_model/guest/bin/build_nginx_passenger.sh"), 'Failed to build nginx+passenger'
         end
                 
+        render_to_remote "/cloud_model/guest/etc/systemd/system/console-getty.service", "#{build_dir}/usr/lib/systemd/system/console-getty.service"
+
         render_to_remote "/cloud_model/guest/etc/systemd/system/network@.service", "#{build_dir}/etc/systemd/system/network@.service"
         chroot build_dir, "ln -s /usr/lib/systemd/system/network@.service /etc/systemd/system/multi-user.target.wants/network@eth0.service"
         
         render_to_remote "/cloud_model/guest/etc/systemd/system/mongodb.service", "#{build_dir}/etc/systemd/system/mongodb.service"
         render_to_remote "/cloud_model/guest/etc/systemd/system/redis.service", "#{build_dir}/etc/systemd/system/redis.service"
+        render_to_remote "/cloud_model/guest/bin/tomcat-7", "#{build_dir}/usr/sbin/tomcat-7", 0755
+        render_to_remote "/cloud_model/guest/etc/systemd/system/tomcat-7.service", "#{build_dir}/etc/systemd/system/tomcat-7.service"
+        render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service", "#{build_dir}/etc/systemd/system/nginx.service"
         render_to_remote "/cloud_model/guest/etc/systemd/system/sshd.service", "#{build_dir}/etc/systemd/system/sshd.service"
         
         render_to_remote "/cloud_model/support/etc/locale.conf", "#{build_dir}/etc/locale.conf", host: @guest
         render_to_remote "/cloud_model/support/etc/vconsole.conf", "#{build_dir}/etc/vconsole.conf", host: @guest
+        render_to_remote "/cloud_model/guest/etc/tmpfiles.d/nginx.conf", "#{build_dir}/etc/tmpfiles.d/nginx.conf"
         
         @guest.update_attributes build_state: :finished
       rescue Exception => e

@@ -64,8 +64,7 @@ module CloudModel
       end
     
       def auto_start
-        puts "        Add Nginx to runlevel default"
-        @host.exec "ln -sf /etc/init.d/sp-nginx #{@guest.deploy_path}/etc/runlevels/default/"
+        super
         # TODO: Resolve dependencies
         # Services::Ssh.new(@host, @options).write_config
       end

@@ -1,0 +1,52 @@
+<%- 
+nginx_index = Net::HTTP.get(URI.parse("http://nginx.org/download/"))
+nginx_version = nginx_index.scan(/nginx-(1\.7\.[0-9]*)\.tar.gz/).last.first 
+-%>
+
+export prefix=/opt/nginx_passenger
+export configdir='/etc/nginx'
+export builddir=$prefix/src
+
+export CFLAGS='-O3 -mtune=core2 -mmmx -msse -msse2 -msse3 -fexpensive-optimizations -ftree-loop-optimize -ftree-vectorize -ftree-vectorizer-verbose=5'
+export CXXFLAGS=$CFLAGS
+
+groupadd -f -r -g 1001 www &&
+useradd -c 'added by cloud_model for nginx' -d /var/www -s /bin/bash -r -g 1001 -u 1001 www
+
+mkdir -p $builddir &&
+cd $builddir &&
+wget http://nginx.org/download/nginx-<%= nginx_version %>.tar.gz &&
+tar xzvf nginx-<%= nginx_version %>.tar.gz &&
+gem install --no-rdoc --no-ri passenger &&
+
+passenger-install-nginx-module --auto \
+  --prefix=$prefix \
+  --nginx-source-dir=$builddir/nginx-<%= nginx_version %> \
+  --extra-configure-flags="\
+    --conf-path=$configdir/nginx.conf \
+    --with-http_gzip_static_module \
+    --without-http_autoindex_module \
+    --pid-path=/run/nginx.pid \
+    --http-log-path=/var/log/nginx/access.log \
+    --error-log-path=/var/log/nginx/error.log \
+    --user=www \
+    --group=www \
+    --with-ipv6 \
+    --with-http_ssl_module \
+    --with-http_spdy_module \
+    --with-http_perl_module \
+    --http-client-body-temp-path=/tmp/http/client_body_temp \
+    --http-proxy-temp-path=/tmp/http/proxy_temp \
+    --http-fastcgi-temp-path=/tmp/http/fastcgi_temp \
+    --with-http_stub_status_module \
+  " &&
+
+rm -rf $builddir
+
+export ruby_bin=`which ruby`
+export gem_dir=`gem env gemdir`
+export passenger_version=`passenger-config --version`
+echo >/etc/nginx/passenger.conf "# Include to config passenger
+passenger_root                  ${gem_dir}/gems/passenger-${passenger_version};
+passenger_ruby                  ${ruby_bin};  
+"
