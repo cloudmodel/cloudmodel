@@ -390,6 +390,7 @@ module CloudModel
           chroot! build_dir, "emerge --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
           chroot! build_dir, "eselect ruby set ruby21", "Failed to set ruby version to 2.1"
           chroot! build_dir, "/usr/share/tomcat-7/gentoo/tomcat-instance-manager.bash --create", 'Failed to create tomcat config'
+          chroot! build_dir, "rm -rf /var/lib/tomcat-7/webapps/ROOT", "Failed to remove genuine root app for tomcat"
         end
         
         if true
