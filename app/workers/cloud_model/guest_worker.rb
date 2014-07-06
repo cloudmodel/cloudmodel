@@ -364,7 +364,10 @@ module CloudModel
           packages += %w(
             dev-lang/ruby
             dev-ruby/rubygems
+            dev-ruby/bundler
+            net-libs/nodejs
             net-misc/curl
+            dev-vcs/git
           )
           
           # Redis
