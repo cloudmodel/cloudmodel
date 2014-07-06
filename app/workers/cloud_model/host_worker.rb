@@ -44,7 +44,7 @@ module CloudModel
         '/usr/share/man',
         '/usr/share/doc',
         '/usr/portage/*'
-        ] C: '/vm/build/host'
+        ], C: '/vm/build/host'
     
       #
       # Download files to local /inst

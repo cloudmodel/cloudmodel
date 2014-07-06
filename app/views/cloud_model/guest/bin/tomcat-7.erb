@@ -11,12 +11,12 @@ TOMCAT_START=start
 # JPDA_ADDRESS="8000"
 # JPDA_OPTS="-Xdebug -Xrunjdwp:transport=${JPDA_TRANSPORT},address=${JPDA_ADDRESS},server=y,suspend=n"
 
+source /etc/conf.d/tomcat-7
+
 export JAVA_HOME=`java-config ${TOMCAT_JVM:+--select-vm ${TOMCAT_JVM}} --jre-home`
 
 CLASSPATH=`java-config --classpath tomcat-7${TOMCAT_EXTRA_JARS:+,${TOMCAT_EXTRA_JARS}}`
 export CLASSPATH="${CLASSPATH}${TOMCAT_EXTRA_CLASSPATH:+:${TOMCAT_EXTRA_CLASSPATH}}"
-
-source /etc/conf.d/tomcat-7
 
 cmd=java args=
 if [ "${TOMCAT_START}" = "debug" ] || [ "${TOMCAT_START}" = "-security debug" ] ; then

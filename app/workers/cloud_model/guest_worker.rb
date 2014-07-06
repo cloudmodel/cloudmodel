@@ -363,6 +363,7 @@ module CloudModel
           # )
           packages += %w(
             dev-lang/ruby
+            dev-ruby/rubygems
             net-misc/curl
           )
           
@@ -384,7 +385,8 @@ module CloudModel
           
           #chroot! build_dir, "emerge --update --newuse --deep --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
           chroot! build_dir, "emerge --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
-          chroot! build_dir, "/usr/share/tomcat-7/gentoo/tomcat-instance-manager.bash --create"
+          chroot! build_dir, "eselect ruby set ruby21", "Failed to set ruby version to 2.1"
+          chroot! build_dir, "/usr/share/tomcat-7/gentoo/tomcat-instance-manager.bash --create", 'Failed to create tomcat config'
         end
         
         if true

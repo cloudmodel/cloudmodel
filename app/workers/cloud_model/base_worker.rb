@@ -10,9 +10,14 @@ module CloudModel
     
     # render_to_remote template, remote_file, [[perms], locals]
     def render_to_remote template, remote_file, *param_array
+      perm = if param_array.first.is_a? Fixnum
+        param_array.shift 
+      else
+        0600
+      end
+            
       locals = param_array.pop || {}
-      perm = param_array.first || 0600
-
+      
       @host.ssh_connection.sftp.file.open(remote_file, 'w', perm) do |f|
         f.puts render(template, locals)
       end
