@@ -100,6 +100,7 @@ module CloudModel
     
         write_fstab
 
+        ## TODO: One shot to update admin guest
         @guest.undefine || raise("Failed to undefine guest")
     
         umount_all
@@ -109,6 +110,7 @@ module CloudModel
         define_guest
         @guest.start || raise("Failed to start guest")
     
+        ## TODO: This should be called after one-shot update of admin guest
         puts "    Destroy old root LV #{old_volume.name}"
         @host.exec "lvremove -f #{old_volume.device}"
       
