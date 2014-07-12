@@ -40,7 +40,7 @@ module CloudModel
       @bundle_command || if Rails.env.test? or Rails.env.development?
         'bundle'        
       else
-        'PATH=/bin:/sbin:/usr/bin /usr/local/bin/bundle' 
+        'PATH=/bin:/sbin:/usr/bin:/usr/local/bin /usr/bin/bundle' 
       end
     end
   end
