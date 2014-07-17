@@ -15,7 +15,7 @@ module CloudModel
         return false unless has_backups
         timestamp = Time.now.strftime "%Y%m%d%H%M%S"
         FileUtils.mkdir_p backup_directory
-        command = "mongodump -h #{guest.private_address} --port #{port} -o #{backup_directory}/#{timestamp}"
+        command = "LC_ALL=C mongodump -h #{guest.private_address} --port #{port} -o #{backup_directory}/#{timestamp}"
 
         Rails.logger.debug command
         Rails.logger.debug `#{command}`
@@ -34,7 +34,7 @@ module CloudModel
       
       def restore timestamp='latest'
         if File.exists? "#{backup_directory}/#{timestamp}"
-          command = "mongorestore --drop -h #{guest.private_address} --port #{port} #{backup_directory}/#{timestamp}"
+          command = "LC_ALL=C mongorestore --drop -h #{guest.private_address} --port #{port} #{backup_directory}/#{timestamp}"
 
           Rails.logger.debug command
           Rails.logger.debug `#{command}`
