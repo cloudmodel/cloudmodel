@@ -31,8 +31,8 @@ de:
     running: Wird erstellt
     checking_out: Wird ausgecheckt
     bundling: Bibliliotheken werden geladen
-    building_assets: Assets werden erstellen
-    packaging: Packet wird erstellen 
+    building_assets: Assets werden erstellt
+    packaging: Packet wird erstellt
     storing: Daten sichern
     finished: Abgeschlossen
     failed: Fehlgeschlagen
@@ -44,7 +44,7 @@ de:
         repo_not_found: nicht gefunden oder nicht zugreifbar
         branch_not_pulled: nicht gefunden oder nicht ladbar
         bundle_failed: Packen des Gemfiles fehlgeschlagen
-        building_assets_failed: erstellen fehlgeschlagen
+        building_assets_failed: Erstellen fehlgeschlagen
         
     models:
       cloud_model/host: 
