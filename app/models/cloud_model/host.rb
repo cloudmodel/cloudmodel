@@ -33,6 +33,8 @@ module CloudModel
     enum_field :build_state, values: {
       0x00 => :pending,
       0x01 => :running,
+      0xe0 => :packaging,
+      0xe8 => :downloading,
       0xf0 => :finished,
       0xf1 => :failed,
       0xff => :not_started
@@ -157,13 +159,20 @@ module CloudModel
       end
     end
     
+    def ssh_address
+      initial_root_pw ? primary_address.ip : private_network.list_ips.first
+    end
+    
+    def shell
+      puts "ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa root@#{ssh_address}"
+    end
+    
     def sync_inst_images
       if CloudModel.config.skip_sync_images
         return true
       end
       
       # TODO: make work with initial root pw
-      ssh_address = initial_root_pw ? primary_address.ip : private_network.list_ips.first
       command = "rsync -avz -e 'ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' #{CloudModel.config.data_directory.shellescape}/inst/ root@#{ssh_address}:/inst"
       Rails.logger.debug command
       `#{command}`

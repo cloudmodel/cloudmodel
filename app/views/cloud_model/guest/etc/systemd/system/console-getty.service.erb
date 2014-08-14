@@ -12,7 +12,6 @@ After=systemd-user-sessions.service plymouth-quit-wait.service
 Before=getty.target
 
 [Service]
-#ExecStart=-/sbin/agetty --noclear --keep-baud console 115200,38400,9600 $TERM
 ExecStart=-/sbin/agetty --autologin root --nohostname --noclear --nohints -8 console 38400
 Type=idle
 Restart=always

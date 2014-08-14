@@ -1,0 +1,22 @@
+[Unit]
+Description=Ethernet Network Connectivity
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+ExecStart=/bin/ip link set eth0 up
+ExecStart=/bin/ip address add <%= host.primary_address %> brd <%= host.primary_address.broadcast %> dev eth0
+<% host.addresses.each do |address| -%>
+
+<% address.list_ips.each do |ip| -%>
+ExecStart=/bin/ip address add <%= ip %>/<%= address.subnet %> dev eth0
+<% end -%>
+<% end -%>
+ExecStart=/bin/ip route add default via <%= host.primary_address.gateway %>
+
+ExecStop=/bin/ip addr flush dev eth0
+ExecStop=/bin/ip link set dev eth0 down
+
+[Install]
+WantedBy=network.target

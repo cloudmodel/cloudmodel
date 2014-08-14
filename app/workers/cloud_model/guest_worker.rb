@@ -321,17 +321,6 @@ module CloudModel
         # Copy dns configuration
         @host.exec! "cp -L /etc/resolv.conf #{build_dir}/etc/", 'Failed to copy resolv.conf'
         
-        # Prepare chroot by loop mounting some important devices
-        unless @host.mounted_at? "#{build_dir}/proc"
-          @host.exec! "mount -t proc none #{build_dir}/proc", 'Failed to mount proc to build system'
-        end
-        unless @host.mounted_at? "#{build_dir}/sys"
-          @host.exec! "mount --rbind /sys #{build_dir}/sys", 'Failed to mount sys to build system'
-        end
-        unless @host.mounted_at? "#{build_dir}/dev"
-          @host.exec! "mount --rbind /dev #{build_dir}/dev", 'Failed to mount dev to build system'
-        end
-        
         # Update system software
         mkdir_p "#{build_dir}/usr/portage"
         if true
@@ -358,11 +347,6 @@ module CloudModel
             dev-db/mongodb
           )
           
-          # TODO: nginx+passenger ebuild or other merging 
-          # # NGINX \w passenger
-          # packages += %w(
-          #   www-servers/nginx
-          # )
           packages += %w(
             dev-lang/ruby
             dev-ruby/rubygems
@@ -388,16 +372,13 @@ module CloudModel
             www-servers/tomcat
           )
           
-          #chroot! build_dir, "emerge --update --newuse --deep --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
           chroot! build_dir, "emerge --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
           chroot! build_dir, "eselect ruby set ruby21", "Failed to set ruby version to 2.1"
           chroot! build_dir, "/usr/share/tomcat-7/gentoo/tomcat-instance-manager.bash --create", 'Failed to create tomcat config'
           chroot! build_dir, "rm -rf /var/lib/tomcat-7/webapps/ROOT", "Failed to remove genuine root app for tomcat"
         end
         
-        if true
-          chroot! build_dir, render("/cloud_model/guest/bin/build_nginx_passenger.sh"), 'Failed to build nginx+passenger'
-        end
+        chroot! build_dir, render("/cloud_model/guest/bin/build_nginx_passenger.sh"), 'Failed to build nginx+passenger'
                 
         render_to_remote "/cloud_model/guest/etc/systemd/system/console-getty.service", "#{build_dir}/usr/lib/systemd/system/console-getty.service"
 
@@ -405,11 +386,13 @@ module CloudModel
         chroot build_dir, "ln -s /usr/lib/systemd/system/network@.service /etc/systemd/system/multi-user.target.wants/network@eth0.service"
         
         render_to_remote "/cloud_model/guest/etc/systemd/system/mongodb.service", "#{build_dir}/etc/systemd/system/mongodb.service"
-        render_to_remote "/cloud_model/guest/etc/systemd/system/redis.service", "#{build_dir}/etc/systemd/system/redis.service"
+        render_to_remote "/cloud_model/support/etc/system/unit.d/restart.conf", "#{build_dir}/etc/system/redis.service.d/restart.conf"
         render_to_remote "/cloud_model/guest/bin/tomcat-7", "#{build_dir}/usr/sbin/tomcat-7", 0755
         render_to_remote "/cloud_model/guest/etc/systemd/system/tomcat-7.service", "#{build_dir}/etc/systemd/system/tomcat-7.service"
         render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service", "#{build_dir}/etc/systemd/system/nginx.service"
-        render_to_remote "/cloud_model/guest/etc/systemd/system/sshd.service", "#{build_dir}/etc/systemd/system/sshd.service"
+        render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.service", "#{build_dir}/etc/systemd/system/rake@.service"
+        render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.timer", "#{build_dir}/etc/systemd/system/rake@.timer"
+        render_to_remote "/cloud_model/support/etc/system/unit.d/restart.conf", "#{build_dir}/etc/system/sshd.service.d/restart.conf"
         
         render_to_remote "/cloud_model/support/etc/locale.conf", "#{build_dir}/etc/locale.conf", host: @guest
         render_to_remote "/cloud_model/support/etc/vconsole.conf", "#{build_dir}/etc/vconsole.conf", host: @guest
@@ -419,8 +402,10 @@ module CloudModel
       rescue Exception => e
         CloudModel.log_exception e
         @guest.update_attributes build_state: :failed, build_last_issue: "#{e}"
-        return false    
+        raise e
       end
+      
+      cleanup_chroot build_dir
     end
   end
 end

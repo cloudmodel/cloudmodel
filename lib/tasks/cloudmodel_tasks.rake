@@ -4,6 +4,17 @@ namespace :cloudmodel do
     CloudModel::Guest.all.map{|guest| guest.backup}
   end
   
+  namespace :host_image do
+    task :load_host do
+      @host_worker = CloudModel::HostImageWorker.new CloudModel::Host.find(ENV['HOST_ID'])
+    end
+    
+    desc "Build host image"
+    task :build_image => [:environment, :load_host] do
+      @host_worker.build_image
+    end
+  end
+  
   namespace :host do
     task :load_host do
       @host_worker = CloudModel::HostWorker.new CloudModel::Host.find(ENV['HOST_ID'])
@@ -18,20 +29,10 @@ namespace :cloudmodel do
     task :redeploy => [:environment, :load_host] do
       @host_worker.redeploy
     end
-    
-    desc "Build host image"
-    task :build_image => [:environment, :load_host] do
-      @host_worker.build_image
-    end
-    
+        
     desc "Update tinc host files"
     task :update_tinc_host_files => [:environment, :load_host] do
       @host_worker.update_tinc_host_files
-    end
-    
-    desc "Create new host image"
-    task :create_image => [:environment, :load_host] do
-      @host_worker.create_image
     end
   end
   

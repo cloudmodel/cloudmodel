@@ -6,10 +6,6 @@ require 'securerandom'
 module CloudModel
   class HostWorker < BaseWorker
 
-    def initialize(host)
-      @host = host
-    end
-
     def host
       @host
     end
@@ -18,54 +14,6 @@ module CloudModel
       "/mnt/root-#{@timestamp}"
     end
     
-    def create_image
-      #
-      # Create boot image
-      #
-      
-      @host.mount_boot_fs
-      build_tar '/boot', "/inst/boot.tar.bz2", :j, one_file_system: true
-      @host.exec 'umount /boot'
-    
-      #
-      # Create root image
-      #
-      
-      build_tar '/', "/inst/root.tar.bz2", :j, one_file_system: true, exclude: [
-        '/etc/udev/rules.d/70-persistent-net.rules',
-        '/tmp/*',
-        '/var/tmp/*',
-        '/var/cache/*',
-        '/var/log/*',
-        '/inst/*', 
-        '/vm/*',
-        '/etc/libvirt/lxc/*',
-        '/etc/tinc/vpn/*',
-        '/usr/share/man',
-        '/usr/share/doc',
-        '/usr/portage/*'
-        ], C: '/vm/build/host'
-    
-      #
-      # Download files to local /inst
-      #
-      
-      unless CloudModel.config.skip_sync_images
-        `mkdir -p #{CloudModel.config.data_directory.shellescape}/inst`
-        @host.ssh_connection.sftp.download! "/inst/boot.tar.bz2", "#{CloudModel.config.data_directory}/inst/boot.tar.bz2"
-        @host.ssh_connection.sftp.download! "/inst/root.tar.bz2", "#{CloudModel.config.data_directory}/inst/root.tar.bz2"
-      end
-      
-      return true
-    end
-  
-    def copy_config path
-      #
-      # Copy config from old host fs
-      #
-      @host.exec! "cp -ra #{path.shellescape} #{root}#{path.shellescape}", "Failed to copy old config #{path}"
-    end
-  
     def config_firewall
       #
       # Configure firewall
@@ -81,9 +29,7 @@ module CloudModel
       # Configure fstab
       #
       
-      @host.ssh_connection.sftp.file.open("#{root}/etc/fstab", 'w') do |f|
-        f.puts render('/cloud_model/host/etc/fstab', host: @host, timestamp: @timestamp)
-      end
+      render_to_remote '/cloud_model/host/etc/fstab', "#{root}/etc/fstab", host: @host, timestamp: @timestamp
     end
   
     def config_libvirt_guests
@@ -98,9 +44,7 @@ module CloudModel
         # Generate xml file in /etc/libvirt/lxc/
         #
         
-        @host.ssh_connection.sftp.file.open("#{root}/etc/libvirt/lxc/#{guest.name}.xml", 'w', 0600) do |f|
-          f.puts render("/cloud_model/host/etc/libvirt/lxc/guest.xml", guest: guest)
-        end
+        render_to_remote "/cloud_model/host/etc/libvirt/lxc/guest.xml", "#{root}/etc/libvirt/lxc/#{guest.name}.xml", guest: guest
 
         #
         # Link maschine to /etc/libvirt/lxc/autostart/
@@ -129,17 +73,13 @@ module CloudModel
       #
       success, mtab = @host.exec('mount')
       print '.'
-      unless mtab.match(/on #{root}\/proc type/)
-        @host.exec! "mount -t proc none #{root}/proc", "Failed to mount /proc to chroot"
-      end
-      
-      unless mtab.match(/on #{root}\/proc type/)
-        @host.exec! "mount --rbind /dev #{root}/dev", "Failed to mount /dev to chroot"
-      end
       
       unless @host.mount_boot_fs root
         raise "Failed to mount /boot to chroot"
       end
+      
+      render_to_remote "/cloud_model/host/etc/default/grub", "#{root}/etc/default/grub", root: @deploy_lv
+      
       
       chroot! root, "grub2-install /dev/sda", 'Failed to install grub on sda'
       chroot! root, "grub2-mkconfig -o /boot/grub/grub.cfg", 'Failed to config grub'
@@ -163,16 +103,14 @@ module CloudModel
       
       mkdir_p "#{root}/etc/tinc/vpn/hosts/"
       CloudModel::VpnClient.each do |client|
-        @host.ssh_connection.sftp.file.open("#{root}/etc/tinc/vpn/hosts/#{client.name.shellescape}", 'w') do |f|
-          f.puts render("/cloud_model/host/etc/tinc/client", client: client)
-        end
+        render_to_remote "/cloud_model/host/etc/tinc/client", "#{root}/etc/tinc/vpn/hosts/#{client.name.shellescape}", client: client
       end
       
       CloudModel::Host.each do |host|
-        @host.ssh_connection.sftp.file.open("#{root}/etc/tinc/vpn/hosts/#{host.name.shellescape}", 'w') do |f|
-          f.puts render("/cloud_model/host/etc/tinc/host", host: host)
-        end
+        render_to_remote "/cloud_model/host/etc/tinc/host", "#{root}/etc/tinc/vpn/hosts/#{host.name.shellescape}", host: host
       end
+      
+      true
     end
 
     def use_last_deploy_root
@@ -188,6 +126,71 @@ module CloudModel
       end
     end
     
+    def make_deploy_disk
+      #
+      # Partition disks
+      #
+
+      @host.exec! "sgdisk -go -n 1:2048:526335 -t 1:ef02 -c 1:boot -n 2:526336:67635199 -t 2:8200 -c 2:swap -N 3 -t 3:fd00 -c 3:lvm /dev/sda", "Failed to create partitions on /dev/sda"
+      @host.exec! "sgdisk -go -n 1:2048:526335 -t 1:ef02 -c 1:boot -n 2:526336:67635199 -t 2:8200 -c 2:swap -N 3 -t 3:fd00 -c 3:lvm /dev/sdb", "Failed to create partitions on /dev/sdb"
+             
+      #
+      # make raid 
+      #
+      # /dev/md127 is needed for /boot as grub would name it so anyway after first boot
+      #
+             
+      if md_data = @host.exec('cat /proc/mdstat') and md_data[0] and md_data = md_data[1]
+        unless md_data =~ /md127 \: active raid1 sdb1\[1\] sda1\[0\]/
+          @host.exec 'mdadm --create -e1 -f /dev/md127 --level=1 --raid-devices=2 /dev/sda1 /dev/sdb1'
+          
+        end
+
+        unless md_data =~ /md1 \: active raid1 sdb3\[1\] sda3\[0\]/
+          @host.exec 'mdadm --create -e1 -f /dev/md1 --level=1 --raid-devices=2 /dev/sda3 /dev/sdb3'
+          
+        end          
+      else
+        raise 'Failed to stat md data'
+      end                 
+             
+      #
+      # make swap
+      #
+             
+      @host.exec! 'mkswap /dev/sda2', 'Failed to create swap on sda'
+      @host.exec! 'mkswap /dev/sdb2', 'Failed to create swap on sdb'
+             
+      #
+      # make boot
+      #
+             
+      @host.exec! 'mkfs.ext2 /dev/md127', 'Failed to create fs for boot'
+      
+      #
+      # make lvm
+      #
+      # TODO: create vg0 if server was replaced
+      
+      @host.volume_groups.create! name: 'vg0', disk_device: 'md1'
+
+      # 
+      # make /inst
+      # 
+    
+      @host.exec 'umount /inst'
+      @host.exec 'lvremove -f vg0 inst' # Destroy lv inst if exists
+      @host.exec! 'lvcreate -L32G -ninst vg0', 'Failed to create logical volume for /inst'
+      @host.exec! 'mkfs.ext4 /dev/vg0/inst', 'Failed to create fs for /inst'
+      @host.exec 'mkdir -p /inst'
+      @host.exec! 'mount /dev/vg0/inst /inst', 'Failed to mount /inst'      
+      
+      #
+      # The rest is quite similar to redeploy
+      #  
+      # TODO: SSH connection to new host for sync images etc. without entering password
+    end
+    
     def make_deploy_root
       @timestamp = Time.now.strftime '%Y%m%d%H%M%S'
       
@@ -200,7 +203,9 @@ module CloudModel
       unless @deploy_lv.mount "#{root}"
         raise 'Failed to mount system partition'
       end
-      
+    end
+    
+    def populate_deploy_root
       #
       # Populate deploy root with system image
       #
@@ -211,18 +216,15 @@ module CloudModel
     
     def config_deploy_root
       mkdir_p "#{root}/etc/conf.d"
-      @host.ssh_connection.sftp.file.open("#{root}/etc/conf.d/net", 'w') do |f|
-        f.puts render("/cloud_model/host/etc/conf.d/net", host: @host)
-      end 
       
-      @host.ssh_connection.sftp.file.open("#{root}/etc/conf.d/hostname", 'w') do |f|
-        f.write render("/cloud_model/host/etc/conf.d/hostname", host: @host)
-      end
+      render_to_remote "/cloud_model/host/etc/systemd/system/network.service", "#{root}/etc/systemd/system/network.service", host: @host
+      chroot root, "ln -s /usr/lib/systemd/system/network.service /etc/systemd/system/multi-user.target.wants/"
+            
+      render_to_remote "/cloud_model/support/etc/hostname", "#{root}/etc/hostname", host: @host
+      render_to_remote "/cloud_model/support/etc/machine_info", "#{root}/etc/machine-info", host: @host     
       
-      mkdir_p "#{root}/etc/libvirt/qemu/networks"
-      @host.ssh_connection.sftp.file.open("#{root}/etc/libvirt/qemu/networks/default.xml", 'w') do |f|
-        f.puts render("/cloud_model/host/etc/libvirt/qemu/networks/default.xml", host: @host)
-      end
+      mkdir_p "#{root}/etc/libvirt/qemu/networks"     
+      render_to_remote "/cloud_model/host/etc/libvirt/qemu/networks/default.xml", "#{root}/etc/libvirt/qemu/networks/default.xml", host: @host
       
       config_firewall
 
@@ -230,13 +232,8 @@ module CloudModel
       mkdir_p "#{root}/etc/tinc/vpn/"
       update_tinc_host_files root
       
-      @host.ssh_connection.sftp.file.open("#{root}/etc/tinc/vpn/tinc.conf", 'w') do |f|
-        f.puts render("/cloud_model/host/etc/tinc/tinc.conf", host: @host)
-      end
-          
-      @host.ssh_connection.sftp.file.open("#{root}/etc/tinc/vpn/tinc-up", 'w', 0755) do |f|
-        f.puts render("/cloud_model/host/etc/tinc/tinc-up", host: @host)
-      end
+      render_to_remote "/cloud_model/host/etc/tinc/tinc.conf", "#{root}/etc/tinc/vpn/tinc.conf", host: @host
+      render_to_remote "/cloud_model/host/etc/tinc/tinc-up", "#{root}/etc/tinc/vpn/tinc-up", 0755, host: @host
   
       config_fstab
       config_libvirt_guests
@@ -256,15 +253,21 @@ module CloudModel
     end
 
     def make_keys
-      @host.ssh_connection.sftp.file.open("#{root}/etc/tinc/vpn/rsa_key.priv", 'w', 0600) do |f|
-        f.puts render("/cloud_model/host/etc/tinc/rsa_key.priv", host: @host)
-      end
+      render_to_remote "/cloud_model/host/etc/tinc/rsa_key.priv", "#{root}/etc/tinc/vpn/rsa_key.priv", 0600, host: @host
       # Host SSH keys will be generated on first host start
     end
     
     def copy_keys
-      copy_config '/etc/tinc/vpn/rsa_key.priv'
-      copy_config '/etc/ssh/'
+      @host.exec! "cp -ra /etc/tinc/vpn/rsa_key.priv #{root}/etc/tinc/vpn/rsa_key.priv", "Failed to copy old tinc key"
+      @host.exec! "cp -ra /etc/ssh/ #{root}/etc/ssh", "Failed to copy old ssk keys"
+    end
+    
+    def sync_inst_images
+      if CloudModel.config.skip_sync_images
+        raise 'skipped'
+      end
+      
+      @host.sync_inst_images
     end
 
     def deploy
@@ -272,215 +275,48 @@ module CloudModel
       
       @host.update_attributes deploy_state: :running, deploy_last_issue: nil
       
-      begin
-        #
-        # Partition disks
-        #
-
-        @host.exec! "sgdisk -go -n 1:2048:526335 -t 1:ef02 -c 1:boot -n 2:526336:67635199 -t 2:8200 -c 2:swap -N 3 -t 3:fd00 -c 3:lvm /dev/sda", "Failed to create partitions on /dev/sda"
-        @host.exec! "sgdisk -go -n 1:2048:526335 -t 1:ef02 -c 1:boot -n 2:526336:67635199 -t 2:8200 -c 2:swap -N 3 -t 3:fd00 -c 3:lvm /dev/sdb", "Failed to create partitions on /dev/sdb"
-               
-        #
-        # make raid 
-        #
-        # /dev/md127 is needed for /boot as grub would name it so anyway after first boot
-        #
-               
-        if md_data = @host.exec('cat /proc/mdstat') and md_data[0] and md_data = md_data[1]
-          unless md_data =~ /md127 \: active raid1 sdb1\[1\] sda1\[0\]/
-            @host.exec 'mdadm --create -e1 -f /dev/md127 --level=1 --raid-devices=2 /dev/sda1 /dev/sdb1'
-            
-          end
-
-          unless md_data =~ /md1 \: active raid1 sdb3\[1\] sda3\[0\]/
-            @host.exec 'mdadm --create -e1 -f /dev/md1 --level=1 --raid-devices=2 /dev/sda3 /dev/sdb3'
-            
-          end          
-        else
-          raise 'Failed to stat md data'
-        end                 
-               
-        #
-        # make swap
-        #
-               
-        @host.exec! 'mkswap /dev/sda2', 'Failed to create swap on sda'
-        @host.exec! 'mkswap /dev/sdb2', 'Failed to create swap on sdb'
-               
-        #
-        # make boot
-        #
-               
-        @host.exec! 'mkfs.ext2 /dev/md127', 'Failed to create fs for boot'
-        
-        #
-        # make lvm
-        #
-        
-        @host.volume_groups.create! name: 'vg0', disk_device: 'md1'
-
-        # 
-        # make /inst
-        # 
+      build_start_at = Time.now
       
-        @host.exec 'umount /inst'
-        @host.exec 'lvremove -f vg0 inst' # Destroy lv inst if exists
-        @host.exec! 'lvcreate -L32G -ninst vg0', 'Failed to create logical volume for /inst'
-        @host.exec! 'mkfs.ext4 /dev/vg0/inst', 'Failed to create fs for /inst'
-        @host.exec 'mkdir -p /inst'
-        @host.exec! 'mount /dev/vg0/inst /inst', 'Failed to mount /inst'      
-        
-        #
-        # The rest is quite similar to redeploy
-        #  
-        
-        @host.sync_inst_images
-        make_deploy_root
-        make_keys
-        config_deploy_root
-        boot_deploy_root
-      rescue Exception => e
-        CloudModel.log_exception e
-        @host.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
-        return false
-      end
+      steps = [
+        ['Prepare disk for new system', :make_deploy_disk],
+        ['Upsync system images', :sync_inst_images],
+        ['Prepare volume for new system', :make_deploy_root],
+        ['Populate volume with new system image', :populate_deploy_root],
+        ['Config new system', :config_deploy_root],         
+        ['Make crypto keys', :make_keys],
+        # TODO: apply existing guests and restore backups
+        ['Write boot config and reboot', :boot_deploy_root],        
+      ]
+      
+      run_steps :deploy, steps, options
+      
+      @host.update_attributes deploy_state: :finished
+      
+      puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"      
     end
 
-    def redeploy
+    def redeploy options={}
       return false unless @host.deploy_state == :pending
       
       @host.update_attributes deploy_state: :running, deploy_last_issue: nil
       
-      begin
-        @host.sync_inst_images
-        make_deploy_root
-        copy_keys
-        config_deploy_root         
-        boot_deploy_root
-      rescue Exception => e
-        CloudModel.log_exception e
-        @host.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
-        return false
-      end    
-    end
-    
-    def build_image      
-      return false unless @host.build_state == :pending
+      build_start_at = Time.now
       
-      build_dir = '/vm/build/host'
- 
-      @host.update_attributes build_state: :running, build_last_issue: nil
-
-      begin
-        gentoo_mirrors = [
-          'http://linux.rz.ruhr-uni-bochum.de/download/gentoo-mirror/',
-          'http://ftp.fi.muni.cz/pub/linux/gentoo/',
-          'http://ftp-stud.fht-esslingen.de/pub/Mirrors/gentoo/',
-          'http://mirror.netcologne.de/gentoo/'
-        ]
-        
-        #
-        # Create and mount build root if necessary
-        #
-        unless @host.mounted_at? build_dir
-          # begin
-          #   build_lv = CloudModel::LogicalVolume.find_by(name: 'build-host')
-          # rescue 
-          #   build_lv = CloudModel::LogicalVolume.create! name: 'build-host', disk_space: "32G", volume_group: @host.volume_groups.first
-          # end
-          build_lv = CloudModel::LogicalVolume.find_or_create_by! name: 'build-host', disk_space: "32G", volume_group: @host.volume_groups.first
-          build_lv.apply
-          unless build_lv.mount build_dir
-            raise 'Failed to mount build partition'
-          end
-        end
-
-        if true
-          # Find latest stage 3 image on gentoo mirror
-          gentoo_release_path = 'releases/amd64/autobuilds/'
-          gentoo_stage3_info = 'latest-stage3-amd64-hardened+nomultilib.txt'
-          gentoo_stage3_file = Net::HTTP.get(URI.parse("#{CloudModel.config.gentoo_mirrors.first}#{gentoo_release_path}#{gentoo_stage3_info}")).lines.last.strip.shellescape
-        
-          # Download and unpack stage 3
-          @host.exec! "curl #{CloudModel.config.gentoo_mirrors.first}#{gentoo_release_path}#{gentoo_stage3_file} -o #{build_dir}/stage3.tar.bz2", 'Could not load stage 3 file'
-          # TODO: Check checksum of stage3 file
-          @host.exec! "cd #{build_dir} && tar xjpf stage3.tar.bz2", 'Failed to unpack stage 3 file'
-        
-          @host.ssh_connection.sftp.remove! "#{build_dir}/stage3.tar.bz2"
-        end
-        
-        # Configure gentoo parameters
-        render_to_remote "/cloud_model/host/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, host: @host, mirrors: gentoo_mirrors
-        render_to_remote "/cloud_model/host/etc/portage/package.accept_keywords", "#{build_dir}/etc/portage/package.accept_keywords", 0600, host: @host, mirrors: gentoo_mirrors
-        render_to_remote "/cloud_model/host/etc/portage/package.use", "#{build_dir}/etc/portage/package.use", 0600, host: @host, mirrors: gentoo_mirrors
-        render_to_remote "/cloud_model/host/etc/genkernel.conf", "#{build_dir}/etc/genkernel.conf", host: @host
-        mkdir_p "#{build_dir}/etc/cloud_model"
-        render_to_remote "/cloud_model/host/etc/cloud_model/kernel.config", "#{build_dir}/etc/cloud_model/kernel.config", host: @host
-        
-        # Copy dns configuration
-        @host.exec! "cp -L /etc/resolv.conf #{build_dir}/etc/", 'Failed to copy resolv.conf'
-        
-        # Prepare chroot by loop mounting some important devices
-        unless @host.mounted_at? "#{build_dir}/proc"
-          @host.exec! "mount -t proc none #{build_dir}/proc", 'Failed to mount proc to build system'
-        end
-        unless @host.mounted_at? "#{build_dir}/sys"
-          @host.exec! "mount --rbind /sys #{build_dir}/sys", 'Failed to mount sys to build system'
-        end
-        unless @host.mounted_at? "#{build_dir}/dev"
-          @host.exec! "mount --rbind /dev #{build_dir}/dev", 'Failed to mount dev to build system'
-        end
-        unless @host.mount_boot_fs build_dir
-          raise "Failed to mount /boot to build system"
-        end
-        
-        # Write script to be run in build chroot
-        mkdir_p "#{build_dir}/usr/portage"
-        if true
-          chroot! build_dir, "emerge-webrsync", 'Failed to sync portage'
-          chroot! build_dir, "emerge --sync --quiet", 'Failed to sync portage'
-          chroot! build_dir, "emerge --oneshot portage", 'Failed to merge new portage'
-          chroot! build_dir, "emerge --update --newuse --deep --with-bdeps=y @world", 'Failed to update system packages'
-          chroot! build_dir, "emerge --depclean", 'Failed to clean up after updating system'
-
-          packages = %w(
-            app-portage/mirrorselect
-            app-portage/gentoolkit
-            sys-kernel/gentoo-sources
-            sys-kernel/genkernel
-            sys-apps/gptfdisk
-            sys-apps/systemd
-            sys-apps/dbus
-            sys-kernel/linux-headers
-            sys-apps/kmod
-            sys-fs/lvm2
-            sys-fs/mdadm
-            net-firewall/iptables
-            sys-apps/iproute2
-            net-misc/openssh
-            net-misc/tinc
-            app-emulation/lxc
-            app-emulation/libvirt
-          )
-          chroot! build_dir, "emerge --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
-        end
-        # Kernel config
-        # Set default kernel (had a broken link after unpacking, so let's go sure)
-        chroot! build_dir, "eselect kernel set 1", 'Failed to select kernel sources'
-        chroot! build_dir, "genkernel --kernel-config=/etc/cloud_model/kernel.config all", 'Failed to merge kernel'
-                
-        
-        
-        @host.update_attributes build_state: :finished
-      rescue Exception => e
-        CloudModel.log_exception e
-        @host.update_attributes build_state: :failed, build_last_issue: "#{e}"
-        return false    
-      end
+      steps = [
+        ['Upsync system images', :sync_inst_images],
+        ['Prepare volume for new system', :make_deploy_root],
+        ['Populate volume with new system image', :populate_deploy_root],
+        ['Config new system', :config_deploy_root],         
+        ['Copy crypto keys from old system', :copy_keys],
+        ['Write boot config and reboot', :boot_deploy_root],        
+      ]
+      
+      run_steps :deploy, steps, options
+      
+      @host.update_attributes deploy_state: :finished
+      
+      puts "Finished redeploy host in #{distance_of_time_in_words_to_now build_start_at}" 
     end
     
-    def update_image
-      raise 'should update system; not yet implemented'
-    end
   end
 end

@@ -1,6 +1,11 @@
 module CloudModel
   class BaseWorker
     include AbstractController::Rendering
+    include ActionView::Helpers::DateHelper
+
+    def initialize(host)
+      @host = host
+    end
     
     def render template, locals={}
       av = ActionView::Base.new
@@ -23,9 +28,54 @@ module CloudModel
       end
     end
     
+    def prepare_chroot chroot_dir, options={}
+      @chroot_prepared ||= {}
+      
+      return true if @chroot_prepared[chroot_dir] and not options[:force]
+      
+      unless @host.mounted_at? "#{chroot_dir}/proc"
+        @host.exec! "mount -t proc none #{chroot_dir}/proc", 'Failed to mount proc to build system'
+      end
+      unless @host.mounted_at? "#{chroot_dir}/sys"
+        @host.exec! "mount --bind /sys #{chroot_dir}/sys", 'Failed to mount sys to build system'
+      end
+      unless @host.mounted_at? "#{chroot_dir}/dev"
+        @host.exec! "mount --bind /dev #{chroot_dir}/dev", 'Failed to mount dev to build system'
+      end
+      unless @host.mounted_at? "#{chroot_dir}/dev/pts"
+        @host.exec! "mount --bind /dev #{chroot_dir}/dev/pts", 'Failed to mount dev to build system'
+      end
+      
+      @chroot_prepared[chroot_dir] = true
+    end
+    
+    def cleanup_chroot chroot_dir
+      @chroot_prepared ||= {}
+
+      if @host.mounted_at? "#{chroot_dir}/dev/pts"
+        @host.exec! "umount #{chroot_dir}/dev/pts", 'Failed to unmount dev to build system'
+      end
+      if @host.mounted_at? "#{chroot_dir}/dev"
+        @host.exec! "umount #{chroot_dir}/dev", 'Failed to unmount dev to build system'
+      end
+      if @host.mounted_at? "#{chroot_dir}/sys"
+        @host.exec! "umount #{chroot_dir}/sys", 'Failed to unmount sys to build system'
+      end
+      if @host.mounted_at? "#{chroot_dir}/proc"
+        @host.exec! "umount #{chroot_dir}/proc", 'Failed to unmount proc to build system'
+      end
+      
+      @chroot_prepared[chroot_dir] = false
+      
+      true
+    end
+    
     def chroot chroot_dir, command
       key = SecureRandom.uuid
       Rails.logger.debug "CHROOT: #{chroot_dir}: #{command}"
+      
+      prepare_chroot chroot_dir
+      
       render_to_remote "/cloud_model/support/chroot.sh", "#{chroot_dir}/root/chroot-#{key}.sh", 0700, command: command        
       result = @host.exec "chroot #{chroot_dir} /root/chroot-#{key}.sh"
       begin
@@ -84,5 +134,55 @@ module CloudModel
 
       @host.exec! cmd, "Failed to build tar #{dst}"
     end
+    
+    def run_steps stage, steps, options={}
+      indent = options[:indent] || 2
+      
+      counter_prefix = options[:counter_prefix] || ''
+      counter = 0
+      
+      skip_to_string = options[:skip_to] || ''
+      if skip_splitted = /^(\d+)\.?(.*)/.match(skip_to_string)
+        skip_to_string = skip_splitted[2]
+        skip_to = skip_splitted[1].to_i
+      else
+        skip_to = 0
+      end
+      
+      steps.each do |step|
+        counter += 1
+        print "#{' ' * indent}(#{counter_prefix}#{counter}) #{step[0]}"
+        
+        if skip_to > counter
+          puts " [Skipped]"
+        else
+          if step[1].class == Array
+            puts ''
+            run_steps stage, step[1], options.merge(
+              indent: indent+2, 
+              counter_prefix: "#{counter_prefix}#{counter}.",
+              skip_to: skip_to == counter ? skip_to_string : ''
+            )
+          else
+            begin
+              ts = Time.now
+              self.send step[1]   
+              puts " [Done in #{distance_of_time_in_words_to_now ts}]"   
+            rescue Exception => e
+              if e.class == RuntimeError and e.message == 'skipped'
+                puts " [Skipped]"
+              else
+                puts " [Failed after #{distance_of_time_in_words_to_now ts}]"
+                puts ''
+                CloudModel.log_exception e
+                @host.update_attributes :"#{stage}_state" => :failed, :"#{stage}_last_issue" => "#{e}"
+                raise e
+              end
+            end
+          end
+        end
+      end   
+    end
+    
   end
 end

@@ -1,0 +1,10 @@
+[Unit]
+Description=Call rake task inside /var/www/rails/current
+
+[Service]
+Nice=19
+User=www
+Group=www
+EnvironmentFile=/etc/conf.d/rails
+WorkingDirectory=/var/www/rails/current
+ExecStart=/usr/bin/bundle exec rake %i

@@ -6,9 +6,9 @@ module CloudModel
     class NginxWorker < CloudModel::Services::BaseWorker
       def write_config
         puts "        Write nginx config"
-        @host.ssh_connection.sftp.file.open(File.expand_path("etc/nginx/nginx.conf", @guest.deploy_path), 'w') do |f|
-          f.write render("/cloud_model/guest/etc/nginx/nginx.conf", guest: @guest, model: @model)
-        end
+                
+        render_to_remote "/cloud_model/guest/etc/nginx/nginx.conf", "#{@guest.deploy_path}/etc/nginx/nginx.conf", host: @guest, model: @model      
+        render_to_remote "/cloud_model/guest/etc/conf.d/rails", "#{@guest.deploy_path}/etc/conf.d/rails", host: @guest, model: @model
       
         puts "        Make nginx root"
         mkdir_p "#{@guest.deploy_path}#{@model.www_root}"
@@ -17,7 +17,7 @@ module CloudModel
           puts "    Copy SSL files"
           ssl_base_dir = File.expand_path("etc/nginx/ssl", @guest.deploy_path)
           mkdir_p ssl_base_dir
-        
+                  
           @host.ssh_connection.sftp.file.open(File.expand_path("#{@guest.external_hostname}.crt", ssl_base_dir), 'w') do |f|
             f.write @model.ssl_cert.crt
           end
@@ -42,15 +42,11 @@ module CloudModel
           @host.ssh_connection.sftp.remove!(temp_file_name)
           
           if @model.deploy_web_image.has_mongodb?
-            @host.ssh_connection.sftp.file.open("#{@guest.deploy_path}#{@model.www_root}/current/config/mongoid.yml", 'w') do |f|
-              f.write render("/cloud_model/web_image/mongoid.yml", guest: @guest, model: @model)
-            end
+            render_to_remote "/cloud_model/web_image/mongoid.yml", "#{@guest.deploy_path}#{@model.www_root}/current/config/mongoid.yml", guest: @guest, model: @mode
           end
         
           if @model.deploy_web_image.has_redis?
-            @host.ssh_connection.sftp.file.open("#{@guest.deploy_path}#{@model.www_root}/current/config/redis.yml", 'w') do |f|
-              f.write render("/cloud_model/web_image/redis.yml", guest: @guest, model: @model)
-            end
+            render_to_remote "/cloud_model/web_image/redis.yml", "#{@guest.deploy_path}#{@model.www_root}/current/config/redis.yml", guest: @guest, model: @mode
           end
         end
       

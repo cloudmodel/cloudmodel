@@ -43,7 +43,12 @@ module CloudModel
       volume_group.host.exec command
     end
     
-    def apply
+    def format_disk!
+      Rails.logger.debug "Make FS"
+      exec "mkfs.#{disk_format.shellescape} #{device.shellescape}"     
+    end
+    
+    def apply options={}
       begin
         data = real_info
 
@@ -65,14 +70,17 @@ module CloudModel
             Rails.logger.debug "Shrink LV"
             exec "lvreduce #{device.shellescape} --size #{disk_space.to_i}b -f"
           end
+          
+          if options[:wipe]
+            format_disk!
+          end
         else
           # Create LV as it seems not to exist
           Rails.logger.debug "Create LV"    
     
           exec "lvcreate -L #{disk_space.to_i}b -n #{name} #{volume_group.device.shellescape}"
   
-          Rails.logger.debug "Make FS"
-          exec "mkfs.#{disk_format.shellescape} #{device.shellescape}"     
+          format_disk!
         end
         
         return true
