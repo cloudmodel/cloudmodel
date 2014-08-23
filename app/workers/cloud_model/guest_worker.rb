@@ -256,9 +256,9 @@ module CloudModel
 
     def config_firewall
       puts "    Configure Firewall"
-      CloudModel::FirewallWorker.new(@host).write_init_script
+      CloudModel::FirewallWorker.new(@host).write_scripts
       puts "      Restart Firewall"
-      @host.exec! "/etc/init.d/cloudmodel restart", "Failed to restart Firewall!"
+      @host.exec! "/etc/cloud_model/firewall_stop && /etc/cloud_model/firewall_start", "Failed to restart Firewall!"
     end
     
     def define_guest

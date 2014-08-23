@@ -1,0 +1,12 @@
+[Unit]
+Description=Establish firewall rules
+# sounds reasonable to have firewall up before any of the services go up
+Before=network.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /etc/cloud_model/firewall_start
+
+[Install]
+WantedBy=basic.target

@@ -191,6 +191,10 @@ module CloudModel
   
       commands
     end
+    
+    def shebang
+      "#!/bin/sh\n"
+    end
 
     def stop_script(options = {})
       commands = []
@@ -204,17 +208,23 @@ module CloudModel
           ['-X SSH_ATTACKED', '-X SSH_CHECK'].each do |attrs|
             commands << "#{iptables} #{attrs} || echo 'Failed to run: #{iptables} #{attrs}'"
           end
+        else
+          commands << "#{iptables} -X SSH_ATTACKED || echo 'Warning: Cannot undefine SSH_ATTACKED for #{iptables}'"
         end
       end  
-      commands * "\n    "
+      commands * "\n"
     end
 
     def list_script(options = {})
       commands = []
       iptables_bins.each do |iptables|
+        commands << "echo"
+        commands << "echo 'List rules for #{iptables}'"
+        commands << "echo"        
+        
         commands << "#{iptables} -L"
       end  
-      commands * "\n    "
+      commands * "\n"
     end
 
     def start_script(options = {})
@@ -277,19 +287,25 @@ module CloudModel
         commands << "#{ip4tables_bin} -A OUTPUT -o #{interface} -p icmp --icmp-type timestamp-reply -j DROP"
       end
   
-      commands * "\n    "
+      #commands * "\n"
+      
+      commands.map{|c| "echo '#{c}'\n#{c}"} * "\n"
     end
     
-    def init_script      
-      render("/cloud_model/host/etc/init.d/cloudmodel", firewall_worker: self)
-    end
-    
-    def write_init_script options = {root: ''}
+    def write_scripts options = {root: ''}
       root = options[:root] || ''
-      mkdir_p "#{root}/etc/init.d/"
-      @host.ssh_connection.sftp.file.open("#{root}/etc/init.d/cloudmodel", 'w', 0700) do |f|
-        f.puts init_script
+      mkdir_p "#{root}/etc/cloud_model/"
+      @host.ssh_connection.sftp.file.open("#{root}/etc/cloud_model/firewall_start", 'w', 0700) do |f|
+        f.puts shebang + start_script(options)
       end
+      @host.ssh_connection.sftp.file.open("#{root}/etc/cloud_model/firewall_stop", 'w', 0700) do |f|
+        f.puts shebang + stop_script(options)
+      end
+      @host.ssh_connection.sftp.file.open("#{root}/etc/cloud_model/firewall_list", 'w', 0700) do |f|
+        f.puts shebang + list_script(options)
+      end
+      
+      true
     end
   end
 end

@@ -19,7 +19,7 @@ module CloudModel
       # Configure firewall
       #
       
-      CloudModel::FirewallWorker.new(@host).write_init_script root: root
+      CloudModel::FirewallWorker.new(@host).write_scripts root: root
     
       @host.exec! "ln -sf /etc/init.d/cloudmodel #{root}/etc/runlevels/default/", 'failed to add firewall to autostart'     
     end
@@ -218,8 +218,8 @@ module CloudModel
       mkdir_p "#{root}/etc/conf.d"
       
       render_to_remote "/cloud_model/host/etc/systemd/system/network.service", "#{root}/etc/systemd/system/network.service", host: @host
-      chroot root, "ln -s /usr/lib/systemd/system/network.service /etc/systemd/system/multi-user.target.wants/"
-            
+      chroot root, "ln -s #{root}/etc/systemd/system/network.service /etc/systemd/system/network.target.wants/"
+                  
       render_to_remote "/cloud_model/support/etc/hostname", "#{root}/etc/hostname", host: @host
       render_to_remote "/cloud_model/support/etc/machine_info", "#{root}/etc/machine-info", host: @host     
       

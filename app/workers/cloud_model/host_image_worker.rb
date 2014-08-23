@@ -191,12 +191,13 @@ module CloudModel
       chroot! build_dir, "ln -sf /proc/self/mounts /etc/mtab", "Failed to link mtab for systemd"
 
       mkdir_p "#{build_dir}/etc/systemd/system/sysinit.target.wants"
+      mkdir_p "#{build_dir}/etc/systemd/system/network.target.wants"  
+      mkdir_p "#{build_dir}/etc/systemd/system/basic.target.wants"  
       mkdir_p "#{build_dir}/etc/systemd/system/sockets.target.wants"  
       mkdir_p "#{build_dir}/etc/systemd/system/multi-user.target.wants"
 
       chroot! build_dir, "ln -s /usr/lib/systemd/system/dm-event.service /etc/systemd/system/sysinit.target.wants/", 'Failed to put dmevent service to autostart'
       chroot! build_dir, "ln -s /usr/lib/systemd/system/dm-event.socket /etc/systemd/system/sockets.target.wants/", 'Failed to put dmevent socket to autostart'
-      #chroot! build_dir, "ln -s /usr/lib64/systemd/system/NetworkManager.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put NetworkManager to autostart'
       chroot! build_dir, "ln -s /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put SSH daemon to autostart'
       chroot! build_dir, "ln -s /usr/lib/systemd/system/tincd@.service /etc/systemd/system/multi-user.target.wants/tincd@vpn.service", 'Failed to put Tinc daemon to autostart'
       chroot! build_dir, "ln -s /usr/lib/systemd/system/libvirtd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put libvirt daemon to autostart'
@@ -205,7 +206,6 @@ module CloudModel
       chroot! build_dir, "ln -s /usr/lib/systemd/system/nullmailer.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put nullmailer to autostart'
 
       # TODO: Make smartd run
-      # - Configure HDs
       # - Add email to notify
       # - Add callback to CloudModel (?)
       chroot! build_dir, "ln -s /usr/lib/systemd/system/smartd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put SMART daemon to autostart'
@@ -218,7 +218,9 @@ module CloudModel
       # - Add callback to CloudModel (?)
       chroot! build_dir, "ln -s /usr/lib/systemd/system/lvm2-monitor.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put LVM2 monitor to autostart'
 
-      # TODO: CloudModel init (nat etc)
+      # CloudModel firewall (for NAT etc.)
+      render_to_remote "/cloud_model/host/etc/systemd/system/firewall.service", "#{build_dir}/etc/systemd/system/firewall.service", host: @host
+      chroot build_dir, "ln -s /etc/systemd/system/firewall.service /etc/systemd/system/basic.target.wants/"
 
       # TODO: Enable lvmetad
       # - Patch /etc/lvm/lvm.conf
@@ -226,7 +228,7 @@ module CloudModel
       #chroot! build_dir, "ln -s /usr/lib/systemd/system/lvm2-lvmetad.service /etc/systemd/system/sysinit.target.wants/", 'Failed to put LVM metalv daemon to autostart'
       #chroot! build_dir, "ln -s /usr/lib/systemd/system/lvm2-lvmetad.socket /etc/systemd/system/sockets.target.wants/", 'Failed to put LVM metalv socket to autostart'
 
-      # TODO: Make monitoring run (nagios based)
+      # TODO: Make monitoring run (nagios based; lm_sensors)
     end
 
     def configure_systemd_restart
