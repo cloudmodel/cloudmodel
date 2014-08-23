@@ -259,7 +259,7 @@ module CloudModel
     
     def copy_keys
       @host.exec! "cp -ra /etc/tinc/vpn/rsa_key.priv #{root}/etc/tinc/vpn/rsa_key.priv", "Failed to copy old tinc key"
-      @host.exec! "cp -ra /etc/ssh/ #{root}/etc/ssh", "Failed to copy old ssk keys"
+      @host.exec! "cp -ra /etc/ssh/* #{root}/etc/ssh/", "Failed to copy old ssh keys"
     end
     
     def sync_inst_images
