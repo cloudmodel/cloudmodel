@@ -2,6 +2,7 @@ module CloudModel
   class Config 
     attr_writer :data_directory, :backup_directory, :bundle_command
     attr_writer :skip_sync_images, :gentoo_mirrors
+    attr_accessor :admin_email, :gentoo_mirrors
     
     def initialize(&block) 
       configure(&block) if block_given?
@@ -26,22 +27,8 @@ module CloudModel
       @skip_sync_images || false
     end
     
-    # Run `mirrorselect -s4 -H -o` and replace uri Array
-    def gentoo_mirrors
-      @gentoo_mirrors ||  %w(
-        http://linux.rz.ruhr-uni-bochum.de/download/gentoo-mirror/
-        http://ftp.fi.muni.cz/pub/linux/gentoo/
-        http://ftp-stud.fht-esslingen.de/pub/Mirrors/gentoo/
-        http://mirror.netcologne.de/gentoo/
-      )
-    end
-    
     def bundle_command
-      @bundle_command || if Rails.env.test? or Rails.env.development?
-        'bundle'        
-      else
-        'PATH=/bin:/sbin:/usr/bin:/usr/local/bin /usr/bin/bundle' 
-      end
+      @bundle_command || 'PATH=/bin:/sbin:/usr/bin:/usr/local/bin /usr/bin/bundle'
     end
   end
 end

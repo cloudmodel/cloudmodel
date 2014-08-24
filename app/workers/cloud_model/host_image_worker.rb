@@ -9,14 +9,12 @@ module CloudModel
     def host
       @host
     end
-      
-    def gentoo_mirrors
-      [
-        'http://linux.rz.ruhr-uni-bochum.de/download/gentoo-mirror/',
-        'http://ftp.fi.muni.cz/pub/linux/gentoo/',
-        'http://ftp-stud.fht-esslingen.de/pub/Mirrors/gentoo/',
-        'http://mirror.netcologne.de/gentoo/'
-      ]
+    
+    def check_config
+      unless CloudModel.config.gentoo_mirrors
+        raise "You need to configure at least one gentoo_mirror in CloudModel.config.gentoo_mirrors"
+      end
+      true
     end
 
     def build_dir
@@ -79,9 +77,9 @@ module CloudModel
     end
 
     def configure_build_system
-      render_to_remote "/cloud_model/host/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: gentoo_mirrors, host: @host
-      render_to_remote "/cloud_model/host/etc/portage/package.accept_keywords", "#{build_dir}/etc/portage/package.accept_keywords", 0600, mirrors: gentoo_mirrors
-      render_to_remote "/cloud_model/host/etc/portage/package.use", "#{build_dir}/etc/portage/package.use", 0600, mirrors: gentoo_mirrors
+      render_to_remote "/cloud_model/host/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: CloudModel.config.gentoo_mirrors, host: @host
+      render_to_remote "/cloud_model/host/etc/portage/package.accept_keywords", "#{build_dir}/etc/portage/package.accept_keywords", 0600
+      render_to_remote "/cloud_model/host/etc/portage/package.use", "#{build_dir}/etc/portage/package.use", 0600
 
       # Copy dns configuration
       @host.exec! "cp -L /etc/resolv.conf #{build_dir}/etc/", 'Failed to copy resolv.conf'
@@ -206,8 +204,8 @@ module CloudModel
       chroot! build_dir, "ln -s /usr/lib/systemd/system/nullmailer.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put nullmailer to autostart'
 
       # TODO: Make smartd run
-      # - Add email to notify
       # - Add callback to CloudModel (?)
+      render_to_remote "/cloud_model/host/etc/smartd.conf", "#{build_dir}/etc/smartd.conf", host: @host
       chroot! build_dir, "ln -s /usr/lib/systemd/system/smartd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put SMART daemon to autostart'
       # TODO: Make mdadm report errors
       # - Add email to notify
@@ -310,6 +308,7 @@ module CloudModel
       build_start_at = Time.now
       
       steps = [
+        ["Check config", :check_config],
         ["Prepare build dir", :prepare_build_dir],
         ["Get Gentoo stage3 image", [
           ["Download latest stage 3", :download_stage3],

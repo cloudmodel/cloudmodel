@@ -16,5 +16,7 @@ MAKEOPTS="-j<%= host.cpu_count + 1 %>"
 PORTAGE_NICENESS="19"
 EMERGE_DEFAULT_OPTS="--jobs=6 --load-average=<%= host.cpu_count %> --keep-going --autounmask=n"
 FEATURES="parallel-fetch"
+<%- if CloudModel.config.gentoo_mirrors -%>
 
 GENTOO_MIRRORS="<%= CloudModel.config.gentoo_mirrors * ' ' %>"
+<%- end -%>

@@ -1,0 +1,5 @@
+<%- if CloudModel.config.admin_email -%>
+DEVICESCAN -m <%= CloudModel.config.admin_email %>
+<%- else -%>
+DEVICESCAN
+<%- end -%>
