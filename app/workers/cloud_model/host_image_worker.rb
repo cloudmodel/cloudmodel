@@ -120,15 +120,6 @@ module CloudModel
       chroot! build_dir, "emerge --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
     end
 
-    def emerge_kernel
-      emerge! %w(
-        sys-kernel/gentoo-sources
-        sys-kernel/genkernel-next
-        sys-kernel/linux-headers
-      )
-      chroot! build_dir, "eselect kernel set 1", 'Failed to select kernel sources'
-    end
-
     def emerge_sys_tools
       emerge! %w(
         app-portage/mirrorselect
@@ -139,7 +130,12 @@ module CloudModel
         sys-apps/dbus
         sys-apps/kmod
         sys-apps/systemd
+
+        sys-kernel/gentoo-sources
+        sys-kernel/genkernel-next
+        sys-kernel/linux-headers
       )
+      chroot! build_dir, "eselect kernel set 1", 'Failed to select kernel sources'
     end
 
     def emerge_mon_tools
@@ -326,7 +322,6 @@ module CloudModel
           ["Update base packages", :emerge_update_world],
           ["Cleanup base system", :emerge_depclean],
           ["Cleanup perl installation", :perl_cleaner],
-          ["Fetch kernel", :emerge_kernel],
           ["Build system tools", :emerge_sys_tools],
           ["Build monitoring tools", :emerge_mon_tools],
           ["Build filesystem tools", :emerge_fs_tools],
