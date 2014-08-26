@@ -5,15 +5,32 @@ Description=Ethernet Network Connectivity
 Type=oneshot
 RemainAfterExit=yes
 
+# Config ethernet of host
+
 ExecStart=/bin/ip link set eth0 up
-ExecStart=/bin/ip address add <%= host.primary_address %> brd <%= host.primary_address.broadcast %> dev eth0
+ExecStart=/bin/ip addr add <%= host.primary_address %> brd <%= host.primary_address.broadcast %> dev eth0
 <% host.addresses.each do |address| -%>
 
 <% address.list_ips.each do |ip| -%>
-ExecStart=/bin/ip address add <%= ip %>/<%= address.subnet %> dev eth0
+ExecStart=/bin/ip addr add <%= ip %>/<%= address.subnet %> brd <%= address.broadcast %> dev eth0
 <% end -%>
 <% end -%>
 ExecStart=/bin/ip route add default via <%= host.primary_address.gateway %>
+
+# Config bridge for guests
+
+<%- bridge_dev = 'virbr0' -%>
+ExecStart=/sbin/brctl addbr <%= bridge_dev %>
+ExecStart=/sbin/brctl stp <%= bridge_dev %> on
+#ExecStart=/sbin/brctl setfd <%= bridge_dev %> 0
+ExecStart=/sbin/brctl sethello <%= bridge_dev %> 10
+
+ExecStart=/bin/ip link set <%= bridge_dev %> up
+ExecStart=/bin/ip addr add <%= host.private_network.list_ips.first %>/<%= host.private_network.subnet %> dev <%= bridge_dev %>
+ExecStart=/bin/bash -c '/bin/echo 1 >/proc/sys/net/ipv4/ip_forward'
+
+ExecStop=/bin/ip addr flush dev <%= bridge_dev %>
+ExecStop=/bin/ip link set dev <%= bridge_dev %> down
 
 ExecStop=/bin/ip addr flush dev eth0
 ExecStop=/bin/ip link set dev eth0 down

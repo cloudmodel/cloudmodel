@@ -157,6 +157,7 @@ module CloudModel
         net-misc/networkmanager
         net-firewall/iptables
         sys-apps/iproute2
+        net-misc/bridge-utils
       )
     end
 

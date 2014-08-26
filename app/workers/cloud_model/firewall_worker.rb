@@ -125,13 +125,41 @@ module CloudModel
       commands
     end
 
+    def masq_private(options)
+      commands = []
+      # Forward bridged IPv4 network
+      
+      # commands << "#{ip4tables_bin} -A INPUT -i virbr0 -p udp -m udp --dport 53 -j ACCEPT"
+      # commands << "#{ip4tables_bin} -A INPUT -i virbr0 -p tcp -m tcp --dport 53 -j ACCEPT"
+      # commands << "#{ip4tables_bin} -A INPUT -i virbr0 -p udp -m udp --dport 67 -j ACCEPT"
+      # commands << "#{ip4tables_bin} -A INPUT -i virbr0 -p tcp -m tcp --dport 67 -j ACCEPT"
+      
+      # commands << "#{ip4tables_bin} -A FORWARD -d #{@host.private_network} -o virbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"
+      # commands << "#{ip4tables_bin} -A FORWARD -s #{@host.private_network} -i virbr0 -j ACCEPT"
+      # commands << "#{ip4tables_bin} -A FORWARD -i virbr0 -o virbr0 -j ACCEPT"
+      
+      # commands << "#{ip4tables_bin} -A FORWARD -o virbr0 -j REJECT --reject-with icmp-port-unreachable"
+      # commands << "#{ip4tables_bin} -A FORWARD -i virbr0 -j REJECT --reject-with icmp-port-unreachable"
+      
+      #commands << "#{ip4tables_bin} -A OUTPUT -o virbr0 -p udp -m udp --dport 68 -j ACCEPT"
+      
+      # Handle multicast
+      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} -d 224.0.0.0/24 -j RETURN"
+      # Handle broadcast
+      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} -d 255.255.255.255/32 -j RETURN"
+      # Masquerading
+      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network} -p tcp -j MASQUERADE --to-ports 1024-65535"
+      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network} -p udp -j MASQUERADE --to-ports 1024-65535"
+      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network} -j MASQUERADE" 
+    end
+
     def nat(host, interface, port, proto, nat_host)
       iptables = iptables_bin(host)
   
       commands = []
   
-      commands << "#{iptables} -t nat -A PREROUTING -i #{interface} -p #{proto}  -d #{host} --dport #{port} -j DNAT --to-destination #{nat_host}:#{port}"
-      commands << "#{iptables} -t nat -A POSTROUTING -o #{interface} -p #{proto}  -d #{host} --dport #{port} -j MASQUERADE"
+      commands << "#{iptables} -t nat -A PREROUTING -p #{proto} -d #{host} --dport #{port} -j DNAT --to-destination #{nat_host}:#{port}"
+      commands << "#{iptables} -t nat -A POSTROUTING -p #{proto} -d #{host} --dport #{port} -j MASQUERADE"
   
       commands
     end
@@ -200,8 +228,8 @@ module CloudModel
       commands = []
       iptables_bins.each do |iptables|
         # ['-F', '-t nat -F'].each do |attrs|
-        ['-F'].each do |attrs|
-          commands << "#{iptables} #{attrs}"
+        ['-F', '-t nat -F'].each do |attrs|
+          commands << "#{iptables} #{attrs} || echo 'Warning: Cannot succeed #{iptables} #{attrs}'"
         end
         
         if ssh_deep_inspect?
@@ -239,6 +267,7 @@ module CloudModel
         end
       end
 
+      # Implement rules
       @rules.each do |host, host_options|
         host_options = host_options.clone    
         host_options.keys.each do |key|
@@ -274,6 +303,8 @@ module CloudModel
           commands << "#{iptables} -A SSH_ATTACKED -j REJECT"
         end
       end
+  
+      commands += masq_private(options)
   
       interfaces.uniq.each do |interface|
         iptables_bins.each do |iptables|
