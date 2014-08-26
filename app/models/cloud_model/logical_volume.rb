@@ -43,6 +43,10 @@ module CloudModel
       volume_group.host.exec command
     end
     
+    def exec! command, message
+      volume_group.host.exec! command, message
+    end      
+    
     def format_disk!
       Rails.logger.debug "Make FS"
       exec "mkfs.#{disk_format.shellescape} #{device.shellescape}"     
@@ -58,7 +62,7 @@ module CloudModel
           if data[:l_size].to_i < disk_space
             # Enlarge LV
             Rails.logger.debug "Enlarge LV"
-            exec "lvextend #{device.shellescape} --size #{disk_space.to_i}b"
+            exec "lvextend #{device.shellescape} --size #{(disk_space / 1024.0).floor}K"
         
             Rails.logger.debug "Enlarge FS"
             exec "resize2fs #{device.shellescape}"
@@ -68,7 +72,7 @@ module CloudModel
             exec "e2fsck -f #{device.shellescape} && resize2fs #{device.shellescape} #{(disk_space / 1024.0).floor}K"
         
             Rails.logger.debug "Shrink LV"
-            exec "lvreduce #{device.shellescape} --size #{disk_space.to_i}b -f"
+            exec "lvreduce #{device.shellescape} --size #{(disk_space / 1024.0).floor}K -f"
           end
           
           if options[:wipe]
@@ -78,7 +82,7 @@ module CloudModel
           # Create LV as it seems not to exist
           Rails.logger.debug "Create LV"    
     
-          exec "lvcreate -L #{disk_space.to_i}b -n #{name} #{volume_group.device.shellescape}"
+          exec! "lvcreate -L #{(disk_space / 1024.0).floor}K -n #{name} --yes #{volume_group.device.shellescape}", "Failed to create logical volume #{name}"
   
           format_disk!
         end

@@ -208,13 +208,13 @@ module CloudModel
           end
 
           channel.on_request("exit-status") do |ch,data|
-            #puts "  exit-status: #{data}"
             exit_status = data.read_long
+            #puts "  exit-status: #{exit_status}"
           end
 
           channel.on_request("exit-signal") do |ch, data|
-            #puts "  exit-signal: #{data}"
             exit_signal = data.read_long
+            #puts "  exit-signal: #{exit_signal}"
           end
         end
       end
