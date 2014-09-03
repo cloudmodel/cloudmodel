@@ -6,7 +6,7 @@ namespace :cloudmodel do
   
   namespace :host_image do
     task :load_host do
-      @host_worker = CloudModel::HostImageWorker.new CloudModel::Host.find(ENV['HOST_ID'])
+      @host_worker = CloudModel::Images::HostWorker.new CloudModel::Host.find(ENV['HOST_ID'])
     end
     
     desc "Build host image"
@@ -33,6 +33,17 @@ namespace :cloudmodel do
     desc "Update tinc host files"
     task :update_tinc_host_files => [:environment, :load_host] do
       @host_worker.update_tinc_host_files
+    end
+  end
+  
+  namespace :guest_image do
+    task :load_host do
+      @host_worker = CloudModel::Images::GuestWorker.new CloudModel::Guest.find(ENV['GUEST_ID'])
+    end
+    
+    desc "Build host image"
+    task :build_image => [:environment, :load_host] do
+      @host_worker.build_image
     end
   end
   

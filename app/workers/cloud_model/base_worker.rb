@@ -151,6 +151,9 @@ module CloudModel
       
       steps.each do |step|
         counter += 1
+        
+        step = [step.to_s.humanize, step] if step.class == Symbol
+        
         print "#{' ' * indent}(#{counter_prefix}#{counter}) #{step[0]}"
         
         if skip_to > counter
