@@ -13,7 +13,7 @@ module CloudModel
       
       
         mkdir_p ssh_host_key_source
-        %w(dsa ecdsa rsa).each do |type|
+        %w(dsa ed25519 rsa).each do |type|
           key_file = "#{ssh_host_key_source}/ssh_host_#{type}_key"
           begin
             @host.ssh_connection.sftp.lstat! key_file
@@ -33,7 +33,7 @@ module CloudModel
           f.write CloudModel::SshPubKey.all.to_a * "\n"
         end
   
-        @host.exec! "chown -R www:www #{ssh_target.shellescape}", "Failed to change owner of www client keys to user www"
+        @host.exec! "chown -R 1001:1001 #{ssh_target.shellescape}", "Failed to change owner of www client keys to user www (1001)"
       end
     
       def auto_start

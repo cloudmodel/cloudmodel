@@ -7,8 +7,8 @@ module CloudModel
       def write_config
         puts "        Write nginx config"
                 
-        render_to_remote "/cloud_model/guest/etc/nginx/nginx.conf", "#{@guest.deploy_path}/etc/nginx/nginx.conf", host: @guest, model: @model      
-        render_to_remote "/cloud_model/guest/etc/conf.d/rails", "#{@guest.deploy_path}/etc/conf.d/rails", host: @guest, model: @model
+        render_to_remote "/cloud_model/guest/etc/nginx/nginx.conf", "#{@guest.deploy_path}/etc/nginx/nginx.conf", guest: @guest, model: @model      
+        render_to_remote "/cloud_model/guest/etc/conf.d/rails", "#{@guest.deploy_path}/etc/conf.d/rails", guest: @guest, model: @model
       
         puts "        Make nginx root"
         mkdir_p "#{@guest.deploy_path}#{@model.www_root}"
@@ -42,11 +42,11 @@ module CloudModel
           @host.ssh_connection.sftp.remove!(temp_file_name)
           
           if @model.deploy_web_image.has_mongodb?
-            render_to_remote "/cloud_model/web_image/mongoid.yml", "#{@guest.deploy_path}#{@model.www_root}/current/config/mongoid.yml", guest: @guest, model: @mode
+            render_to_remote "/cloud_model/web_image/mongoid.yml", "#{@guest.deploy_path}#{@model.www_root}/current/config/mongoid.yml", guest: @guest, model: @model
           end
         
           if @model.deploy_web_image.has_redis?
-            render_to_remote "/cloud_model/web_image/redis.yml", "#{@guest.deploy_path}#{@model.www_root}/current/config/redis.yml", guest: @guest, model: @mode
+            render_to_remote "/cloud_model/web_image/redis.yml", "#{@guest.deploy_path}#{@model.www_root}/current/config/redis.yml", guest: @guest, model: @model
           end
         end
       
