@@ -1,0 +1,7 @@
+## Check S.M.A.R.T-Status
+## This plugin test the DNS service on the specified host using dig
+
+define command {
+    command_name    check_smart
+    command_line    $PLUGINSDIR$/check_smart.rb -d $_SERVICESMARTDEV$ -h $HOSTADDRESS$
+}

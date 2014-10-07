@@ -47,6 +47,10 @@ module CloudModel
         lines = result.split("\n")
         head = lines.shift.split(";").map{|c| c.strip.sub('#', '').gsub(' ', '_').gsub(/\%$/, '_percentage').gsub('%', '_percentage_').underscore.to_sym}
 
+        # Rename second :lv column as :lv_full
+        lv_found = false
+        head.map!{|x| x==:lv ? (!lv_found ? (lv_found=true; x) : :lv_full) : x}
+
         lines.each do |row|
           columns = row.split(";")
           row_hash = {}

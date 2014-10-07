@@ -1,0 +1,7 @@
+## Check LVM
+## This plugin test the LVM service on the specified host for given volume group
+
+define command {
+    command_name    check_lvm
+    command_line    $PLUGINSDIR$/check_lvm.rb -w 90 -c 95 -d $_SERVICEVGDEV$ -h $HOSTADDRESS$
+}

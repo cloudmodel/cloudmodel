@@ -7,6 +7,10 @@ module CloudModel
         :mongodb
       end
       
+      def shinken_services_append
+        ', mongodb'
+      end
+      
       def backupable?
         true 
       end

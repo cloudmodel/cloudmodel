@@ -36,11 +36,10 @@ module CloudModel
             raise 'Failed to mount build partition'
           end
         end
-
-        # # Mount boot device
-        # unless @host.mount_boot_fs build_dir
-        #   raise "Failed to mount /boot to build system"
-        # end
+      end
+      
+      def remount_build_dir
+        CloudModel::LogicalVolume.find_by(name: "build-#{build_type}").mount build_dir
       end
 
       def unmount_build_dir
@@ -69,10 +68,17 @@ module CloudModel
         @host.ssh_connection.sftp.remove! "#{build_dir}/stage3.tar.bz2"
       end
     
-      def configure_build_system
-        render_to_remote "/cloud_model/#{build_type}/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: CloudModel.config.gentoo_mirrors, host: @host
+      def configure_build_system       
+        render_to_remote "/cloud_model/#{build_type}/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: CloudModel.config.gentoo_mirrors, host: @host, layman: false
         render_to_remote "/cloud_model/#{build_type}/etc/portage/package.accept_keywords", "#{build_dir}/etc/portage/package.accept_keywords", 0600
         render_to_remote "/cloud_model/#{build_type}/etc/portage/package.use", "#{build_dir}/etc/portage/package.use", 0600
+
+        render_to_remote "/cloud_model/support/etc/vconsole.conf", "#{build_dir}/etc/vconsole.conf"
+        
+        # Configure locale
+        render_to_remote "/cloud_model/support/etc/locale.gen", "#{build_dir}/etc/locale.gen"
+        chroot! build_dir, "locale-gen", 'Failed to generate default locale'
+        render_to_remote "/cloud_model/support/etc/locale.conf", "#{build_dir}/etc/locale.conf"
 
         # Copy dns configuration
         @host.exec! "cp -L /etc/resolv.conf #{build_dir}/etc/", 'Failed to copy resolv.conf'
@@ -111,13 +117,55 @@ module CloudModel
         mkdir_p "#{build_dir}/var/cache/revdep-rebuild"
         chroot! build_dir, "revdep-rebuild", "Failed to clean system packages"
       end
+      
+      def config_layman
+        # Include CloudModel gentoo overlay
+        mkdir_p "#{build_dir}/etc/layman"
+        emerge! %w(
+          app-portage/layman
+        )
+        render_to_remote "/cloud_model/support/etc/layman/layman.cfg", "#{build_dir}/etc/layman/layman.cfg"
+        chroot! build_dir, "layman -S && layman -a CloudModel", 'Failed to add gentoo overlay'
+        render_to_remote "/cloud_model/#{build_type}/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: CloudModel.config.gentoo_mirrors, host: @host, layman: true
+      end
 
       def emerge! packages
         chroot! build_dir, "emerge --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
       end
+      
+      def emerge_postgres
+        emerge! %w(
+          dev-db/postgresql-server
+        )
+        
+        version = "9.3" # TODO: Find actual version of postgres, not assuming one
+        data_dir = "/var/lib/postgresql/#{version}/data"
+        config_dir = "/etc/conf.d/postgresql-#{version}"
+
+        # init database
+        begin
+          @host.ssh_connection.sftp.lstat! "#{build_dir}/#{data_dir}"
+        rescue
+          mkdir_p "#{build_dir}/#{data_dir}"
+          chroot! build_dir, "chown -Rf postgres:postgres #{data_dir.shellescape}", "Can't assign data dir to postgres user"
+          chroot! build_dir, "chmod 0700 #{data_dir.shellescape}", "Failed to change mod on data directory"
+
+          chroot! build_dir, "su postgres -c '/usr/lib/postgresql-#{version}/bin/initdb -D #{data_dir.shellescape}'", "Failed to init database"
+        end
+        
+        begin
+          @host.ssh_connection.sftp.lstat! "#{build_dir}/#{config_dir}"          
+        rescue
+          mkdir_p "#{build_dir}/#{config_dir}"
+          chroot! build_dir, "chown -Rf postgres:postgres #{data_dir.shellescape}", "Can't assign config dir to postgres user"
+          chroot! build_dir, "mv #{data_dir}/*.conf #{config_dir}/", "Failed to copy config to #{config_dir}"      
+        end
+        
+        true
+      end
     
       def configure_udev
-        chroot! build_dir, "ln -s /dev/null /etc/udev/rules.d/80-net-setup-link.rules", 'Failed to config network devices to old behaviour'
+        chroot! build_dir, "ln -sf /dev/null /etc/udev/rules.d/80-net-setup-link.rules", 'Failed to config network devices to old behaviour'
       end
 
       def configure_systemd
@@ -128,13 +176,7 @@ module CloudModel
         mkdir_p "#{build_dir}/etc/systemd/system/basic.target.wants"  
         mkdir_p "#{build_dir}/etc/systemd/system/sockets.target.wants"  
         mkdir_p "#{build_dir}/etc/systemd/system/multi-user.target.wants"
-
-        chroot! build_dir, "ln -s /usr/lib/systemd/system/dm-event.service /etc/systemd/system/sysinit.target.wants/", 'Failed to put dmevent service to autostart'
-        chroot! build_dir, "ln -s /usr/lib/systemd/system/dm-event.socket /etc/systemd/system/sockets.target.wants/", 'Failed to put dmevent socket to autostart'
-        chroot! build_dir, "ln -s /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put SSH daemon to autostart'
-        chroot! build_dir, "ln -s /usr/lib/systemd/system/tincd@.service /etc/systemd/system/multi-user.target.wants/tincd@vpn.service", 'Failed to put Tinc daemon to autostart'
-        chroot! build_dir, "ln -s /usr/lib/systemd/system/libvirtd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put libvirt daemon to autostart'
-      end
+     end
     
       def create_system_users
         # TODO: Make system user

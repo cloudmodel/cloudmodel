@@ -6,7 +6,7 @@ module CloudModel
     class TomcatWorker < CloudModel::Services::BaseWorker
       def write_config
         target = "#{@guest.deploy_path}/var/tomcat" 
-              
+         
         puts "        Deploy WAR Image #{@model.deploy_war_image.name} to #{@guest.deploy_path}#{target}"
         temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
         io = StringIO.new(@model.deploy_war_image.file.data)
@@ -14,7 +14,7 @@ module CloudModel
         mkdir_p target
         @host.exec "cd #{target.shellescape} && tar xjpf #{temp_file_name}"
         @host.ssh_connection.sftp.remove!(temp_file_name)
-            
+        
         # Read manifest
         manifest = ''
         @host.ssh_connection.sftp.file.open( "#{target}/manifest.yml") do |f|
@@ -23,18 +23,23 @@ module CloudModel
         
         puts "        Write tomcat config"
         mkdir_p File.expand_path("etc/tomcat-7/Catalina/localhost", @guest.deploy_path) 
-        @host.ssh_connection.sftp.file.open(File.expand_path("etc/tomcat-7/server.xml", @guest.deploy_path), 'w') do |f|
-          f.write render("/cloud_model/guest/etc/tomcat-7/server.xml", guest: @guest, model: @model)
-        end
-              
-        @host.ssh_connection.sftp.file.open(File.expand_path("etc/conf.d/tomcat-7", @guest.deploy_path), 'w') do |f|
-          f.write render("/cloud_model/guest/etc/conf.d/tomcat-7", manifest: manifest, worker: self, guest: @guest, model: @model)
-        end
-              
-        @host.ssh_connection.sftp.file.open(File.expand_path("etc/tomcat-7/Catalina/localhost/ROOT.xml", @guest.deploy_path), 'w') do |f|
-          f.write render("/cloud_model/guest/etc/tomcat-7/servlet.xml", manifest: manifest, worker: self, guest: @guest, model: @model)
-        end
-              
+        # @host.ssh_connection.sftp.file.open(File.expand_path("etc/tomcat-7/server.xml", @guest.deploy_path), 'w') do |f|
+        #   f.write render("/cloud_model/guest/etc/tomcat-7/server.xml", guest: @guest, model: @model)
+        # end
+        #
+        # @host.ssh_connection.sftp.file.open(File.expand_path("etc/conf.d/tomcat-7", @guest.deploy_path), 'w') do |f|
+        #   f.write render("/cloud_model/guest/etc/conf.d/tomcat-7", manifest: manifest, worker: self, guest: @guest, model: @model)
+        # end
+        #
+        # @host.ssh_connection.sftp.file.open(File.expand_path("etc/tomcat-7/Catalina/localhost/ROOT.xml", @guest.deploy_path), 'w') do |f|
+        #   f.write render("/cloud_model/guest/etc/tomcat-7/servlet.xml", manifest: manifest, worker: self, guest: @guest, model: @model)
+        # end
+        
+        render_to_remote "/cloud_model/guest/etc/tomcat-7/server.xml", "#{@guest.deploy_path}/etc/tomcat-7/server.xml", guest: @guest, model: @model      
+        render_to_remote "/cloud_model/guest/etc/conf.d/tomcat-7", "#{@guest.deploy_path}/etc/conf.d/tomcat-7", manifest: manifest, worker: self, guest: @guest, model: @model     
+        render_to_remote "/cloud_model/guest/etc/tomcat-7/servlet.xml", "#{@guest.deploy_path}/etc/tomcat-7/Catalina/localhost/ROOT.xml", manifest: manifest, worker: self, guest: @guest, model: @model    
+        render_to_remote "/cloud_model/guest/etc/tomcat-7/tomcat-users.xml", "#{@guest.deploy_path}/etc/tomcat-7/tomcat-users.xml", guest: @guest, model: @model      
+        
         @host.exec "chown -R 265:265 #{target.shellescape}"
       end
     

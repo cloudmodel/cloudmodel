@@ -1,3 +1,9 @@
-<%= render '/cloud_model/support/package.use' %>
+<%= render '/cloud_model/support/etc/portage/package.use' %>
 
-net-misc/networkmanager -bluetooth -wext -wifi -ppp -modemmanager
+# Monitoring
+net-analyzer/shinken arbiter broker livestat poller reactionner receiver scheduler
+net-analyzer/nagios-plugins  ipv6 ssl suid -gnutls jabber -ldap -mysql -nagios-dns -nagios-game -nagios-ntp nagios-ping nagios-ssh -postgres -radius -samba smart -snmp sudo -ups
+
+media-libs/gd jpeg png
+net-analyzer/net-snmp lm_sensors pci diskio
+net-analyzer/check_mk livestatus smart

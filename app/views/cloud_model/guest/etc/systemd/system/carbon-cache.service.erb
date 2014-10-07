@@ -1,0 +1,13 @@
+[Unit]
+Description = Metrics store
+
+[Service]
+Type = forking
+GuessMainPID = false
+PIDFile = /run/graphite/carbon-cache-a.pid
+ExecStart = /usr/bin/carbon-cache.py --config=/etc/graphite/carbon.conf start
+User = graphite
+Group = graphite
+
+[Install]
+WantedBy = multi-user.target

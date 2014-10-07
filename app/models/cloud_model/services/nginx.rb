@@ -46,6 +46,19 @@ module CloudModel
       def kind
         :http
       end
+      
+      def shinken_services_append
+        services_string = ''
+        unless ssl_only
+          services_string += ', nginx'
+        end
+        
+        if ssl_supported
+          services_string += ', https'
+        end
+        
+        services_string
+      end
     end
   end
 end

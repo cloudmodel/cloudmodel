@@ -8,6 +8,10 @@ module CloudModel
       def kind
         :http
       end
+      
+      def shinken_services_append
+        ', tomcat'
+      end
     end
   end
 end

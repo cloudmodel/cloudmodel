@@ -36,6 +36,7 @@ module CloudModel
         emerge! %w(
           app-portage/mirrorselect
           app-portage/gentoolkit
+          
           sys-boot/grub
 
           sys-apps/gptfdisk
@@ -49,14 +50,15 @@ module CloudModel
         )
         chroot! build_dir, "eselect kernel set 1", 'Failed to select kernel sources'
       end
-
-      def emerge_mon_tools
+    
+      def emerge_monitoring
         emerge! %w(
           sys-apps/lm_sensors
           sys-apps/smartmontools
+          net-analyzer/net-snmp
         )
       end
-
+      
       def emerge_fs_tools
         emerge! %w(
           sys-fs/mdadm
@@ -66,7 +68,6 @@ module CloudModel
 
       def emerge_net_tools
         emerge! %w(
-          net-misc/networkmanager
           net-firewall/iptables
           sys-apps/iproute2
           net-misc/bridge-utils
@@ -90,6 +91,13 @@ module CloudModel
       end
   
       def configure_systemd_services
+
+        chroot! build_dir, "ln -sf /usr/lib/systemd/system/dm-event.service /etc/systemd/system/sysinit.target.wants/", 'Failed to put dmevent service to autostart'
+        chroot! build_dir, "ln -sf /usr/lib/systemd/system/dm-event.socket /etc/systemd/system/sockets.target.wants/", 'Failed to put dmevent socket to autostart'
+        chroot! build_dir, "ln -sf /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put SSH daemon to autostart'
+        chroot! build_dir, "ln -sf /usr/lib/systemd/system/tincd@.service /etc/systemd/system/multi-user.target.wants/tincd@vpn.service", 'Failed to put Tinc daemon to autostart'
+        chroot! build_dir, "ln -sf /usr/lib/systemd/system/libvirtd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put libvirt daemon to autostart'
+ 
         # TODO: Config nullmailer to send mails
         chroot! build_dir, "ln -s /usr/lib/systemd/system/nullmailer.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put nullmailer to autostart'
 
@@ -204,12 +212,14 @@ module CloudModel
           ]],
           ["Build system", [
             ["Update portage", :emerge_portage],
+            ["Add CloudModel overlay", :config_layman],
             ["Update base packages", :emerge_update_world],
             ["Cleanup base system", :emerge_depclean],
             ["Cleanup perl installation", :perl_cleaner],
             ["Cleanup python installation", :python_cleaner],
             ["Build system tools", :emerge_sys_tools],
-            ["Build monitoring tools", :emerge_mon_tools],
+            #["Build postgres SQL servers", :emerge_postgres],
+            ["Build monitoring tools", :emerge_monitoring],
             ["Build filesystem tools", :emerge_fs_tools],
             ["Build network tools", :emerge_net_tools],
             ["Build CloudModel packages", :emerge_cm_packages],
@@ -235,6 +245,8 @@ module CloudModel
         @host.update_attributes build_state: :finished
       
         puts "Finished building image in #{distance_of_time_in_words_to_now build_start_at}"
+        
+        true
       end
     
     end

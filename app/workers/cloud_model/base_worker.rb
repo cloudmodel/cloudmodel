@@ -142,10 +142,11 @@ module CloudModel
       counter = 0
       
       skip_to_string = options[:skip_to] || ''
-      if skip_splitted = /^(\d+)\.?(.*)/.match(skip_to_string)
+      if skip_splitted = /^(\d+)\.?(.*)/.match(skip_to_string.to_s)
         skip_to_string = skip_splitted[2]
         skip_to = skip_splitted[1].to_i
       else
+        skip_to_string = ''
         skip_to = 0
       end
       

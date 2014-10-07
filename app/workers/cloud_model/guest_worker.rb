@@ -206,7 +206,7 @@ module CloudModel
         end
       rescue
         raise "Failed to configure profile file!"
-      end
+      end      
     end
 
     def config_services
@@ -224,6 +224,8 @@ module CloudModel
           raise "Failed to configure service #{service.class.model_name.element.camelcase} '#{service.name}'"
         end
       end
+      mkdir_p "#{@guest.deploy_path}/usr/share/cloud_model/"
+      render_to_remote "/cloud_model/guest/usr/share/cloud_model/fix_permissions.sh", "#{@guest.deploy_path}/usr/share/cloud_model/fix_permissions.sh", 0755, guest: guest 
     end
 
     def config_firewall
