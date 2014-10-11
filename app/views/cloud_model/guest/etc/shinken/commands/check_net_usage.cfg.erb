@@ -1,0 +1,7 @@
+## Check network usage
+## This plugin tests network usage
+
+define command {
+    command_name    check_net_usage
+    command_line    $PLUGINSDIR$/check_net_usage.rb -h $HOSTADDRESS$
+}

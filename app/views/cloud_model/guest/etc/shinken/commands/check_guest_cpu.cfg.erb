@@ -1,0 +1,7 @@
+## Check cpu usage on guest
+## This plugin tests cpu usage of a guest
+
+define command {
+    command_name    check_guest_cpu
+    command_line    $PLUGINSDIR$/check_guest_cpu.rb -h $_HOSTSNMPSERVER$ -g $_HOSTGUESTNAME$
+}

@@ -29,18 +29,18 @@ end
 options = parse_options
 data = retrieve_data '1.3.6.1.4.1.32473.8.3.101', options
 
-size = data['vsize'].to_i
-free = data['vfree'].to_i
-usage = 100.0 * (size - free) / size
-data = {'usage' => "#{usage.round(2)}%"}.merge data
+data['vsize'] = data['vsize'].to_i
+data['vfree'] = data['vfree'].to_i
+usage = 100.0 * (data['vsize'] - data['vfree']) / data['vsize']
+data = {'usage' => "#{usage.round(2)}"}.merge data
 
 if usage > options[:crit]
-  puts "CRITICAL - #{data['usage']} use | #{perfdata data}"
+  puts "CRITICAL - #{data['usage']}% used | #{perfdata data}"
   exit STATE_CRITICAL
 elsif usage > options[:warn]  
-  puts "WARNING - #{data['usage']} used | #{perfdata data}"
+  puts "WARNING - #{data['usage']}% used | #{perfdata data}"
   exit STATE_WARNING
 else
-  puts "OK - #{data['usage']} used | #{perfdata data}"
+  puts "OK - #{data['usage']}% used | #{perfdata data}"
   exit STATE_OK
 end

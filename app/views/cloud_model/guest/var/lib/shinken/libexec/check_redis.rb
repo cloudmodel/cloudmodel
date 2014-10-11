@@ -28,10 +28,10 @@ begin
 
   data = redis.info
 rescue Redis::CannotConnectError => e
-  puts "CRITICAL: #{e} | #{perfdata data}"
+  puts "CRITICAL - #{e} | #{perfdata data}"
   exit STATE_CRITICAL
 rescue Exception => e
-   puts "WARNING: #{e} | #{perfdata data}"
+   puts "WARNING - #{e} | #{perfdata data}"
    exit STATE_WARNING
 end
 

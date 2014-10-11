@@ -23,6 +23,17 @@ module CloudModel
                
         puts "        Fix systemd services"
         host.exec! "for i in #{@guest.deploy_path}/usr/lib/systemd/system/shinken-*; do sed -i s,/usr/sbin,/usr/bin, $i; done", 'Failed to patch shinken services'
+      
+        # TODO: Remove this lines once it is in image
+        build_dir = @guest.deploy_path
+        render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/snmp_helpers.rb", "#{build_dir}/var/lib/shinken/libexec/snmp_helpers.rb", 0700
+        %w(cpu disks mem net_usage lm_sensors lvm mdstat smart guest_cpu guest_mem mongodb nginx redis tomcat).each do |check_name|
+          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/check_#{check_name}.rb", "#{build_dir}/var/lib/shinken/libexec/check_#{check_name}.rb", 0700
+          render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{build_dir}/etc/shinken/commands/check_#{check_name}.cfg"
+          render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{build_dir}/etc/shinken/services/#{check_name}.cfg"
+        end
+        chroot! build_dir, "chown -R shinken:shinken /var/lib/shinken/libexec/", 'Failed to assign check scripts to shinken user'
+        chroot build_dir, "rm /var/lib/shinken/libexec/check_sensors.rb /etc/shinken/commands/check_sensors.cfg /etc/shinken/services/sensors.cfg"
       end
     
       def auto_start

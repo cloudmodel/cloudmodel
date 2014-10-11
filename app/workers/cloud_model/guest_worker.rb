@@ -113,7 +113,7 @@ module CloudModel
 
       mounts.sort{|a,b| b[0] <=> a[0]}.each do |mount|
         puts "      Unmount FS #{mount[0]}"
-        @host.exec! "umount -f #{mount[0]}", "Failed to unmount #{mount[0]}!"
+        @host.exec "umount -f #{mount[0]}"#, "Failed to unmount #{mount[0]}!"
       end
       puts "      Unmounting done"
     end

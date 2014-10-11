@@ -1,0 +1,7 @@
+## Check memory usage on guest
+## This plugin tests memory usage of a guest
+
+define command {
+    command_name    check_guest_mem
+    command_line    $PLUGINSDIR$/check_guest_mem.rb -h $_HOSTSNMPSERVER$ -g $_HOSTGUESTNAME$
+}

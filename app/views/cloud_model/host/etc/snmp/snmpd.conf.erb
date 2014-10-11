@@ -1,6 +1,10 @@
 rocommunity      public
 dontPrintUnits   true
+includeAllDisks
 
 exec .1.3.6.1.4.1.32473.8.1 smart /etc/snmp/smart.sh
 exec .1.3.6.1.4.1.32473.8.2 raid /etc/snmp/mdstat.sh
 exec .1.3.6.1.4.1.32473.8.3 vg /etc/snmp/vg.sh
+
+pass_persist .1.3.6.1.4.1.32473.100 /etc/snmp/vm_info.py
+

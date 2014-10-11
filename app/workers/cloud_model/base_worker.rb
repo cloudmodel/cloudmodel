@@ -23,6 +23,14 @@ module CloudModel
             
       locals = param_array.pop || {}
       
+      # remote_dir = File.dirname remote_file
+      # begin
+      #   @host.ssh_connection.sftp.dir.entries remote_dir
+      # rescue Exception => e
+      #   puts "Directory #{remote_dir} does not exist, creating it (#{e})"
+      #   mkdir_p remote_dir
+      # end
+            
       @host.ssh_connection.sftp.file.open(remote_file, 'w', perm) do |f|
         f.puts render(template, locals)
       end
@@ -158,7 +166,23 @@ module CloudModel
         print "#{' ' * indent}(#{counter_prefix}#{counter}) #{step[0]}"
         
         if skip_to > counter
-          puts " [Skipped]"
+          if step[2] and step[2][:on_skip]
+            print " (Run skip action)"
+            begin
+              ts = Time.now
+              self.send step[2][:on_skip]
+              puts " [Done in #{distance_of_time_in_words_to_now ts}]"
+            rescue
+              puts " [Failed after #{distance_of_time_in_words_to_now ts}]"
+              puts ''
+              CloudModel.log_exception e
+              @host.update_attributes :"#{stage}_state" => :failed, :"#{stage}_last_issue" => "#{e}"
+              raise e
+              
+            end
+          else
+            puts " [Skipped]"
+          end
         else
           if step[1].class == Array
             puts ''

@@ -37,7 +37,7 @@ begin
   data = {}
   uri = URI("http#{options[:ssl] ? 's' : ''}://#{options[:host]}:8080/manager/status?XML=true")
 rescue Exception => e
-   puts "WARNING: #{e} | #{perfdata data}"
+   puts "WARNING - #{e} | #{perfdata data}"
    exit STATE_WARNING
 end
 
@@ -61,11 +61,11 @@ end
 data['http_version'] = res.http_version
 
 if res.code == '404'
-  puts "WARNING: tomcat status not found on server, but server running | "
+  puts "WARNING - tomcat status not found on server, but server running | "
   exit STATE_WARNING
 end
 if res.code == '401'
-  puts "WARNING: no privileges to access tomcat status on server | "
+  puts "WARNING - no privileges to access tomcat status on server | "
   exit STATE_WARNING
 end
 
@@ -77,7 +77,7 @@ begin
   
   if data['memory_free'] and data['memory_total'] > 0
     mem_usage = (100.0 * (data['memory_total']-data['memory_free'])/data['memory_total'])
-    data['memory_usage'] = "#{mem_usage.round(2)}%"
+    data['memory_usage'] = mem_usage.round(2)
   end
   
   connector = doc.xpath('//status/connector[@name=\'"http-bio-8080"\']')
@@ -90,14 +90,14 @@ begin
     end
     
     thread_usage = (100.0 * data['thread_currentCount']/data['thread_maxs'])
-    data['thread_usage'] = "#{thread_usage.round(2)}%" 
+    data['thread_usage'] = thread_usage.round(2)
   end
 rescue Exception => e
-  puts "WARNING: could not parse status xml: #{e} | #{perfdata data}"
+  puts "WARNING - could not parse status xml: #{e} | #{perfdata data}"
   exit STATE_WARNING
 end
 
-usage_string = "Memory #{data['memory_usage']} used; Threads #{data['thread_usage']} used"
+usage_string = "Memory #{data['memory_usage']}% used; Threads #{data['thread_usage']}% used"
 
 if mem_usage > options[:crit] or thread_usage > options[:crit]
   puts "CRITICAL - #{usage_string} | #{perfdata data}"

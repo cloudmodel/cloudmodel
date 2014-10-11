@@ -31,6 +31,10 @@ module CloudModel
         mkdir_p "#{build_dir}/etc/cloud_model"
         render_to_remote "/cloud_model/host/etc/cloud_model/kernel.config", "#{build_dir}/etc/cloud_model/kernel.config"
       end
+      
+      def config_layman_funtoo
+        chroot! build_dir, "layman -a funtoo-overlay", 'Failed adding funtoo overlay'
+      end
 
       def emerge_sys_tools
         emerge! %w(
@@ -55,8 +59,18 @@ module CloudModel
         emerge! %w(
           sys-apps/lm_sensors
           sys-apps/smartmontools
+          app-admin/sysstat
           net-analyzer/net-snmp
+          dev-python/pip
         )
+        
+        @host.exec! "python2 /usr/bin/pip install snmp_passpersis", 'Failed to install snmp passpersis'
+        
+        %w(mdstat.sh smart.sh vg.sh vm_info.py).each do |file|
+          render_to_remote "/cloud_model/host/etc/snmp/#{file}", "#{build_dir}/etc/snmp/#{file}", 0755
+        end
+        render_to_remote "/cloud_model/host/etc/snmp/snmpd.conf", "#{build_dir}/etc/snmp/snmpd.conf"
+        
       end
       
       def emerge_fs_tools
@@ -82,12 +96,15 @@ module CloudModel
           app-emulation/libvirt
           mail-mta/nullmailer
         )
+        
+        render_to_remote "/cloud_model/host/etc/ssh/sshd_config", "#{build_dir}/etc/ssh/sshd_config"
       end
 
       def compile_kernel
         render_to_remote "/cloud_model/host/etc/genkernel.conf", "#{build_dir}/etc/genkernel.conf", host: @host
       
         chroot! build_dir, "genkernel --kernel-config=/etc/cloud_model/kernel.config all", 'Failed to build kernel'
+        chroot! build_dir, "cd /usr/src/linux && make mrproper", 'Failed to cleanup kernel'
       end
   
       def configure_systemd_services
@@ -97,21 +114,14 @@ module CloudModel
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put SSH daemon to autostart'
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/tincd@.service /etc/systemd/system/multi-user.target.wants/tincd@vpn.service", 'Failed to put Tinc daemon to autostart'
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/libvirtd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put libvirt daemon to autostart'
+        chroot! build_dir, "ln -sf /usr/lib/systemd/system/snmpd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put snmp daemon to autostart'
  
         # TODO: Config nullmailer to send mails
         chroot! build_dir, "ln -s /usr/lib/systemd/system/nullmailer.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put nullmailer to autostart'
 
-        # TODO: Make smartd run
-        # - Add callback to CloudModel (?)
         render_to_remote "/cloud_model/host/etc/smartd.conf", "#{build_dir}/etc/smartd.conf", host: @host
         chroot! build_dir, "ln -s /usr/lib/systemd/system/smartd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put SMART daemon to autostart'
-        # TODO: Make mdadm report errors
-        # - Add email to notify
-        # - Add callback to CloudModel (?)
         chroot! build_dir, "ln -s /usr/lib/systemd/system/mdadm.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put MDADM to autostart'
-        # TODO: Make lvm2 monitor report errors
-        # - Add email to notify
-        # - Add callback to CloudModel (?)
         chroot! build_dir, "ln -s /usr/lib/systemd/system/lvm2-monitor.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put LVM2 monitor to autostart'
 
         # CloudModel firewall (for NAT etc.)
@@ -123,8 +133,6 @@ module CloudModel
         #   - "use_lvmetad = 0" => "use_lvmetad = 1"
         #chroot! build_dir, "ln -s /usr/lib/systemd/system/lvm2-lvmetad.service /etc/systemd/system/sysinit.target.wants/", 'Failed to put LVM metalv daemon to autostart'
         #chroot! build_dir, "ln -s /usr/lib/systemd/system/lvm2-lvmetad.socket /etc/systemd/system/sockets.target.wants/", 'Failed to put LVM metalv socket to autostart'
-
-        # TODO: Make monitoring run (nagios based; lm_sensors)
       end
 
       def configure_systemd_restart
@@ -154,6 +162,9 @@ module CloudModel
 
         mkdir_p "#{build_dir}/etc/system/nullmailer.service.d"
         render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{build_dir}/etc/system/nullmailer.service.d/restart.conf"
+        
+        mkdir_p "#{build_dir}/etc/system/snmpd.service.d"
+        render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{build_dir}/etc/system/snmpd.service.d/restart.conf"
       end
 
       def package_boot
@@ -212,7 +223,10 @@ module CloudModel
           ]],
           ["Build system", [
             ["Update portage", :emerge_portage],
-            ["Add CloudModel overlay", :config_layman],
+            ["Configure overlays", [
+              ["Add CloudModel overlay", :config_layman],
+              ["Add funtoo overlay", :config_layman_funtoo],
+            ]],
             ["Update base packages", :emerge_update_world],
             ["Cleanup base system", :emerge_depclean],
             ["Cleanup perl installation", :perl_cleaner],

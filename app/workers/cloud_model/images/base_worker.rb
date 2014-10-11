@@ -70,9 +70,10 @@ module CloudModel
     
       def configure_build_system       
         render_to_remote "/cloud_model/#{build_type}/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: CloudModel.config.gentoo_mirrors, host: @host, layman: false
-        render_to_remote "/cloud_model/#{build_type}/etc/portage/package.accept_keywords", "#{build_dir}/etc/portage/package.accept_keywords", 0600
-        render_to_remote "/cloud_model/#{build_type}/etc/portage/package.use", "#{build_dir}/etc/portage/package.use", 0600
-
+        %w(accept_keywords use mask unmask).each do |portage_conf|
+          render_to_remote "/cloud_model/#{build_type}/etc/portage/package.#{portage_conf}", "#{build_dir}/etc/portage/package.#{portage_conf}", 0600
+        end
+        
         render_to_remote "/cloud_model/support/etc/vconsole.conf", "#{build_dir}/etc/vconsole.conf"
         
         # Configure locale

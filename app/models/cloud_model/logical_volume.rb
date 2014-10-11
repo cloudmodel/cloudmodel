@@ -86,8 +86,16 @@ module CloudModel
           # Create LV as it seems not to exist
           Rails.logger.debug "Create LV"    
     
-          exec! "lvcreate -L #{(disk_space / 1024.0).floor}K -n #{name} --yes #{volume_group.device.shellescape}", "Failed to create logical volume #{name}"
-  
+          begin
+            exec! "lvcreate -L #{(disk_space / 1024.0).floor}K -n #{name} --yes #{volume_group.device.shellescape}", "Failed to create logical volume #{name}"
+          rescue RuntimeError => e
+            if e.message.include?("unrecognized option '--yes'")
+              # In case of rescue system has old lvcreate not knowing --yes
+              exec! "lvcreate -L #{(disk_space / 1024.0).floor}K -n #{name} #{volume_group.device.shellescape}", "Failed to create logical volume #{name}"              
+            else
+              raise e
+            end
+          end
           format_disk!
         end
         

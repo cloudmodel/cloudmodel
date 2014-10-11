@@ -26,6 +26,7 @@ end
 options = parse_options
 data = retrieve_data '1.3.6.1.4.1.32473.8.2.101', options
 
+data['devices'] = data['devices'].gsub(',', ':')
 data = {'num_devices' => data.delete('num-devices')}.merge data
 
 if data['num_devices'].to_i==options[:num_devices]

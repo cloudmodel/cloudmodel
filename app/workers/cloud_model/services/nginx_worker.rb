@@ -51,12 +51,12 @@ module CloudModel
         end
       
         @host.exec "chmod -R 2775 #{@guest.deploy_path}#{@model.www_root}"
-        @host.exec "chown -R www:www #{@guest.deploy_path}#{@model.www_root}"
+        chroot @guest.deploy_path, "chown -R www:www #{@model.www_root}"
         
-        log_dir_path = "#{@guest.deploy_path}/var/log/nginx/"
+        log_dir_path = "/var/log/nginx/"
         mkdir_p log_dir_path
-        @host.exec "chmod -R 2770 #{log_dir_path}"
-        @host.exec "chown -R www:www #{log_dir_path}"
+        @host.exec  "chmod -R 2770 #{@guest.deploy_path}#{log_dir_path}"
+        chroot @guest.deploy_path, "chown -R www:www #{log_dir_path}"
       end
     
       def auto_start

@@ -29,7 +29,7 @@ begin
   data = {}
   uri = URI("http#{options[:ssl] ? 's' : ''}://#{options[:host]}/nginx_status")
 rescue Exception => e
-   puts "WARNING: #{e} | #{perfdata data}"
+   puts "WARNING - #{e} | #{perfdata data}"
    exit STATE_WARNING
 end
 
@@ -51,20 +51,20 @@ begin
     data["#{k.downcase}"] = v
   end
 rescue Exception => e
-   puts "WARNING: #{e} | #{perfdata data}"
+   puts "WARNING - #{e} | #{perfdata data}"
    exit STATE_WARNING
 end
 
 if res.code == '404'
-  puts "WARNING: nginx_status not found on server, but server running | "
+  puts "WARNING - nginx_status not found on server, but server running | "
   exit STATE_WARNING
 end
 if res.code == '403'
-  puts "WARNING: no privileges to access nginx_status on server | "
+  puts "WARNING - no privileges to access nginx_status on server | "
   exit STATE_WARNING
 end
 
-# TODO: Implement checks on different values from redis info
+# TODO: Implement checks on different values from nginx info
 #
 # usage = 95
 #

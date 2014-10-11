@@ -98,7 +98,6 @@ module CloudModel
 
           dev-python/pycairo
           dev-python/django
-          www-servers/gunicorn
         )
 
         python_site_packages_path = '/usr/lib/python2.7/site-packages'
@@ -152,30 +151,23 @@ host.exec! "echo \"D /var/run/graphite 0755 graphite graphite\" > #{build_dir}/e
         chroot! build_dir, "shinken install auth-cfg-password", 'Unable to install shinken auth-cfg-password'
         chroot! build_dir, "shinken install ui-graphite", 'Unable to install shinken ui-graphite'
 
-        chroot! build_dir, "shinken install linux-snmp", 'Unable to install shinken linux-snmp'
         chroot! build_dir, "shinken install http", 'Unable to install shinken http'
-        chroot! build_dir, "shinken install mongodb", 'Unable to install shinken mongodb'
         chroot! build_dir, "shinken install ssh", 'Unable to install shinken ssh'
-        chroot! build_dir, "shinken install tomcat", 'Unable to install shinken tomcat'
 
         chroot! build_dir, "gem install snmp", 'Unable to install ruby snmp gem'
         chroot! build_dir, "gem install redis", 'Unable to install ruby redis gem'
+        chroot! build_dir, "gem install bson_ext mongo", 'Unable to install ruby mongo gem'
         chroot! build_dir, "gem install nokogiri -- --use-system-libraries", 'Unable to install ruby nokogiri gem'
 
         chroot! build_dir, "rm -rf /etc/shinken/hosts/localhost.cfg", "Failed to remove localhost example for shinken host"
-        
-        render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/snmp_helpers.rb", "#{build_dir}/var/lib/shinken/libexec/snmp_helpers.rb", 0700
-        %w(lvm mdstat smart redis nginx tomcat).each do |check_name|
-          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/check_#{check_name}.rb", "#{build_dir}/var/lib/shinken/libexec/check_#{check_name}.rb", 0700
-          render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{build_dir}/etc/shinken/commands/check_#{check_name}.cfg"
-          render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{build_dir}/etc/shinken/services/#{check_name}.cfg"
-        end
-        chroot! build_dir, "chown -R shinken:shinken /var/lib/shinken/libexec/", 'Failed to assign check scripts to shinken user'
 
-
-        # smartd.service
-        # snmpd.service
-
+        # render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/snmp_helpers.rb", "#{build_dir}/var/lib/shinken/libexec/snmp_helpers.rb", 0700
+        # %w(cpu disks mem net_usage sensors lvm mdstat smart mongodb nginx redis tomcat).each do |check_name|
+        #   render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/check_#{check_name}.rb", "#{build_dir}/var/lib/shinken/libexec/check_#{check_name}.rb", 0700
+        #   render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{build_dir}/etc/shinken/commands/check_#{check_name}.cfg"
+        #   render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{build_dir}/etc/shinken/services/#{check_name}.cfg"
+        # end
+        # chroot! build_dir, "chown -R shinken:shinken /var/lib/shinken/libexec/", 'Failed to assign check scripts to shinken user'
       end
           
       def configure_system
