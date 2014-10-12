@@ -40,7 +40,7 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/tomcat-7/servlet.xml", "#{@guest.deploy_path}/etc/tomcat-7/Catalina/localhost/ROOT.xml", manifest: manifest, worker: self, guest: @guest, model: @model    
         render_to_remote "/cloud_model/guest/etc/tomcat-7/tomcat-users.xml", "#{@guest.deploy_path}/etc/tomcat-7/tomcat-users.xml", guest: @guest, model: @model      
         
-        chroot @guest.deploy_path, "chown -R tomcat:tomcat #{target.shellescape}"
+        chroot @guest.deploy_path, "chown -R tomcat:tomcat /var/tomcat"
       end
     
       def interpolate_value(value)

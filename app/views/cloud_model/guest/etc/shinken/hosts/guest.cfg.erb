@@ -24,4 +24,6 @@ define host{
     _DISKS_BASEPATH     <%= guest.base_path%>
     _DISKS_WARN         90
     _DISKS_CRIT         95
+    
+    _CHECK_HTTPS_URI    /nginx_status
 }

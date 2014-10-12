@@ -8,7 +8,7 @@ module CloudModel
         end
         
         log_dir_path = "/var/log/redis/"
-        mkdir_p log_dir_path
+        mkdir_p "#{@guest.deploy_path}#{log_dir_path}"
         @host.exec "chmod -R 2770 #{@guest.deploy_path}#{log_dir_path}"
         chroot @guest.deploy_path, "chown -R redis:redis #{log_dir_path}"
       end

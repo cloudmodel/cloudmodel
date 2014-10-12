@@ -6,6 +6,10 @@ module CloudModel
       def kind
         :monitoring
       end
+      
+      def port
+        7767
+      end
     end
   end
 end

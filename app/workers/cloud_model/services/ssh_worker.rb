@@ -33,7 +33,7 @@ module CloudModel
           f.write CloudModel::SshPubKey.all.to_a * "\n"
         end
   
-        chroot! "chown -R www:www #{ssh_target.shellescape}", "Failed to change owner of www client keys to user www (1001)"
+        chroot! @guest.deploy_path, "chown -R www:www /var/www/.ssh", "Failed to change owner of www client keys to user www (1001)"
       end
     
       def auto_start

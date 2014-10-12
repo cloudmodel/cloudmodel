@@ -60,11 +60,14 @@ module CloudModel
           sys-apps/lm_sensors
           sys-apps/smartmontools
           app-admin/sysstat
-          net-analyzer/net-snmp
           dev-python/pip
         )
         
-        @host.exec! "python2 /usr/bin/pip install snmp_passpersis", 'Failed to install snmp passpersis'
+        emerge! %w(
+          net-analyzer/net-snmp
+        )
+        
+        chroot! build_dir, "python2 /usr/bin/pip install snmp_passpersist", 'Failed to install snmp passpersist'
         
         %w(mdstat.sh smart.sh vg.sh vm_info.py).each do |file|
           render_to_remote "/cloud_model/host/etc/snmp/#{file}", "#{build_dir}/etc/snmp/#{file}", 0755
@@ -232,12 +235,12 @@ module CloudModel
             ["Cleanup perl installation", :perl_cleaner],
             ["Cleanup python installation", :python_cleaner],
             ["Build system tools", :emerge_sys_tools],
-            #["Build postgres SQL servers", :emerge_postgres],
-            ["Build monitoring tools", :emerge_monitoring],
             ["Build filesystem tools", :emerge_fs_tools],
+            ["Compile kernel", :compile_kernel],
+            #["Build postgres SQL servers", :emerge_postgres],
             ["Build network tools", :emerge_net_tools],
             ["Build CloudModel packages", :emerge_cm_packages],
-            ["Compile kernel", :compile_kernel],
+            ["Build monitoring tools", :emerge_monitoring],
           ]],
           ["Configure system", [
             ["Configure udev", :configure_udev],
