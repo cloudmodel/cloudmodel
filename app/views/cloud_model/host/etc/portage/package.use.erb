@@ -1,3 +1,5 @@
-<%= render '/cloud_model/support/package.use' %>
+<%= render '/cloud_model/support/etc/portage/package.use' %>
 
-net-misc/networkmanager -bluetooth -wext -wifi -ppp -modemmanager
+# Monitoring
+net-analyzer/net-snmp lm_sensors pci diskio netlink perl python
+net-analyzer/check_mk livestatus smart

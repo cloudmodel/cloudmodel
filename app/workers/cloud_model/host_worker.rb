@@ -113,19 +113,6 @@ module CloudModel
       true
     end
 
-    def use_last_deploy_root
-      real_volumes = @host.volume_groups.first.list_real_volumes
-      raise 'Unable to get real volume list' unless real_volumes
-      last_volume = real_volumes.keys.find_all{|i| i.to_s.match /root-*/}.sort{|a,b| b.to_s <=> a.to_s}.first.try :to_s
-      if last_volume
-        @timestamp = last_volume.to_s.sub /\Aroot-([0-9]*)\z/, '\1'
-        @deploy_lv = CloudModel::LogicalVolume.where(name: "root-#{@timestamp}").first
-        @deploy_lv.mount "#{root}"
-      else
-        raise 'No last deploy root lv found'
-      end
-    end
-    
     def make_deploy_disk
       #
       # Partition disks
@@ -205,7 +192,26 @@ module CloudModel
       end
     end
     
+    def use_last_deploy_root
+      real_volumes = @host.volume_groups.first.list_real_volumes
+      raise 'Unable to get real volume list' unless real_volumes
+      last_volume = real_volumes.keys.find_all{|i| i.to_s.match /\Aroot-[0-9]*\z/}.sort{|a,b| b.to_s <=> a.to_s}.first
+      if last_volume
+        @timestamp = last_volume.to_s.sub /\Aroot-([0-9]*)\z/, '\1'
+        @deploy_lv = CloudModel::LogicalVolume.where(name: "root-#{@timestamp}").first
+        unless @deploy_lv
+          @deploy_lv = CloudModel::LogicalVolume.new name: "root-#{@timestamp}", disk_space: real_volumes[last_volume][:l_size], volume_group: @host.volume_groups.first          
+        end
+        @deploy_lv.mount "#{root}"
+      else
+        raise 'No last deploy root lv found'
+      end
+    end
+    
+    
     def populate_deploy_root
+      # TODO: mkdir -p /inst && mount /dev/mapper/vg0-inst to /inst if needed
+      
       #
       # Populate deploy root with system image
       #
@@ -218,7 +224,7 @@ module CloudModel
       mkdir_p "#{root}/etc/conf.d"
       
       render_to_remote "/cloud_model/host/etc/systemd/system/network.service", "#{root}/etc/systemd/system/network.service", host: @host
-      chroot root, "ln -s #{root}/etc/systemd/system/network.service /etc/systemd/system/network.target.wants/"
+      chroot root, "ln -sf #{root}/etc/systemd/system/network.service /etc/systemd/system/network.target.wants/"
                   
       render_to_remote "/cloud_model/support/etc/hostname", "#{root}/etc/hostname", host: @host
       render_to_remote "/cloud_model/support/etc/machine_info", "#{root}/etc/machine-info", host: @host     
@@ -249,17 +255,36 @@ module CloudModel
       
       @host.ssh_connection.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "#{ssh_dir}/authorized_keys"
       
+      # TODO: Init lm_sensors with
+      # sensors-detect --auto
+      # on hold as it requires lm_sensors 3.3.5+
+      
+      chroot root, "/usr/sbin/sensors-detect --auto"
+      
       return true
     end
 
     def make_keys
+      mkdir_p "#{root}/etc/tinc/vpn/"
       render_to_remote "/cloud_model/host/etc/tinc/rsa_key.priv", "#{root}/etc/tinc/vpn/rsa_key.priv", 0600, host: @host
       # Host SSH keys will be generated on first host start
     end
     
     def copy_keys
-      @host.exec! "cp -ra /etc/tinc/vpn/rsa_key.priv #{root}/etc/tinc/vpn/rsa_key.priv", "Failed to copy old tinc key"
-      @host.exec! "cp -ra /etc/ssh/* #{root}/etc/ssh/", "Failed to copy old ssh keys"
+      # TODO: put keys to a more failsafe location like somewhere in /inst
+      
+      begin
+        @host.exec! "cp -ra /etc/tinc/vpn/rsa_key.priv #{root}/etc/tinc/vpn/rsa_key.priv", "Failed to copy old tinc key"
+      rescue
+        print " (old tinc key not found, create new)"
+        make_keys
+      end
+      
+      begin
+        @host.exec! "cp -ra /etc/ssh/ssh_host_*_key* #{root}/etc/ssh/", "Failed to copy old ssh keys"
+      rescue
+        print " (old ssh keys not found)"
+      end
     end
     
     def sync_inst_images
@@ -304,7 +329,7 @@ module CloudModel
       
       steps = [
         ['Upsync system images', :sync_inst_images],
-        ['Prepare volume for new system', :make_deploy_root],
+        ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
         ['Populate volume with new system image', :populate_deploy_root],
         ['Config new system', :config_deploy_root],         
         ['Copy crypto keys from old system', :copy_keys],

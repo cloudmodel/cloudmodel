@@ -1,0 +1,8 @@
+define service{
+   service_description           Memory
+   use            generic-service
+   register       0
+   host_name	  cm-guest
+   check_command  check_guest_mem
+   aggregation    system
+}

@@ -1,0 +1,7 @@
+## Check mongodb health
+## This plugin tests mongodb status
+
+define command {
+    command_name    check_mongodb
+    command_line    $PLUGINSDIR$/check_mongodb.rb -h $HOSTADDRESS$
+}

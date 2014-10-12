@@ -1,0 +1,9 @@
+#!/bin/sh
+
+for i in /dev/[hs]d?; do
+	smart=`/usr/sbin/smartctl -a ${i}`
+	state=`echo "${smart}" | grep 'SMART overall-health self-assessment test result:' | sed s/.*:\ //`
+	temperature=`echo "${smart}" | grep ' Temperature_Celsius' | awk '{print \$10}'`
+	
+	echo "dev=$(echo $i | sed s,/dev/,, ) state=${state} temp=${temperature}"
+done

@@ -1,0 +1,8 @@
+define service{
+   service_description           Sensors
+   use            generic-service
+   register       0
+   host_name	  cm-host
+   check_command  check_lm_sensors
+   aggregation    system
+}

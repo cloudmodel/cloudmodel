@@ -9,6 +9,10 @@ module CloudModel
       def kind
         :ssh
       end
+      
+      def shinken_services_append
+        ', ssh'
+      end
     end
   end
 end

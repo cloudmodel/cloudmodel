@@ -159,8 +159,12 @@ module CloudModel
       end
     end
     
+    def private_address
+       private_network.list_ips.first
+     end
+    
     def ssh_address
-      initial_root_pw ? primary_address.ip : private_network.list_ips.first
+      initial_root_pw ? primary_address.ip : private_address
     end
     
     def shell
@@ -197,24 +201,24 @@ module CloudModel
             abort "FAILED: couldn't execute command (ssh.channel.exec)"
           end
           channel.on_data do |ch,data|
-            #puts "  stdout: #{data}"
+            Rails.logger.debug "  STDOUT: #{data}"
             stdout_data += data
           end
 
           channel.on_extended_data do |ch,type,data|
-            #puts "  stderr (#{type}): #{data}"
+            Rails.logger.debug "  STDERR: (#{type}): #{data}"
             stderr_data[type] ||= ''
             stderr_data[type] += data
           end
 
           channel.on_request("exit-status") do |ch,data|
             exit_status = data.read_long
-            #puts "  exit-status: #{exit_status}"
+            Rails.logger.debug "  exit-status: #{exit_status}"
           end
 
           channel.on_request("exit-signal") do |ch, data|
             exit_signal = data.read_long
-            #puts "  exit-signal: #{exit_signal}"
+            Rails.logger.debug "  exit-signal: #{exit_signal}"
           end
         end
       end

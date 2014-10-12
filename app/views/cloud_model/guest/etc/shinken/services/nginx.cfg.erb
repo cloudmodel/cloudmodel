@@ -1,0 +1,7 @@
+define service{
+   service_description           Nginx
+   use            generic-service
+   register       0
+   host_name	  nginx
+   check_command  check_nginx
+}

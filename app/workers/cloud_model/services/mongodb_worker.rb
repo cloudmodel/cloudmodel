@@ -9,11 +9,11 @@ module CloudModel
           f.write render("/cloud_model/guest/etc/mongodb.conf", guest: @guest, model: @model)
         end
       
-        @host.exec "chown -R 101:root #{@guest.deploy_path.shellescape}#{target.shellescape}"
-        log_dir_path = "#{@guest.deploy_path}/var/log/mongodb/"
-        mkdir_p log_dir_path
-        @host.exec "chmod -R 2770 #{log_dir_path}"
-        @host.exec "chown -R 101:root #{log_dir_path}"
+        chroot @guest.deploy_path, "chown -R 101:root #{target.shellescape}"
+        log_dir_path = "/var/log/mongodb/"
+        mkdir_p "#{@guest.deploy_path}#{log_dir_path}"
+        @host.exec "chmod -R 2770 #{@guest.deploy_path}#{log_dir_path}"
+        chroot @guest.deploy_path, "chown -R mongodb:root #{log_dir_path}"
       end
     end
   end

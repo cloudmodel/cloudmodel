@@ -1,0 +1,7 @@
+define service{
+   service_description           Redis
+   use            generic-service
+   register       0
+   host_name	  redis
+   check_command  check_redis
+}

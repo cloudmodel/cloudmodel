@@ -78,7 +78,7 @@ http {
 <%- else -%>
     root                          <%= model.www_root %>/current/public;
 <%- end -%>
-    client_max_body_size          200M;
+    client_max_body_size          600M;
     client_body_buffer_size       128k;
     client_header_timeout         30m;
     client_body_timeout           30m;
@@ -107,6 +107,15 @@ http {
       try_files                   $uri $uri/ /index.html;
     }
 <%- end -%>
+    location /nginx_status {
+      stub_status                 on;
+      access_log                  off;
+      allow                       <%= model.host.private_network.ip %>/16;
+      deny all;
+    }
+    
+    include /etc/nginx/server.d/*;
+
 <%- if protocol == :https -%>
 
     <%- if model.ssl_enforce? or model.ssl_only? -%>

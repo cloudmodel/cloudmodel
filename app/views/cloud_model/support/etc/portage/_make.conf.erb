@@ -8,7 +8,10 @@ CHOST="x86_64-pc-linux-gnu"
 # profile used for building.
 USE="bindist mmx sse sse2"
 PORTDIR="/usr/portage"
-#PORTDIR_OVERLAY="/usr/local/portage"
+<%- if layman -%>
+#PORTDIR_OVERLAY="/var/lib/layman/CloudModel"
+source /var/lib/layman/make.conf
+<%- end -%>
 DISTDIR="${PORTDIR}/distfiles"
 PKGDIR="${PORTDIR}/packages"
 

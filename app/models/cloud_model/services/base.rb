@@ -21,12 +21,20 @@ module CloudModel
         }
       end
     
+      def host
+        guest.host
+      end
+    
       def used_ports
         [port]
       end
     
       def kind
         :unknown
+      end
+      
+      def shinken_services_append
+        nil
       end
       
       def backupable?

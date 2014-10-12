@@ -54,6 +54,7 @@ module CloudModel
     
     attr_accessor :deploy_path, :deploy_volume
     
+    before_validation :set_dhcp_private_address, :on => :create
     before_validation :set_root_volume_name
     #after_save :deploy
     
@@ -139,6 +140,22 @@ module CloudModel
       end
     end 
     
+    def has_service?(service_type)
+      services.select{|s| s._type == service_type}.count > 0
+    end
+    
+    def shinken_services_append
+      services_string = ''
+      
+      services.each do |service|
+        if service_string = service.shinken_services_append
+          services_string += service_string
+        end
+      end
+      
+      services_string
+    end
+     
     def self.deploy_state_id_for deploy_state
       enum_fields[:deploy_state][:values].invert[deploy_state]
     end
@@ -313,8 +330,13 @@ module CloudModel
     end
     
     private  
+    def set_dhcp_private_address
+      self.private_address = host.dhcp_private_address unless private_address
+    end
+    
     def set_root_volume_name
       root_volume.name = "#{name}-root-#{Time.now.strftime "%Y%m%d%H%M%S"}" unless root_volume.name
+      root_volume.volume_group = host.volume_groups.first unless root_volume.volume_group
     end
   end
 end

@@ -1,0 +1,8 @@
+## Check nginx health
+## This plugin tests the nginx service on the specified host
+# check_smart -d <device>
+
+define command {
+    command_name    check_nginx
+    command_line    $PLUGINSDIR$/check_nginx.rb -h $HOSTADDRESS$
+}

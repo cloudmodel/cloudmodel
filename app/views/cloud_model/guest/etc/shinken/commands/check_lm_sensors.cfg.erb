@@ -1,0 +1,7 @@
+## Check sensors health
+## This plugin tests sensors readings
+
+define command {
+    command_name    check_lm_sensors
+    command_line    $PLUGINSDIR$/check_lm_sensors.rb -h $HOSTADDRESS$
+}

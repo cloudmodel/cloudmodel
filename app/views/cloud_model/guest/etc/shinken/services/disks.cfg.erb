@@ -1,0 +1,17 @@
+define service{
+   service_description           Disks
+   use            generic-service
+   register       0
+   host_name	  cm-host
+   check_command  check_host_disks
+   aggregation    system
+}
+
+define service{
+   service_description           Disks
+   use            generic-service
+   register       0
+   host_name	  cm-guest
+   check_command  check_guest_disks
+   aggregation    system
+}

@@ -49,7 +49,7 @@ module CloudModel
     
     def format_disk!
       Rails.logger.debug "Make FS"
-      exec "mkfs.#{disk_format.shellescape} #{device.shellescape}"     
+      exec "mkfs  -F -t #{disk_format.shellescape} #{device.shellescape}"     
     end
     
     def apply options={}
@@ -64,15 +64,19 @@ module CloudModel
             Rails.logger.debug "Enlarge LV"
             exec "lvextend #{device.shellescape} --size #{(disk_space / 1024.0).floor}K"
         
-            Rails.logger.debug "Enlarge FS"
-            exec "resize2fs #{device.shellescape}"
+            unless options[:wipe]
+              Rails.logger.debug "Enlarge FS"
+              exec "resize2fs #{device.shellescape}"
+            end
           elsif data[:l_size].to_i > disk_space
             # Shrink LV
             Rails.logger.debug "Shrink FS"
             exec "e2fsck -f #{device.shellescape} && resize2fs #{device.shellescape} #{(disk_space / 1024.0).floor}K"
         
-            Rails.logger.debug "Shrink LV"
-            exec "lvreduce #{device.shellescape} --size #{(disk_space / 1024.0).floor}K -f"
+            unless options[:wipe]
+              Rails.logger.debug "Shrink LV"
+              exec "lvreduce #{device.shellescape} --size #{(disk_space / 1024.0).floor}K -f"
+            end
           end
           
           if options[:wipe]
@@ -82,8 +86,16 @@ module CloudModel
           # Create LV as it seems not to exist
           Rails.logger.debug "Create LV"    
     
-          exec! "lvcreate -L #{(disk_space / 1024.0).floor}K -n #{name} --yes #{volume_group.device.shellescape}", "Failed to create logical volume #{name}"
-  
+          begin
+            exec! "lvcreate -L #{(disk_space / 1024.0).floor}K -n #{name} --yes #{volume_group.device.shellescape}", "Failed to create logical volume #{name}"
+          rescue RuntimeError => e
+            if e.message.include?("unrecognized option '--yes'")
+              # In case of rescue system has old lvcreate not knowing --yes
+              exec! "lvcreate -L #{(disk_space / 1024.0).floor}K -n #{name} #{volume_group.device.shellescape}", "Failed to create logical volume #{name}"              
+            else
+              raise e
+            end
+          end
           format_disk!
         end
         

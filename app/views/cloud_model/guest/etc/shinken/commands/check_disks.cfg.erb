@@ -1,0 +1,12 @@
+## Check disks usage
+## This plugin tests disk usage
+
+define command {
+    command_name    check_host_disks
+    command_line    $PLUGINSDIR$/check_disks.rb -h $HOSTADDRESS$ -d "$_HOSTDISKS$"
+}
+
+define command {
+    command_name    check_guest_disks
+    command_line    $PLUGINSDIR$/check_disks.rb -h $_HOSTSNMPSERVER$ -d "$_HOSTDISKS$" -b "$_HOSTDISKS_BASEPATH$"
+}

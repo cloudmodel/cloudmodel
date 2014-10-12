@@ -6,6 +6,10 @@ module CloudModel
       def kind
         :redis
       end
+      
+      def shinken_services_append
+        ', redis'
+      end
     end
   end
 end

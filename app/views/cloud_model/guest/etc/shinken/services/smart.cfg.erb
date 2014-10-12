@@ -1,0 +1,21 @@
+define service{
+   service_description           SMART-sda
+   use            generic-service
+   register       0
+   host_name	  smart
+   check_command  check_smart
+   aggregation    system
+   _SMARTDEV      sda
+   _SMARTTYPE     sat
+}
+
+define service{
+   service_description           SMART-sdb
+   use            generic-service
+   register       0
+   host_name      smart
+   check_command  check_smart
+   aggregation    system
+   _SMARTDEV      sdb
+   _SMARTTYPE     sat
+}

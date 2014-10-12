@@ -1,5 +1,6 @@
-<%= render '/cloud_model/support/make.conf', host: host %>
+<%= render '/cloud_model/support/etc/portage/make.conf', host: host, layman: layman %>
 
 USE="-X -cups -minimal -gnome -gtk -kde -qt4 -consolekit -alsa -pulseaudi -openvz -qemu bindist selinux mmx sse sse2 nptl nptlonly cpudetection ipv6 lvm systemd lxc virt-network vde dbus udev gudev device-mapper"
 
+LINGUAS="en"
 DRACUT_MODULES="raid lvm"

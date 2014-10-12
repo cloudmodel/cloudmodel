@@ -1,0 +1,25 @@
+define host{
+  use                     generic-host, cm-host, ssh, smart, lvm, mdstat, sensors
+  contact_groups          admins
+  host_name               <%= host.name %>
+  address                 <%= host.private_address %>
+
+#    _SNMPCOMMUNITY      $SNMPCOMMUNITYREAD$
+    _SNMP_MSG_MAX_SIZE  65535
+
+    _CPU_WARN           80
+    _CPU_CRIT           90
+    _LOAD_WARN          2,2,2
+    _LOAD_CRIT          3,3,3
+
+    _MEMORY_WARN        80
+    _MEMORY_CRIT        95
+
+    _NET_IFACES         eth0,virbr0,vpn
+    _NET_WARN           90,90,0,0,0,0
+    _NET_CRIT           0,0,0,0,0,0
+
+    _DISKS             /,/inst
+    _DISKS_WARN       90
+    _DISKS_CRIT       95
+}
