@@ -244,6 +244,9 @@ module CloudModel
         f.puts render("/cloud_model/host/etc/libvirt/lxc/guest.xml", guest: @guest, skip_uuid: true)
       end
       puts "    Define VM with virsh"
+      # Make sure it is not defined anymore
+      # It can fail gracefully - fails fatal on define else
+      @host.exec "virsh undefine #{@guest.name.shellescape}"
       @host.exec! "virsh define /inst/tmp/#{@guest.name.shellescape}.xml", "Failed to define guest '#{@guest.name.shellescape}'"
     end
   end

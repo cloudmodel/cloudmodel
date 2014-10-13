@@ -23,24 +23,13 @@ module CloudModel
         
         puts "        Write tomcat config"
         mkdir_p File.expand_path("etc/tomcat-7/Catalina/localhost", @guest.deploy_path) 
-        # @host.ssh_connection.sftp.file.open(File.expand_path("etc/tomcat-7/server.xml", @guest.deploy_path), 'w') do |f|
-        #   f.write render("/cloud_model/guest/etc/tomcat-7/server.xml", guest: @guest, model: @model)
-        # end
-        #
-        # @host.ssh_connection.sftp.file.open(File.expand_path("etc/conf.d/tomcat-7", @guest.deploy_path), 'w') do |f|
-        #   f.write render("/cloud_model/guest/etc/conf.d/tomcat-7", manifest: manifest, worker: self, guest: @guest, model: @model)
-        # end
-        #
-        # @host.ssh_connection.sftp.file.open(File.expand_path("etc/tomcat-7/Catalina/localhost/ROOT.xml", @guest.deploy_path), 'w') do |f|
-        #   f.write render("/cloud_model/guest/etc/tomcat-7/servlet.xml", manifest: manifest, worker: self, guest: @guest, model: @model)
-        # end
         
-        render_to_remote "/cloud_model/guest/etc/tomcat-7/server.xml", "#{@guest.deploy_path}/etc/tomcat-7/server.xml", guest: @guest, model: @model      
         render_to_remote "/cloud_model/guest/etc/conf.d/tomcat-7", "#{@guest.deploy_path}/etc/conf.d/tomcat-7", manifest: manifest, worker: self, guest: @guest, model: @model     
-        render_to_remote "/cloud_model/guest/etc/tomcat-7/servlet.xml", "#{@guest.deploy_path}/etc/tomcat-7/Catalina/localhost/ROOT.xml", manifest: manifest, worker: self, guest: @guest, model: @model    
-        render_to_remote "/cloud_model/guest/etc/tomcat-7/tomcat-users.xml", "#{@guest.deploy_path}/etc/tomcat-7/tomcat-users.xml", guest: @guest, model: @model      
+        render_to_remote "/cloud_model/guest/etc/tomcat-7/server.xml", "#{@guest.deploy_path}/etc/tomcat-7/server.xml", 0640, guest: @guest, model: @model      
+        render_to_remote "/cloud_model/guest/etc/tomcat-7/servlet.xml", "#{@guest.deploy_path}/etc/tomcat-7/Catalina/localhost/ROOT.xml", 0640, manifest: manifest, worker: self, guest: @guest, model: @model    
+        render_to_remote "/cloud_model/guest/etc/tomcat-7/tomcat-users.xml", "#{@guest.deploy_path}/etc/tomcat-7/tomcat-users.xml", 0640, guest: @guest, model: @model      
         
-        chroot @guest.deploy_path, "chown -R tomcat:tomcat /var/tomcat"
+        chroot @guest.deploy_path, "chown -R tomcat:tomcat /var/tomcat /etc/tomcat-7/server.xml /etc/tomcat-7/Catalina/localhost /etc/tomcat-7/tomcat-users.xml"
       end
     
       def interpolate_value(value)

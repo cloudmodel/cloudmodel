@@ -281,7 +281,7 @@ module CloudModel
       end
       
       begin
-        @host.exec! "cp -ra /etc/ssh/ssh_host_*_key* #{root}/etc/ssh/", "Failed to copy old ssh keys"
+        @host.exec! "cp -ra /etc/ssh/ssh_host_*key* #{root}/etc/ssh/", "Failed to copy old ssh keys"
       rescue
         print " (old ssh keys not found)"
       end
