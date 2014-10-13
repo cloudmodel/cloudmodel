@@ -40,9 +40,9 @@ def update():
     pp.add_str('1.{0}.1'.format(i), machine_name)
 
     file = open('{0}/memory.limit_in_bytes'.format(machine, 'r'))
-    pp.add_int('1.{0}.2.1'.format(i), file.read().strip())
+    pp.add_cnt_64bit('1.{0}.2.1'.format(i), file.read().strip())
     file = open('{0}/memory.usage_in_bytes'.format(machine, 'r'))
-    pp.add_int('1.{0}.2.2'.format(i), file.read().strip())
+    pp.add_cnt_64bit('1.{0}.2.2'.format(i), file.read().strip())
 
     if machine_name in startval and machine_name in endval:
       delta = int(endval[machine_name]) - int(startval[machine_name])
