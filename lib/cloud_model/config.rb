@@ -28,7 +28,7 @@ module CloudModel
     end
     
     def bundle_command
-      @bundle_command || 'PATH=/bin:/sbin:/usr/bin:/usr/local/bin /usr/bin/bundle'
+      @bundle_command || 'PATH=/bin:/sbin:/usr/bin:/usr/local/bin bundle'
     end
   end
 end
