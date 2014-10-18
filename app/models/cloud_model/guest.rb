@@ -58,7 +58,7 @@ module CloudModel
     before_validation :set_root_volume_name
     #after_save :deploy
     
-    STATES = {
+    VM_STATES = {
       -1 => :undefined,
       0 => :no_state,
       1 => :running,
@@ -71,7 +71,11 @@ module CloudModel
     }
    
     def state_to_id state
-      STATES.invert[state.to_sym] || -1
+      CloudModel::Livestatus::STATES.invert[state.to_sym] || -1
+    end
+    
+    def vm_state_to_id state
+      VM_STATES.invert[state.to_sym] || -1
     end
     
     def base_path
@@ -222,10 +226,22 @@ module CloudModel
       end
     end
     
+    def livestatus
+      @livestatus ||= CloudModel::Livestatus::Host.find("#{host.name}.#{name}", only: %w(host_name description state plugin_output perf_data))
+    end
+    
     def state
+      if livestatus
+        livestatus.state
+      else
+        -1
+      end
+    end
+    
+    def vm_state
       @real_state unless @real_state.blank?
       begin
-        @real_state = state_to_id virsh('domstate').strip
+        @real_state = vm_state_to_id virsh('domstate').strip
       rescue
         -1
       end
@@ -244,7 +260,7 @@ module CloudModel
     
         vm_info['memory']  = vm_info.delete('used_memory').to_i * 1024
         vm_info['max_mem'] = vm_info.delete('max_memory').to_i * 1024
-        vm_info['state']   = state_to_id(vm_info['state'])
+        vm_info['state']   = vm_state_to_id(vm_info['state'])
         vm_info['cpus']    = vm_info.delete("cpu(s)").to_i
         vm_info['active']  = (vm_info['state'] == 1)
         
@@ -273,7 +289,7 @@ module CloudModel
     def stop! options = {}
       stop
       timeout = options[:timeout] || 600
-      while state != -1 and timeout > 0 do
+      while vm_state != -1 and timeout > 0 do
         sleep 0.1
         timeout -= 1
       end
@@ -282,7 +298,7 @@ module CloudModel
     def undefine
       begin
         # Return true if the domain is not defined before
-        if STATES[state] == :undefined
+        if VM_STATES[vm_state] == :undefined
           Rails.logger.debug "Domain #{self.name} was not defined before"
           return true
         end

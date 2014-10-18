@@ -24,7 +24,7 @@ CloudModel.configure do |config|
   )
   
   ## Set custom bundle command call 
-  ## Defaults to 'PATH=/bin:/sbin:/usr/bin:/usr/local/bin /usr/bin/bundle'
+  ## Defaults to 'PATH=/bin:/sbin:/usr/bin:/usr/local/bin bundle'
   config.bundle_command = 'bundle'
   
   ## Configure email address of admin for notifications, monitoring
@@ -32,4 +32,13 @@ CloudModel.configure do |config|
   ## if you want to notify more than one, just use a mailing list address.
   ## Defaults to nil
   # config.admin_email = 'admin@example.com'
+  
+  ## Configure where to find livestatus db
+  ## Set host of livestatus db
+  ## Defaults to nil
+  config.livestatus_host = '10.99.0.253'
+  
+  ## Set port of livestatus db
+  ## Defaults to 50000
+  # config.livestatus_port = 50000
 end

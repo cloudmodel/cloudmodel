@@ -1,6 +1,14 @@
 de:
   cloud_model/guest/state:
     undefined: Nicht Definiert
+    running: Läuft
+    warning: Warnung
+    critical: Kritisch
+    unknown: Unbekannt
+    dependent: Abhängigkeit
+    
+  cloud_model/guest/vm_state:
+    undefined: Nicht Definiert
     no_state: Ohne Status
     running: Läuft
     blocked: Blockiert
@@ -108,6 +116,7 @@ de:
         addresses: Adressen/Subnetze
         guests: Gastsysteme
         volume_groups: Logische Laufwerksgruppen
+        state: Status
         deploy_state: Installationsstatus
         deploy_last_issue: Letztes Problem bei der Installation
       cloud_model/guest:
@@ -124,6 +133,7 @@ de:
         root_volume: Systemlaufwerk
         guest_volumes: Andere Laufwerke
         state: Status
+        vm_state: VM Status
         deploy_state: Installationsstatus
         deploy_last_issue: Letztes Problem bei der Installation
       cloud_model/volume_group:

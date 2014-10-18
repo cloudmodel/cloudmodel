@@ -3,6 +3,8 @@ module CloudModel
     attr_writer :data_directory, :backup_directory, :bundle_command
     attr_writer :skip_sync_images, :gentoo_mirrors
     attr_accessor :admin_email, :gentoo_mirrors
+    attr_accessor :livestatus_host
+    attr_writer :livestatus_port
     
     def initialize(&block) 
       configure(&block) if block_given?
@@ -29,6 +31,10 @@ module CloudModel
     
     def bundle_command
       @bundle_command || 'PATH=/bin:/sbin:/usr/bin:/usr/local/bin bundle'
+    end
+    
+    def livestatus_port
+      @livestatus_port || 50000
     end
   end
 end

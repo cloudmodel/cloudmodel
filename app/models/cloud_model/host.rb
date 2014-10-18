@@ -292,6 +292,18 @@ module CloudModel
       end
     end
     
+    def livestatus
+      @livestatus ||= CloudModel::Livestatus::Host.find(name, only: %w(host_name description state plugin_output perf_data))
+    end
+    
+    def state
+      if livestatus
+        livestatus.state
+      else
+        -1
+      end
+    end
+    
     def deployable?
       [:finished, :failed, :not_started].include? deploy_state
     end

@@ -1,6 +1,14 @@
 en:
   cloud_model/guest/state:
     undefined: Not Defined
+    running: Running
+    warning: Warning
+    critical: Critical
+    unknown: Unknown
+    dependent: Dependent
+    
+  cloud_model/guest/vm_state:
+    undefined: Not Defined
     no_state: No State
     running: Running
     blocked: Blocked
@@ -108,6 +116,7 @@ en:
         addresses: Addresses/Subnets
         guests: Guest Systems
         volume_groups: Logical Volume Groups
+        state: State
         deploy_state: Deploy State
         deploy_last_issue: Last Deploy Issue
       cloud_model/guest:
@@ -124,6 +133,7 @@ en:
         root_volume: Root Volume
         guest_volumes: Other Volumes
         state: State
+        vm_state: VM State
         deploy_state: Deploy State
         deploy_last_issue: Last Deploy Issue
       cloud_model/volume_group:
