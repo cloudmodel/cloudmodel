@@ -16,7 +16,7 @@ def get_values():
   for machine in glob.glob("/sys/fs/cgroup/cpu/machine.slice/machine-lxc\\x2d*"):
     machine_name = machine.replace('/sys/fs/cgroup/cpu/machine.slice/machine-lxc\\x2d', '').replace('.scope', '').replace('\\x2d', '-')
 
-    file = open('{0}/cpuacct.usage'.format(machine, 'r'))
+    file = open('{0}/cpuacct.usage'.format(machine), 'r')
     values[machine_name] = file.read().strip()
 
   return values
@@ -39,9 +39,9 @@ def update():
     machine_name = machine.replace('/sys/fs/cgroup/memory/machine.slice/machine-lxc\\x2d', '').replace('.scope', '').replace('\\x2d', '-')
     pp.add_str('1.{0}.1'.format(i), machine_name)
 
-    file = open('{0}/memory.limit_in_bytes'.format(machine, 'r'))
+    file = open('{0}/memory.limit_in_bytes'.format(machine), 'r')
     pp.add_cnt_64bit('1.{0}.2.1'.format(i), file.read().strip())
-    file = open('{0}/memory.usage_in_bytes'.format(machine, 'r'))
+    file = open('{0}/memory.usage_in_bytes'.format(machine), 'r')
     pp.add_cnt_64bit('1.{0}.2.2'.format(i), file.read().strip())
 
     if machine_name in startval and machine_name in endval:

@@ -1,5 +1,0 @@
-#!/bin/sh
-
-for i in /dev/md?*; do
-        echo `mdadm --brief --verbose --detail ${i}` | sed s,^ARRAY\ /dev/,dev=,
-done

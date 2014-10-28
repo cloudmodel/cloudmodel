@@ -13,6 +13,10 @@ class String
     tr("-", "_").tr(" ", "_").
     downcase
   end
+
+  def underscore
+    self.scan(/[a-z]+|[A-Z][a-z]+|[A-Z]+/).join("_").downcase
+  end
 end
 
 def snmpdata_to_hash(data)
