@@ -69,7 +69,7 @@ module CloudModel
         
         chroot! build_dir, "python2 /usr/bin/pip install snmp_passpersist", 'Failed to install snmp passpersist'
         
-        %w(mdstat.sh smart.sh vg.sh vm_info.py).each do |file|
+        %w(df.py mdstat.py smart.py vg.py vm_info.py).each do |file|
           render_to_remote "/cloud_model/host/etc/snmp/#{file}", "#{build_dir}/etc/snmp/#{file}", 0755
         end
         render_to_remote "/cloud_model/host/etc/snmp/snmpd.conf", "#{build_dir}/etc/snmp/snmpd.conf"
@@ -232,12 +232,12 @@ module CloudModel
             ]],
             ["Update base packages", :emerge_update_world],
             ["Cleanup base system", :emerge_depclean],
+            ["Cleanup gcc installation", :gcc_cleaner],
             ["Cleanup perl installation", :perl_cleaner],
             ["Cleanup python installation", :python_cleaner],
             ["Build system tools", :emerge_sys_tools],
             ["Build filesystem tools", :emerge_fs_tools],
             ["Compile kernel", :compile_kernel],
-            #["Build postgres SQL servers", :emerge_postgres],
             ["Build network tools", :emerge_net_tools],
             ["Build CloudModel packages", :emerge_cm_packages],
             ["Build monitoring tools", :emerge_monitoring],

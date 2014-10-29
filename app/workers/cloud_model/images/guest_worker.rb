@@ -86,6 +86,9 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.service", "#{build_dir}/etc/systemd/system/rake@.service"
         render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.timer", "#{build_dir}/etc/systemd/system/rake@.timer"
         render_to_remote "/cloud_model/guest/etc/tmpfiles.d/nginx.conf", "#{build_dir}/etc/tmpfiles.d/nginx.conf"
+      
+        # mkdir -p /etc/systemd/system/timers.target.wants
+        # ln -s /etc/systemd/system/rake@.timer /etc/systemd/system/timers.target.wants/rake@cloudmodel:guest:backup_all.timer
       end
   
       def emerge_shinken  
@@ -233,6 +236,7 @@ host.exec! "echo \"D /var/run/graphite 0755 graphite graphite\" > #{build_dir}/e
             ["Add CloudModel overlay", :config_layman],
             ["Update base packages", :emerge_update_world],
             ["Cleanup base system", :emerge_depclean],
+            ["Cleanup gcc installation", :gcc_cleaner],
             ["Cleanup perl installation", :perl_cleaner],
             ["Cleanup python installation", :python_cleaner],
             ["Build system tools", :emerge_sys_tools],

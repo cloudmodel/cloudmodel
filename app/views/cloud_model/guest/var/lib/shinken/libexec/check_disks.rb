@@ -4,7 +4,7 @@ require 'optparse'
 require File.expand_path('../snmp_helpers', __FILE__)
 
 def parse_options
-  options = {crit: 90, warn: 95, disks: []}
+  options = {devices: [], warn: 80, crit: 90}
   
   OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} [options]"
@@ -12,108 +12,76 @@ def parse_options
     opts.on("-h", "--host ADDRESS", "address to SNMP server") do |v|
       options[:host] = v
     end
-    opts.on("-d", "--disks DISKS", "disks to check (don't set for all)") do |v|
+    opts.on("-d", "--disks DISKS", "mounted disks to check (don't set for all)") do |v|
       options[:disks] = v.split(',').map(&:strip)
-    end
-    opts.on("-b", "--base PREFIX", "base prefix for mountpoints of disks to check") do |v|
-      options[:base] = v
     end
     opts.on("-w", "--warn WARNING", "warning level in percent") do |v|
       options[:warn] = v.to_i
     end
     opts.on("-c", "--crit CRITICAL", "critical level in percent") do |v|
       options[:crit] = v.to_i
-    end
+    end    
   end.parse!
   
   options
 end
 
-class RawData
-  def initialize options={}
-    @options = options
+class DfRawData
+  def initialize
     @data = {}
-    @base_oid = '1.3.6.1.2.1.25.2.3.1'
+  
+    oid = '1.3.6.1.4.1.32473.104'
+    @value_labels = {}
+    @label_filter = /#{oid}\.1\.([0-9]+)\.1/
+    @value_label_filter = /#{oid}\.0\.1\.2\.([0-9]+)/
+    @value_filter = /#{oid}\.1\.([0-9]+)\.2\.([0-9]+)/
   end
   
-  def storage_type_from_id id
-    id = id.to_s.gsub('1.3.6.1.2.1.25.2.1.', '')
-    
-    {
-      '1'  => 'other',
-      '2'  => 'ram',
-      '3'  => 'virtual_memory',
-      '4'  => 'fixed_disk',
-      '5'  => 'removable_disk',
-      '6'  => 'floppy_disk',
-      '7'  => 'compact_disk',
-      '8'  => 'ram_disk',
-      '9'  => 'flash_memory',
-      '10' => 'network_disk'
-    }[id] || "unknown_#{id}"
-  end
+  def insert index, data_type, value
   
-  def data_type_from_id id
-    {
-      '1'  => 'index',
-      '2'  => 'type',
-      '3'  => 'description',
-      '4'  => 'allocation_units',
-      '5'  => 'size',
-      '6'  => 'used',
-      '7'  => 'allow_failures'
-    }[id] || "unknown_#{id}"
-  end
-  
-  def insert index, data_type, value    
     @data[index] ||= {}
     @data[index][data_type] = value
   end
-  
+
   def << item
-    name = item.name.to_s.gsub(/^#{@base_oid}\./, '')
+    name = item.name.to_s
     value = item.value
-    
-    data_type, index = name.split('.')
-    
-    case data_type
-    when '1'
-      nil
-    when '2'
-      insert index, data_type_from_id(data_type), storage_type_from_id(value)
-    else
-      insert index, data_type_from_id(data_type), value
+  
+    if res = @label_filter.match(name)
+      insert res[1], 'label', value
+    end
+    if res = @value_label_filter.match(name)
+      @value_labels[res[1]] = value.to_s.underscore
+    end
+    if res = @value_filter.match(name)
+      insert res[1], @value_labels[res[2]], value
     end
   end
-  
-  def to_data
-    data = {
-      'description' => {},
-      'size' => {}, 
-      'used' => {},
-      'usage' => {}
-    }
+
+  def to_data options
+    data = {'description' => {}, 'usage' => {}}
     
-    real_disks = @options[:disks].map{ |d| "#{@options[:base]}#{d}".gsub(/\/$/, '').gsub(/^$/, '/') }
-    
-    @data.values.each do |item|
-      item_description = item['description'].sub(/#{@options[:base]}/, '').sub(/^$/, '/')
-      
-      item_sensor = if item_description == '/'
-        'root'
-      else
-        item_description.sub(/^\//, '').gsub('_','__').gsub('/','_').to_sensor_name
-      end
-      
-      if %w(fixed_disk removable_disk).include? item['type']
-        if (real_disks.empty? and item['description'].match(/^#{@options[:base]}/)) or real_disks.include?(item['description'])
-          data['description'][item_sensor] = item_description
-          %w(size used).each do |data_type|
-            data[data_type]["#{item_sensor}_kb"] = (1.0 * item[data_type].to_i * item['allocation_units'].to_i / 1024).round(3)
-          end
-          item_usage = (100.0 * item['used'].to_i / item['size'].to_i).round(2)
-          data['usage']["#{item_sensor}"] = item_usage
+    @data.each do |k,item|
+      label = item.delete('label') || 'unknown'
+      if options[:disks].empty? or options[:disks].include?(label)
+        description = label
+        label = if label == '/'
+          'root'
+        else
+          label.sub(/^\//, '').gsub('_','__').gsub('/','_').to_sensor_name
         end
+        
+        data['description'][label] = description
+        
+        item.each do |sk, sv|
+          data[sk] ||= {}
+          data[sk][label] = sv
+        end
+        data['bytes_total'][label] = data['bytes_total'][label].to_i
+        data['bytes_available'][label] = data['bytes_available'][label].to_i
+        data['bytes_used'][label] = data['bytes_used'][label].to_i
+        usage = 100.0 * (data['bytes_used'][label]) / data['bytes_total'][label]
+        data['usage'][label] = usage.round(2)
       end
     end
     
@@ -122,31 +90,36 @@ class RawData
 end
 
 options = parse_options
-oid = '1.3.6.1.2.1.25.2.3.1'
-raw_data = RawData.new options
-  
-retrieve_raw_data oid, raw_data, options
+raw_data = DfRawData.new 
+retrieve_raw_data '1.3.6.1.4.1.32473.104', raw_data, options
+data = raw_data.to_data options
 
-data = raw_data.to_data 
+failures = []
+warnings = []
 
-max_usage = 0.0
-max_item = '<unknown>'
-data['usage'].each do |k,v|
-  if v > max_usage
-    max_usage = v
-    max_item = k
+if options[:disks]
+  (options[:disks] - data['description'].values).each do |v|
+    failures << "#{v} not mounted"
   end
 end
 
-usage_string = "Highest usage #{max_usage}% appears on #{data['description'][max_item]}"
+data['usage'].each do |k,v|
+  if v > options[:crit]
+    failures << "#{v}% usage on #{k}" 
+  elsif v > options[:warn]
+    warnings << "#{v}% usage on #{k}" 
+  end
+end
 
-if max_usage > options[:crit]
-  puts "CRITICAL - #{usage_string} | #{perfdata data}"
-  exit STATE_CRITICAL
-elsif max_usage > options[:warn]
-  puts "WARNING - #{usage_string} | #{perfdata data}"
-  exit STATE_WARNING
+if failures.empty?
+  if warnings.empty?
+    puts "OK - All VolumeGroups are fine | #{perfdata data}"
+    exit STATE_OK
+  else
+    puts "WARNING - #{warnings * ', '} | #{perfdata data}"
+    exit STATE_WARNING
+  end
 else
-  puts "OK - #{usage_string} | #{perfdata data}"
-  exit STATE_OK
+  puts "CRITICAL - #{(failures+warnings) * ', '} | #{perfdata data}"
+  exit STATE_CRITICAL
 end

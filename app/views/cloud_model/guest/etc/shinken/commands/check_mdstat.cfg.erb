@@ -3,5 +3,5 @@
 
 define command {
     command_name    check_mdstat
-    command_line    $PLUGINSDIR$/check_mdstat.rb -n $_SERVICEMDNUMDISKS$ -d $_SERVICEMDNAME$ -h $HOSTADDRESS$
+    command_line    $PLUGINSDIR$/check_mdstat.rb -n $_SERVICEMDNUMDISKS$ -d "$_HOSTRAID_ARRAYS$" -h $HOSTADDRESS$
 }

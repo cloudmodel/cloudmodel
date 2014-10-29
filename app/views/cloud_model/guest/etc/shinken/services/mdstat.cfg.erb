@@ -1,21 +1,8 @@
 define service{
-   service_description           Raid-Boot
+   service_description           Raid
    use            generic-service
    register       0
    host_name	    mdstat
    check_command  check_mdstat
    aggregation    system
-   _MDNAME        md126
-   _MDNUMDISKS    2
-}
-
-define service{
-   service_description           Raid-LVM
-   use            generic-service
-   register       0
-   host_name      mdstat
-   check_command  check_mdstat
-   aggregation    system
-   _MDNAME        md127
-   _MDNUMDISKS    2
 }

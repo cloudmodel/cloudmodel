@@ -113,6 +113,10 @@ module CloudModel
       def python_cleaner
         chroot! build_dir, "python-updater -v", 'Failed to clean python installation'
       end
+      
+      def gcc_cleaner
+        chroot! build_dir, "gcc-config 1", 'Failed to set gcc profile'
+      end
     
       def system_cleaner
         mkdir_p "#{build_dir}/var/cache/revdep-rebuild"

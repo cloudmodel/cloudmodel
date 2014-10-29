@@ -3,5 +3,5 @@
 
 define command {
     command_name    check_smart
-    command_line    $PLUGINSDIR$/check_smart.rb -d $_SERVICESMARTDEV$ -h $HOSTADDRESS$
+    command_line    $PLUGINSDIR$/check_smart.rb -d "$_HOSTSMART_DISKS$" -h $HOSTADDRESS$
 }
