@@ -75,7 +75,6 @@ class VgRawData
       data['usage'][label] = usage.round(2)
     end
     
-    puts data
     data
   end
 end
@@ -94,17 +93,27 @@ if options[:devices]
   end
 end
 
+max_usage = 0.0
+max_item = '<unknown>'
+
 data['usage'].each do |k,v|
   if v > options[:crit]
     failures << "#{v}% usage on #{k}" 
   elsif v > options[:warn]
     warnings << "#{v}% usage on #{k}" 
   end
+
+  if v > max_usage
+    max_usage = v
+    max_item = k 
+  end
 end
 
 if failures.empty?
   if warnings.empty?
-    puts "OK - All VolumeGroups are fine | #{perfdata data}"
+    usage_string = "Highest usage #{max_usage}% on #{max_item}"
+    
+    puts "OK - #{usage_string} | #{perfdata data}"
     exit STATE_OK
   else
     puts "WARNING - #{warnings * ', '} | #{perfdata data}"

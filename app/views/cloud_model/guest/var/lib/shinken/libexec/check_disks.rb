@@ -4,7 +4,7 @@ require 'optparse'
 require File.expand_path('../snmp_helpers', __FILE__)
 
 def parse_options
-  options = {devices: [], warn: 80, crit: 90}
+  options = {disks: [], warn: 80, crit: 90}
   
   OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} [options]"
@@ -14,6 +14,9 @@ def parse_options
     end
     opts.on("-d", "--disks DISKS", "mounted disks to check (don't set for all)") do |v|
       options[:disks] = v.split(',').map(&:strip)
+    end
+    opts.on("-b", "--base PREFIX", "base prefix for mountpoints of disks to check") do |v|
+      options[:base] = v
     end
     opts.on("-w", "--warn WARNING", "warning level in percent") do |v|
       options[:warn] = v.to_i
@@ -27,7 +30,8 @@ def parse_options
 end
 
 class DfRawData
-  def initialize
+  def initialize options
+    @options = options
     @data = {}
   
     oid = '1.3.6.1.4.1.32473.104'
@@ -61,14 +65,19 @@ class DfRawData
   def to_data options
     data = {'description' => {}, 'usage' => {}}
     
+    real_disks = @options[:disks].map{ |d| "#{@options[:base]}#{d}".gsub(/\/$/, '').gsub(/^$/, '/') }
+    
     @data.each do |k,item|
-      label = item.delete('label') || 'unknown'
-      if options[:disks].empty? or options[:disks].include?(label)
-        description = label
-        label = if label == '/'
+      description = item.delete('label') || 'unknown'
+      
+      if (real_disks.empty? and description.match(/^#{@options[:base]}/)) or real_disks.include?(description)
+        description = description.sub(/#{@options[:base]}/, '').sub(/^$/, '/')
+        
+        
+        label = if description == '/'
           'root'
         else
-          label.sub(/^\//, '').gsub('_','__').gsub('/','_').to_sensor_name
+          description.sub(/^\//, '').gsub('_','__').gsub('/','_').to_sensor_name
         end
         
         data['description'][label] = description
@@ -90,30 +99,39 @@ class DfRawData
 end
 
 options = parse_options
-raw_data = DfRawData.new 
+raw_data = DfRawData.new options
 retrieve_raw_data '1.3.6.1.4.1.32473.104', raw_data, options
 data = raw_data.to_data options
 
 failures = []
 warnings = []
 
-if options[:disks]
+unless options[:disks].empty?
   (options[:disks] - data['description'].values).each do |v|
     failures << "#{v} not mounted"
   end
 end
 
+max_usage = 0.0
+max_item = '<unknown>'
+
 data['usage'].each do |k,v|
   if v > options[:crit]
-    failures << "#{v}% usage on #{k}" 
+    failures << "#{v}% usage on #{data['description'][k]}" 
   elsif v > options[:warn]
-    warnings << "#{v}% usage on #{k}" 
+    warnings << "#{v}% usage on #{data['description'][k]}" 
+  end
+  if v > max_usage
+    max_usage = v
+    max_item = k
   end
 end
 
 if failures.empty?
   if warnings.empty?
-    puts "OK - All VolumeGroups are fine | #{perfdata data}"
+    usage_string = "Highest usage #{max_usage}% on #{data['description'][max_item]}"
+    
+    puts "OK - #{usage_string} | #{perfdata data}"
     exit STATE_OK
   else
     puts "WARNING - #{warnings * ', '} | #{perfdata data}"
