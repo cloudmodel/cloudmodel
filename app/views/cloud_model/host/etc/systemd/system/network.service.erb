@@ -35,6 +35,7 @@ ExecStart=/bin/bash -c '/bin/echo 1 >/proc/sys/net/ipv4/ip_forward'
 
 ExecStop=/bin/ip addr flush dev <%= bridge_dev %>
 ExecStop=/bin/ip link set dev <%= bridge_dev %> down
+ExecStop=/sbin/brctl delbr <%= bridge_dev %>
 
 ExecStop=/bin/ip addr flush dev eth0
 ExecStop=/bin/ip link set dev eth0 down
