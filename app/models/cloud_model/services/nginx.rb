@@ -59,6 +59,13 @@ module CloudModel
         
         services_string
       end
+      
+      def livestatus
+        if guest.livestatus
+          guest.livestatus.services.find{|s| s.description == 'Nginx'} || guest.livestatus.services.find{|s| s.description == 'HttpsCertificate'}
+        end
+      end
+      
     end
   end
 end

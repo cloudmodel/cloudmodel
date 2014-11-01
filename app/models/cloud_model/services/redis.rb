@@ -10,6 +10,13 @@ module CloudModel
       def shinken_services_append
         ', redis'
       end
+      
+      def livestatus
+        if guest.livestatus
+          guest.livestatus.services.find{|s| s.description == 'Redis'}
+        end
+      end
+      
     end
   end
 end

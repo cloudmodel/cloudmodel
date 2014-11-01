@@ -186,8 +186,10 @@ de:
       cloud_model/services/base:
         name: Dienstname
         port: Dienstport
+        guest: Gastsystem
         public_service: Öffentlicher Dienst?
         has_backups: Dienstdaten sichern?
+        state: Status
         _type: Dienstart
       cloud_model/services/nginx:
         port: HTTP Port

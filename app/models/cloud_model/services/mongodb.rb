@@ -11,6 +11,12 @@ module CloudModel
         ', mongodb'
       end
       
+      def livestatus
+        if guest.livestatus
+          guest.livestatus.services.find{|s| s.description == 'MongoDB'}
+        end
+      end
+      
       def backupable?
         true 
       end
