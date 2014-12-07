@@ -326,13 +326,13 @@ module CloudModel
     def write_scripts options = {root: ''}
       root = options[:root] || ''
       mkdir_p "#{root}/etc/cloud_model/"
-      @host.ssh_connection.sftp.file.open("#{root}/etc/cloud_model/firewall_start", 'w', 0700) do |f|
+      @host.sftp.file.open("#{root}/etc/cloud_model/firewall_start", 'w', 0700) do |f|
         f.puts shebang + start_script(options)
       end
-      @host.ssh_connection.sftp.file.open("#{root}/etc/cloud_model/firewall_stop", 'w', 0700) do |f|
+      @host.sftp.file.open("#{root}/etc/cloud_model/firewall_stop", 'w', 0700) do |f|
         f.puts shebang + stop_script(options)
       end
-      @host.ssh_connection.sftp.file.open("#{root}/etc/cloud_model/firewall_list", 'w', 0700) do |f|
+      @host.sftp.file.open("#{root}/etc/cloud_model/firewall_list", 'w', 0700) do |f|
         f.puts shebang + list_script(options)
       end
       

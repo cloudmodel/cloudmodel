@@ -25,14 +25,16 @@ module CloudModel
       
       # remote_dir = File.dirname remote_file
       # begin
-      #   @host.ssh_connection.sftp.dir.entries remote_dir
+      #   @host.sftp.dir.entries remote_dir
       # rescue Exception => e
       #   puts "Directory #{remote_dir} does not exist, creating it (#{e})"
       #   mkdir_p remote_dir
       # end
+      
+      content = render(template, locals) 
             
-      @host.ssh_connection.sftp.file.open(remote_file, 'w', perm) do |f|
-        f.puts render(template, locals)
+      @host.sftp.file.open(remote_file, 'w', perm) do |f|
+        f.puts content
       end
     end
     
@@ -87,7 +89,7 @@ module CloudModel
       render_to_remote "/cloud_model/support/chroot.sh", "#{chroot_dir}/root/chroot-#{key}.sh", 0700, command: command        
       result = @host.exec "chroot #{chroot_dir} /root/chroot-#{key}.sh"
       begin
-        @host.ssh_connection.sftp.remove! "#{chroot_dir}/root/chroot-#{key}.sh"
+        @host.sftp.remove! "#{chroot_dir}/root/chroot-#{key}.sh"
       rescue
         Rails.logger.error "Failed to remove remote file #{chroot_dir}/root/chroot-#{key}.sh"
       end

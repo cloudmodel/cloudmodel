@@ -128,7 +128,7 @@ module CloudModel
     def write_fstab
       puts "  Write fstab"
 
-      @host.ssh_connection.sftp.file.open("/etc/fstab", 'w') do |f|
+      @host.sftp.file.open("/etc/fstab", 'w') do |f|
         f.puts render('/cloud_model/host/etc/fstab', host: @host, timestamp: @timestamp)
       end
     end
@@ -183,7 +183,7 @@ module CloudModel
 
       begin
         puts "    Write hosts file"
-        @host.ssh_connection.sftp.file.open("#{@guest.deploy_path}/etc/hosts", 'w') do | f |
+        @host.sftp.file.open("#{@guest.deploy_path}/etc/hosts", 'w') do | f |
           f.puts "127.0.0.1       localhost"
           f.puts "::1             localhost"
           @host.guests.each do |guest|
@@ -197,7 +197,7 @@ module CloudModel
     
       begin
         puts "    Append prompt to profile file"
-        @host.ssh_connection.sftp.file.open("#{@guest.deploy_path}/etc/profile", "a") do |f|
+        @host.sftp.file.open("#{@guest.deploy_path}/etc/profile", "a") do |f|
           f.puts "if [[ ${EUID} == 0 ]] ; then"
           f.puts "\tPS1='\\[\\033[01;31m\\]#{@guest.name.shellescape}\\[\\033[01;34m\\] \\W \\$\\[\\033[00m\\] '"
           f.puts "else"
@@ -240,7 +240,7 @@ module CloudModel
       puts "    Write /etc/libvirt/lxc/#{@guest.name}.xml"
 
       mkdir_p '/inst/tmp'
-      @host.ssh_connection.sftp.file.open("/inst/tmp/#{@guest.name}.xml", 'w', 0600) do |f|
+      @host.sftp.file.open("/inst/tmp/#{@guest.name}.xml", 'w', 0600) do |f|
         f.puts render("/cloud_model/host/etc/libvirt/lxc/guest.xml", guest: @guest, skip_uuid: true)
       end
       puts "    Define VM with virsh"

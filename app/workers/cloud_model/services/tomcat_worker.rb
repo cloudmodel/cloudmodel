@@ -10,14 +10,14 @@ module CloudModel
         puts "        Deploy WAR Image #{@model.deploy_war_image.name} to #{@guest.deploy_path}#{target}"
         temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
         io = StringIO.new(@model.deploy_war_image.file.data)
-        @host.ssh_connection.sftp.upload!(io, temp_file_name)     
+        @host.sftp.upload!(io, temp_file_name)     
         mkdir_p target
         @host.exec "cd #{target.shellescape} && tar xjpf #{temp_file_name}"
-        @host.ssh_connection.sftp.remove!(temp_file_name)
+        @host.sftp.remove!(temp_file_name)
         
         # Read manifest
         manifest = ''
-        @host.ssh_connection.sftp.file.open( "#{target}/manifest.yml") do |f|
+        @host.sftp.file.open( "#{target}/manifest.yml") do |f|
           manifest = YAML.load(f.read)
         end
         

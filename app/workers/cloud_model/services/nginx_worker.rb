@@ -18,15 +18,15 @@ module CloudModel
           ssl_base_dir = File.expand_path("etc/nginx/ssl", @guest.deploy_path)
           mkdir_p ssl_base_dir
                   
-          @host.ssh_connection.sftp.file.open(File.expand_path("#{@guest.external_hostname}.crt", ssl_base_dir), 'w') do |f|
+          @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.crt", ssl_base_dir), 'w') do |f|
             f.write @model.ssl_cert.crt
           end
         
-          @host.ssh_connection.sftp.file.open(File.expand_path("#{@guest.external_hostname}.key", ssl_base_dir), 'w') do |f|
+          @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.key", ssl_base_dir), 'w') do |f|
             f.write @model.ssl_cert.key
           end
         
-          @host.ssh_connection.sftp.file.open(File.expand_path("#{@guest.external_hostname}.ca.crt", ssl_base_dir), 'w') do |f|
+          @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.ca.crt", ssl_base_dir), 'w') do |f|
             f.write @model.ssl_cert.ca
           end
         end
@@ -37,9 +37,9 @@ module CloudModel
           puts "        Deploy WebImage #{@model.deploy_web_image.name} to #{@guest.deploy_path}#{@model.www_root}"
           temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
           io = StringIO.new(@model.deploy_web_image.file.data)
-          @host.ssh_connection.sftp.upload!(io, temp_file_name)
+          @host.sftp.upload!(io, temp_file_name)
           @host.exec "cd #{@guest.deploy_path}#{@model.www_root} && tar xpf #{temp_file_name}"
-          @host.ssh_connection.sftp.remove!(temp_file_name)
+          @host.sftp.remove!(temp_file_name)
           
           if @model.deploy_web_image.has_mongodb?
             render_to_remote "/cloud_model/web_image/mongoid.yml", "#{@guest.deploy_path}#{@model.www_root}/current/config/mongoid.yml", guest: @guest, model: @model

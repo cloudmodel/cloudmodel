@@ -50,7 +50,7 @@ module CloudModel
         # Link maschine to /etc/libvirt/lxc/autostart/
         #
         
-        @host.ssh_connection.sftp.symlink! "/etc/libvirt/lxc/#{guest.name}.xml", "#{root}/etc/libvirt/lxc/autostart/#{guest.name}.xml"
+        @host.sftp.symlink! "/etc/libvirt/lxc/#{guest.name}.xml", "#{root}/etc/libvirt/lxc/autostart/#{guest.name}.xml"
         
         #
         # Make dir for vm root
@@ -253,7 +253,7 @@ module CloudModel
       ssh_dir = "#{root}/root/.ssh"
       mkdir_p ssh_dir
       
-      @host.ssh_connection.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "#{ssh_dir}/authorized_keys"
+      @host.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "#{ssh_dir}/authorized_keys"
       
       # Config exim form mail out
       render_to_remote "/cloud_model/host/etc/exim/exim-out.conf", "#{root}/etc/exim/exim.conf", host: @host

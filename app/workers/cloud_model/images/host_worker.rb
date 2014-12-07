@@ -198,8 +198,8 @@ module CloudModel
 
         @host.update_attributes build_state: :downloading
         `mkdir -p #{CloudModel.config.data_directory.shellescape}/inst`
-        @host.ssh_connection.sftp.download! "/inst/boot.tar.bz2", "#{CloudModel.config.data_directory}/inst/boot.tar.bz2"
-        @host.ssh_connection.sftp.download! "/inst/root.tar.bz2", "#{CloudModel.config.data_directory}/inst/root.tar.bz2"
+        @host.sftp.download! "/inst/boot.tar.bz2", "#{CloudModel.config.data_directory}/inst/boot.tar.bz2"
+        @host.sftp.download! "/inst/root.tar.bz2", "#{CloudModel.config.data_directory}/inst/root.tar.bz2"
       end
     
       def build_image options={}

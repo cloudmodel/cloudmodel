@@ -208,7 +208,7 @@ host.exec! "echo \"D /var/run/graphite 0755 graphite graphite\" > #{build_dir}/e
         @guest.update_attributes build_state: :downloading
       
         `mkdir -p #{CloudModel.config.data_directory.shellescape}/inst`
-        @host.ssh_connection.sftp.download! "/inst/guest.tar", "#{CloudModel.config.data_directory}/inst/guest.tar"
+        @host.sftp.download! "/inst/guest.tar", "#{CloudModel.config.data_directory}/inst/guest.tar"
       end
     
     

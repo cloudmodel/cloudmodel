@@ -3,7 +3,7 @@ module CloudModel
     class SshWorker < CloudModel::Services::BaseWorker
       def write_config
         puts "        Write SSH config"
-        @host.ssh_connection.sftp.file.open(File.expand_path("etc/ssh/sshd_config", @guest.deploy_path), 'w') do |f|
+        @host.sftp.file.open(File.expand_path("etc/ssh/sshd_config", @guest.deploy_path), 'w') do |f|
           f.write render("/cloud_model/guest/etc/ssh/sshd_config", guest: @guest, model: @model)
         end
       
@@ -16,7 +16,7 @@ module CloudModel
         %w(dsa ed25519 rsa).each do |type|
           key_file = "#{ssh_host_key_source}/ssh_host_#{type}_key"
           begin
-            @host.ssh_connection.sftp.lstat! key_file
+            @host.sftp.lstat! key_file
           rescue Net::SFTP::StatusException => e
             @host.exec! "ssh-keygen -t #{type} -f #{key_file.shellescape} -N ''", 'Failed to generate host keys'
           end
@@ -29,7 +29,7 @@ module CloudModel
         @host.exec "rm -rf #{ssh_target.shellescape}"
         #@host.exec! "cp -ra /inst/ssh/client_keys #{ssh_target}", "Failed to copy www client keys"
         mkdir_p ssh_target
-        @host.ssh_connection.sftp.file.open("#{ssh_target}/authorized_keys", 'w') do |f|
+        @host.sftp.file.open("#{ssh_target}/authorized_keys", 'w') do |f|
           f.write CloudModel::SshPubKey.all.to_a * "\n"
         end
   

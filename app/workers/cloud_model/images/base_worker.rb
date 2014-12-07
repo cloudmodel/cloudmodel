@@ -65,10 +65,11 @@ module CloudModel
       end
 
       def remove_stage3
-        @host.ssh_connection.sftp.remove! "#{build_dir}/stage3.tar.bz2"
+        @host.sftp.remove! "#{build_dir}/stage3.tar.bz2"
       end
     
       def configure_build_system       
+        mkdir_p "#{build_dir}/etc/portage"
         render_to_remote "/cloud_model/#{build_type}/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: CloudModel.config.gentoo_mirrors, host: @host, layman: false
         %w(accept_keywords use mask unmask).each do |portage_conf|
           render_to_remote "/cloud_model/#{build_type}/etc/portage/package.#{portage_conf}", "#{build_dir}/etc/portage/package.#{portage_conf}", 0600
@@ -149,7 +150,7 @@ module CloudModel
 
         # init database
         begin
-          @host.ssh_connection.sftp.lstat! "#{build_dir}/#{data_dir}"
+          @host.sftp.lstat! "#{build_dir}/#{data_dir}"
         rescue
           mkdir_p "#{build_dir}/#{data_dir}"
           chroot! build_dir, "chown -Rf postgres:postgres #{data_dir.shellescape}", "Can't assign data dir to postgres user"
@@ -159,7 +160,7 @@ module CloudModel
         end
         
         begin
-          @host.ssh_connection.sftp.lstat! "#{build_dir}/#{config_dir}"          
+          @host.sftp.lstat! "#{build_dir}/#{config_dir}"          
         rescue
           mkdir_p "#{build_dir}/#{config_dir}"
           chroot! build_dir, "chown -Rf postgres:postgres #{data_dir.shellescape}", "Can't assign config dir to postgres user"

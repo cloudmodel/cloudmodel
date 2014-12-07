@@ -169,6 +169,10 @@ module CloudModel
       end
     end
     
+    def sftp
+      ssh_connection.sftp
+    end
+    
     def private_address
        private_network.list_ips.first
      end
@@ -202,7 +206,7 @@ module CloudModel
       #puts command
       
       # Close SFTP channel as it would break the ssh loop
-      ssh_connection.sftp.close_channel
+      sftp.close_channel
       ssh_connection.instance_variable_set('@sftp', nil)
       
       ssh_connection.open_channel do |channel|
