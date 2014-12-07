@@ -20,7 +20,6 @@ module CloudModel
     
     field :private_address, type: String
     field :external_address, type: String
-    field :external_hostname, type: String
     
     field :memory_size, type: Integer, default: 2147483648
     field :cpu_count, type: Integer, default: 2
@@ -103,11 +102,7 @@ module CloudModel
     end
     
     def external_hostname
-      self[:external_hostname] ||= begin
-        Resolv.getname(external_address)
-      rescue
-        external_address
-      end
+      @external_hostname ||= CloudModel::Address.from_str(external_address).hostname
     end
     
     def uuid

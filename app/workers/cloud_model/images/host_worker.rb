@@ -97,7 +97,7 @@ module CloudModel
           net-misc/tinc
           app-emulation/lxc
           app-emulation/libvirt
-          mail-mta/nullmailer
+          mail-mta/exim
         )
         
         render_to_remote "/cloud_model/host/etc/ssh/sshd_config", "#{build_dir}/etc/ssh/sshd_config"
@@ -119,8 +119,7 @@ module CloudModel
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/libvirtd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put libvirt daemon to autostart'
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/snmpd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put snmp daemon to autostart'
  
-        # TODO: Config nullmailer to send mails
-        chroot! build_dir, "ln -s /usr/lib/systemd/system/nullmailer.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put nullmailer to autostart'
+        chroot! build_dir, "ln -s /usr/lib/systemd/system/exim.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put exim to autostart'
 
         render_to_remote "/cloud_model/host/etc/smartd.conf", "#{build_dir}/etc/smartd.conf", host: @host
         chroot! build_dir, "ln -s /usr/lib/systemd/system/smartd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put SMART daemon to autostart'

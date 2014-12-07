@@ -33,6 +33,12 @@ CloudModel.configure do |config|
   ## Defaults to nil
   # config.admin_email = 'admin@example.com'
   
+  ## Configure email domain for mail out
+  ## Set to only one email domain
+  ## Specifies a domain that Exim uses when it constructs a complete email address from a local login name. 
+  ## Defaults to nil
+  # config.email_domain = 'example.com'
+  
   ## Configure where to find livestatus db
   ## Set host of livestatus db
   ## Defaults to nil

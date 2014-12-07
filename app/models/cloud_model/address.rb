@@ -10,6 +10,15 @@ module CloudModel
     field :ip, type: String
     field :subnet, type: Integer
     field :gateway, type: String
+    field :hostname, type: String
+    
+    def hostname
+      self[:hostname] ||= begin
+        Resolv.getname(ip)
+      rescue
+        ip
+      end
+    end
     
     validates :ip, presence: true
     validates :subnet, presence: true

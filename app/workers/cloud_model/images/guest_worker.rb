@@ -30,6 +30,7 @@ module CloudModel
           net-misc/curl
           dev-vcs/git
           net-analyzer/net-snmp
+          mail-mta/ssmtp
         )
         # Tool for setting serial console size in terminal; call on virsh console to fix terminal size
         render_to_remote "/cloud_model/guest/bin/fixterm.sh", "#{build_dir}/bin/fixterm", 0755

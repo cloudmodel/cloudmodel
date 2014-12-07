@@ -224,7 +224,7 @@ module CloudModel
       mkdir_p "#{root}/etc/conf.d"
       
       render_to_remote "/cloud_model/host/etc/systemd/system/network.service", "#{root}/etc/systemd/system/network.service", host: @host
-      chroot root, "ln -sf #{root}/etc/systemd/system/network.service /etc/systemd/system/network.target.wants/"
+      chroot root, "ln -sf /etc/systemd/system/network.service /etc/systemd/system/multi-user.target.wants/"
                   
       render_to_remote "/cloud_model/support/etc/hostname", "#{root}/etc/hostname", host: @host
       render_to_remote "/cloud_model/support/etc/machine_info", "#{root}/etc/machine-info", host: @host     
@@ -235,7 +235,7 @@ module CloudModel
       config_firewall
 
       # TINC part
-      mkdir_p "#{root}/etc/tinc/vpn/"
+      mkdir_p "#{root}/etc/tinc/vpn"
       update_tinc_host_files root
       
       render_to_remote "/cloud_model/host/etc/tinc/tinc.conf", "#{root}/etc/tinc/vpn/tinc.conf", host: @host
@@ -254,6 +254,11 @@ module CloudModel
       mkdir_p ssh_dir
       
       @host.ssh_connection.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "#{ssh_dir}/authorized_keys"
+      
+      # Config exim form mail out
+      render_to_remote "/cloud_model/host/etc/exim/exim-out.conf", "#{root}/etc/exim/exim.conf", host: @host
+      mkdir_p "#{root}/var/log/exim"
+      chroot! root, "chown -R mail:mail /var/log/exim", 'Failed to assign exim log folder to mail user'
       
       # TODO: Init lm_sensors with
       # sensors-detect --auto
@@ -274,6 +279,7 @@ module CloudModel
       # TODO: put keys to a more failsafe location like somewhere in /inst
       
       begin
+        mkdir_p "#{root}/etc/tinc/vpn/"
         @host.exec! "cp -ra /etc/tinc/vpn/rsa_key.priv #{root}/etc/tinc/vpn/rsa_key.priv", "Failed to copy old tinc key"
       rescue
         print " (old tinc key not found, create new)"
@@ -307,8 +313,8 @@ module CloudModel
         ['Upsync system images', :sync_inst_images],
         ['Prepare volume for new system', :make_deploy_root],
         ['Populate volume with new system image', :populate_deploy_root],
-        ['Config new system', :config_deploy_root],         
         ['Make crypto keys', :make_keys],
+        ['Config new system', :config_deploy_root],         
         # TODO: apply existing guests and restore backups
         ['Write boot config and reboot', :boot_deploy_root],        
       ]

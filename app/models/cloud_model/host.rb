@@ -57,13 +57,13 @@ module CloudModel
     accepts_nested_attributes_for :addresses, allow_destroy: true
     
     embeds_one :primary_address, class_name: "CloudModel::Address", autobuild: true, inverse_of: :host
-    accepts_nested_attributes_for :primary_address  
+    accepts_nested_attributes_for :primary_address
     
     embeds_one :private_network, class_name: "CloudModel::Address", autobuild: true, inverse_of: :host
-    accepts_nested_attributes_for :private_network  
+    accepts_nested_attributes_for :private_network
   
     has_many :volume_groups, class_name: "CloudModel::VolumeGroup", inverse_of: :host
-    accepts_nested_attributes_for :volume_groups  
+    accepts_nested_attributes_for :volume_groups
     
     validates :name, presence: true, uniqueness: true, format: {with: /\A[a-z0-9\-_]+\z/}
     validates :primary_address, presence: true
@@ -129,6 +129,16 @@ module CloudModel
     
     def dhcp_external_address
       available_external_address_collection.last
+    end
+  
+    def email_hostname     
+      hostname = primary_address.hostname
+      
+      if hostname == primary_address.ip.to_s or hostname !=~ /.*\..*/
+        hostname = "#{name}.#{CloudModel.config.email_domain || 'example.com'}"
+      end
+      
+      hostname
     end
   
     def tinc_private_key
