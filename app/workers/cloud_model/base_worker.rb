@@ -1,4 +1,10 @@
 module CloudModel
+  class MockHost
+    def update_attributes attrs
+      Rails.logger.debug attrs
+    end
+  end
+  
   class BaseWorker
     include AbstractController::Rendering
     include ActionView::Helpers::DateHelper
@@ -111,8 +117,17 @@ module CloudModel
     
     def local_exec command
       Rails.logger.debug "LOKAL EXEC: #{command}"
-      result = `#{command}`
+      result = %x(#{command} 2>&1)
       Rails.logger.debug "    #{result}"
+      result
+    end
+    
+    def local_exec! command, message
+      result = local_exec command
+
+      unless $?.success?
+        raise "#{message}: #{result}"
+      end
       result
     end
   
@@ -145,13 +160,57 @@ module CloudModel
       @host.exec! cmd, "Failed to build tar #{dst}"
     end
     
-    def run_steps stage, steps, options={}
-      indent = options[:indent] || 2
+    def run_step_command stage, command, step, options
+      skip_to_string, skip_to = parse_step_skip_to options[:skip_to]
+            
+      ts = Time.now
+      begin
+        if step[2] and step[2][:each]
+          puts ':'
+          indent = options[:indent] || 2
       
-      counter_prefix = options[:counter_prefix] || ''
-      counter = 0
-      
-      skip_to_string = options[:skip_to] || ''
+          counter_prefix = options[:counter_prefix] || ''
+          counter = 0
+          
+          step[2][:each].each do |object|
+            counter += 1
+            print "#{' ' * indent}(#{counter_prefix}#{counter}) For #{object.name}"
+            
+            if skip_to > counter
+              puts " [Skipped]"
+            else
+              if options[:pretend]
+                puts " [Done (pretended)]"
+              else
+                ts = Time.now
+                self.send step[1], object
+                puts " [Done in #{distance_of_time_in_words_to_now ts}]"
+              end
+            end
+          end
+        else
+          if options[:pretend]
+            puts " [Done (pretended)]"
+          else
+            ts = Time.now
+            self.send step[1]   
+            puts " [Done in #{distance_of_time_in_words_to_now ts}]"   
+          end
+        end
+      rescue Exception => e
+        if e.class == RuntimeError and e.message == 'skipped'
+          puts " [Skipped]"
+        else
+          puts " [Failed after #{distance_of_time_in_words_to_now ts}]"
+          puts ''
+          CloudModel.log_exception e
+          @host.update_attributes :"#{stage}_state" => :failed, :"#{stage}_last_issue" => "#{e}"
+          raise e
+        end
+      end
+    end
+    
+    def parse_step_skip_to skip_to_string = ''
       if skip_splitted = /^(\d+)\.?(.*)/.match(skip_to_string.to_s)
         skip_to_string = skip_splitted[2]
         skip_to = skip_splitted[1].to_i
@@ -160,8 +219,25 @@ module CloudModel
         skip_to = 0
       end
       
+      [skip_to_string, skip_to]
+    end
+    
+    def run_steps stage, steps, options={}
+      indent = options[:indent] || 2
+      
+      counter_prefix = options[:counter_prefix] || ''
+      counter = 0
+      
+      skip_to_string, skip_to = parse_step_skip_to options[:skip_to]
+            
       steps.each do |step|
         counter += 1
+        
+        step_options = options.merge(
+          indent: indent+2, 
+          counter_prefix: "#{counter_prefix}#{counter}.",
+          skip_to: skip_to == counter ? skip_to_string : ''
+        )
         
         step = [step.to_s.humanize, step] if step.class == Symbol
         
@@ -170,45 +246,16 @@ module CloudModel
         if skip_to > counter
           if step[2] and step[2][:on_skip]
             print " (Run skip action)"
-            begin
-              ts = Time.now
-              self.send step[2][:on_skip]
-              puts " [Done in #{distance_of_time_in_words_to_now ts}]"
-            rescue
-              puts " [Failed after #{distance_of_time_in_words_to_now ts}]"
-              puts ''
-              CloudModel.log_exception e
-              @host.update_attributes :"#{stage}_state" => :failed, :"#{stage}_last_issue" => "#{e}"
-              raise e
-              
-            end
+            run_step_command stage, step[2][:on_skip], step, step_options
           else
             puts " [Skipped]"
           end
         else
           if step[1].class == Array
-            puts ''
-            run_steps stage, step[1], options.merge(
-              indent: indent+2, 
-              counter_prefix: "#{counter_prefix}#{counter}.",
-              skip_to: skip_to == counter ? skip_to_string : ''
-            )
+            puts ':'
+            run_steps stage, step[1], step_options
           else
-            begin
-              ts = Time.now
-              self.send step[1]   
-              puts " [Done in #{distance_of_time_in_words_to_now ts}]"   
-            rescue Exception => e
-              if e.class == RuntimeError and e.message == 'skipped'
-                puts " [Skipped]"
-              else
-                puts " [Failed after #{distance_of_time_in_words_to_now ts}]"
-                puts ''
-                CloudModel.log_exception e
-                @host.update_attributes :"#{stage}_state" => :failed, :"#{stage}_last_issue" => "#{e}"
-                raise e
-              end
-            end
+            run_step_command stage, step[1], step, step_options
           end
         end
       end   
