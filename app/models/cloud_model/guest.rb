@@ -102,7 +102,7 @@ module CloudModel
     end
     
     def external_hostname
-      @external_hostname ||= CloudModel::Address.from_str(external_address).hostname
+      @external_hostname ||= external_address.blank? ? '' : CloudModel::Address.from_str(external_address).hostname
     end
     
     def uuid
