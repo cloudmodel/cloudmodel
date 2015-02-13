@@ -48,6 +48,8 @@ module CloudModel
           dev-lang/ruby
           dev-ruby/rubygems
           net-libs/nodejs
+          
+          media-gfx/imagemagick
         )
         chroot! build_dir, "eselect ruby set ruby21", "Failed to set ruby version to 2.1"
         chroot! build_dir, "gem install bundler", "Failed to install bundler"
@@ -99,6 +101,7 @@ module CloudModel
           dev-perl/Net-SNMP
           dev-python/pip
           dev-python/pymongo
+          dev-python/xmpppy
 
           dev-python/pycairo
           dev-python/django
