@@ -70,13 +70,13 @@ module CloudModel
             end
           elsif data[:l_size].to_i > disk_space
             # Shrink LV
-            Rails.logger.debug "Shrink FS"
-            exec "e2fsck -f #{device.shellescape} && resize2fs #{device.shellescape} #{(disk_space / 1024.0).floor}K"
-        
             unless options[:wipe]
-              Rails.logger.debug "Shrink LV"
-              exec "lvreduce #{device.shellescape} --size #{(disk_space / 1024.0).floor}K -f"
+              Rails.logger.debug "Shrink FS"
+              exec "e2fsck -f #{device.shellescape} && resize2fs #{device.shellescape} #{(disk_space / 1024.0).floor}K"
             end
+            
+            Rails.logger.debug "Shrink LV"
+            exec "lvreduce #{device.shellescape} --size #{(disk_space / 1024.0).floor}K -f"
           end
           
           if options[:wipe]

@@ -1,7 +1,7 @@
 module CloudModel
   module Services
     class MonitoringWorker < CloudModel::Services::BaseWorker
-      def write_config
+      def write_hosts_config
         puts "        Write shinken hosts"
         CloudModel::Host.all.each do |host|
           render_to_remote "/cloud_model/guest/etc/shinken/hosts/host.cfg", "#{@guest.deploy_path}/etc/shinken/hosts/#{host.name}.cfg", host: host
@@ -10,6 +10,10 @@ module CloudModel
             render_to_remote "/cloud_model/guest/etc/shinken/hosts/guest.cfg", "#{@guest.deploy_path}/etc/shinken/hosts/#{host.name}.#{guest.name}.cfg", guest: guest
           end
         end
+      end
+      
+      def write_config
+        write_hosts_config
            
         puts "        Write shinken config"
         render_to_remote "/cloud_model/guest/etc/shinken/brokers/broker-master.cfg", "#{@guest.deploy_path}/etc/shinken/brokers/broker-master.cfg", service: @model
