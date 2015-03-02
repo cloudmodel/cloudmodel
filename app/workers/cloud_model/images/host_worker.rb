@@ -203,7 +203,7 @@ module CloudModel
       end
     
       def build_image options={}
-        return false unless @host.build_state == :pending
+        return false unless @host.build_state == :pending or options[:force]
        
         @host.update_attributes! build_state: :running, build_last_issue: nil
       

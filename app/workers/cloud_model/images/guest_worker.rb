@@ -51,7 +51,7 @@ module CloudModel
           
           media-gfx/imagemagick
         )
-        chroot! build_dir, "eselect ruby set ruby21", "Failed to set ruby version to 2.1"
+        chroot! build_dir, "eselect ruby set ruby22", "Failed to set ruby version to 2.2"
         chroot! build_dir, "gem install bundler", "Failed to install bundler"
       end
     
@@ -76,10 +76,10 @@ module CloudModel
           dev-java/icedtea-bin
           www-servers/tomcat
         )
-        chroot! build_dir, "/usr/share/tomcat-7/gentoo/tomcat-instance-manager.bash --create", 'Failed to create tomcat config'
-        chroot! build_dir, "rm -rf /var/lib/tomcat-7/webapps/ROOT", "Failed to remove genuine root app for tomcat"
-        render_to_remote "/cloud_model/guest/bin/tomcat-7", "#{build_dir}/usr/sbin/tomcat-7", 0755
-        render_to_remote "/cloud_model/guest/etc/systemd/system/tomcat-7.service", "#{build_dir}/etc/systemd/system/tomcat-7.service"
+        chroot! build_dir, "/usr/share/tomcat-8/gentoo/tomcat-instance-manager.bash --create", 'Failed to create tomcat config'
+        chroot! build_dir, "rm -rf /var/lib/tomcat-8/webapps/ROOT", "Failed to remove genuine root app for tomcat"
+        render_to_remote "/cloud_model/guest/bin/tomcat-8", "#{build_dir}/usr/sbin/tomcat-8", 0755
+        render_to_remote "/cloud_model/guest/etc/systemd/system/tomcat-8.service", "#{build_dir}/etc/systemd/system/tomcat-8.service"
       end
         
       def build_nginx_passenger
@@ -216,8 +216,7 @@ host.exec! "echo \"D /var/run/graphite 0755 graphite graphite\" > #{build_dir}/e
     
     
       def build_image options={}   
-        return false unless @guest.build_state == :pending
- 
+        return false unless @guest.build_state == :pending or options[:force]
         @guest.update_attributes build_state: :running, build_last_issue: nil
       
         build_start_at = Time.now

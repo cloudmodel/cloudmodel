@@ -72,7 +72,8 @@ module CloudModel
         mkdir_p "#{build_dir}/etc/portage"
         render_to_remote "/cloud_model/#{build_type}/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: CloudModel.config.gentoo_mirrors, host: @host, layman: false
         %w(accept_keywords use mask unmask).each do |portage_conf|
-          render_to_remote "/cloud_model/#{build_type}/etc/portage/package.#{portage_conf}", "#{build_dir}/etc/portage/package.#{portage_conf}", 0600
+          mkdir_p "#{build_dir}/etc/portage/package.#{portage_conf}"
+          render_to_remote "/cloud_model/#{build_type}/etc/portage/package.#{portage_conf}", "#{build_dir}/etc/portage/package.#{portage_conf}/cloudmodel", 0600
         end
         
         render_to_remote "/cloud_model/support/etc/vconsole.conf", "#{build_dir}/etc/vconsole.conf"

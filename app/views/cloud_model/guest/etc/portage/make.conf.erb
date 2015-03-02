@@ -1,7 +1,7 @@
 <%= render '/cloud_model/support/etc/portage/make.conf', host: host, layman: layman %>
 
-RUBY_TARGETS="ruby21"
+RUBY_TARGETS="ruby22"
 
-USE="-X -cups -minimal -gnome -gtk -kde -qt4 -consolekit -alsa -pulseaudi -openvz -qemu -apache bindist selinux mmx sse sse2 nptl nptlonly cpudetection ipv6 systemd vde ruby ruby_targets_ruby21 dbus"
+USE="-X -cups -minimal -gnome -gtk -kde -qt4 -consolekit -alsa -pulseaudi -openvz -qemu -apache bindist selinux mmx sse sse2 nptl nptlonly cpudetection ipv6 systemd vde ruby dbus"
 NGINX_MODULES_HTTP="spdy passenger status flv browser autoindex rewrite proxy xslt dav gzip fastcgi" 
 NGINX_MODULES_MAIL="imap smtp" 

@@ -1,12 +1,12 @@
 [Unit]
-Description=Tomcat 7 servlet container
+Description=Tomcat 8 servlet container
 After=network.target
 
 [Service]
 User=tomcat
 Group=tomcat
-ExecStart=/usr/sbin/tomcat-7 start
-ExecStop=/usr/sbin/tomcat-7 stop
+ExecStart=/usr/sbin/tomcat-8 start
+ExecStop=/usr/sbin/tomcat-8 stop
 Restart=always
 
 [Install]
