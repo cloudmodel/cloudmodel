@@ -25,11 +25,11 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/shinken/contactgroups/admin.cfg", "#{@guest.deploy_path}/etc/shinken/contactgroups/admins.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/contacts/admin.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/admin.cfg", service: @model
         
-        if CloudModel.config.uses_xmmp?
-          render_to_remote "/cloud_model/guest/etc/shinken/contacts/xmmp.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/xmmp.cfg", service: @model
-          render_to_remote "/cloud_model/guest/etc/shinken/notificationways/xmmp.cfg", "#{@guest.deploy_path}/etc/shinken/notificationways/xmmp.cfg", service: @model
-          host.exec! "sed -i s,#!/usr/bin/python ,#!/usr/bin/python2 , /var/lib/shinken/libexec/notify_by_xmpp.py; done", 'Failed to patch xmmp notify'
-          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmmp.ini", "#{build_dir}/var/lib/shinken/libexec/notify_by_xmmp.ini", 0600
+        if CloudModel.config.uses_xmpp?
+          render_to_remote "/cloud_model/guest/etc/shinken/contacts/xmpp.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/xmpp.cfg", service: @model
+          render_to_remote "/cloud_model/guest/etc/shinken/notificationways/xmpp.cfg", "#{@guest.deploy_path}/etc/shinken/notificationways/xmpp.cfg", service: @model
+          host.exec! "sed -i s,#!/usr/bin/python\\ ,#!/usr/bin/python2\\ , /var/lib/shinken/libexec/notify_by_xmpp.py", 'Failed to patch xmpp notify'
+          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmpp.ini", "#{build_dir}/var/lib/shinken/libexec/notify_by_xmpp.ini", 0600
         end
             
         puts "        Write nginx config for graphite"
