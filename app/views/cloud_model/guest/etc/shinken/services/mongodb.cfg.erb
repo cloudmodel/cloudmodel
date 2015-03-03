@@ -1,6 +1,7 @@
 define service{
    service_description           MongoDB
    use            generic-service
+   contact_groups admins
    register       0
    host_name	  mongodb
    check_command  check_mongodb

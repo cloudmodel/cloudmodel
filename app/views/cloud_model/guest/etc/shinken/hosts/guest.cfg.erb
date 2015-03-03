@@ -1,9 +1,9 @@
 define host{
-        use                     generic-host, cm-guest<%= guest.shinken_services_append %>
-        contact_groups		admins
-        host_name               <%= guest.host.name %>.<%= guest.name %>
-        parents                 <%= guest.host.name %>
-        address                 <%= guest.private_address %>
+    use                 generic-host, cm-guest<%= guest.shinken_services_append %>
+    contact_groups		  admins
+    host_name           <%= guest.host.name %>.<%= guest.name %>
+    parents             <%= guest.host.name %>
+    address             <%= guest.private_address %>
 
     _SNMPSERVER         <%= guest.host.private_address %>
     _GUESTNAME          <%= guest.name %>
@@ -13,7 +13,7 @@ define host{
     _LOAD_WARN          2,2,2
     _LOAD_CRIT          3,3,3
 
-    _MEMORY_WARN        80
+    _MEMORY_WARN        90
     _MEMORY_CRIT        95
 
     _NET_IFACES         eth0

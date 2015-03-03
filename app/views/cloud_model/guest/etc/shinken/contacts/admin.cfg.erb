@@ -1,0 +1,10 @@
+define contact{
+    use               generic-contact
+    contact_name      admin
+    password          admin
+    is_admin          1
+<%- if CloudModel.config.admin_email -%>
+    email             <%= CloudModel.config.admin_email %>
+    notificationways  email
+<%- end -%>
+}

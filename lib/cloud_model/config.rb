@@ -2,7 +2,10 @@ module CloudModel
   class Config 
     attr_writer :data_directory, :backup_directory, :bundle_command
     attr_writer :skip_sync_images, :gentoo_mirrors
-    attr_accessor :admin_email, :email_domain, :gentoo_mirrors
+    attr_writer :xmmp_port
+    attr_accessor :xmmp_server, :xmmp_user, :xmmp_password
+
+    attr_accessor :admin_email, :admin_xmmp, :email_domain, :gentoo_mirrors
     attr_accessor :livestatus_host
     attr_writer :livestatus_port
     
@@ -31,6 +34,14 @@ module CloudModel
     
     def bundle_command
       @bundle_command || 'PATH=/bin:/sbin:/usr/bin:/usr/local/bin bundle'
+    end
+    
+    def xmmp_port
+      @xmmp_port || 5222
+    end
+    
+    def uses_xmmp?
+      xmmp_server && xmmp_user && admin_xmmp
     end
     
     def livestatus_port

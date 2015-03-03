@@ -1,6 +1,7 @@
 define service{
    service_description           Raid
    use            generic-service
+   contact_groups admins
    register       0
    host_name	    mdstat
    check_command  check_mdstat

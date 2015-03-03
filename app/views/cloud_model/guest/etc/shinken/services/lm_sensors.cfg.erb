@@ -1,6 +1,7 @@
 define service{
    service_description           Sensors
    use            generic-service
+   contact_groups admins
    register       0
    host_name	  cm-host
    check_command  check_lm_sensors

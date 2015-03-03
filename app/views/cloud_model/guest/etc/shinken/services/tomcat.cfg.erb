@@ -1,6 +1,7 @@
 define service{
    service_description           Tomcat
    use            generic-service
+   contact_groups admins
    register       0
    host_name	  tomcat
    check_command  check_tomcat

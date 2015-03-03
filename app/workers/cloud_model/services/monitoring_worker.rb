@@ -20,6 +20,17 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/shinken/modules/livestatus.cfg", "#{@guest.deploy_path}/etc/shinken/modules/livestatus.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/webui.cfg", "#{@guest.deploy_path}/etc/shinken/modules/webui.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/ui-graphite.cfg", "#{@guest.deploy_path}/etc/shinken/modules/ui-graphite.cfg", service: @model
+          
+        puts "        Write notification config"  
+        render_to_remote "/cloud_model/guest/etc/shinken/contactgroups/admin.cfg", "#{@guest.deploy_path}/etc/shinken/contactgroups/admins.cfg", service: @model
+        render_to_remote "/cloud_model/guest/etc/shinken/contacts/admin.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/admin.cfg", service: @model
+        
+        if CloudModel.config.uses_xmmp?
+          render_to_remote "/cloud_model/guest/etc/shinken/contacts/xmmp.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/xmmp.cfg", service: @model
+          render_to_remote "/cloud_model/guest/etc/shinken/notificationways/xmmp.cfg", "#{@guest.deploy_path}/etc/shinken/notificationways/xmmp.cfg", service: @model
+          host.exec! "sed -i s,#!/usr/bin/python ,#!/usr/bin/python2 , /var/lib/shinken/libexec/notify_by_xmpp.py; done", 'Failed to patch xmmp notify'
+          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmmp.ini", "#{build_dir}/var/lib/shinken/libexec/notify_by_xmmp.ini", 0600
+        end
             
         puts "        Write nginx config for graphite"
         mkdir_p "#{@guest.deploy_path}/etc/nginx/server.d"
