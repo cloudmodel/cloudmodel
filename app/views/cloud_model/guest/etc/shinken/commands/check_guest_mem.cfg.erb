@@ -3,5 +3,5 @@
 
 define command {
     command_name    check_guest_mem
-    command_line    $PLUGINSDIR$/check_guest_mem.rb -h $_HOSTSNMPSERVER$ -g $_HOSTGUESTNAME$
+    command_line    $PLUGINSDIR$/check_guest_mem.rb -h $_HOSTSNMPSERVER$ -g $_HOSTGUESTNAME$ -w $_HOSTMEMORY_WARN$ -c $_HOSTMEMORY_CRIT$
 }
