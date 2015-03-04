@@ -28,8 +28,8 @@ module CloudModel
         if CloudModel.config.uses_xmpp?
           render_to_remote "/cloud_model/guest/etc/shinken/contacts/xmpp.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/xmpp.cfg", service: @model
           render_to_remote "/cloud_model/guest/etc/shinken/notificationways/xmpp.cfg", "#{@guest.deploy_path}/etc/shinken/notificationways/xmpp.cfg", service: @model
-          host.exec! "sed -i s,#!/usr/bin/python\\ ,#!/usr/bin/python2\\ , /var/lib/shinken/libexec/notify_by_xmpp.py", 'Failed to patch xmpp notify'
-          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmpp.ini", "#{build_dir}/var/lib/shinken/libexec/notify_by_xmpp.ini", 0600
+          host.exec! "sed -i s,#!/usr/bin/python\\ ,#!/usr/bin/python2\\ , #{@guest.deploy_path}/var/lib/shinken/libexec/notify_by_xmpp.py", 'Failed to patch xmpp notify'
+          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmpp.ini", "#{@guest.deploy_path}/var/lib/shinken/libexec/notify_by_xmpp.ini", 0600
         end
             
         puts "        Write nginx config for graphite"

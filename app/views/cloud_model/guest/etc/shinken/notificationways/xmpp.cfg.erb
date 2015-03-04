@@ -3,7 +3,7 @@ define notificationway{
        notificationway_name            xmpp
        service_notification_period     24x7
        host_notification_period        24x7
-       service_notification_options    c,w,r
+       service_notification_options    w,u,c,r,f
        host_notification_options       d,u,r,f,s
        service_notification_commands   notify-service-by-xmpp ; send service notifications via xmpp
        host_notification_commands      notify-host-by-xmpp    ; send host notifications via xmpp
