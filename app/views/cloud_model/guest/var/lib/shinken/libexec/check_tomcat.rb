@@ -80,8 +80,11 @@ begin
     data['memory_usage'] = mem_usage.round(2)
   end
   
-  connector = doc.xpath('//status/connector[@name=\'"http-bio-8080"\']')
-  if connector
+  connector = doc.xpath('//status/connector[@name=\'"http-nio-8080"\']')
+  if connector.size == 0
+    connector = doc.xpath('//status/connector[@name=\'"http-bio-8080"\']')    
+  end
+  if connector.size > 0
     connector.xpath('./requestInfo').first.attributes.each do |k,v| 
       data["request_#{k}"] = v.to_s.to_i
     end
