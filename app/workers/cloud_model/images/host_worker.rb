@@ -31,10 +31,6 @@ module CloudModel
         mkdir_p "#{build_dir}/etc/cloud_model"
         render_to_remote "/cloud_model/host/etc/cloud_model/kernel.config", "#{build_dir}/etc/cloud_model/kernel.config"
       end
-      
-      def config_layman_funtoo
-        chroot! build_dir, "layman -a funtoo-overlay", 'Failed adding funtoo overlay'
-      end
 
       def emerge_sys_tools
         emerge! %w(
@@ -111,6 +107,7 @@ module CloudModel
       end
   
       def configure_systemd_services
+        chroot! build_dir, "ln -sf /usr/lib/systemd/system/distccd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put distcc daemon to autostart'
 
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/dm-event.service /etc/systemd/system/sysinit.target.wants/", 'Failed to put dmevent service to autostart'
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/dm-event.socket /etc/systemd/system/sockets.target.wants/", 'Failed to put dmevent socket to autostart'
@@ -225,10 +222,7 @@ module CloudModel
           ]],
           ["Build system", [
             ["Update portage", :emerge_portage],
-            ["Configure overlays", [
-              ["Add CloudModel overlay", :config_layman],
-              ["Add funtoo overlay", :config_layman_funtoo],
-            ]],
+            ["Configure overlays", :config_layman],
             ["Update base packages", :emerge_update_world],
             ["Cleanup base system", :emerge_depclean],
             ["Cleanup gcc installation", :gcc_cleaner],

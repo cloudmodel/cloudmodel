@@ -101,11 +101,10 @@ module CloudModel
           dev-perl/Net-SNMP
           dev-python/pip
           dev-python/pymongo
-          dev-python/xmpppy
-
           dev-python/pycairo
-          dev-python/django
         )
+        # dev-python/xmpppy
+        # dev-python/django
 
         python_site_packages_path = '/usr/lib/python2.7/site-packages'
 
@@ -117,6 +116,7 @@ module CloudModel
         chroot! build_dir, "python2 /usr/bin/pip install django-tagging", 'Unable to install python django-tagging'
         chroot! build_dir, "python2 /usr/bin/pip install uwsgi", 'Unable to install python uwsgi'
         chroot! build_dir, "python2 /usr/bin/pip install graphite-web --install-option='--install-scripts=/usr/bin' --install-option='--install-lib=#{python_site_packages_path}' --install-option='--install-data=/var/lib/graphite'", 'Unable to install python graphite-web'
+        chroot! build_dir, "python2 /usr/bin/pip install git+https://github.com/ArchipelProject/xmpppy", 'Unable to install python graphite-web'
         chroot! build_dir, "sed -i 's/from twisted.scripts._twistd_unix import daemonize/import daemonize/' #{python_site_packages_path}/carbon/util.py", 'Unable to patch python carbon'
 
 

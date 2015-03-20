@@ -17,7 +17,7 @@ module CloudModel
         rescue Exception => e
           CloudModel.log_exception e
           @web_image.update_attributes build_state: :failed, build_last_issue: "Unable to clone repository '#{@web_image.git_repo}'."
-          system "rm -rf #{@web_image.build_path.shellescape}/current"
+          system "rm -rf #{@web_image.build_path.shellescape}"
           return false
         end
       end
@@ -161,7 +161,7 @@ module CloudModel
         #puts "----"
         #puts command
         #puts "----"
-        #pp ENV
+        #puts ENV.to_json
         
         run_step step, command
       end

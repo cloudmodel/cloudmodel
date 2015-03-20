@@ -1,15 +1,32 @@
 module CloudModel
   module Services
     class MonitoringWorker < CloudModel::Services::BaseWorker
-      def write_hosts_config
+      def write_hosts_config options = {}
         puts "        Write shinken hosts"
+        
+        hosts_dir = options[:hosts_dir] || "#{@guest.deploy_path}/etc/shinken/hosts"
+        mkdir_p "#{hosts_dir}"
+
         CloudModel::Host.all.each do |host|
-          render_to_remote "/cloud_model/guest/etc/shinken/hosts/host.cfg", "#{@guest.deploy_path}/etc/shinken/hosts/#{host.name}.cfg", host: host
+          render_to_remote "/cloud_model/guest/etc/shinken/hosts/host.cfg", "#{hosts_dir}/#{host.name}.cfg", host: host
           
           host.guests.each do |guest|
-            render_to_remote "/cloud_model/guest/etc/shinken/hosts/guest.cfg", "#{@guest.deploy_path}/etc/shinken/hosts/#{host.name}.#{guest.name}.cfg", guest: guest
+            render_to_remote "/cloud_model/guest/etc/shinken/hosts/guest.cfg", "#{hosts_dir}/#{host.name}.#{guest.name}.cfg", guest: guest
           end
         end
+      end
+      
+      def update_hosts_config
+        ts = Time.now.strftime('%Y%m%d%M%H%S')
+        hosts_base_path = "/etc/shinken/hosts"
+        hosts_build_path = "#{hosts_base_path}.build.#{ts}"
+        hosts_old_path = "#{hosts_base_path}.old.#{ts}"
+        
+        build_dir = guest.base_path
+        
+        write_hosts_config hosts_dir: "#{build_dir}#{hosts_build_path}"
+        chroot! build_dir, "mv /etc/shinken/hosts #{hosts_old_path} && mv #{hosts_build_path} /etc/shinken/hosts"
+        # TODO: run on guest: " && systemctl restart shinken-arbiter", "Failed to restart shinken"
       end
       
       def write_config
@@ -25,7 +42,7 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/shinken/contactgroups/admin.cfg", "#{@guest.deploy_path}/etc/shinken/contactgroups/admins.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/contacts/admin.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/admin.cfg", service: @model
         
-        if CloudModel.config.uses_xmpp?
+        if CloudModel.config.uses_xmpp
           render_to_remote "/cloud_model/guest/etc/shinken/contacts/xmpp.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/xmpp.cfg", service: @model
           render_to_remote "/cloud_model/guest/etc/shinken/notificationways/xmpp.cfg", "#{@guest.deploy_path}/etc/shinken/notificationways/xmpp.cfg", service: @model
           host.exec! "sed -i s,#!/usr/bin/python\\ ,#!/usr/bin/python2\\ , #{@guest.deploy_path}/var/lib/shinken/libexec/notify_by_xmpp.py", 'Failed to patch xmpp notify'

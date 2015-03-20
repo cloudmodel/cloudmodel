@@ -15,10 +15,10 @@ source /var/lib/layman/make.conf
 DISTDIR="${PORTDIR}/distfiles"
 PKGDIR="${PORTDIR}/packages"
 
-MAKEOPTS="-j<%= host.cpu_count + 1 %>"
+MAKEOPTS="-j<%= CloudModel::Host.all.sum(&:cpu_count) + 1 %>"
 PORTAGE_NICENESS="19"
 EMERGE_DEFAULT_OPTS="--jobs=6 --load-average=<%= host.cpu_count %> --keep-going --autounmask=n"
-FEATURES="parallel-fetch"
+FEATURES="distcc parallel-fetch"
 <%- if CloudModel.config.gentoo_mirrors -%>
 
 GENTOO_MIRRORS="<%= CloudModel.config.gentoo_mirrors * ' ' %>"

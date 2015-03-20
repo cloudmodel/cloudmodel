@@ -135,7 +135,7 @@ module CloudModel
 
     def mk_root_lv  
       deploy_volume_params = @guest.root_volume.as_json(except: [:id, :_id, :created_at, :update_at, :name])
-      deploy_volume_params[:name] = "#{@guest.root_volume.name.gsub(/(-([0-9]*))$/, '')}-#{Time.now.strftime "%Y%m%d%H%M%S"}"
+      deploy_volume_params[:name] = "#{@guest.name}-root-#{Time.now.strftime "%Y%m%d%H%M%S"}"
   
       puts "  Creating new logical volume #{deploy_volume_params[:name]}"
   

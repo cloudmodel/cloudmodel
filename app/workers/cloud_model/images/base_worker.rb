@@ -26,7 +26,7 @@ module CloudModel
         unless @host.mounted_at? build_dir
           # puts "    Create build host partition"
           begin
-            build_lv = CloudModel::LogicalVolume.find_by(name: "build-#{build_type}")
+            build_lv = @host.volume_groups.first.logical_volumes.find_by(name: "build-#{build_type}")
             build_lv.apply wipe: true
           rescue
             build_lv = CloudModel::LogicalVolume.create! name: "build-#{build_type}", disk_space: "32G", volume_group: @host.volume_groups.first
@@ -72,7 +72,16 @@ module CloudModel
         mkdir_p "#{build_dir}/etc/portage"
         render_to_remote "/cloud_model/#{build_type}/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: CloudModel.config.gentoo_mirrors, host: @host, layman: false
         %w(accept_keywords use mask unmask).each do |portage_conf|
-          mkdir_p "#{build_dir}/etc/portage/package.#{portage_conf}"
+          path = "/etc/portage/package.#{portage_conf}"
+          
+          begin
+            if @host.sftp.stat!("#{build_dir}#{path}").type != 2
+              chroot! build_dir, "mv #{path} #{path}.gentoo && mkdir -p #{path} && mv #{path}.gentoo #{path}/gentoo", "Failed to move old #{portage_conf} config"
+            end
+          rescue
+            mkdir_p "#{build_dir}/etc/portage/package.#{portage_conf}"
+          end
+          
           render_to_remote "/cloud_model/#{build_type}/etc/portage/package.#{portage_conf}", "#{build_dir}/etc/portage/package.#{portage_conf}/cloudmodel", 0600
         end
         
@@ -96,7 +105,12 @@ module CloudModel
         chroot! build_dir, "emerge --sync --quiet", 'Failed to sync portage'
       end
 
-      def emerge_portage
+      def emerge_portage    
+        # Config and build distcc
+        chroot! build_dir, "emerge --nodeps sys-devel/distcc", "Failed to merge distcc"
+        chroot! build_dir, "/usr/bin/distcc-config --set-hosts '#{CloudModel::Host.all.map{|h| h.private_network.list_ips.first} * ' '}'", "Failed to set distcc hosts"
+        
+        # update portage
         chroot! build_dir, "emerge --oneshot portage", 'Failed to merge new portage'
       end
 
@@ -133,6 +147,7 @@ module CloudModel
         )
         render_to_remote "/cloud_model/support/etc/layman/layman.cfg", "#{build_dir}/etc/layman/layman.cfg"
         chroot! build_dir, "layman -S && layman -a CloudModel", 'Failed to add gentoo overlay'
+        #chroot! build_dir, "layman -S", 'Failed to sync gentoo overlay'
         render_to_remote "/cloud_model/#{build_type}/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: CloudModel.config.gentoo_mirrors, host: @host, layman: true
       end
 
