@@ -153,6 +153,7 @@ module CloudModel
         ENV.delete_if { | k, _ | k[0, 7] == "BUNDLE_" } 
         ENV["BUNDLE_GEMFILE"] = "#{@web_image.build_path}/current/Gemfile"
         ENV["PATH"] += ':/usr/local/bin'
+        ENV["GEM_PATH"] += ":/usr/local/lib/ruby/gems/#{Gem.ruby_api_version}:/usr/lib/ruby/gems/#{Gem.ruby_api_version}"
         ENV["RUBYLIB"] = nil
         if ENV.has_key?("RUBYOPT")
           ENV["RUBYOPT"] = ENV["RUBYOPT"].sub("-rbundler/setup", "")
