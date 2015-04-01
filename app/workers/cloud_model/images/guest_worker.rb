@@ -89,9 +89,6 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.service", "#{build_dir}/etc/systemd/system/rake@.service"
         render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.timer", "#{build_dir}/etc/systemd/system/rake@.timer"
         render_to_remote "/cloud_model/guest/etc/tmpfiles.d/nginx.conf", "#{build_dir}/etc/tmpfiles.d/nginx.conf"
-      
-        # mkdir -p /etc/systemd/system/timers.target.wants
-        # ln -s /etc/systemd/system/rake@.timer /etc/systemd/system/timers.target.wants/rake@cloudmodel:guest:backup_all.timer
       end
   
       def emerge_shinken  

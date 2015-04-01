@@ -100,6 +100,12 @@ en:
       cloud_model/services/tomcat:
         one: Tomcat Service
         other: Tomcat Services
+      cloud_model/services/monitoring:
+        one: Monitoring Service
+        other: Monitoring Services
+      cloud_model/services/backup:
+        one: Backup Service
+        other: Backup Services
     attributes:
       cloud_model/address:
         ip: IP Address
