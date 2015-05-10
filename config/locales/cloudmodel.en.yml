@@ -106,6 +106,12 @@ en:
       cloud_model/services/backup:
         one: Backup Service
         other: Backup Services
+      cloud_model/ssh_pub_key:
+        one: SSH Public Key
+        other: SSH Public Keys
+      cloud_model/vpn_client:
+        one: VPN Client
+        other: VPN Clients
     attributes:
       cloud_model/address:
         ip: IP Address
@@ -171,6 +177,13 @@ en:
         key: Private Key
         crt: Public Key
         valid_thru: Valid Thru
+      cloud_model/ssh_pub_key:
+        name: Key Name
+        key: Public Key
+      cloud_model/vpn_client:
+        name: Client Name
+        tinc_public_key: Public Key
+        address: IP Address
       cloud_model/web_image:
         name: Name
         git_server: GIT Server

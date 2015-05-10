@@ -106,6 +106,12 @@ de:
       cloud_model/services/backup:
         one: Sicherungsdienst
         other: Sicherungsdienste
+      cloud_model/ssh_pub_key:
+        one: SSH öffentlicher Schlüssel
+        other: SSH öffentliche Schlüssel
+      cloud_model/vpn_client:
+        one: VPN Client
+        other: VPN Clients
     attributes:
       cloud_model/address:
         ip: IP Adresse
@@ -171,6 +177,13 @@ de:
         key: Privater Schlüssel
         crt: Öffentlicher Schlüssel
         valid_thru: Gültig bis
+      cloud_model/ssh_pub_key:
+        name: Schlüsselname
+        key: Öffentlicher Schlüssel
+      cloud_model/vpn_client:
+        name: Clientname
+        tinc_public_key: Öffentlicher Schlüssel
+        address: Netzwerkadresse
       cloud_model/web_image:
         name: Name
         git_server: GIT Server

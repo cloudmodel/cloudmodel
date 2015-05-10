@@ -15,5 +15,9 @@ module CloudModel
     def to_s
       key
     end
+    
+    def name
+      key.split(' ').last
+    end
   end
 end
