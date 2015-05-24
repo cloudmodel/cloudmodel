@@ -8,7 +8,7 @@
   <vcpu placement='static'><%= guest.cpu_count %></vcpu>
   <os>
     <type arch='x86_64'>exe</type>
-    <init>/usr/lib/systemd/systemd</init>
+    <init>/lib/systemd/systemd</init>
   </os>
   <clock offset='utc'/>
   <on_poweroff>destroy</on_poweroff>

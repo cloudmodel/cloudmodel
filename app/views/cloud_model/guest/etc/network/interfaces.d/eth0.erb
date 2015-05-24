@@ -1,0 +1,8 @@
+auto eth0
+iface eth0 inet static
+        address <%= guest.private_address %>
+        netmask <%= host.private_network.cidr.wildcard_mask %>
+        network <%= host.private_network.network %>
+        broadcast <%= host.private_network.broadcast %>
+        gateway <%= host.private_network.gateway %>
+        dns-nameservers 8.8.8.8 8.8.8.4.4 

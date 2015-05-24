@@ -4,6 +4,7 @@ module CloudModel
     attr_writer :skip_sync_images, :gentoo_mirrors
     attr_writer :xmpp_port
     attr_accessor :xmpp_server, :xmpp_user, :xmpp_password
+    attr_writer :ubuntu_mirror, :ubuntu_deb_src
 
     attr_accessor :admin_email, :admin_xmpp, :email_domain, :gentoo_mirrors
     attr_accessor :livestatus_host
@@ -25,6 +26,18 @@ module CloudModel
     
     def backup_directory
       @backup_directory || "#{data_directory}/backups"
+    end
+    
+    def ubuntu_mirror
+      @ubuntu_mirror || 'archive.ubuntu.com'
+    end
+    
+    def ubuntu_deb_src
+      if @ubuntu_deb_src.nil?
+        true
+      else
+        @ubuntu_deb_src 
+      end
     end
     
     # If true do not sync images on deploy

@@ -5,7 +5,10 @@ function die {
   exit 1
 }
 
-env-update
+#env-update
 source /etc/profile
+
+export LC_ALL=C
+export RUNLEVEL=1 
 
 <%=raw command %>

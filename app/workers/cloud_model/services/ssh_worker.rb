@@ -2,6 +2,9 @@ module CloudModel
   module Services
     class SshWorker < CloudModel::Services::BaseWorker
       def write_config
+        puts "        Install SSH"
+        chroot! @guest.deploy_path, "apt-get install ssh -y", "Failed to install SSH"
+        
         puts "        Write SSH config"
         @host.sftp.file.open(File.expand_path("etc/ssh/sshd_config", @guest.deploy_path), 'w') do |f|
           f.write render("/cloud_model/guest/etc/ssh/sshd_config", guest: @guest, model: @model)
@@ -33,7 +36,8 @@ module CloudModel
           f.write CloudModel::SshPubKey.all.to_a * "\n"
         end
   
-        chroot! @guest.deploy_path, "chown -R www:www /var/www/.ssh", "Failed to change owner of www client keys to user www (1001)"
+        # TODO: Reenable after config for ngix done
+        # chroot! @guest.deploy_path, "chown -R www:www /var/www/.ssh", "Failed to change owner of www client keys to user www (1001)"
       end
     
       def auto_start
