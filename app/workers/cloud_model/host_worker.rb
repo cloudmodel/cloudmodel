@@ -256,8 +256,8 @@ module CloudModel
       @host.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "#{ssh_dir}/authorized_keys"
       
       # DistCC config
-      mkdir_p "#{root}/etc/systemd/system/distccd.service"
-      render_to_remote "/cloud_model/host/etc/systemd/system/distccd.service/00gentoo.conf", "#{root}/etc/systemd/system/distccd.service/00gentoo.conf", host: @host
+      mkdir_p "#{root}/etc/systemd/system/distccd.service.d"
+      render_to_remote "/cloud_model/host/etc/systemd/system/distccd.service.d/00gentoo.conf", "#{root}/etc/systemd/system/distccd.service.d/00gentoo.conf", host: @host
       
       # Config exim form mail out
       render_to_remote "/cloud_model/host/etc/exim/exim-out.conf", "#{root}/etc/exim/exim.conf", host: @host
