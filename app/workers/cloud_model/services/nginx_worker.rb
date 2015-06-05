@@ -5,10 +5,19 @@ module CloudModel
   module Services
     class NginxWorker < CloudModel::Services::BaseWorker
       def write_config
-        puts "        Write nginx config"
+        puts "        Install nginx"
+        chroot! @guest.deploy_path, "apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 561F9B9CAC40B2F7", "Failed to add fusion key"
+        chroot! @guest.deploy_path, "apt-get install apt-transport-https ca-certificates -y", "Failed to install ca-certificates"
+        render_to_remote "/cloud_model/guest/etc/apt/sources.list.d/passenger.list", "#{@guest.deploy_path}/etc/apt/sources.list.d/passenger.list", 600
+        chroot! @guest.deploy_path, "apt-get update", "Failed to update packages"
+        chroot! @guest.deploy_path, "apt-get install nginx-extras passenger -y", "Failed to install nginx+passenger"
+        
+        puts "        Config nginx"
                 
         render_to_remote "/cloud_model/guest/etc/nginx/nginx.conf", "#{@guest.deploy_path}/etc/nginx/nginx.conf", guest: @guest, model: @model      
-        render_to_remote "/cloud_model/guest/etc/conf.d/rails", "#{@guest.deploy_path}/etc/conf.d/rails", guest: @guest, model: @model
+        render_to_remote "/cloud_model/guest/etc/default/rails", "#{@guest.deploy_path}/etc/default/rails", guest: @guest, model: @model
+        chroot! @guest.deploy_path, "groupadd -f -r -g 1001 www && useradd -c 'added by cloud_model for nginx' -d /var/www -s /bin/bash -r -g 1001 -u 1001 www", "Failed to add www user"
+        
       
         puts "        Make nginx root"
         mkdir_p "#{@guest.deploy_path}#{@model.www_root}"

@@ -49,7 +49,9 @@ http {
 
   index                           index.html;
 <%- if model.passenger_supported? %>
-  include                         passenger.conf;
+#  include                         passenger.conf;
+  passenger_root /usr/lib/ruby/vendor_ruby/phusion_passenger/locations.ini;
+  passenger_ruby /usr/bin/passenger_free_ruby;
 <% end -%>
 
 <%-
@@ -145,7 +147,7 @@ http {
     # #
     # ssl_dhparam /etc/ssl/certs/dhparam.pem;
         
-    passenger_set_cgi_param       HTTP_X_FORWARDED_PROTO https;
+    passenger_env_var             HTTP_X_FORWARDED_PROTO https;
 <%- end -%>
 <%- end -%>
   }
