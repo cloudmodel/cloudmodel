@@ -1,65 +1,19 @@
 #!/bin/bash
-CATALINA_PID=/run/tomcat8.pid
-CATALINA_HOME=/usr/share/tomcat8
-CATALINA_BASE=/var/lib/tomcat-8
-CATALINA_TMPDIR=/var/tmp/tomcat-8
-CATALINA_OPTS=
-
-TOMCAT_START=start
-
-# JPDA_TRANSPORT="dt_socket"
-# JPDA_ADDRESS="8000"
-# JPDA_OPTS="-Xdebug -Xrunjdwp:transport=${JPDA_TRANSPORT},address=${JPDA_ADDRESS},server=y,suspend=n"
-
-source /etc/conf.d/tomcat-8
-
-export JAVA_HOME=`java-config ${TOMCAT_JVM:+--select-vm ${TOMCAT_JVM}} --jre-home`
-
-CLASSPATH=`java-config --classpath tomcat-8${TOMCAT_EXTRA_JARS:+,${TOMCAT_EXTRA_JARS}}`
+source /etc/default/tomcat8
 export CLASSPATH="${CLASSPATH}${TOMCAT_EXTRA_CLASSPATH:+:${TOMCAT_EXTRA_CLASSPATH}}"
-
-cmd=java args=
-if [ "${TOMCAT_START}" = "debug" ] || [ "${TOMCAT_START}" = "-security debug" ] ; then
-	cmd=jdb
-	args="${args} -sourcepath ${CATALINA_HOME}/../../jakarta-tomcat-catalina/catalina/src/share"
-fi
-if [ "${TOMCAT_START}" = "-security debug" ] || [ "${TOMCAT_START}" = "-security start" ]; then
-	args="${args} -Djava.security.manager"
-	args="${args} -Djava.security.policy=${CATALINA_BASE}/conf/catalina.policy"
-fi
-if [ "${TOMCAT_START}" = "jpda start" ] ; then
-	args="${args} ${JPDA_OPTS}"
-fi
-if [ -r "${CATALINA_HOME}"/bin/tomcat-juli.jar ]; then
-	args="${args} -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager \
-	-Djava.util.logging.config.file=${CATALINA_BASE}/conf/logging.properties"
-fi
 
 mkdir -p $CATALINA_TMPDIR
 cd $CATALINA_TMPDIR
 
-case $1 in
-  start)
-    echo $$ > $CATALINA_PID
-
-    exec ${JAVA_HOME}/bin/${cmd} \
-    	${JAVA_OPTS} \
-    	${args} \
-    	-Dcatalina.base="${CATALINA_BASE}" \
-    	-Dcatalina.home="${CATALINA_HOME}" \
-    	-Djava.io.tmpdir="${CATALINA_TMPDIR}" \
-    	-classpath "${CLASSPATH}" \
-    	org.apache.catalina.startup.Bootstrap \
-    	${CATALINA_OPTS} \
-    	${TOMCAT_START} 
-    ;;
-  stop)
-    exec ${JAVA_HOME}/bin/java \
-    	-Dcatalina.base="${CATALINA_BASE}" \
-    	-Dcatalina.home="${CATALINA_HOME}" \
-    	-Djava.io.tmpdir="${CATALINA_TMPDIR}" \
-      -classpath ${CLASSPATH} \
-      org.apache.catalina.startup.Bootstrap \
-      stop
-    ;;
-esac
+#exec /usr/share/tomcat8/bin/catalina.sh $1
+	
+set -a; JAVA_HOME="$JAVA_HOME"; source /etc/default/tomcat8; \
+                CATALINA_HOME="$CATALINA_HOME"; \
+                CATALINA_BASE="$CATALINA_BASE"; \
+                JAVA_OPTS="$JAVA_OPTS"; \
+                CATALINA_PID="$CATALINA_PID"; \
+                CATALINA_TMPDIR="$CATALINA_TMPDIR"; \
+                LANG="$LANG"; \
+	            cd "/var/lib/tomcat8"; \
+	            /usr/share/tomcat8/bin/catalina.sh $@
+ 

@@ -8,8 +8,12 @@ module CloudModel
         target = "#{@guest.deploy_path}/var/tomcat" 
         
         puts "        Install tomcat"
-        chroot! @guest.deploy_path, "apt-get install openjdk-8-jre-headless tomcat8 -y", "Failed to install tomcat"
-         
+        chroot! @guest.deploy_path, "apt-get install openjdk-8-jre-headless tomcat8 tomcat8-admin -y", "Failed to install tomcat"
+        # Fix Ubuntu bug
+        # https://bugs.launchpad.net/ubuntu/+source/ca-certificates-java/+bug/1396760
+        chroot! @guest.deploy_path, "/var/lib/dpkg/info/ca-certificates-java.postinst configure", "Failed to config CA certs for tomcat"
+
+        
         puts "        Deploy WAR Image #{@model.deploy_war_image.name} to #{@guest.deploy_path}#{target}"
         temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
         io = StringIO.new(@model.deploy_war_image.file.data)
@@ -25,14 +29,20 @@ module CloudModel
         end
         
         puts "        Write tomcat config"
-        mkdir_p File.expand_path("etc/tomcat8/Catalina/localhost", @guest.deploy_path) 
+        tomcat_conf_dir = '/etc/tomcat8'
+        #tomcat_conf_dir = '/usr/share/tomcat8/conf'
         
-        render_to_remote "/cloud_model/guest/etc/default/tomcat8", "#{@guest.deploy_path}/etc/default/tomcat8", manifest: manifest, worker: self, guest: @guest, model: @model     
-        render_to_remote "/cloud_model/guest/etc/tomcat8/server.xml", "#{@guest.deploy_path}/etc/tomcat8/server.xml", 0640, guest: @guest, model: @model      
-        render_to_remote "/cloud_model/guest/etc/tomcat8/servlet.xml", "#{@guest.deploy_path}/etc/tomcat8/Catalina/localhost/ROOT.xml", 0640, manifest: manifest, worker: self, guest: @guest, model: @model    
-        render_to_remote "/cloud_model/guest/etc/tomcat8/tomcat-users.xml", "#{@guest.deploy_path}/etc/tomcat8/tomcat-users.xml", 0640, guest: @guest, model: @model      
+        mkdir_p "#{@guest.deploy_path}#{tomcat_conf_dir}/Catalina/localhost"
         
-        chroot @guest.deploy_path, "chown -R tomcat8:tomcat8 /var/tomcat /etc/tomcat8/server.xml /etc/tomcat8/Catalina/localhost /etc/tomcat8/tomcat-users.xml"
+        render_to_remote "/cloud_model/guest/etc/default/tomcat8", "#{@guest.deploy_path}/etc/default/tomcat8", manifest: manifest, worker: self, guest: @guest, model: @model      
+        render_to_remote "/cloud_model/guest/etc/tmpfiles.d/tomcat8.conf", "#{@guest.deploy_path}/etc/tmpfiles.d/tomcat8.conf"
+        render_to_remote "/cloud_model/guest/etc/tomcat8/server.xml", "#{@guest.deploy_path}#{tomcat_conf_dir}/server.xml", 0640, guest: @guest, model: @model      
+        render_to_remote "/cloud_model/guest/etc/tomcat8/servlet.xml", "#{@guest.deploy_path}#{tomcat_conf_dir}/Catalina/localhost/ROOT.xml", 0640, manifest: manifest, worker: self, guest: @guest, model: @model    
+        render_to_remote "/cloud_model/guest/etc/tomcat8/tomcat-users.xml", "#{@guest.deploy_path}#{tomcat_conf_dir}/tomcat-users.xml", 0640, guest: @guest, model: @model      
+        chroot! @guest.deploy_path, "rm -rf /var/lib/tomcat8/webapps/ROOT", "Failed to remove genuine root app for tomcat"
+        
+        
+        chroot @guest.deploy_path, "chown -R tomcat8:tomcat8 /var/tomcat #{tomcat_conf_dir}"
       end
     
       def interpolate_value(value)

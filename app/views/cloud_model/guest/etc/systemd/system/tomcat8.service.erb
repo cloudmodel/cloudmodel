@@ -3,8 +3,10 @@ Description=Tomcat 8 servlet container
 After=network.target
 
 [Service]
-User=tomcat
-Group=tomcat
+User=tomcat8
+Group=tomcat8
+Type=forking
+PIDFile=/run/tomcat8/pid
 ExecStart=/usr/sbin/tomcat8 start
 ExecStop=/usr/sbin/tomcat8 stop
 Restart=always
