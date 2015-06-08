@@ -2,9 +2,10 @@
 Description=Call rake on schedule
 
 [Timer]
-OnBootSec=15min    # run 15 minutes after boot time
+OnBootSec=900
+# run 15 minutes after boot time
 OnCalendar=00:00
-AccuracySec=10min
+AccuracySec=600
 
 [Install]
 WantedBy=timers.target
