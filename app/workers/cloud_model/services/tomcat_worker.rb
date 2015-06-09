@@ -49,12 +49,19 @@ module CloudModel
         value.to_s.gsub("%TARGET%", "/var/tomcat").gsub("%DATA_DIR%", "/var/tomcat/data")
       end
     
+      def service_name
+        "tomcat8"
+      end
+    
       def auto_start
         puts "        Add Tomcat to runlevel default"
         render_to_remote "/cloud_model/guest/bin/tomcat8", "#{@guest.deploy_path}/usr/sbin/tomcat8", 0755
-        render_to_remote "/cloud_model/guest/etc/systemd/system/tomcat8.service", "#{@guest.deploy_path}/etc/systemd/system/tomcat8.service"
-        
+        render_to_remote "/cloud_model/guest/etc/systemd/system/tomcat8.service", "#{@guest.deploy_path}/etc/systemd/system/tomcat8.service"       
         @host.exec "ln -sf /etc/systemd/system/tomcat8.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
+
+        mkdir_p overlay_path
+        render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{overlay_path}/restart.conf"
+        render_to_remote "/cloud_model/guest/etc/systemd/system/tomcat8.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"
       end
     end
   end

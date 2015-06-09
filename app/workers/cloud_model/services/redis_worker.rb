@@ -11,11 +11,13 @@ module CloudModel
         end
       end
       
-      def auto_start
-        puts "        Add Redis to runlevel default"
-        @host.exec "ln -sf /lib/systemd/system/redis-server.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
+      def service_name
+        "redis-server"
       end
       
+      def auto_restart
+        true
+      end 
     end
   end
 end

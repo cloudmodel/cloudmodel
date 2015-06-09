@@ -40,9 +40,12 @@ module CloudModel
         # chroot! @guest.deploy_path, "chown -R www:www /var/www/.ssh", "Failed to change owner of www client keys to user www (1001)"
       end
     
-      def auto_start
-        puts "        Add SSH to runlevel default"
-        @host.exec "ln -sf /etc/systemd/system/sshd.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
+      def service_name
+        "sshd"
+      end
+      
+      def auto_restart
+        true
       end
     end
   end
