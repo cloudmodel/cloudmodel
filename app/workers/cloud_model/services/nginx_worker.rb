@@ -11,7 +11,15 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/apt/sources.list.d/passenger.list", "#{@guest.deploy_path}/etc/apt/sources.list.d/passenger.list", 600
         chroot! @guest.deploy_path, "apt-get update", "Failed to update packages"
         chroot! @guest.deploy_path, "apt-get install nginx-extras passenger -y", "Failed to install nginx+passenger"
-        
+      
+        puts "        Install ruby deps"
+        packages = %w(git bundler)
+        packages += %w(zlib1g-dev libxml2-dev) # Nokogiri
+        packages << 'ruby-bcrypt' # bcrypt      
+        packages << 'imagemagick' # imagemagick
+        packages << 'nodejs' # JS interpreter 
+        chroot! @guest.deploy_path, "apt-get install #{packages * ' '} -y", "Failed to install packeges for deployment of rails app"
+         
         puts "        Config nginx"
                 
         render_to_remote "/cloud_model/guest/etc/nginx/nginx.conf", "#{@guest.deploy_path}/etc/nginx/nginx.conf", guest: @guest, model: @model      
@@ -23,7 +31,7 @@ module CloudModel
         mkdir_p "#{@guest.deploy_path}#{@model.www_root}"
       
         if @model.ssl_supported?
-          puts "    Copy SSL files"
+          puts "        Copy SSL files"
           ssl_base_dir = File.expand_path("etc/nginx/ssl", @guest.deploy_path)
           mkdir_p ssl_base_dir
                   
@@ -68,8 +76,13 @@ module CloudModel
         chroot @guest.deploy_path, "chown -R www:www #{log_dir_path}"
       end
     
+      def auto_restart
+        true
+      end
+      
       def auto_start
         super
+        render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"
         # TODO: Resolve dependencies
         # Services::Ssh.new(@host, @options).write_config
       end
