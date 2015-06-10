@@ -2,11 +2,8 @@
 # Example to set library path for tomcat-native:
 #   JAVA_OPTS="-Djava.library.path=/usr/lib"
 #
-<% if manifest[:properties] -%>
-export JAVA_OPTS="<%= manifest[:properties].map{|k,v| "-D#{k}=#{worker.interpolate_value v}"} * ' '%> -Djava.awt.headless=true -Xmx128M"
-<% else -%>
-#JAVA_OPTS=""
-<% end -%>
+export JAVA_OPTS="<%= manifest[:properties].map{|k,v| "-D#{k}=#{worker.interpolate_value v}"} * ' '%> -Djava.awt.headless=true -Xms<%= model.heap_size %> -Xmx<%= model.heap_size %>"
+
 
 # Additional packages to put on the default classpath.
 # jakarta-jstl is needed for some of the examples.
