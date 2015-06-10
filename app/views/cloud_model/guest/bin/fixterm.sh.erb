@@ -1,9 +1,27 @@
-#!/bin/sh
+#!/bin/bash
 echo -en "\e[18t" # returns \e[8;??;??t
-IFS='[;'
-read -d t -s esc params
-set -- $params
-[ $# = 3 -a "$1" = 8 ] && shift
-[ $# != 2 ] && echo error >&2 && exit 1
-echo setting terminal to "$2x$1" >&2
-stty rows "$1" cols "$2"
+t=''
+r=''
+c=''
+p=0
+while test "$t" != t ; do
+  read -s -n 1 t
+  case "$t" in
+    't')
+    ;;
+    ';')
+      p=$(($p + 1))
+      ;;
+    * )
+      case "$p" in
+        '1' )
+          r="$r$t"
+          ;;
+        '2' )
+          c="$c$t"
+      esac
+  esac
+done
+echo "rows is $r, cols is $c"
+ 
+stty rows "$r" cols "$c"
