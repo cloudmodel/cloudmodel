@@ -16,8 +16,9 @@ module CloudModel
         packages = %w(git bundler)
         packages += %w(zlib1g-dev libxml2-dev) # Nokogiri
         packages << 'ruby-bcrypt' # bcrypt      
-        packages << 'imagemagick' # imagemagick
         packages << 'nodejs' # JS interpreter 
+        packages << 'imagemagick' # imagemagick
+        packages << 'libxml2-utils' # xmllint (TODO: needed for one rails project, make this configurable)
         chroot! @guest.deploy_path, "apt-get install #{packages * ' '} -y", "Failed to install packeges for deployment of rails app"
          
         puts "        Config nginx"
@@ -31,7 +32,7 @@ module CloudModel
         mkdir_p "#{@guest.deploy_path}#{@model.www_root}"
       
         if @model.ssl_supported?
-          puts "        Copy SSL files"
+          puts "        Write SSL files"
           ssl_base_dir = File.expand_path("etc/nginx/ssl", @guest.deploy_path)
           mkdir_p ssl_base_dir
                   
