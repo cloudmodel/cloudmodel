@@ -4,11 +4,11 @@ After = network.target remote-fs.target nss-lookup.target
 
 [Service]
 Environment = "DJANGO_SETTINGS_MODULE=graphite.settings"
-ExecStartPre = /usr/bin/python2 /usr/lib/python2.7/site-packages/graphite/manage.py syncdb --noinput
-ExecStart = /usr/bin/uwsgi --module 'django.core.handlers.wsgi:WSGIHandler()' --socket 127.0.0.1:3031 --chdir /usr/lib/python2.7/site-packages/graphite --processes 1 --master --harakiri 120 --max-requests 5000
+ExecStartPre = /usr/bin/python2 /usr/lib/python2.7/dist-packages/graphite/manage.py syncdb --noinput
+ExecStart = /usr/bin/uwsgi --module 'django.core.handlers.wsgi:WSGIHandler()' --socket 127.0.0.1:3031 --chdir /usr/lib/python2.7/dist-packages/graphite --processes 1 --master --harakiri 120 --max-requests 5000
 Restart = always
-User = graphite
-Group = graphite
+User = _graphite
+Group = _graphite
 
 [Install]
 WantedBy = multi-user.target

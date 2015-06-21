@@ -1,4 +1,4 @@
-#!/bin/env ruby
+#!/usr/bin/ruby
 
 require 'optparse'
 require File.expand_path('../snmp_helpers', __FILE__)

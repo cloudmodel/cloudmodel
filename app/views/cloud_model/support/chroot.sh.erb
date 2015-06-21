@@ -9,6 +9,7 @@ function die {
 source /etc/profile
 
 export LC_ALL=C
-export RUNLEVEL=1 
+export RUNLEVEL=1
+export DEBIAN_FRONTEND=noninteractive
 
 <%=raw command %>
