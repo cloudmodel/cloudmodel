@@ -1,0 +1,19 @@
+define host{
+   name           https
+   use            generic-host
+   register       0
+
+   _CHECK_HTTPS_DOMAIN_NAME        $HOSTADDRESS$
+   _CHECK_HTTPS_PORT               443
+   _CHECK_HTTPS_URI                /
+   _CHECK_HTTPS_AUTH               #login:password
+   _CHECK_HTTPS_MINIMUM_DAYS       30
+}
+
+define service{
+   service_description           Https
+   use            generic-service
+   register       0
+   host_name	  https
+   check_command  check_https
+}

@@ -173,10 +173,14 @@ de:
         has_backups: Laufwerkdaten sichern?
       cloud_model/certificate:
         name: Name
+        name: Name
         ca: Zertifizierungsstelle
         key: Privater Schlüssel
         crt: Öffentlicher Schlüssel
+        valid_from: Gültig von
         valid_thru: Gültig bis
+        issuer: Aussteller
+        common_name: Allgemeiner Name
       cloud_model/ssh_pub_key:
         name: Schlüsselname
         key: Öffentlicher Schlüssel

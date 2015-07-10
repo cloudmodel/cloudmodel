@@ -35,17 +35,24 @@ module CloudModel
         
         puts "        Install shinken and graphite-web"
         packages = %w(shinken nagios-plugins) # Shicken Base
-        packages += %w(shinken-mod-logstore-mongodb shinken-mod-mongodb) # Shinken MongoDB
+        packages += %w(shinken-mod-logstore-mongodb shinken-mod-mongodb shinken-mod-retention-mongodb) # Shinken MongoDB
         packages += %w(shinken-mod-graphite shinken-mod-ui-graphite graphite-carbon graphite-web) # Graphite/Carbon
         packages += %w(shinken-mod-livestatus) # Livestatus 
-        packages += %w(python-xmpp) # XMPP notifications
+       # packages += %w(python-xmpp) # XMPP notifications # Broken in 15.04
+       packages += %w(python-pip) # Use pip to install xmpp
+        
+        packages += %w(ruby-snmp ruby-mongo ruby-nokogiri ruby-redis) # Ruby deps for check scripts
         #pacakges += %w(python-whisper python-pip)
         chroot! @guest.deploy_path, "apt-get install #{packages * ' '} -y", "Failed to install mongodb"
+        chroot! @guest.deploy_path, "python2 /usr/bin/pip install git+https://github.com/ArchipelProject/xmpppy", 'Unable to install python graphite-web'
+
 
         write_hosts_config
            
         puts "        Write shinken config"
-        render_to_remote "/cloud_model/guest/etc/shinken/brokers/broker-master.cfg", "#{@guest.deploy_path}/etc/shinken/brokers/broker-master.cfg", service: @model
+        #render_to_remote "/cloud_model/guest/etc/shinken/arbiters/arbiter.cfg", "#{@guest.deploy_path}/etc/shinken/arbiters/arbiter.cm.cfg", service: @model
+        render_to_remote "/cloud_model/guest/etc/shinken/brokers/broker.cfg", "#{@guest.deploy_path}/etc/shinken/brokers/broker.cfg", service: @model
+        #render_to_remote "/cloud_model/guest/etc/shinken/schedulers/scheduler.cfg", "#{@guest.deploy_path}/etc/shinken/schedulers/scheduler.cm.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/livestatus.cfg", "#{@guest.deploy_path}/etc/shinken/modules/livestatus.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/webui.cfg", "#{@guest.deploy_path}/etc/shinken/modules/webui.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/ui-graphite.cfg", "#{@guest.deploy_path}/etc/shinken/modules/ui-graphite.cfg", service: @model
@@ -67,7 +74,7 @@ module CloudModel
         if CloudModel.config.uses_xmpp?
           render_to_remote "/cloud_model/guest/etc/shinken/contacts/xmpp.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/xmpp.cfg", service: @model
           render_to_remote "/cloud_model/guest/etc/shinken/notificationways/xmpp.cfg", "#{@guest.deploy_path}/etc/shinken/notificationways/xmpp.cfg", service: @model
-          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmpp.py", "#{@guest.deploy_path}#{plugins_dir}/notify_by_xmpp.py", 0600
+          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmpp.py", "#{@guest.deploy_path}#{plugins_dir}/notify_by_xmpp.py", 0700
           render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmpp.ini", "#{@guest.deploy_path}#{plugins_dir}/notify_by_xmpp.ini", 0600
         end
             
@@ -78,6 +85,10 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/shinken/shinken.cfg", "#{@guest.deploy_path}/etc/shinken/shinken.cfg"
 
         render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/snmp_helpers.rb", "#{@guest.deploy_path}#{plugins_dir}/snmp_helpers.rb", 0700
+        %w(https ssh).each do |check_name|
+          render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/commands/check_#{check_name}.cfg"
+          render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/services/#{check_name}.cfg"
+        end
         %w(cpu disks mem net_usage lm_sensors lvm mdstat smart guest_cpu guest_mem mongodb nginx redis tomcat).each do |check_name|
           render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/check_#{check_name}.rb", "#{@guest.deploy_path}#{plugins_dir}/check_#{check_name}.rb", 0700
           render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/commands/check_#{check_name}.cfg"
@@ -98,6 +109,9 @@ module CloudModel
         %w(carbon-cache graphite-web shinken-arbiter shinken-broker shinken-poller shinken-reactionner shinken-receiver shinken-scheduler).each do |service|
           @host.exec "ln -sf /lib/systemd/system/#{service}.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
         end
+        
+        # disable shinken start as we start it in modules
+        @host.exec "rm #{@guest.deploy_path.shellescape}/etc/rc?.d/?01shinken"
       
         # TODO: Resolve dependencies
         # Services::Nginx.new(@host, @options).write_config

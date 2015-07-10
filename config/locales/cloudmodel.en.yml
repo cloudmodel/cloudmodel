@@ -176,7 +176,10 @@ en:
         ca: Certificate Authority
         key: Private Key
         crt: Public Key
+        valid_from: Valid From
         valid_thru: Valid Thru
+        issuer: Issuer
+        common_name: Common Name
       cloud_model/ssh_pub_key:
         name: Key Name
         key: Public Key
