@@ -1,52 +1,45 @@
-<%- if service.graphite_web_enabled -%>
 location /graphite/ {
-        gzip off;
-        include uwsgi_params;
-        uwsgi_pass      127.0.0.1:3031;
+  gzip off;
+  root /usr/lib/python2.7/dist-packages/graphite/public;
+  passenger_user _graphite;
+  passenger_group _graphite;
+  passenger_enabled on;
 }
+<%- if service.graphite_web_enabled -%>
 location /content {
-        alias /usr/lib/python2.7/site-packages/graphite/content;
-        gzip off;
-        include uwsgi_params;
-        uwsgi_pass      127.0.0.1:3031;
+  passenger_user _graphite;
+  passenger_group _graphite;
+  alias /usr/lib/python2.7/dist-packages/graphite/content;
+  gzip off;
 }
 location /metrics {
-        alias /usr/lib/python2.7/site-packages/graphite/metrics;
-        gzip off;
-        include uwsgi_params;
-        uwsgi_pass      127.0.0.1:3031;
+  passenger_user _graphite;
+  passenger_group _graphite;
+  alias /usr/lib/python2.7/dist-packages/graphite/metrics;
+  gzip off;
 }
 location /dashboard {
-        alias /usr/lib/python2.7/site-packages/graphite/dashboard;
-        gzip off;
-        include uwsgi_params;
-        uwsgi_pass      127.0.0.1:3031;
-}
-location /render {
-        alias /usr/lib/python2.7/site-packages/graphite/render;
-        gzip off;
-        include uwsgi_params;
-        uwsgi_pass      127.0.0.1:3031;
+  passenger_user _graphite;
+  passenger_group _graphite;
+  alias /usr/lib/python2.7/dist-packages/graphite/dashboard;
+  gzip off;
 }
 location /browser {
-        alias /usr/lib/python2.7/site-packages/graphite/browser;
-        gzip off;
-        include uwsgi_params;
-        uwsgi_pass      127.0.0.1:3031;
+  passenger_user _graphite;
+  passenger_group _graphite;
+  alias /usr/lib/python2.7/dist-packages/graphite/browser;
+  gzip off;
 }
 location /composer {
-        alias /usr/lib/python2.7/site-packages/graphite/composer;
-        gzip off;
-        include uwsgi_params;
-        uwsgi_pass      127.0.0.1:3031;
+  passenger_user _graphite;
+  passenger_group _graphite;
+  alias /usr/lib/python2.7/dist-packages/graphite/composer;
+  gzip off;
 }
-
-<%- else service.graphite_web_enabled -%>
-location /render {
-        alias /usr/lib/python2.7/site-packages/graphite/render;
-        gzip off;
-        include uwsgi_params;
-        uwsgi_pass      127.0.0.1:3031;
-}
-
 <%- end -%>
+location /render {
+  passenger_user _graphite;
+  passenger_group _graphite;
+  alias /usr/lib/python2.7/dist-packages/graphite/render;
+  gzip off;
+}

@@ -1,0 +1,15 @@
+import sys, os
+sys.path.append(os.getcwd())
+os.environ['DJANGO_SETTINGS_MODULE'] = "graphite.settings"
+
+# For newer django do:
+#import django.core.handlers.wsgi
+#application = django.core.handlers.wsgi.WSGIHandler()
+# For actual django do:
+from django.core.wsgi import get_wsgi_application
+application = get_wsgi_application()
+# End django 
+
+project_path='/usr/lib/python2.7/dist-packages/graphite'
+
+sys.path.insert(1, project_path)

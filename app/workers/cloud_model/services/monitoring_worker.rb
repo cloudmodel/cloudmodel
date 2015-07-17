@@ -39,14 +39,15 @@ module CloudModel
         packages += %w(shinken-mod-graphite shinken-mod-ui-graphite graphite-carbon graphite-web) # Graphite/Carbon
         packages += %w(shinken-mod-livestatus) # Livestatus 
        # packages += %w(python-xmpp) # XMPP notifications # Broken in 15.04
-       packages += %w(python-pip) # Use pip to install xmpp
+        packages += %w(python-pip) # Use pip to install xmpp
         
         packages += %w(ruby-snmp ruby-mongo ruby-nokogiri ruby-redis) # Ruby deps for check scripts
-        #pacakges += %w(python-whisper python-pip)
+        
+        python_site_packages_path = '/usr/lib/python2.7/dist-packages'
+        
         chroot! @guest.deploy_path, "apt-get install #{packages * ' '} -y", "Failed to install mongodb"
         chroot! @guest.deploy_path, "python2 /usr/bin/pip install git+https://github.com/ArchipelProject/xmpppy", 'Unable to install python graphite-web'
-
-
+        
         write_hosts_config
            
         puts "        Write shinken config"
@@ -57,6 +58,7 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/shinken/modules/webui.cfg", "#{@guest.deploy_path}/etc/shinken/modules/webui.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/ui-graphite.cfg", "#{@guest.deploy_path}/etc/shinken/modules/ui-graphite.cfg", service: @model
           
+        mkdir_p "#{@guest.deploy_path}/etc/graphite"  
         render_to_remote "/cloud_model/guest/etc/graphite/carbon.conf", "#{@guest.deploy_path}/etc/graphite/carbon.conf", 0544
         render_to_remote "/cloud_model/guest/etc/graphite/storage-schemas.conf", "#{@guest.deploy_path}/etc/graphite/storage-schemas.conf", 0544
                           
@@ -80,7 +82,9 @@ module CloudModel
             
         puts "        Write nginx config for graphite"
         mkdir_p "#{@guest.deploy_path}/etc/nginx/server.d"
+        mkdir_p "#{@guest.deploy_path}/usr/lib/python2.7/dist-packages/graphite/public"
         render_to_remote "/cloud_model/guest/etc/nginx/server.d/graphite.conf", "#{@guest.deploy_path}/etc/nginx/server.d/graphite.conf", service: @model         
+        render_to_remote "/cloud_model/guest/graphite/passenger_wsgi.py", "#{@guest.deploy_path}/usr/lib/python2.7/dist-packages/graphite/passenger_wsgi.py", 0755, service: @model         
            
         render_to_remote "/cloud_model/guest/etc/shinken/shinken.cfg", "#{@guest.deploy_path}/etc/shinken/shinken.cfg"
 
@@ -101,17 +105,18 @@ module CloudModel
         puts "        Add Monitoring Services to runlevel default"
         
         puts "        Write graphite-web systemd"
-        mkdir_p "#{@guest.deploy_path}/etc/systemd/system/graphite-web.service.d"
-        render_to_remote "/cloud_model/guest/etc/systemd/system/graphite-web.service", "#{@guest.deploy_path}/etc/systemd/system/graphite-web.service"
-        render_to_remote "/cloud_model/guest/etc/systemd/system/graphite-web.service.d/fix_perms.conf", "#{@guest.deploy_path}/etc/systemd/system/graphite-web.service.d/fix_perms.conf"
+        mkdir_p "#{@guest.deploy_path}/etc/systemd/system/nginx.service.d"
+        render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service.d/graphite-web.conf", "#{@guest.deploy_path}/etc/systemd/system/nginx.service.d/graphite-web.conf"        
         
-        
-        %w(carbon-cache graphite-web shinken-arbiter shinken-broker shinken-poller shinken-reactionner shinken-receiver shinken-scheduler).each do |service|
+        # Start shinken-arbiter shinken-broker shinken-poller shinken-reactionner shinken-receiver shinken-scheduler with shinken wrapper
+        %w(carbon-cache shinken).each do |service|
           @host.exec "ln -sf /lib/systemd/system/#{service}.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
         end
         
-        # disable shinken start as we start it in modules
-        @host.exec "rm #{@guest.deploy_path.shellescape}/etc/rc?.d/?01shinken"
+        # disable shinken submodules start as we start it in wrapper
+        @host.exec "rm #{@guest.deploy_path.shellescape}/etc/rc?.d/?01shinken-*"
+        # remove example host
+        @host.exec "rm #{@guest.deploy_path.shellescape}/etc/shinken/hosts/localhost.cfg"
       
         # TODO: Resolve dependencies
         # Services::Nginx.new(@host, @options).write_config
