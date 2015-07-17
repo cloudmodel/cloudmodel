@@ -264,7 +264,7 @@ module CloudModel
     end
 
     def config_services
-      puts "    Handle and config Services"
+      puts "    Install and config Services"
       @guest.services.each do |service|
         begin
           puts "      #{service.class.model_name.element.camelcase} '#{service.name}'"
