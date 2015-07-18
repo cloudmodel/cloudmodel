@@ -47,6 +47,8 @@ module CloudModel
         
         chroot! @guest.deploy_path, "apt-get install #{packages * ' '} -y", "Failed to install mongodb"
         chroot! @guest.deploy_path, "python2 /usr/bin/pip install git+https://github.com/ArchipelProject/xmpppy", 'Unable to install python graphite-web'
+        #chroot! @guest.deploy_path, "python2 /usr/bin/pip install shinken --upgrade", "Failed to upgrade shinken"
+        chroot! @guest.deploy_path, "shinken --init", "Failed to init shinken"
         
         write_hosts_config
            
@@ -99,6 +101,15 @@ module CloudModel
           render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/services/#{check_name}.cfg"
         end
         chroot! @guest.deploy_path, "chown -R shinken:shinken #{plugins_dir}", 'Failed to assign check scripts to shinken user'
+      
+        puts "        Setup systemd startup files"
+        render_to_remote "/cloud_model/guest/etc/tmpfiles.d/shinken.conf", "#{@guest.deploy_path}/etc/tmpfiles.d/shinken.conf"         
+        %w(shinken-arbiter shinken-broker shinken-poller shinken-reactionner shinken-receiver shinken-scheduler).each do |service|
+          render_to_remote "/cloud_model/guest/etc/systemd/system/#{service}.service", "#{@guest.deploy_path}/etc/systemd/system/#{service}.service"         
+        end
+        # disable shinken init.d start scripts
+        @host.exec "rm #{@guest.deploy_path.shellescape}/etc/rc?.d/?01shinken*"
+        @host.exec "rm #{@guest.deploy_path.shellescape}/etc/init.d/shinken*"   
       end
     
       def auto_start
@@ -108,13 +119,10 @@ module CloudModel
         mkdir_p "#{@guest.deploy_path}/etc/systemd/system/nginx.service.d"
         render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service.d/graphite-web.conf", "#{@guest.deploy_path}/etc/systemd/system/nginx.service.d/graphite-web.conf"        
         
-        # Start shinken-arbiter shinken-broker shinken-poller shinken-reactionner shinken-receiver shinken-scheduler with shinken wrapper
-        %w(carbon-cache shinken).each do |service|
+        %w(carbon-cache shinken-arbiter shinken-broker shinken-poller shinken-reactionner shinken-receiver shinken-scheduler).each do |service|
           @host.exec "ln -sf /lib/systemd/system/#{service}.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
         end
         
-        # disable shinken submodules start as we start it in wrapper
-        @host.exec "rm #{@guest.deploy_path.shellescape}/etc/rc?.d/?01shinken-*"
         # remove example host
         @host.exec "rm #{@guest.deploy_path.shellescape}/etc/shinken/hosts/localhost.cfg"
       
