@@ -8,12 +8,18 @@ module CloudModel
       end
 
       def socket
-        @socket ||= TCPSocket.new(CloudModel.config.livestatus_host, CloudModel.config.livestatus_port)
+        begin
+          @socket ||= TCPSocket.new(CloudModel.config.livestatus_host, CloudModel.config.livestatus_port)
+        rescue
+          nil
+        end
         #socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
       end
     
       def request query, options = {}
         command = query.strip
+        
+        return Hash.new(state: -1) unless socket
     
         unless options[:where].blank?
           options[:where].each do |k,v|
