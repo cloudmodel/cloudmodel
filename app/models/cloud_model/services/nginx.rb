@@ -21,6 +21,8 @@ module CloudModel
     
       field :deploy_redis_host, type: String
       field :deploy_redis_port, type: Integer, default: 6379
+      
+      field :daily_rake_task, type: String, default: nil
     
       
       def www_home

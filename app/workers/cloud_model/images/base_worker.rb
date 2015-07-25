@@ -198,6 +198,7 @@ module CloudModel
         mkdir_p "#{build_dir}/etc/systemd/system/basic.target.wants"  
         mkdir_p "#{build_dir}/etc/systemd/system/sockets.target.wants"  
         mkdir_p "#{build_dir}/etc/systemd/system/multi-user.target.wants"
+        mkdir_p "#{build_dir}/etc/systemd/system/timers.target.wants"
      end
     
       def create_system_users

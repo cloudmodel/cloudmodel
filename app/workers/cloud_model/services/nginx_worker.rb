@@ -67,7 +67,7 @@ module CloudModel
             render_to_remote "/cloud_model/web_image/redis.yml", "#{@guest.deploy_path}#{@model.www_root}/current/config/redis.yml", guest: @guest, model: @model
           end
         end
-      
+              
         @host.exec "chmod -R 2775 #{@guest.deploy_path}#{@model.www_root}"
         chroot @guest.deploy_path, "chown -R www:www #{@model.www_root}"
         
@@ -86,6 +86,14 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"
         # TODO: Resolve dependencies
         # Services::Ssh.new(@host, @options).write_config
+        
+        if @model.daily_rake_task
+          render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.service", "#{@guest.deploy_path}/etc/systemd/system/rake@.service"
+          render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.timer", "#{@guest.deploy_path}/etc/systemd/system/rake@.timer"
+          mkdir_p "#{@guest.deploy_path}/etc/systemd/system/timers.target.wants"
+          chroot @guest.deploy_path, "ln -s /etc/systemd/system/rake@.timer /etc/systemd/system/timers.target.wants/rake@#{@model.daily_rake_task.shellescape}.timer"
+        end
+        
       end
     end
   end
