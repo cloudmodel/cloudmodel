@@ -35,8 +35,8 @@ module CloudModel
         mkdir_p ssh_www_key_source
         mkdir_p ssh_target
         
-        # Copy client keys from inst if existing
-        @host.exec! "cp -ra #{ssh_www_key_source.shellescape}/id_* #{ssh_target.shellescape}", "Failed to copy client keys"        
+        # Copy client keys from inst (if existing)
+        @host.exec "cp -ra #{ssh_www_key_source.shellescape}/id_* #{ssh_target.shellescape}" 
         
         # Write authorized keys from database entries
         @host.sftp.file.open("#{ssh_target}/authorized_keys", 'w') do |f|
