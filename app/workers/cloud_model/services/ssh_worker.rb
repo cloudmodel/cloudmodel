@@ -36,7 +36,12 @@ module CloudModel
         mkdir_p ssh_target
         
         # Copy client keys from inst (if existing)
-        @host.exec "cp -ra #{ssh_www_key_source.shellescape}/id_* #{ssh_target.shellescape}" 
+        begin
+          if @host.sftp.dir.glob(ssh_www_key_source, 'id_*').size > 0
+            @host.exec! "cp -ra #{ssh_www_key_source.shellescape}/id_* #{ssh_target.shellescape}", "Failed to copy client keys"
+          end
+        rescue Net::SFTP::StatusException => e
+        end
         
         # Write authorized keys from database entries
         @host.sftp.file.open("#{ssh_target}/authorized_keys", 'w') do |f|
