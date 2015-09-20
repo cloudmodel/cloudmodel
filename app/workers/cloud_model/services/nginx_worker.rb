@@ -83,7 +83,7 @@ module CloudModel
       
       def auto_start
         super
-        render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"
+        render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf", guest: @guest, model: @model
         # TODO: Resolve dependencies
         # Services::Ssh.new(@host, @options).write_config
         

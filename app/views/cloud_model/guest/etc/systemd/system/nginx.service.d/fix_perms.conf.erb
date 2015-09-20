@@ -1,4 +1,4 @@
 [Service]
 PermissionsStartOnly=true
 ExecStartPre=/bin/chown -R www:www /var/www
-ExecStartPre=-/usr/bin/sudo -u www /var/www/rails/current/script/prestart
+ExecStartPre=-/usr/bin/sudo -u www RAILS_ENV=<%= model.passenger_env %> /var/www/rails/current/script/prestart
