@@ -156,7 +156,7 @@ module CloudModel
     
     def unpack_root_image
       
-      ubuntu_version = "15.04"
+      ubuntu_version = "15.10"
       ubuntu_image = "ubuntu-core-#{ubuntu_version}-core-amd64.tar.gz"
       ubuntu_url = "http://cdimage.ubuntu.com/ubuntu-core/releases/#{ubuntu_version}/release/#{ubuntu_image}"
       
@@ -213,7 +213,7 @@ module CloudModel
       # apt-get install apt-transport-https ca-certificates -y
       #  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 561F9B9CAC40B2F7
       ## Write to /etc/apt/sources.list.d/passenger.list
-      # deb https://oss-binaries.phusionpassenger.com/apt/passenger vivid main
+      # deb https://oss-binaries.phusionpassenger.com/apt/passenger wily main
       ## Update packages including passenger
       # chown root: /etc/apt/sources.list.d/passenger.list
       # chmod 600 /etc/apt/sources.list.d/passenger.list
