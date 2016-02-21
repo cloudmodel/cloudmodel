@@ -306,7 +306,7 @@ module CloudModel
     end
 
     def deploy
-      return false unless @host.deploy_state == :pending
+      return false unless @host.deploy_state == :pending or options[:force]
       
       @host.update_attributes deploy_state: :running, deploy_last_issue: nil
       
@@ -331,7 +331,7 @@ module CloudModel
     end
 
     def redeploy options={}
-      return false unless @host.deploy_state == :pending
+      return false unless @host.deploy_state == :pending or options[:force]
       
       @host.update_attributes deploy_state: :running, deploy_last_issue: nil
       
