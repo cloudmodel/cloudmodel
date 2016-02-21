@@ -151,8 +151,8 @@ module CloudModel
         render_to_remote "/cloud_model/#{build_type}/etc/portage/make.conf", "#{build_dir}/etc/portage/make.conf", 0600, mirrors: CloudModel.config.gentoo_mirrors, host: @host, layman: true
       end
 
-      def emerge! packages
-        chroot! build_dir, "emerge --autounmask=y #{packages * ' '}", 'Failed to merge needed packages'
+      def emerge! packages, emerge_options = ''
+        chroot! build_dir, "emerge --autounmask=y #{emerge_options} #{packages * ' '}", 'Failed to merge needed packages'
       end
       
       def emerge_postgres
