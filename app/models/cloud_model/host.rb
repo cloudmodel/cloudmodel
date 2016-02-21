@@ -370,5 +370,10 @@ module CloudModel
         CloudModel.log_exception e
       end
     end  
+    
+    def build!(options={})      
+      host_worker = CloudModel::Images::HostWorker.new self
+      host_worker.build_image options
+    end
   end
 end
