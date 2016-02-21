@@ -45,8 +45,11 @@ module CloudModel
           sys-apps/systemd
 
           sys-kernel/gentoo-sources
-          sys-kernel/genkernel-next
           sys-kernel/linux-headers
+          sys-kernel/genkernel-next
+          sys-apps/busybox
+          sys-fs/mdadm
+          sys-fs/lvm2
         )
         chroot! build_dir, "eselect kernel set 1", 'Failed to select kernel sources'
       end
@@ -73,10 +76,7 @@ module CloudModel
       end
       
       def emerge_fs_tools
-        emerge! %w(
-          sys-fs/mdadm
-          sys-fs/lvm2
-        )
+        # Moved to system build
       end
 
       def emerge_net_tools
