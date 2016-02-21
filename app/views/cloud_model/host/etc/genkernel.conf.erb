@@ -17,6 +17,12 @@ OLDCONFIG="yes"
 # Run 'make menuconfig' before compiling this kernel?
 MENUCONFIG="no"
 
+# Run 'make nconfig' (ncurses 'menuconfig') before compiling this kernel?
+NCONFIG="no"
+
+# Note, that two previous lines are mutual exclusive (logically), while
+# MENUCONFIG has a higher priority if both them is enabled.
+
 # Run 'make clean' before compilation?
 # If set to NO, implies MRPROPER WILL NOT be run
 # Also, if clean is NO, it won't copy over any configuration
@@ -72,6 +78,10 @@ LVM="yes"
 # If included, busybox is rebuilt if the cached copy is out of date.
 BUSYBOX="yes"
 
+# Use udev instead of mdev as the default device manager for the initramfs.
+# If you use systemd and perhaps lvm, you _must_ keep this turned on.
+UDEV="yes"
+
 # Includes mdadm/mdmon binaries in initramfs.
 # Without sys-fs/mdadm[static] installed, this will build a static mdadm.
 MDADM="yes"
@@ -89,12 +99,6 @@ MDADM="yes"
 
 # Add e2fsprogs support.
 E2FSPROGS="yes"
-
-# Include support for unionfs
-#UNIONFS="1"
-
-# Include support for zfs volume management.
-#ZFS="no"
 
 # Enable copying of firmware into initramfs
 #FIRMWARE="no"
@@ -117,10 +121,12 @@ DISKLABEL="yes"
 # This supersedes the "SPLASH_THEME" option of /etc/conf.d/splash (in early space).
 #SPLASH_THEME="gentoo"
 
-# Run the specified command in the current environment after the kernel and
-# modules have been compiled, useful to rebuild external kernel module.
-# use "emerge --quiet @module-rebuild" for >=portage-2.2
-#CMD_CALLBACK=""
+# Installs, or not, plymouth into the initramfs. If "splash" will be
+# passed at boot, plymouth will be activated.
+# PLYMOUTH="yes"
+
+# Embeds the given plymouth theme into the initramfs.
+# PLYMOUTH_THEME="text"
 
 # =========Keymap Settings=========
 #
@@ -164,16 +170,6 @@ DISKLABEL="yes"
 # option.
 #UTILS_LD="ld"
 
-
-# Common prefix of cros compile commands
-#UTILS_CROSS_COMPILE="x86_64-pc-linux-gnu"
-
-
-# Value of CROSS_COMPILE utils variable
-# during kernel compilation
-#KERNEL_CROSS_COMPILE="x86_64-pc-linux-gnu"
-
-
 # =========GENKERNEL LOCATION CONFIGURATION============
 # Variables:
 #   %%ARCH%%  - Final determined architecture
@@ -191,7 +187,7 @@ GK_SHARE="${GK_SHARE:-/usr/share/genkernel}"
 # Location of the default cache
 CACHE_DIR="/var/cache/genkernel"
 # Location of DISTDIR, where our source tarballs are stored
-DISTDIR="${CACHE_DIR}/src"
+DISTDIR="/var/lib/genkernel/src"
 # Log output file
 LOGFILE="/var/log/genkernel.log"
 # Debug Level
