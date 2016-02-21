@@ -352,6 +352,11 @@ module CloudModel
       end
     end
     
+    def redeploy!(options={})
+      host_worker = CloudModel::HostWorker.new self
+      host_worker.redeploy options
+    end
+    
     def buildable?
       [:finished, :failed, :not_started].include? build_state
     end
