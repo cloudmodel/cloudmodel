@@ -94,6 +94,7 @@ module CloudModel
           app-emulation/lxc
           app-emulation/libvirt
           mail-mta/exim
+          net-misc/ntp
         )
         
         render_to_remote "/cloud_model/host/etc/ssh/sshd_config", "#{build_dir}/etc/ssh/sshd_config"
@@ -114,6 +115,7 @@ module CloudModel
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put SSH daemon to autostart'
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/tincd@.service /etc/systemd/system/multi-user.target.wants/tincd@vpn.service", 'Failed to put Tinc daemon to autostart'
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/libvirtd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put libvirt daemon to autostart'
+        chroot! build_dir, "ln -sf /usr/lib/systemd/system/ntpd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put ntp daemon to autostart'
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/snmpd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put snmp daemon to autostart'
  
         chroot! build_dir, "ln -s /usr/lib/systemd/system/exim.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put exim to autostart'
