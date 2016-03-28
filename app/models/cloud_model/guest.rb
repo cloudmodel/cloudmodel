@@ -122,7 +122,11 @@ module CloudModel
     end
     
     def exec command
-      host.exec command
+      host.exec "LANG=en.UTF-8 /usr/bin/virsh lxc-enter-namespace --noseclabel #{name.shellescape} -- #{command}"
+    end
+    
+    def exec! command, message
+      host.exec! "LANG=en.UTF-8 /usr/bin/virsh lxc-enter-namespace --noseclabel #{name.shellescape} -- #{command}", message
     end
     
     def virsh cmd, options = []

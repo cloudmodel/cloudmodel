@@ -10,6 +10,12 @@ module CloudModel
       def port
         7767
       end
+      
+      def update_hosts_config! options={}
+        worker = CloudModel::Services::MonitoringWorker.new self.guest, self
+        worker.update_hosts_config options
+        true
+      end
     end
   end
 end

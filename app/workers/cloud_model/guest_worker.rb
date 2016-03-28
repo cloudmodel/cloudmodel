@@ -27,10 +27,13 @@ module CloudModel
         config_guest
         config_services
         config_firewall
-
+        
         define_guest
         @guest.start || raise("Failed to start VM")
         @guest.update_attribute :deploy_state, :finished
+        
+        # update hosts for shinken
+        config_monitoring
         
         return true
       rescue Exception => e
@@ -88,6 +91,9 @@ module CloudModel
         CloudModel::LogicalVolume.where(guest_id: @guest.id).ne(_id: @guest.root_volume.id).destroy
       
         @guest.update_attributes deploy_state: :finished
+        
+        # update hosts for shinken
+        config_monitoring
         
         return true
       rescue Exception => e
@@ -288,6 +294,13 @@ module CloudModel
       CloudModel::FirewallWorker.new(@host).write_scripts
       puts "      Restart Firewall"
       @host.exec! "/etc/cloud_model/firewall_stop && /etc/cloud_model/firewall_start", "Failed to restart Firewall!"
+    end
+    
+    def config_monitoring
+      CloudModel::Guest.where('services._type' => 'CloudModel::Services::Monitoring').each do |guest|
+        service = guest.services.find_by(_type: 'CloudModel::Services::Monitoring').update_hosts_config!
+        guest.exec! "/bin/systemctl restart shinken-arbiter", "Failed to restart shinken"
+      end      
     end
     
     def define_guest

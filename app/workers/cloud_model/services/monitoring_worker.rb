@@ -3,7 +3,7 @@ module CloudModel
   module Services
     class MonitoringWorker < CloudModel::Services::BaseWorker
       def write_hosts_config options = {}
-        puts "        Write shinken hosts"
+        puts "        Write shinken hosts#{options[:title]}"
         
         hosts_dir = options[:hosts_dir] || "#{@guest.deploy_path}/etc/shinken/hosts"
         mkdir_p "#{hosts_dir}"
@@ -17,7 +17,7 @@ module CloudModel
         end
       end
       
-      def update_hosts_config
+      def update_hosts_config options={}
         ts = Time.now.strftime('%Y%m%d%M%H%S')
         hosts_base_path = "/etc/shinken/hosts"
         hosts_build_path = "#{hosts_base_path}.build.#{ts}"
@@ -25,9 +25,8 @@ module CloudModel
         
         build_dir = guest.base_path
         
-        write_hosts_config hosts_dir: "#{build_dir}#{hosts_build_path}"
-        chroot! build_dir, "mv /etc/shinken/hosts #{hosts_old_path} && mv #{hosts_build_path} /etc/shinken/hosts"
-        # TODO: run on guest: " && systemctl restart shinken-arbiter", "Failed to restart shinken"
+        write_hosts_config hosts_dir: "#{build_dir}#{hosts_build_path}", title: " for #{guest.name}"
+        chroot! build_dir, "mv /etc/shinken/hosts #{hosts_old_path} && mv #{hosts_build_path} /etc/shinken/hosts", 'Unable to move hosts config'
       end
       
       def write_config
@@ -111,7 +110,7 @@ module CloudModel
         @host.exec "rm #{@guest.deploy_path.shellescape}/etc/rc?.d/?01shinken*"
         @host.exec "rm #{@guest.deploy_path.shellescape}/etc/init.d/shinken*"   
       end
-    
+      
       def auto_start
         puts "        Add Monitoring Services to runlevel default"
         
