@@ -209,6 +209,11 @@ module CloudModel
       end
     end
   
+    def redeploy!(options={})
+      guest_worker = CloudModel::GuestWorker.new self
+      guest_worker.redeploy options
+    end
+    
     def self.redeploy(ids, options = {})
       criteria = self.where(:id.in => ids.map(&:to_s))      
       valid_ids = criteria.pluck(:_id).map(&:to_s)

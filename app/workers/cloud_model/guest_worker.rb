@@ -43,8 +43,8 @@ module CloudModel
       end
     end
   
-    def redeploy
-      return false unless @guest.deploy_state == :pending
+    def redeploy options={}
+      return false unless @guest.deploy_state == :pending or options[:force]
       @guest.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       begin

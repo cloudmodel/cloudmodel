@@ -47,6 +47,18 @@ module CloudModel
           @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.ca.crt", ssl_base_dir), 'w') do |f|
             f.write @model.ssl_cert.ca
           end
+          
+          host_source_dir = "/inst/hosts_by_ip/#{@guest.private_address}"
+          ssh_host_key_source = "#{host_source_dir}/etc/nginx/ssl"
+          key_file = File.expand_path("dhparam.pem", ssh_host_key_source)
+          begin
+            @host.sftp.lstat! key_file
+          rescue Net::SFTP::StatusException => e
+            mkdir_p ssh_host_key_source
+            @host.exec! "openssl dhparam -out #{key_file.shellescape} 2048", 'Failed to generate dhparam keys'
+          end         
+
+          @host.exec! "cp -ra #{key_file.shellescape} #{ssl_base_dir.shellescape}", "Failed to copy dhparam keys"            
         end
        
         if @model.deploy_web_image
