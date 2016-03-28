@@ -74,6 +74,7 @@ module CloudModel
         write_fstab
 
         ## TODO: One shot to update admin guest
+        @guest.stop!
         @guest.undefine || raise("Failed to undefine guest")
     
         umount_all
