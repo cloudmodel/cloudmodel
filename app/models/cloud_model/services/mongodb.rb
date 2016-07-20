@@ -2,6 +2,7 @@ module CloudModel
   module Services
     class Mongodb < Base
       field :port, type: Integer, default: 27017
+      belongs_to :mongodb_replication_set, class_name: "CloudModel::MongodbReplicationSet"
       
       def kind
         :mongodb
@@ -15,6 +16,14 @@ module CloudModel
         if guest.livestatus
           guest.livestatus.services.find{|s| s.description == 'MongoDB'}
         end
+      end
+      
+      def mongodb_replication_set_master?
+        livestatus.perf_data['repl_ismaster'] == 'true'
+      end
+      
+      def mongodb_replication_set_version
+        livestatus.perf_data['repl_set_version']
       end
       
       def backupable?

@@ -76,6 +76,9 @@ de:
       cloud_model/certificate:
         one: Zertifikat
         other: Zertifikate
+      cloud_model/mongodb_replication_set:
+        one: MongoDB Replikationset
+        other: MongoDB Replikationsets
       cloud_model/web_image:
         one: Web Image
         other: Web Images
@@ -188,6 +191,8 @@ de:
         name: Clientname
         tinc_public_key: Öffentlicher Schlüssel
         address: Netzwerkadresse
+      cloud_model/mongodb_replication_set:
+        name: Setname
       cloud_model/web_image:
         name: Name
         git_server: GIT Server
@@ -214,6 +219,10 @@ de:
         has_backups: Dienstdaten sichern?
         state: Status
         _type: Dienstart
+      cloud_model/services/mongodb:
+        mongodb_replication_set: MongoDB Replikationset
+        mongodb_replication_set_master?: Primärknoten
+        mongodb_replication_set_version: Replikationsversion
       cloud_model/services/nginx:
         port: HTTP Port
         ssl: HTTPS-Verschlüsselung

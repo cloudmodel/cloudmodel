@@ -75,7 +75,10 @@ en:
         other: Guest Volumes  
       cloud_model/certificate:
         one: Certificate
-        other: Certificates    
+        other: Certificates  
+      cloud_model/mongodb_replication_set:
+        one: MongoDB Replication Set
+        other: MongoDB Replication Sets
       cloud_model/web_image:
         one: Web Image
         other: Web Images
@@ -187,6 +190,8 @@ en:
         name: Client Name
         tinc_public_key: Public Key
         address: IP Address
+      cloud_model/mongodb_replication_set:
+        name: Set Name
       cloud_model/web_image:
         name: Name
         git_server: GIT Server
@@ -213,6 +218,10 @@ en:
         has_backups: Backup Service Data?
         state: State
         _type: Service Type
+      cloud_model/services/mongodb:
+        mongodb_replication_set: MongoDB Replication Set
+        mongodb_replication_set_master?: Primary Node
+        mongodb_replication_set_version: Replication Version
       cloud_model/services/nginx:
         port: HTTP Port
         ssl: HTTPS Support

@@ -6,4 +6,8 @@ net:
     #bindIp: 127.0.0.1
     ssl:
         mode: disabled
+<%- if model.mongodb_replication_set -%>
 
+replication:
+   replSetName: <%= model.mongodb_replication_set.name %>
+<%- end -%>
