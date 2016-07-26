@@ -538,3 +538,7 @@ client-output-buffer-limit pubsub 32mb 8mb 60
 #
 # include /path/to/local.conf
 # include /path/to/other.conf
+
+<% if model.redis_sentinel_slave? %>
+slaveof <%= model.redis_sentinel_set.master_address %> <%= model.redis_sentinel_set.master_service.port %>
+<% end %>

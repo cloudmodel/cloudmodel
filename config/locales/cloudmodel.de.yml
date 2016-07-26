@@ -79,6 +79,9 @@ de:
       cloud_model/mongodb_replication_set:
         one: MongoDB Replikationset
         other: MongoDB Replikationsets
+      cloud_model/redis_sentinel_set:
+        one: Redis Replikationset
+        other: Redis Replikationsets
       cloud_model/web_image:
         one: Web Image
         other: Web Images
@@ -193,6 +196,10 @@ de:
         address: Netzwerkadresse
       cloud_model/mongodb_replication_set:
         name: Setname
+        services: Dienste
+      cloud_model/redis_sentinel_set:
+        name: Setname
+        services: Dienste
       cloud_model/web_image:
         name: Name
         git_server: GIT Server
@@ -220,9 +227,14 @@ de:
         state: Status
         _type: Dienstart
       cloud_model/services/mongodb:
-        mongodb_replication_set: MongoDB Replikationset
+        mongodb_replication_set: Replikationset
         mongodb_replication_set_master?: Primärknoten
         mongodb_replication_set_version: Replikationsversion
+      cloud_model/services/redis:
+        redis_sentinel_set: Replikationset
+        redis_sentinel_port: Replikationsport
+        redis_sentinel_master?: Primärknoten
+        redis_sentinel_set_version: Replikationsversion
       cloud_model/services/nginx:
         port: HTTP Port
         ssl: HTTPS-Verschlüsselung

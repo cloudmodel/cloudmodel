@@ -21,6 +21,10 @@ module CloudModel
         }
       end
     
+      def self.find(id)
+        CloudModel::Guest.find_by("services._id" => id).services.find(id)
+      end
+    
       def host
         guest.host
       end
