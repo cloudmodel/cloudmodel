@@ -62,6 +62,14 @@ module CloudModel
       cidr.wildcard_mask
     end
     
+    def tinc_subnet
+      "16"
+    end    
+    
+    def tinc_network
+      NetAddr::CIDR.create("#{CloudModel::Host.last.private_network.ip}/#{tinc_subnet}").network
+    end
+    
     def broadcast
       cidr.broadcast if ip_version == 4
     end

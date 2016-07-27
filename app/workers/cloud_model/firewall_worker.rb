@@ -148,9 +148,9 @@ module CloudModel
       # Handle broadcast
       commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} -d 255.255.255.255/32 -j RETURN"
       # Masquerading
-      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network} -p tcp -j MASQUERADE --to-ports 1024-65535"
-      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network} -p udp -j MASQUERADE --to-ports 1024-65535"
-      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network} -j MASQUERADE" 
+      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network.tinc_network}/#{@host.private_network.tinc_subnet} -p tcp -j MASQUERADE --to-ports 1024-65535"
+      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network.tinc_network}/#{@host.private_network.tinc_subnet} -p udp -j MASQUERADE --to-ports 1024-65535"
+      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network.tinc_network}/#{@host.private_network.tinc_subnet} -j MASQUERADE" 
     end
 
     def nat(host, interface, port, proto, nat_host)

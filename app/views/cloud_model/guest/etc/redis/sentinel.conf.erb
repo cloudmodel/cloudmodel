@@ -102,7 +102,7 @@ sentinel monitor mymaster <%= model.redis_sentinel_set.master_address %> <%= mod
 # Down).
 #
 # Default is 30 seconds.
-sentinel down-after-milliseconds mymaster 30000
+sentinel down-after-milliseconds mymaster 10000
 
 # sentinel parallel-syncs <master-name> <numslaves>
 #
