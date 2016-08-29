@@ -44,6 +44,9 @@ en:
     storing: Storing data
     finished: Finished
     failed: Failed to build
+     
+  cloud_model/services/nginx:
+    deploy_redis_sentinel_set_manual: Manual Redis Configuration      
       
   mongoid:
     errors:
@@ -256,6 +259,7 @@ en:
         deploy_mongodb_port: Use MongoDB Port
         deploy_mongodb_database: Use MongoDB Database
         
+        deploy_redis_sentinel_set_id: Use Redis Sentinel Set
         deploy_redis_host: Use Redis Host
         deploy_redis_port: Use Redis Port
       cloud_model/services/tomcat:

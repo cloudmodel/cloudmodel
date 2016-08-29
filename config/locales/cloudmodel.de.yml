@@ -45,10 +45,13 @@ de:
     finished: Abgeschlossen
     failed: Fehlgeschlagen
   
+  cloud_model/services/nginx:
+    deploy_redis_sentinel_set_manual: Eigene Redis Konfiguration      
+      
   mongoid:
     errors:
       messages:
-        format: "has to be a number optional followed by K, M, G, T or KiB, MiB, GiB, TiB"
+        format: "muss eine Zahl gefolgt von K, M, G, T oder KiB, MiB, GiB, TiB sein"
         repo_not_found: nicht gefunden oder nicht zugreifbar
         branch_not_pulled: nicht gefunden oder nicht ladbar
         bundle_failed: Packen des Gemfiles fehlgeschlagen
@@ -257,6 +260,7 @@ de:
         deploy_mongodb_port: MongoDB Port
         deploy_mongodb_database: MongoDB Datenbank
       
+        deploy_redis_sentinel_set_id: Redis Sentinel Set
         deploy_redis_host: Redis Host
         deploy_redis_port: Redis Port
       cloud_model/services/tomcat:
