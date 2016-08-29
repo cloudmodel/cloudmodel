@@ -1,0 +1,9 @@
+<%= model.passenger_env %>:
+  url: redis://<%= model.deploy_redis_sentinel %>
+  sentinels:
+    <% model.deploy_redis_sentinel_hosts.each do |host| -%>
+    - 
+      host: <%= host['ip'] %>
+      port: <%= host['port'] %>
+    <% end -%>
+  role: master

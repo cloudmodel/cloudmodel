@@ -17,12 +17,13 @@ module CloudModel
         ssh_www_key_source = "#{host_source_dir}/var/www/.ssh"
             
         mkdir_p ssh_host_key_source
-        %w(dsa ed25519 rsa).each do |type|
-          key_file = "#{ssh_host_key_source}/ssh_host_#{type}_key"
+        %w(dsa ecdsa ed25519 rsa).each do |type|
+          key_file = "ssh_host_#{type}_key"
           begin
-            @host.sftp.lstat! key_file
+            @host.sftp.lstat! "#{ssh_host_key_source}/#{key_file}"
           rescue Net::SFTP::StatusException => e
-            @host.exec! "ssh-keygen -t #{type} -f #{key_file.shellescape} -N ''", 'Failed to generate host keys'
+            #chroot! @guest.deploy_path, "ssh-keygen -t #{type} -f /etc/ssh/#{key_file.shellescape} -N ''", 'Failed to generate host keys'
+            @host.exec! "cp -ra #{ssh_host_key_target.shellescape}/ssh/#{key_file}* #{ssh_host_key_source.shellescape} ", "Failed to copy new host keys to inst"        
           end
         end
       

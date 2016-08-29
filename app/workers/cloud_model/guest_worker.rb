@@ -273,9 +273,15 @@ module CloudModel
     end
     
     def config_monitoring
+      puts "    Configure Monitoring"
       CloudModel::Guest.where('services._type' => 'CloudModel::Services::Monitoring').each do |guest|
-        service = guest.services.find_by(_type: 'CloudModel::Services::Monitoring').update_hosts_config!
-        guest.exec! "/bin/systemctl restart shinken-arbiter", "Failed to restart shinken"
+        puts "      on guest #{guest.name}"
+        begin 
+          service = guest.services.find_by(_type: 'CloudModel::Services::Monitoring').update_hosts_config!
+          guest.exec! "/bin/systemctl restart shinken-arbiter", "Failed to restart shinken"
+        rescue
+          puts "        failed!"
+        end
       end      
     end
     

@@ -7,7 +7,7 @@ module CloudModel
       def deploy_web_image base_path=nil   
         if @model.deploy_web_image
           base_path ||= @guest.base_path
-          deploy_id = "#{Time.now.to_i}"
+          deploy_id = "#{Time.now.utc.strftime("%Y%m%d%H%M%S")}"
           deploy_path = "#{base_path}#{@model.www_root}/#{deploy_id}"
           mkdir_p deploy_path
         
