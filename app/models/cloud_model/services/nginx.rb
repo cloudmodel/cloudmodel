@@ -22,8 +22,7 @@ module CloudModel
       field :deploy_redis_host, type: String
       field :deploy_redis_port, type: Integer, default: 6379
       
-      field :deploy_redis_sentinel, type: String, default: nil
-      field :deploy_redis_sentinel_hosts, type: Array
+      belongs_to :deploy_redis_sentinel_set, class_name: 'CloudModel::RedisSentinelSet'
             
       field :daily_rake_task, type: String, default: nil
     

@@ -31,5 +31,11 @@ module CloudModel
     def master_node
       master_service.guest
     end
+    
+    def sentinel_hosts
+      services.map do |s| 
+        {'ip' => s.guest.private_address, 'port' => s.redis_sentinel_port}
+      end
+    end
   end
 end

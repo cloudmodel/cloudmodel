@@ -18,12 +18,14 @@ module CloudModel
           @host.exec "cd #{deploy_path} && tar xpf #{temp_file_name}"
           @host.sftp.remove!(temp_file_name)
           
+          mkdir_p "#{deploy_path}/config"
+          
           if @model.deploy_web_image.has_mongodb?
             render_to_remote "/cloud_model/web_image/mongoid.yml", "#{deploy_path}/config/mongoid.yml", guest: @guest, model: @model
           end
         
           if @model.deploy_web_image.has_redis?
-            if @model.deploy_redis_sentinel
+            if @model.deploy_redis_sentinel_set
               render_to_remote "/cloud_model/web_image/sentinel.yml", "#{deploy_path}/config/redis.yml", guest: @guest, model: @model
             else
               render_to_remote "/cloud_model/web_image/redis.yml", "#{deploy_path}/config/redis.yml", guest: @guest, model: @model
@@ -31,7 +33,7 @@ module CloudModel
           end
           
           mkdir_p "#{deploy_path}/tmp"
-          @host.exec "cd #{base_path}#{@model.www_root}; rm current; ln -s #{deploy_id} current"
+          @host.exec! "cd #{base_path}#{@model.www_root} && rm current && ln -s #{deploy_id} current && touch current/tmp/restart.txt", "Failed to set current"
         end
       end
       
