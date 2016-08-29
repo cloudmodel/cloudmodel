@@ -4,37 +4,68 @@ require 'securerandom'
 module CloudModel
   module Services
     class NginxWorker < CloudModel::Services::BaseWorker
-      def deploy_web_image base_path=nil   
-        if @model.deploy_web_image
-          base_path ||= @guest.base_path
-          deploy_id = "#{Time.now.utc.strftime("%Y%m%d%H%M%S")}"
-          deploy_path = "#{base_path}#{@model.www_root}/#{deploy_id}"
-          mkdir_p deploy_path
+      
+      def unroll_web_image deploy_path
+        return false unless @model.deploy_web_image
         
-          puts "        Deploy WebImage #{@model.deploy_web_image.name} to #{deploy_path}"
-          temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
-          io = StringIO.new(@model.deploy_web_image.file.data)
-          @host.sftp.upload!(io, temp_file_name)
-          @host.exec "cd #{deploy_path} && tar xpf #{temp_file_name}"
-          @host.sftp.remove!(temp_file_name)
-          
-          mkdir_p "#{deploy_path}/config"
-          
-          if @model.deploy_web_image.has_mongodb?
-            render_to_remote "/cloud_model/web_image/mongoid.yml", "#{deploy_path}/config/mongoid.yml", guest: @guest, model: @model
-          end
+        mkdir_p deploy_path
+      
+        puts "        Deploy WebImage #{@model.deploy_web_image.name} to #{deploy_path}"
+        temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
+        io = StringIO.new(@model.deploy_web_image.file.data)
+        @host.sftp.upload!(io, temp_file_name)
+        @host.exec "cd #{deploy_path} && tar xpf #{temp_file_name}"
+        @host.sftp.remove!(temp_file_name)
         
-          if @model.deploy_web_image.has_redis?
-            if @model.deploy_redis_sentinel_set
-              render_to_remote "/cloud_model/web_image/sentinel.yml", "#{deploy_path}/config/redis.yml", guest: @guest, model: @model
-            else
-              render_to_remote "/cloud_model/web_image/redis.yml", "#{deploy_path}/config/redis.yml", guest: @guest, model: @model
-            end
-          end
-          
-          mkdir_p "#{deploy_path}/tmp"
-          @host.exec! "cd #{base_path}#{@model.www_root} && rm current && ln -s #{deploy_id} current && touch current/tmp/restart.txt", "Failed to set current"
+        mkdir_p "#{deploy_path}/config"
+        
+        if @model.deploy_web_image.has_mongodb?
+          render_to_remote "/cloud_model/web_image/mongoid.yml", "#{deploy_path}/config/mongoid.yml", guest: @guest, model: @model
         end
+      
+        if @model.deploy_web_image.has_redis?
+          if @model.deploy_redis_sentinel_set
+            render_to_remote "/cloud_model/web_image/sentinel.yml", "#{deploy_path}/config/redis.yml", guest: @guest, model: @model
+          else
+            render_to_remote "/cloud_model/web_image/redis.yml", "#{deploy_path}/config/redis.yml", guest: @guest, model: @model
+          end
+        end
+        
+        mkdir_p "#{deploy_path}/tmp"
+        @host.exec "touch #{deploy_path}/tmp/restart.txt"
+      end
+      
+      def make_deploy_web_image_id
+        "#{Time.now.utc.strftime("%Y%m%d%H%M%S")}"
+      end
+      
+      def deploy_web_image 
+        if @model.deploy_web_image
+          deploy_id = make_deploy_web_image_id
+          deploy_path = "#{@guest.deploy_path}#{@model.www_root}/#{deploy_id}"
+          
+          unroll_web_image deploy_path
+                
+          @host.exec! "cd #{@guest.deploy_path}#{@model.www_root}; rm current; ln -s #{deploy_id} current", "Failed to set current"
+        end
+      end
+      
+      def redeploy_web_image 
+        return false unless @model.deploy_web_image
+        
+        deploy_id = make_deploy_web_image_id
+        unroll_path = "/tmp/webimage_unroll_#{@model.id}"
+        deploy_path = "#{unroll_path}/var/www/rails/#{deploy_id}"
+        
+        @host.exec! "rm -rf #{unroll_path}", "Failed to clean unroll path"
+        mkdir_p deploy_path
+        unroll_web_image deploy_path
+        
+        @host.exec! "cd #{unroll_path} && tar c . | virsh lxc-enter-namespace #{@model.guest.name.shellescape} --noseclabel -- /bin/tar x", "Failed to transfer files"
+        @host.exec "rm -rf #{unroll_path}"
+        @model.guest.exec! "/bin/chown www:www #{@model.www_root}/#{deploy_id}", "Failed to set user to www "   
+        @model.guest.exec! "/bin/rm -f #{@model.www_root}/current", "Failed to remove old current"
+        @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"   
       end
       
       def write_config
@@ -94,7 +125,7 @@ module CloudModel
           @host.exec! "cp -ra #{key_file.shellescape} #{ssl_base_dir.shellescape}", "Failed to copy dhparam keys"            
         end
        
-        deploy_web_image @guest.deploy_path
+        deploy_web_image
               
         @host.exec "chmod -R 2775 #{@guest.deploy_path}#{@model.www_root}"
         chroot @guest.deploy_path, "chown -R www:www #{@model.www_root}"
