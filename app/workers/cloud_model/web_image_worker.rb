@@ -13,7 +13,7 @@ module CloudModel
         end
 
         begin
-          run_with_clean_env "Cloning", "git clone #{@web_image.git_server.shellescape}:#{@web_image.git_repo.shellescape} #{@web_image.build_path.shellescape}/current"
+          run_with_clean_env "Cloning", "git clone #{@web_image.git_server.shellescape}:#{@web_image.git_repo.shellescape} #{@web_image.build_path.shellescape}"
         rescue Exception => e
           CloudModel.log_exception e
           @web_image.update_attributes build_state: :failed, build_last_issue: "Unable to clone repository '#{@web_image.git_repo}'."
@@ -22,7 +22,7 @@ module CloudModel
         end
       end
       
-      git_script = "cd #{@web_image.build_path.shellescape}/current && "
+      git_script = "cd #{@web_image.build_path.shellescape} && "
       git_script += "git checkout #{@web_image.git_branch.shellescape} &&"
       git_script += "git pull"
       
@@ -35,7 +35,7 @@ module CloudModel
       end
       
       begin
-        @web_image.update_attribute :git_commit, run_with_clean_env("Get Version", "cd #{@web_image.build_path}/current && git log | head -1 | sed s/'commit '//")
+        @web_image.update_attribute :git_commit, run_with_clean_env("Get Version", "cd #{@web_image.build_path} && git log | head -1 | sed s/'commit '//")
       rescue Exception => e
         CloudModel.log_exception e
         @web_image.update_attribute :git_commit,  "failed to get commit hash"
@@ -46,7 +46,7 @@ module CloudModel
     
     def bundle_image
       begin
-        run_with_clean_env "Bundling", "cd #{@web_image.build_path.shellescape}/current && #{CloudModel.config.bundle_command} install --gemfile #{@web_image.build_path.shellescape}/current/Gemfile --path ../shared/bundle --deployment --without development test"
+        run_with_clean_env "Bundling", "cd #{@web_image.build_path.shellescape} && #{CloudModel.config.bundle_command} install --gemfile #{@web_image.build_path.shellescape}/Gemfile --path ./bundle --deployment --without development test"
       rescue CloudModel::ExecutionException => e
         CloudModel.log_exception e
         @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to build image.'      
@@ -59,13 +59,13 @@ module CloudModel
     
     def build_assets
       begin
-        system "rm -rf #{@web_image.build_path.shellescape}/current/public/assets"
+        system "rm -rf #{@web_image.build_path.shellescape}/public/assets"
         
-        run_with_clean_env "Building Assets", "cd #{@web_image.build_path.shellescape}/current && #{CloudModel.config.bundle_command} exec rake RAILS_ENV=production RAILS_GROUPS=assets assets:precompile"
+        run_with_clean_env "Building Assets", "cd #{@web_image.build_path.shellescape} && #{CloudModel.config.bundle_command} exec rake RAILS_ENV=production RAILS_GROUPS=assets assets:precompile"
       rescue CloudModel::ExecutionException => e
         CloudModel.log_exception e
         @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to build assets.'      
-        system "rm -rf #{@web_image.build_path}/current/public/assets"
+        system "rm -rf #{@web_image.build_path}/public/assets"
         return false
       end
       
@@ -74,7 +74,7 @@ module CloudModel
     
     def package_build
       begin
-        run_within_build_env "Packaging", "tar -cpjf #{@web_image.build_path.shellescape}-building.tar.bz2 --directory #{@web_image.build_path.shellescape} --exclude={'.git','./current/.gitignore','./current/tmp/**/*','./current/log/**/*','./spec','./features','.rspec','.gitkeep','./shared/bundle/#{Bundler.ruby_scope}/cache','./shared/bundle/#{Bundler.ruby_scope}/doc'} ."
+        run_within_build_env "Packaging", "tar -cpjf #{@web_image.build_path.shellescape}-building.tar.bz2 --directory #{@web_image.build_path.shellescape} --exclude={'.git','./.gitignore','./tmp/**/*','./log/**/*','./spec','./features','.rspec','.gitkeep','./bundle/#{Bundler.ruby_scope}/cache','.bundle/#{Bundler.ruby_scope}/doc'} ."
       rescue CloudModel::ExecutionException => e
         CloudModel.log_exception e
         @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to package image.'      
@@ -89,7 +89,10 @@ module CloudModel
       return false unless @web_image.build_state == :pending or options[:force]
       @web_image.update_attributes build_state: :running, build_last_issue: nil    
        
-       
+      if options[:clean]
+        system "rm -rf #{@web_image.build_path.shellescape}"
+      end
+      
       begin 
         @web_image.update_attributes build_state: :checking_out
         unless checkout_git
@@ -151,7 +154,7 @@ module CloudModel
             
       Bundler.with_original_env do
         ENV.delete_if { | k, _ | k[0, 7] == "BUNDLE_" } 
-        ENV["BUNDLE_GEMFILE"] = "#{@web_image.build_path}/current/Gemfile"
+        ENV["BUNDLE_GEMFILE"] = "#{@web_image.build_path}/Gemfile"
         ENV["PATH"] += ':/usr/local/bin'
         ENV["GEM_PATH"] += ":/usr/local/lib/ruby/gems/#{Gem.ruby_api_version}:/usr/lib/ruby/gems/#{Gem.ruby_api_version}"
         ENV["RUBYLIB"] = nil

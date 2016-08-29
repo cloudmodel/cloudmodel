@@ -163,9 +163,9 @@ module CloudModel
     
     def unpack_root_image
       
-      ubuntu_version = "15.10"
-      ubuntu_image = "ubuntu-core-#{ubuntu_version}-core-amd64.tar.gz"
-      ubuntu_url = "http://cdimage.ubuntu.com/ubuntu-core/releases/#{ubuntu_version}/release/#{ubuntu_image}"
+      ubuntu_version = "16.04.1"
+      ubuntu_image = "ubuntu-base-#{ubuntu_version}-base-amd64.tar.gz"
+      ubuntu_url = "http://cdimage.ubuntu.com/ubuntu-base/releases/#{ubuntu_version}/release/#{ubuntu_image}"
       
       begin
         @host.sftp.stat!("/inst/#{ubuntu_image}")
@@ -184,6 +184,9 @@ module CloudModel
       @host.exec! "sed -i \"s/^deb-src/# deb-src/\" #{@guest.deploy_path}/etc/apt/sources.list", "Failed to set disable deb-src" unless CloudModel.config.ubuntu_deb_src
       # Don't start services on install
       render_to_remote "/cloud_model/support/usr/sbin/policy-rc.d", "#{@guest.deploy_path}/usr/sbin/policy-rc.d", 0755
+      # Don't install docs
+      render_to_remote  "/cloud_model/support/etc/dpkg/dpkg.cfg.d/01_nodoc", "#{@guest.deploy_path}/etc/dpkg/dpkg.cfg.d/01_nodoc"
+
       
       
       # Update package list
@@ -200,35 +203,7 @@ module CloudModel
       chroot! @guest.deploy_path, "update-locale LANG=en_US.UTF-8 LC_MESSAGES=POSIX", "Failed to update locale"
      
       # Tool for setting serial console size in terminal; call on virsh console to fix terminal size
-      render_to_remote "/cloud_model/guest/bin/fixterm.sh", "#{@guest.deploy_path}/bin/fixterm", 0755
-     
-     
-      #
-      # apt-get install ruby -q -y
-      #
-      ##   MAIL!!!
-      ##
-      ##   openjdk-8-jre-headless tomcat8
-      ##   redis-server
-      ##   mongodb
-      ##   ssh (installs python, search for better alt)
-      ##   shinken graphite-web python-pyxmpp
-      ## 
-      ## 
-      ### NGINX+Passenger
-      #
-      # apt-get install apt-transport-https ca-certificates -y
-      #  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 561F9B9CAC40B2F7
-      ## Write to /etc/apt/sources.list.d/passenger.list
-      # deb https://oss-binaries.phusionpassenger.com/apt/passenger wily main
-      ## Update packages including passenger
-      # chown root: /etc/apt/sources.list.d/passenger.list
-      # chmod 600 /etc/apt/sources.list.d/passenger.list
-      # apt-get update
-      ## Install
-      ##   nginx-extras 
-      ##   passenger (!!)
-      ## 
+      render_to_remote "/cloud_model/guest/bin/fixterm.sh", "#{@guest.deploy_path}/bin/fixterm", 0755   
     end
 
     def config_guest

@@ -4,6 +4,37 @@ require 'securerandom'
 module CloudModel
   module Services
     class NginxWorker < CloudModel::Services::BaseWorker
+      def deploy_web_image base_path=nil   
+        if @model.deploy_web_image
+          base_path ||= @guest.base_path
+          deploy_id = "#{Time.now.to_i}"
+          deploy_path = "#{base_path}#{@model.www_root}/#{deploy_id}"
+          mkdir_p deploy_path
+        
+          puts "        Deploy WebImage #{@model.deploy_web_image.name} to #{deploy_path}"
+          temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
+          io = StringIO.new(@model.deploy_web_image.file.data)
+          @host.sftp.upload!(io, temp_file_name)
+          @host.exec "cd #{deploy_path} && tar xpf #{temp_file_name}"
+          @host.sftp.remove!(temp_file_name)
+          
+          if @model.deploy_web_image.has_mongodb?
+            render_to_remote "/cloud_model/web_image/mongoid.yml", "#{deploy_path}/config/mongoid.yml", guest: @guest, model: @model
+          end
+        
+          if @model.deploy_web_image.has_redis?
+            if @model.deploy_redis_sentinel
+              render_to_remote "/cloud_model/web_image/sentinel.yml", "#{deploy_path}/config/redis.yml", guest: @guest, model: @model
+            else
+              render_to_remote "/cloud_model/web_image/redis.yml", "#{deploy_path}/config/redis.yml", guest: @guest, model: @model
+            end
+          end
+          
+          mkdir_p "#{deploy_path}/tmp"
+          @host.exec "cd #{base_path}#{@model.www_root}; rm current; ln -s #{deploy_id} current"
+        end
+      end
+      
       def write_config
         puts "        Install nginx"
         chroot! @guest.deploy_path, "apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 561F9B9CAC40B2F7", "Failed to add fusion key"
@@ -61,24 +92,7 @@ module CloudModel
           @host.exec! "cp -ra #{key_file.shellescape} #{ssl_base_dir.shellescape}", "Failed to copy dhparam keys"            
         end
        
-        if @model.deploy_web_image
-          mkdir_p "#{@guest.deploy_path}#{@model.www_root}/current"
-        
-          puts "        Deploy WebImage #{@model.deploy_web_image.name} to #{@guest.deploy_path}#{@model.www_root}"
-          temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
-          io = StringIO.new(@model.deploy_web_image.file.data)
-          @host.sftp.upload!(io, temp_file_name)
-          @host.exec "cd #{@guest.deploy_path}#{@model.www_root} && tar xpf #{temp_file_name}"
-          @host.sftp.remove!(temp_file_name)
-          
-          if @model.deploy_web_image.has_mongodb?
-            render_to_remote "/cloud_model/web_image/mongoid.yml", "#{@guest.deploy_path}#{@model.www_root}/current/config/mongoid.yml", guest: @guest, model: @model
-          end
-        
-          if @model.deploy_web_image.has_redis?
-            render_to_remote "/cloud_model/web_image/redis.yml", "#{@guest.deploy_path}#{@model.www_root}/current/config/redis.yml", guest: @guest, model: @model
-          end
-        end
+        deploy_web_image @guest.deploy_path
               
         @host.exec "chmod -R 2775 #{@guest.deploy_path}#{@model.www_root}"
         chroot @guest.deploy_path, "chown -R www:www #{@model.www_root}"

@@ -33,21 +33,34 @@ module CloudModel
         plugins_dir = '/usr/lib/nagios/plugins'
         
         puts "        Install shinken and graphite-web"
-        packages = %w(shinken nagios-plugins) # Shicken Base
-        packages += %w(shinken-mod-logstore-mongodb shinken-mod-mongodb shinken-mod-retention-mongodb) # Shinken MongoDB
-        packages += %w(shinken-mod-graphite shinken-mod-ui-graphite graphite-carbon graphite-web) # Graphite/Carbon
-        packages += %w(shinken-mod-livestatus) # Livestatus 
-       # packages += %w(python-xmpp) # XMPP notifications # Broken in 15.04
-        packages += %w(python-pip) # Use pip to install xmpp
+        packages = %w(nagios-plugins)
+        # packages = %w(shinken) # Shicken Base
+        # packages += %w(shinken-mod-logstore-mongodb shinken-mod-mongodb shinken-mod-retention-mongodb) # Shinken MongoDB
+        # packages += %w(shinken-mod-graphite shinken-mod-ui-graphite )
+        packages += %w(mongodb-clients python-pycurl)
+        packages += %w(graphite-carbon graphite-web) # Graphite/Carbon
+        # packages += %w(shinken-mod-livestatus) # Livestatus
+        packages += %w(python-pip git) # Use pip to install xmpp and shinken
         
         packages += %w(ruby-snmp ruby-mongo ruby-nokogiri ruby-redis) # Ruby deps for check scripts
         
         python_site_packages_path = '/usr/lib/python2.7/dist-packages'
         
-        chroot! @guest.deploy_path, "apt-get install #{packages * ' '} -y", "Failed to install mongodb"
+        chroot! @guest.deploy_path, "apt-get install #{packages * ' '} -y", "Failed to install shinken deps"
         chroot! @guest.deploy_path, "python2 /usr/bin/pip install git+https://github.com/ArchipelProject/xmpppy", 'Unable to install python graphite-web'
         #chroot! @guest.deploy_path, "python2 /usr/bin/pip install shinken --upgrade", "Failed to upgrade shinken"
+        
+        chroot! @guest.deploy_path, "useradd shinken", "Failed to add user shinken"
+        chroot! @guest.deploy_path, "pip install --upgrade pip", "Failed to update pip"
+        chroot! @guest.deploy_path, "pip install pycurl", "Failed to update pycurl"
+        chroot! @guest.deploy_path, "pip install shinken --install-option=\"--install-scripts=/usr/bin\"", "Failed to install shinken"       
         chroot! @guest.deploy_path, "shinken --init", "Failed to init shinken"
+        chroot! @guest.deploy_path, "shinken install livestatus", "Failed to install shinken mod livestatus"
+        chroot! @guest.deploy_path, "shinken install webui", "Failed to install shinken mod webui"
+        chroot! @guest.deploy_path, "shinken install mongodb", "Failed to install shinken mod mongodb"
+        chroot! @guest.deploy_path, "shinken install graphite", "Failed to install shinken mod graphite"
+        chroot! @guest.deploy_path, "shinken install ui-graphite", "Failed to install shinken mod ui-graphite"
+        
         
         write_hosts_config
            

@@ -98,6 +98,11 @@ module CloudModel
       end
     end
     
+    def build!(options = {})      
+      web_image_worker = CloudModel::WebImageWorker.new self
+      web_image_worker.build options
+    end
+    
   end
 end
   
