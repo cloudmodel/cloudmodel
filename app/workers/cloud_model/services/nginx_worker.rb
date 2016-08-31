@@ -50,22 +50,34 @@ module CloudModel
         end
       end
       
-      def redeploy_web_image 
-        return false unless @model.deploy_web_image
+      def redeploy_web_image options={}
+        return false unless options[:force] or (@model.deploy_web_image and @model.redeploy_web_image_state == :pending)
         
-        deploy_id = make_deploy_web_image_id
-        unroll_path = "/tmp/webimage_unroll_#{@model.id}"
-        deploy_path = "#{unroll_path}/var/www/rails/#{deploy_id}"
+        @model.update_attributes redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil    
         
-        @host.exec! "rm -rf #{unroll_path}", "Failed to clean unroll path"
-        mkdir_p deploy_path
-        unroll_web_image deploy_path
-        
-        @host.exec! "cd #{unroll_path} && tar c . | virsh lxc-enter-namespace #{@model.guest.name.shellescape} --noseclabel -- /bin/tar x", "Failed to transfer files"
-        @host.exec "rm -rf #{unroll_path}"
-        @model.guest.exec! "/bin/chown www:www #{@model.www_root}/#{deploy_id}", "Failed to set user to www "   
-        @model.guest.exec! "/bin/rm -f #{@model.www_root}/current", "Failed to remove old current"
-        @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"   
+        puts "  Deploy to #{@guest.name}: #{@model.name}"
+        begin      
+          deploy_id = make_deploy_web_image_id
+          unroll_path = "/tmp/webimage_unroll_#{@model.id}"
+          deploy_path = "#{unroll_path}/var/www/rails/#{deploy_id}"
+
+          @host.exec! "rm -rf #{unroll_path}", "Failed to clean unroll path"
+          mkdir_p deploy_path
+          unroll_web_image deploy_path
+
+          @host.exec! "cd #{unroll_path} && tar c . | virsh lxc-enter-namespace #{@model.guest.name.shellescape} --noseclabel -- /bin/tar x", "Failed to transfer files"
+          @host.exec "rm -rf #{unroll_path}"
+          @model.guest.exec! "/bin/chown www:www #{@model.www_root}/#{deploy_id}", "Failed to set user to www "
+          
+          @model.guest.exec! "/bin/rm -f #{@model.www_root}/current", "Failed to remove old current"
+          @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"
+          @model.guest.exec! "/bin/touch #{@model.www_root}/current/tmp/restart.txt", "Failed to restart service"
+        rescue Exception => e
+          CloudModel.log_exception e
+          @model.update_attributes redeploy_web_image_state: :failed, redeploy_web_image_last_issue: "#{e}" 
+          return false     
+        end
+        @model.update_attributes redeploy_web_image_state: :finished
       end
       
       def write_config

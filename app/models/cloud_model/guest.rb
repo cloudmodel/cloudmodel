@@ -129,6 +129,19 @@ module CloudModel
       host.exec! "LANG=en.UTF-8 /usr/bin/virsh lxc-enter-namespace --noseclabel #{name.shellescape} -- #{command}", message
     end
     
+    def ls directory
+      res = exec("/bin/ls -l #{directory.shellescape}")
+      
+      pp res
+      
+      if res[0]
+        res[1].split("\n")
+      else
+        puts res[1]
+        false
+      end
+    end
+    
     def virsh cmd, options = []
       option_string = ''
       options = [options] if options.is_a? String

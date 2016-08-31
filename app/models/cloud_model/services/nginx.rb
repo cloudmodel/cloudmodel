@@ -1,6 +1,8 @@
 module CloudModel
   module Services
     class Nginx < Base
+      include CloudModel::ENumFields
+
       field :port, type: Integer, default: 80
       field :ssl_supported, type: Mongoid::Boolean#, default: false
       field :ssl_only, type: Mongoid::Boolean, default: false
@@ -14,6 +16,17 @@ module CloudModel
       field :capistrano_supported, type: Mongoid::Boolean, default: false
       
       belongs_to :deploy_web_image, class_name: 'CloudModel::WebImage', inverse_of: :services
+      
+      enum_field :redeploy_web_image_state, values: {
+        0x00 => :pending,
+        0x01 => :running,
+        0xf0 => :finished,
+        0xf1 => :failed,
+        0xff => :not_started
+      }, default: :not_started
+    
+      field :redeploy_web_image_last_issue, type: String
+      
       
       field :deploy_mongodb_host, type: String
       field :deploy_mongodb_port, type: Integer, default: 27017
@@ -49,6 +62,35 @@ module CloudModel
       
       def kind
         :http
+      end
+      
+      def self.redeployable_redeploy_web_image_states
+        [:finished, :failed, :not_started]
+      end    
+    
+      def redeployable?
+        self.class.redeployable_redeploy_web_image_states.include? redeploy_web_image_state
+      end
+    
+    
+      def redeploy(options = {})
+        unless redeployable? or options[:force]
+          return false
+        end
+      
+        update_attribute :redeploy_web_image_state, :pending
+
+        begin
+          CloudModel::call_rake 'cloudmodel:services:nginx:redeploy', guest_id: guest.id, service_id: id
+        rescue Exception => e
+          update_attributes redeploy_web_image_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
+          CloudModel.log_exception e
+        end
+      end
+    
+      def redeploy!(options = {})
+        worker = CloudModel::Services::NginxWorker.new self.guest, self
+        worker.redeploy_web_image options
       end
       
       def shinken_services_append

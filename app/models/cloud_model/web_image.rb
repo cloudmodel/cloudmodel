@@ -37,6 +37,16 @@ module CloudModel
     }, default: :not_started
     
     field :build_last_issue, type: String
+    
+    enum_field :redeploy_state, values: {
+      0x00 => :pending,
+      0x01 => :running,
+      0xf0 => :finished,
+      0xf1 => :failed,
+      0xff => :not_started
+    }, default: :not_started
+    
+    field :redeploy_last_issue, type: String
 
     belongs_to :file, class_name: "Mongoid::GridFS::Fs::File"
     
@@ -46,6 +56,16 @@ module CloudModel
     validates :git_branch, presence: true
     
     used_in_guests_as 'services.deploy_web_image_id'
+    
+    def services
+      services = []
+      used_in_guests.each do |guest| 
+        guest.services.where('deploy_web_image_id': id).each do |service|
+          services << service
+        end
+      end
+      services
+    end
     
     def file_size
       file.try :length
@@ -103,6 +123,39 @@ module CloudModel
       web_image_worker.build options
     end
     
+    def self.redeployable_redeploy_states
+      [:finished, :failed, :not_started]
+    end    
+    
+    def redeployable?
+      self.class.redeployable_redeploy_states.include? redeploy_state
+    end
+    
+    def redeploy(options = {})
+      unless redeployable? or options[:force]
+        return false
+      end
+      
+      update_attribute :redeploy_state, :pending
+      
+      services.each do |service|
+        if service.redeployable? or options[:force]
+          service.update_attributes redeploy_web_image_state: :pending
+        end
+      end
+
+      begin
+        CloudModel::call_rake 'cloudmodel:web_image:redeploy', web_image_id: id
+      rescue Exception => e
+        update_attributes redeploy_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
+        CloudModel.log_exception e
+      end
+    end
+    
+    def redeploy!(options = {})
+      web_image_worker = CloudModel::WebImageWorker.new self
+      web_image_worker.redeploy options
+    end
   end
 end
   

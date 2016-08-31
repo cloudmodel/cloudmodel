@@ -45,6 +45,21 @@ de:
     finished: Abgeschlossen
     failed: Fehlgeschlagen
   
+  cloud_model/web_image/redeploy_state:  
+    not_started: Nicht beauftragt
+    pending: Geplant
+    running: Wird installiert
+    finished: Abgeschlossen
+    failed: Fehlgeschlagen
+   
+  cloud_model/services/nginx/redeploy_web_image_state:  
+    undefined: Nicht Definiert
+    not_started: Nicht beauftragt
+    pending: Geplant
+    running: Wird installiert
+    finished: Abgeschlossen
+    failed: Fehlgeschlagen
+
   cloud_model/services/nginx:
     deploy_redis_sentinel_set_manual: Eigene Redis Konfiguration      
       
@@ -216,6 +231,8 @@ de:
         has_redis: Redis verwenden?
         build_state: Erstellungsstatus
         build_last_issue: Letztes Problem bei der Erstellung
+        redeploy_state: Ausrollstatus
+        redeploy_last_issue: Letztes Problem beim Ausrollen
       cloud_model/war_image:
         name: Name
         file: WAR Image Datei
@@ -255,6 +272,9 @@ de:
         capistrano_supported: Capistrano unterstützen
       
         deploy_web_image: Web Image installieren
+
+        redeploy_web_image_state: Ausrollstatus
+        redeploy_web_image_last_issue: Letztes Problem beim Ausrollen
       
         deploy_mongodb_host: MongoDB Host
         deploy_mongodb_port: MongoDB Port

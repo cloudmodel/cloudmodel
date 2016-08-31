@@ -1,6 +1,6 @@
 namespace :cloudmodel do
   desc "Backup marked services and volumes"
-  task :backup do
+  task :backup => [:environment] do
     CloudModel::Guest.all.map{|guest| guest.backup}
   end
   
@@ -84,7 +84,7 @@ namespace :cloudmodel do
         end
       end
     end
-    
+        
     desc "Backup guest"
     task :backup => [:environment, :load_guest] do
       @guest.backup
@@ -107,12 +107,38 @@ namespace :cloudmodel do
   
   namespace :web_image do
     task :load_web_image do
+      raise "No env variable WEB_IMAGE_ID given" unless ENV['WEB_IMAGE_ID']
       @web_image_worker = CloudModel::WebImageWorker.new CloudModel::WebImage.find(ENV['WEB_IMAGE_ID'])
     end
     
     desc "Build WebImage"
     task :build => [:environment, :load_web_image] do
       @web_image_worker.build
+    end
+    
+    desc "Redeploy app to all guests using WebImage"
+    task :redeploy => [:environment, :load_web_image] do
+      @web_image_worker.redeploy
+    end
+  end
+  
+  namespace :services do
+    namespace :nginx do
+      task :load_web_image do
+        raise "No env variable GUEST_ID given" unless ENV['GUEST_ID']
+        raise "No env variable SERVICE_ID given" unless ENV['SERVICE_ID']
+        @guest = CloudModel::Guest.find ENV['GUEST_ID']
+        @nginx_service = @guest.services.find ENV['SERVICE_ID']
+        raise "Not an nginx service with webimage" unless @nginx_service._type == "CloudModel::Services::Nginx" and @nginx_service.web_image_id
+        
+        @nginx_worker = CloudModel::Services::NginxWorker.new @nginx_service
+      end
+        
+      desc "Redeploy app to Nginx"
+      task :redeploy => [:environment, :load_web_image] do
+        @nginx_worker.redeploy
+      end
+      
     end
   end
   

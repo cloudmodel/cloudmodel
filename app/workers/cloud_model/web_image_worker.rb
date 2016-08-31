@@ -131,6 +131,29 @@ module CloudModel
       return true
     end
     
+    def redeploy options={}      
+      return false unless @web_image.redeploy_state == :pending or options[:force]
+      @web_image.update_attributes redeploy_state: :running, redeploy_last_issue: nil    
+      puts "Redeploy WebImage #{@web_image.name}"
+      begin
+        services = @web_image.services
+
+        services.each do |service|
+          if service.redeployable? or options[:force]
+            service.update_attributes redeploy_web_image_state: :pending
+          end
+        end
+        services.each do |service|
+          service.redeploy! options
+        end
+      rescue Exception => e
+        CloudModel.log_exception e
+        @web_image.update_attributes redeploy_state: :failed, redeploy_last_issue: "#{e}"      
+        return false
+      end
+      @web_image.update_attributes redeploy_state: :finished
+    end
+    
     def run_within_build_env step, command      
       orig_bundler_bin_path = ENV['BUNDLE_BIN_PATH']
       orig_rubyopt = ENV['RUBYOPT']
