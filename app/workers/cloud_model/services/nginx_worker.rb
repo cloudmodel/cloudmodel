@@ -67,7 +67,7 @@ module CloudModel
 
           @host.exec! "cd #{unroll_path} && tar c . | virsh lxc-enter-namespace #{@model.guest.name.shellescape} --noseclabel -- /bin/tar x", "Failed to transfer files"
           @host.exec "rm -rf #{unroll_path}"
-          @model.guest.exec! "/bin/chown www:www #{@model.www_root}/#{deploy_id}", "Failed to set user to www "
+          @model.guest.exec! "/bin/chown -R www:www #{@model.www_root}/#{deploy_id}", "Failed to set user to www "
           
           @model.guest.exec! "/bin/rm -f #{@model.www_root}/current", "Failed to remove old current"
           @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"
