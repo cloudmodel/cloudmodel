@@ -100,6 +100,15 @@ en:
       cloud_model/redis_sentinel_set:
         one: Redis Sentinel Set
         other: Redis Sentinel Sets
+      cloud_model/guest_core_template:
+        one: Guest Core Template
+        other: Guest Core Templates
+      cloud_model/guest_template:
+        one: Guest Template
+        other: Guest Templates
+      cloud_model/guest_template_type:
+        one: Guest Template Type
+        other: Guest Template Types
       cloud_model/web_image:
         one: Web Image
         other: Web Images
@@ -217,6 +226,24 @@ en:
       cloud_model/redis_sentinel_set:
         name: Set Name
         services: Services
+      cloud_model/guest_core_template:
+        id: Template Name
+        build_state: Build State
+        os_version: Version of OS
+        arch: Architecture
+        templates: Templates based on this
+        created_at: Created at
+      cloud_model/guest_template_type:
+        name: Template Type
+        components: Provides Components
+      cloud_model/guest_template:
+        id: Template Name
+        build_state: Build State
+        os_version: Version of OS
+        arch: Architecture
+        core_template: Using Core Template
+        template_type: Template Type
+        created_at: Created at
       cloud_model/web_image:
         name: Name
         git_server: GIT Server

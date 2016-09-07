@@ -100,12 +100,21 @@ de:
       cloud_model/redis_sentinel_set:
         one: Redis Replikationset
         other: Redis Replikationsets
+      cloud_model/guest_core_template:
+        one: Kerntemplate für Gästetemplates
+        other: Kerntemplates für Gästetemplates
+      cloud_model/guest_template:
+        one: Gästetemplate
+        other: Gästetemplates
+      cloud_model/guest_template_type:
+        one: Gästtemplateart
+        other: Gästtemplatearten
       cloud_model/web_image:
-        one: Web Image
-        other: Web Images
+        one: Webpaket
+        other: Webpakete
       cloud_model/war_image:
-        one: WAR Image
-        other: WAR Images      
+        one: WAR-Paket
+        other: WAR-Pakete     
       cloud_model/services/base:
         one: Dienst
         other: Dienste
@@ -218,6 +227,24 @@ de:
       cloud_model/redis_sentinel_set:
         name: Setname
         services: Dienste
+      cloud_model/guest_core_template:
+        id: Bezeichner
+        build_state: Erstellungsstatus
+        os_version: Betriebssystemversion
+        arch: Architektur
+        templates: Templates basierend auf Kerntemplate
+        created_at: Erzeugt am
+      cloud_model/guest_template_type:
+        name: Templateart
+        components: Komponenten beinhaltet
+      cloud_model/guest_template:
+        id: Bezeichner
+        build_state: Erstellungsstatus
+        os_version: Betriebssystemversion
+        arch: Architektur
+        core_template: Benutztes Kerntemplate
+        template_type: Templateart
+        created_at: Erzeugt am
       cloud_model/web_image:
         name: Name
         git_server: GIT Server

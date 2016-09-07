@@ -7,7 +7,7 @@ module CloudModel
     field :os_version
     field :arch
     
-    has_many :guest_templates, class_name: "CloudModel::GuestTemplate"
+    has_many :templates, class_name: "CloudModel::GuestTemplate"
         
     enum_field :build_state, values: {
       0x00 => :pending,
