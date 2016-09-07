@@ -11,6 +11,7 @@ module CloudModel
     field :tinc_public_key, type: String
     field :initial_root_pw, type: String
     field :cpu_count, type: Integer, default: -1
+    field :arch, default: 'amd64'
 
     enum_field :stage, values: {
       0x00 => :pending,

@@ -10,6 +10,10 @@ module CloudModel
         :redis
       end
       
+      def components_needed
+        [:redis]
+      end
+      
       def shinken_services_append
         ', redis'
       end

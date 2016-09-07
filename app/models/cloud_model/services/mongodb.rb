@@ -8,6 +8,10 @@ module CloudModel
         :mongodb
       end
       
+      def components_needed
+        [:mongodb]
+      end
+      
       def shinken_services_append
         ', mongodb'
       end

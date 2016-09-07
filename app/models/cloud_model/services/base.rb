@@ -37,6 +37,10 @@ module CloudModel
         :unknown
       end
       
+      def components_needed
+        []
+      end
+      
       def shinken_services_append
         nil
       end

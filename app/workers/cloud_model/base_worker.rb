@@ -130,6 +130,30 @@ module CloudModel
       end
       result
     end
+    
+    def download_template template
+      # Download build template to local distribution  
+      tarball_target = "#{CloudModel.config.data_directory}#{template.tarball}"   
+      FileUtils.mkdir_p File.dirname(tarball_target)
+      command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa root@#{@host.ssh_address}:#{template.tarball.shellescape} #{tarball_target.shellescape}"
+      Rails.logger.debug command
+      local_exec! command, "Failed to download built template"
+    end
+    
+    def upload_template template
+      # Upload build template to host
+      srcball_target = "#{CloudModel.config.data_directory}#{template.tarball}"  
+      mkdir_p File.dirname(template.tarball)
+      command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa #{srcball_target.shellescape} root@#{@host.ssh_address}:#{template.tarball.shellescape}"
+      Rails.logger.debug command
+      local_exec! command, "Failed to upload built template"
+    end
+  
+    def upsync_templates
+      command = "rsync -avz -e 'ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' #{CloudModel.config.data_directory.shellescape}/inst/templates root@#{@host.ssh_address}:/inst/templates"
+      Rails.logger.debug command
+      local_exec! command, 'Failed to upsync templates'
+    end
   
     def build_tar src, dst, options = {}
       def parse_param param, value

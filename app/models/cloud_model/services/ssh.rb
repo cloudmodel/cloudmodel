@@ -10,6 +10,10 @@ module CloudModel
         :ssh
       end
       
+      def components_needed
+        [] # ssh is default to core
+      end
+      
       def shinken_services_append
         ', ssh'
       end

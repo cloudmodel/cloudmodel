@@ -7,13 +7,6 @@ module CloudModel
       def write_config
         target = "#{@guest.deploy_path}/var/tomcat" 
         
-        puts "        Install tomcat"
-        chroot! @guest.deploy_path, "apt-get install openjdk-8-jre-headless tomcat8 tomcat8-admin -y", "Failed to install tomcat"
-        # Fix Ubuntu bug
-        # https://bugs.launchpad.net/ubuntu/+source/ca-certificates-java/+bug/1396760
-        chroot! @guest.deploy_path, "/var/lib/dpkg/info/ca-certificates-java.postinst configure", "Failed to config CA certs for tomcat"
-
-        
         puts "        Deploy WAR Image #{@model.deploy_war_image.name} to #{@guest.deploy_path}#{target}"
         temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
         io = StringIO.new(@model.deploy_war_image.file.data)
@@ -55,8 +48,6 @@ module CloudModel
     
       def auto_start
         puts "        Add Tomcat to runlevel default"
-        render_to_remote "/cloud_model/guest/bin/tomcat8", "#{@guest.deploy_path}/usr/sbin/tomcat8", 0755
-        render_to_remote "/cloud_model/guest/etc/systemd/system/tomcat8.service", "#{@guest.deploy_path}/etc/systemd/system/tomcat8.service"       
         @host.exec "ln -sf /etc/systemd/system/tomcat8.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
 
         mkdir_p overlay_path

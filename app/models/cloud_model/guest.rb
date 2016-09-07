@@ -34,16 +34,6 @@ module CloudModel
     
     field :deploy_last_issue, type: String
     
-    enum_field :build_state, values: {
-      0x00 => :pending,
-      0x01 => :running,
-      0xf0 => :finished,
-      0xf1 => :failed,
-      0xff => :not_started
-    }, default: :not_started
-    
-    field :build_last_issue, type: String
-    
     accept_size_strings_for :memory_size
       
     validates :name, presence: true, uniqueness: { scope: :host }, format: {with: /\A[a-z0-9\-_]+\z/}
@@ -158,6 +148,23 @@ module CloudModel
     
     def has_service?(service_type)
       services.select{|s| s._type == service_type}.count > 0
+    end
+    
+    def components_needed
+      components = []
+      services.each do |service|
+        components += service.components_needed
+      end
+      
+      components.uniq.sort{|a,b| a<=>b}
+    end
+    
+    def template_type
+      CloudModel::GuestTemplateType.find_or_create_by components: components_needed
+    end
+    
+    def template
+      template_type.last_useable(host)
     end
     
     def shinken_services_append
@@ -340,26 +347,6 @@ module CloudModel
       end      
       
       success
-    end
-    
-    # TODO: Move build related stuff to a GuestImage and a Guest uses a GuestImage than
-    def buildable?
-      [:finished, :failed, :not_started].include? build_state
-    end
-    
-    def build(options = {})
-      unless buildable? or options[:force]
-        return false
-      end
-      
-      update_attribute :build_state, :pending
-      
-      begin
-        CloudModel::call_rake 'cloudmodel:guest:build_image', host_id: host_id, guest_id: id
-      rescue Exception => e
-        update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
-        CloudModel.log_exception e
-      end
     end
     
     private  

@@ -9,6 +9,10 @@ module CloudModel
         :http
       end
       
+      def components_needed
+        [:java, :tomcat]
+      end
+      
       def shinken_services_append
         ', tomcat'
       end

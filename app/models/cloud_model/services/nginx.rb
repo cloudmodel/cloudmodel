@@ -93,6 +93,14 @@ module CloudModel
         worker.redeploy_web_image options
       end
       
+      def components_needed
+        if passenger_supported or capistrano_supported
+          [:nginx, :ruby]
+        else
+          [:nginx]
+        end
+      end
+      
       def shinken_services_append
         services_string = ''
         unless ssl_only

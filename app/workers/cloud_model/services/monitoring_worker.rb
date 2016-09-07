@@ -32,36 +32,6 @@ module CloudModel
       def write_config
         plugins_dir = '/usr/lib/nagios/plugins'
         
-        puts "        Install shinken and graphite-web"
-        packages = %w(nagios-plugins)
-        # packages = %w(shinken) # Shicken Base
-        # packages += %w(shinken-mod-logstore-mongodb shinken-mod-mongodb shinken-mod-retention-mongodb) # Shinken MongoDB
-        # packages += %w(shinken-mod-graphite shinken-mod-ui-graphite )
-        packages += %w(mongodb-clients python-pycurl)
-        packages += %w(graphite-carbon graphite-web) # Graphite/Carbon
-        # packages += %w(shinken-mod-livestatus) # Livestatus
-        packages += %w(python-pip git) # Use pip to install xmpp and shinken
-        
-        packages += %w(ruby-snmp ruby-mongo ruby-nokogiri ruby-redis) # Ruby deps for check scripts
-        
-        python_site_packages_path = '/usr/lib/python2.7/dist-packages'
-        
-        chroot! @guest.deploy_path, "apt-get install #{packages * ' '} -y", "Failed to install shinken deps"
-        chroot! @guest.deploy_path, "python2 /usr/bin/pip install git+https://github.com/ArchipelProject/xmpppy", 'Unable to install python graphite-web'
-        #chroot! @guest.deploy_path, "python2 /usr/bin/pip install shinken --upgrade", "Failed to upgrade shinken"
-        
-        chroot! @guest.deploy_path, "useradd shinken", "Failed to add user shinken"
-        chroot! @guest.deploy_path, "pip install --upgrade pip", "Failed to update pip"
-        chroot! @guest.deploy_path, "pip install pycurl", "Failed to update pycurl"
-        chroot! @guest.deploy_path, "pip install shinken --install-option=\"--install-scripts=/usr/bin\"", "Failed to install shinken"       
-        chroot! @guest.deploy_path, "shinken --init", "Failed to init shinken"
-        chroot! @guest.deploy_path, "shinken install livestatus", "Failed to install shinken mod livestatus"
-        chroot! @guest.deploy_path, "shinken install webui", "Failed to install shinken mod webui"
-        chroot! @guest.deploy_path, "shinken install mongodb", "Failed to install shinken mod mongodb"
-        chroot! @guest.deploy_path, "shinken install graphite", "Failed to install shinken mod graphite"
-        chroot! @guest.deploy_path, "shinken install ui-graphite", "Failed to install shinken mod ui-graphite"
-        
-        
         write_hosts_config
            
         puts "        Write shinken config"
@@ -101,6 +71,9 @@ module CloudModel
         render_to_remote "/cloud_model/guest/graphite/passenger_wsgi.py", "#{@guest.deploy_path}/usr/lib/python2.7/dist-packages/graphite/passenger_wsgi.py", 0755, service: @model         
            
         render_to_remote "/cloud_model/guest/etc/shinken/shinken.cfg", "#{@guest.deploy_path}/etc/shinken/shinken.cfg"
+        render_to_remote "/cloud_model/guest/etc/shinken/resource.cfg", "#{@guest.deploy_path}/etc/shinken/resource.cfg"
+        render_to_remote "/cloud_model/guest/etc/shinken/timeperiods.cfg", "#{@guest.deploy_path}/etc/shinken/timeperiods.cfg"
+        render_to_remote "/cloud_model/guest/etc/shinken/templates.cfg", "#{@guest.deploy_path}/etc/shinken/templates.cfg"
 
         render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/snmp_helpers.rb", "#{@guest.deploy_path}#{plugins_dir}/snmp_helpers.rb", 0700
         %w(https ssh).each do |check_name|
@@ -112,16 +85,7 @@ module CloudModel
           render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/commands/check_#{check_name}.cfg"
           render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/services/#{check_name}.cfg"
         end
-        chroot! @guest.deploy_path, "chown -R shinken:shinken #{plugins_dir}", 'Failed to assign check scripts to shinken user'
-      
-        puts "        Setup systemd startup files"
-        render_to_remote "/cloud_model/guest/etc/tmpfiles.d/shinken.conf", "#{@guest.deploy_path}/etc/tmpfiles.d/shinken.conf"         
-        %w(shinken-arbiter shinken-broker shinken-poller shinken-reactionner shinken-receiver shinken-scheduler).each do |service|
-          render_to_remote "/cloud_model/guest/etc/systemd/system/#{service}.service", "#{@guest.deploy_path}/etc/systemd/system/#{service}.service"         
-        end
-        # disable shinken init.d start scripts
-        @host.exec "rm #{@guest.deploy_path.shellescape}/etc/rc?.d/?01shinken*"
-        @host.exec "rm #{@guest.deploy_path.shellescape}/etc/init.d/shinken*"   
+        chroot! @guest.deploy_path, "chown -R shinken:shinken #{plugins_dir}", 'Failed to assign check scripts to shinken user' 
       end
       
       def auto_start

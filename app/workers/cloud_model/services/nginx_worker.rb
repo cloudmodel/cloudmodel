@@ -80,23 +80,7 @@ module CloudModel
         @model.update_attributes redeploy_web_image_state: :finished
       end
       
-      def write_config
-        puts "        Install nginx"
-        chroot! @guest.deploy_path, "apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 561F9B9CAC40B2F7", "Failed to add fusion key"
-        chroot! @guest.deploy_path, "apt-get install apt-transport-https ca-certificates -y", "Failed to install ca-certificates"
-        render_to_remote "/cloud_model/guest/etc/apt/sources.list.d/passenger.list", "#{@guest.deploy_path}/etc/apt/sources.list.d/passenger.list", 600
-        chroot! @guest.deploy_path, "apt-get update", "Failed to update packages"
-        chroot! @guest.deploy_path, "apt-get install nginx-extras passenger -y", "Failed to install nginx+passenger"
-      
-        puts "        Install ruby deps"
-        packages = %w(git bundler)
-        packages += %w(zlib1g-dev libxml2-dev) # Nokogiri
-        packages << 'ruby-bcrypt' # bcrypt      
-        packages << 'nodejs' # JS interpreter 
-        packages << 'imagemagick' # imagemagick (TODO: needed for some rails projects, make this configurable)
-        packages << 'libxml2-utils' # xmllint (TODO: needed for some rails projects, make this configurable)
-        chroot! @guest.deploy_path, "apt-get install #{packages * ' '} -y", "Failed to install packeges for deployment of rails app"
-         
+      def write_config         
         puts "        Config nginx"
                 
         render_to_remote "/cloud_model/guest/etc/nginx/nginx.conf", "#{@guest.deploy_path}/etc/nginx/nginx.conf", guest: @guest, model: @model      

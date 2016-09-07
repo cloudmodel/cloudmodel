@@ -1,10 +1,7 @@
 module CloudModel
   module Services
     class SshWorker < CloudModel::Services::BaseWorker
-      def write_config
-        puts "        Install SSH"
-        chroot! @guest.deploy_path, "apt-get install ssh -y", "Failed to install SSH"
-        
+      def write_config        
         puts "        Write SSH config"
         @host.sftp.file.open(File.expand_path("etc/ssh/sshd_config", @guest.deploy_path), 'w') do |f|
           f.write render("/cloud_model/guest/etc/ssh/sshd_config", guest: @guest, model: @model)
@@ -22,7 +19,8 @@ module CloudModel
           begin
             @host.sftp.lstat! "#{ssh_host_key_source}/#{key_file}"
           rescue Net::SFTP::StatusException => e
-            #chroot! @guest.deploy_path, "ssh-keygen -t #{type} -f /etc/ssh/#{key_file.shellescape} -N ''", 'Failed to generate host keys'
+            puts "          Generate #{type} SSH key"
+            chroot! @guest.deploy_path, "ssh-keygen -t #{type} -f /etc/ssh/#{key_file.shellescape} -N ''", 'Failed to generate host keys'
             @host.exec! "cp -ra #{ssh_host_key_target.shellescape}/ssh/#{key_file}* #{ssh_host_key_source.shellescape} ", "Failed to copy new host keys to inst"        
           end
         end

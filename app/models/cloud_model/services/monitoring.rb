@@ -7,6 +7,10 @@ module CloudModel
         :monitoring
       end
       
+      def components_needed
+        [:shinken]
+      end
+      
       def port
         7767
       end

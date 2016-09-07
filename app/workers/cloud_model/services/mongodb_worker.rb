@@ -3,9 +3,6 @@ module CloudModel
     class MongodbWorker < CloudModel::Services::BaseWorker
       def write_config
         target = '/var/lib/mongodb'
-
-        puts "        Install mongodb"
-        chroot! @guest.deploy_path, "apt-get install libreadline5 mongodb -y", "Failed to install mongodb"
       
         puts "        Write mongodb config"
         @host.sftp.file.open("#{@guest.deploy_path.shellescape}/etc/mongodb.conf", 'w') do |f|

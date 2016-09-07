@@ -9,7 +9,7 @@
 define module {
     module_name     ui-graphite
     module_type     graphite-webui
-    uri             http://<%= service.guest.private_address %>/  ; Set your Graphite URI. Note : YOURSERVERNAME will be
+    uri             https://<%= service.guest.private_address %>/  ; Set your Graphite URI. Note : YOURSERVERNAME will be
                                             ; changed by your broker hostname
     templates_path  /var/lib/shinken/share/templates/graphite/
     # Optionally specify a source identifier for the metric data sent to

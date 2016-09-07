@@ -162,56 +162,23 @@ module CloudModel
     end
     
     def unpack_root_image
-      
-      ubuntu_version = "16.04.1"
-      ubuntu_image = "ubuntu-base-#{ubuntu_version}-base-amd64.tar.gz"
-      ubuntu_url = "http://cdimage.ubuntu.com/ubuntu-base/releases/#{ubuntu_version}/release/#{ubuntu_image}"
-      
+      puts "    Unpack Template"
+      template = @guest.template
+                  
       begin
-        @host.sftp.stat!("/inst/#{ubuntu_image}")
+        @host.sftp.stat!("#{template.tarball}")
       rescue
-        puts "    Download Ubutu Core #{ubuntu_version}"
-        @host.exec! "cd /inst && curl #{ubuntu_url.shellescape} -o /inst/#{ubuntu_image}", "Failed to download ubuntu image"
+        puts '      Uploading template'
+        upload_template template
       end
-
-      puts "    Populate system with image"
-      @host.exec! "cd #{@guest.deploy_path} && tar xzpf /inst/#{ubuntu_image}", "Failed to unpack system image!"
-      # Copy resolv.conf
-      @host.exec! "cp /etc/resolv.conf #{@guest.deploy_path}/etc", "Failed to copy resolve conf"
-      # Enable universe sources
-      @host.exec! "sed -i \"/^# deb.*universe/ s/^# //\" #{@guest.deploy_path}/etc/apt/sources.list", "Failed to activate universe sources"
-      @host.exec! "sed -i \"s*http://archive.ubuntu.com/ubuntu/*#{CloudModel.config.ubuntu_mirror}*\" #{@guest.deploy_path}/etc/apt/sources.list", "Failed to set ubutu mirror"
-      @host.exec! "sed -i \"s/^deb-src/# deb-src/\" #{@guest.deploy_path}/etc/apt/sources.list", "Failed to set disable deb-src" unless CloudModel.config.ubuntu_deb_src
-      # Don't start services on install
-      render_to_remote "/cloud_model/support/usr/sbin/policy-rc.d", "#{@guest.deploy_path}/usr/sbin/policy-rc.d", 0755
-      # Don't install docs
-      render_to_remote  "/cloud_model/support/etc/dpkg/dpkg.cfg.d/01_nodoc", "#{@guest.deploy_path}/etc/dpkg/dpkg.cfg.d/01_nodoc"
-
       
-      
-      # Update package list
-      puts "    Update core system"
-      chroot! @guest.deploy_path, "apt-get update && apt-get upgrade -y", "Failed to update sources"
-      
-      # Autologin
-      puts "    Config autologin"
-      mkdir_p "#{@guest.deploy_path}/etc/systemd/system/console-getty.service.d"
-      render_to_remote "/cloud_model/guest/etc/systemd/system/console-getty.service.d/autologin.conf", "#{@guest.deploy_path}/etc/systemd/system/console-getty.service.d/autologin.conf"
-      
-      # Set locale
-      chroot! @guest.deploy_path, "localedef -i en_US -c -f UTF-8 en_US.UTF-8", "Failed to define locale"
-      chroot! @guest.deploy_path, "update-locale LANG=en_US.UTF-8 LC_MESSAGES=POSIX", "Failed to update locale"
-     
-      # Tool for setting serial console size in terminal; call on virsh console to fix terminal size
-      render_to_remote "/cloud_model/guest/bin/fixterm.sh", "#{@guest.deploy_path}/bin/fixterm", 0755   
+      @host.exec! "cd #{@guest.deploy_path.shellescape} && tar xf #{template.tarball.shellescape}", 'Failed to unpack template'
     end
 
     def config_guest
       puts "  Prepare VM"
 
       begin
-        puts "    Install network base system"
-        chroot! @guest.deploy_path, "apt-get install netbase -y", "Failed to install network base system"
         puts "    Write network config"
         mkdir_p "#{@guest.deploy_path}/etc/network/interfaces.d"
         render_to_remote "/cloud_model/guest/etc/network/interfaces.d/lo", "#{@guest.deploy_path}/etc/network/interfaces.d/lo"
