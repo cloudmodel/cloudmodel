@@ -35,15 +35,30 @@ namespace :cloudmodel do
       @host_worker.update_tinc_host_files
     end
   end
-  
-  namespace :guest_image do
+
+  namespace :guest_core_template do
     task :load_host do
-      @host_worker = CloudModel::Images::GuestWorker.new CloudModel::Guest.find(ENV['GUEST_ID'])
+      @host = CloudModel::Host.find(ENV['HOST_ID'])
+      @template = CloudModel::GuestCoreTemplate.find(ENV['TEMPLATE_ID'])
+      @guest_template_worker = CloudModel::GuestTemplateWorker.new @host
     end
     
-    desc "Build host image"
-    task :build_image => [:environment, :load_host] do
-      @host_worker.build_image
+    desc "Build guest core template"
+    task :build => [:environment, :load_host] do
+      @guest_template_worker.build_core_template @template
+    end
+  end
+
+  namespace :guest_template do
+    task :load_host do
+      @host = CloudModel::Host.find(ENV['HOST_ID'])
+      @template = CloudModel::GuestTemplate.find(ENV['TEMPLATE_ID'])
+      @guest_template_worker = CloudModel::GuestTemplateWorker.new @host
+    end
+    
+    desc "Build guest template"
+    task :build => [:environment, :load_host] do
+      @guest_template_worker.build_template @template
     end
   end
   

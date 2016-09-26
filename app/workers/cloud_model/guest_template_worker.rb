@@ -14,14 +14,16 @@ module CloudModel
       ], C: build_path
     end
     
-    def build_core_template options={}
+    def build_core_template template, options={}
       ubuntu_version = "16.04.1"
-      ubuntu_arch = "amd64"
+      ubuntu_arch = template.arch
       ubuntu_image = "ubuntu-base-#{ubuntu_version}-base-#{ubuntu_arch}.tar.gz"
       ubuntu_url = "http://cdimage.ubuntu.com/ubuntu-base/releases/#{ubuntu_version}/release/#{ubuntu_image}"
 
-      template = CloudModel::GuestCoreTemplate.create build_state: 'running', os_version: "ubuntu-#{ubuntu_version}", arch: ubuntu_arch
       build_path = "/inst/templates/build/core/#{template.id}"
+      
+      return false unless template.build_state == :pending or options[:force]
+      template.update_attributes build_state: :running, os_version: "ubuntu-#{ubuntu_version}"
       
       begin  
         mkdir_p build_path
@@ -83,8 +85,6 @@ module CloudModel
         template.update_attribute :build_state, :downloading
         download_template template
         
-        # TODO: Sync templates
-        
         template.update_attribute :build_state, :finished
       rescue Exception => e
         CloudModel.log_exception e
@@ -101,16 +101,14 @@ module CloudModel
     end
     
     def build_template(template, options={})
-      return false unless template.build_state == :pending  
+      return false unless template.build_state == :pending or options[:force]
       template.update_attribute :build_state, :running
     
       begin
         build_path = "/inst/templates/build/#{template.template_type.id}/#{template.id}"      
         
         mkdir_p build_path
-        
-        # TODO: Sync templates
-        
+                
         begin
           @host.sftp.stat!("#{template.core_template.tarball}")
         rescue
@@ -151,16 +149,6 @@ module CloudModel
       @host.exec "rm -rf #{build_path.shellescape}"
       
       return template
-    end
-    
-    def build_new_template(template_type, options={})
-      core_template = CloudModel::GuestCoreTemplate.last_useable(@host)
-      template = template_type.templates.create(
-        build_state: 'pending',
-        core_template: core_template,
-        arch: core_template.arch
-      )
-      build_template template, options
     end
   end
 end
