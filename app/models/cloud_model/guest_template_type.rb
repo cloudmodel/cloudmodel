@@ -11,7 +11,6 @@ module CloudModel
     def new_template host
       core_template = CloudModel::GuestCoreTemplate.last_useable(host)
       templates.create(
-        build_state: 'pending',
         core_template: core_template,
         arch: core_template.arch
       )
@@ -19,6 +18,7 @@ module CloudModel
     
     def build_new_template!(host, options={})
       template = new_template(host)
+      template.build_state = :pending
       template.build! host, options
       template
     end

@@ -33,15 +33,21 @@ module CloudModel
     }, default: :not_started
     
     field :deploy_last_issue, type: String
+    attr_accessor :deploy_path, :deploy_volume
+    def deploy_volume
+      @deploy_volume ||= root_volume
+    end
     
+    def deploy_path
+      @deploy_path ||= base_path
+    end
+        
     accept_size_strings_for :memory_size
       
     validates :name, presence: true, uniqueness: { scope: :host }, format: {with: /\A[a-z0-9\-_]+\z/}
     validates :host, presence: true
     validates :root_volume, presence: true
     validates :private_address, presence: true
-    
-    attr_accessor :deploy_path, :deploy_volume
     
     before_validation :set_dhcp_private_address, :on => :create
     before_validation :set_root_volume_name
@@ -69,14 +75,6 @@ module CloudModel
     
     def base_path
       "/vm/#{name}"
-    end
-    
-    def deploy_volume
-      @deploy_volume ||= root_volume
-    end
-    
-    def deploy_path
-      @deploy_path ||= base_path
     end
    
     def config_root_path

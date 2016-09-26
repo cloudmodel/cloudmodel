@@ -30,7 +30,7 @@ module CloudModel
     end
     
     def self.new_template_to_build host
-      CloudModel::GuestCoreTemplate.create build_state: 'pending', arch: host.arch
+      CloudModel::GuestCoreTemplate.create arch: host.arch
     end
     
     def self.build!(host, options={})
@@ -42,7 +42,7 @@ module CloudModel
         return false
       end
 
-      update_attribute build_state: :pending, arch: host.arch
+      update_attributes build_state: :pending, arch: host.arch
 
       begin
         CloudModel::call_rake 'cloudmodel:guest_core_template:build', host_id: host.id, template_id: id
@@ -60,7 +60,9 @@ module CloudModel
     def self.last_useable(host, options={})
       template = self.where(arch: host.arch, build_state_id: 0xf0).last
       unless template
-        template = build!(host, options)
+        template = new_template_to_build
+        tamplate.build_state = :pending
+        template.build!(host, options)
       end
       template
     end
