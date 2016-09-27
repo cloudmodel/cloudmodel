@@ -7,7 +7,7 @@ module CloudModel
         # packages = %w(shinken) # Shicken Base
         # packages += %w(shinken-mod-logstore-mongodb shinken-mod-mongodb shinken-mod-retention-mongodb) # Shinken MongoDB
         # packages += %w(shinken-mod-graphite shinken-mod-ui-graphite )
-        packages += %w(mongodb-clients python-pymongo python-pycurl)
+        packages += %w(mongodb-clients python-pycurl)
         packages += %w(graphite-carbon graphite-web) # Graphite/Carbon
         # packages += %w(shinken-mod-livestatus) # Livestatus
         packages += %w(python-pip git) # Use pip to install xmpp and shinken
@@ -22,8 +22,9 @@ module CloudModel
         
         chroot! build_path, "useradd shinken", "Failed to add user shinken"
         chroot! build_path, "pip install --upgrade pip", "Failed to update pip"
-        chroot! build_path, "pip install pycurl", "Failed to update pycurl"
-        chroot! build_path, "pip install shinken --install-option=\"--install-scripts=/usr/bin\"", "Failed to install shinken"       
+        chroot! build_path, "pip install pymongo==2.7.2", "Failed to install pymongo 2.7.2"
+        chroot! build_path, "pip install pycurl", "Failed to install pycurl"
+        chroot! build_path, "pip install shinken==2.0.3 --install-option=\"--install-scripts=/usr/bin\"", "Failed to install shinken 2.0.3"       
         chroot! build_path, "shinken --init", "Failed to init shinken"
         
         %w(livestatus webui mongodb logstore-mongodb mod-mongodb retention-mongodb graphite ui-graphite auth-cfg-password).each do |service|

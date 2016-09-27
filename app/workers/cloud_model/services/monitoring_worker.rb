@@ -37,6 +37,7 @@ module CloudModel
         puts "        Write shinken config"
         #render_to_remote "/cloud_model/guest/etc/shinken/arbiters/arbiter.cfg", "#{@guest.deploy_path}/etc/shinken/arbiters/arbiter.cm.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/brokers/broker.cfg", "#{@guest.deploy_path}/etc/shinken/brokers/broker.cfg", service: @model
+        render_to_remote "/cloud_model/guest/etc/shinken/brokers/commands.cfg", "#{@guest.deploy_path}/etc/shinken/brokers/commands.cfg", service: @model
         #render_to_remote "/cloud_model/guest/etc/shinken/schedulers/scheduler.cfg", "#{@guest.deploy_path}/etc/shinken/schedulers/scheduler.cm.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/livestatus.cfg", "#{@guest.deploy_path}/etc/shinken/modules/livestatus.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/webui.cfg", "#{@guest.deploy_path}/etc/shinken/modules/webui.cfg", service: @model
