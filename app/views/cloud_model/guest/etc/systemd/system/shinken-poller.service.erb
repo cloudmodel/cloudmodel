@@ -3,8 +3,7 @@ Description=Shinken Poller
 After=syslog.target
 
 [Service]
-#Type=forking
-ExecStart=/usr/bin/shinken-poller -c /etc/shinken/daemons/pollerd.ini
+ExecStart=/usr/bin/shinken-poller -r -c /etc/shinken/daemons/pollerd.ini
 
 [Install]
 WantedBy=multi-user.target

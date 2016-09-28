@@ -146,14 +146,14 @@ host.exec! "echo \"D /var/run/graphite 0755 graphite graphite\" > #{build_dir}/e
 
         chroot! build_dir, "shinken --init", 'Unable to init shinken'
 
-        chroot! build_dir, "shinken install graphite", 'Unable to install shinken graphite'
+        chroot! build_dir, "shinken install graphite2", 'Unable to install shinken graphite'
         chroot! build_dir, "shinken install mod-mongodb", 'Unable to install shinken mod-mongodb'
         chroot! build_dir, "shinken install logstore-mongodb", 'Unable to install shinken logstore-mongodb'
         chroot! build_dir, "shinken install livestatus", 'Unable to install shinken livestatus'
 
         chroot! build_dir, "shinken install webui", 'Unable to install shinken webui'
         chroot! build_dir, "shinken install auth-cfg-password", 'Unable to install shinken auth-cfg-password'
-        chroot! build_dir, "shinken install ui-graphite", 'Unable to install shinken ui-graphite'
+        chroot! build_dir, "shinken install ui-graphite2", 'Unable to install shinken ui-graphite'
 
         chroot! build_dir, "shinken install http", 'Unable to install shinken http'
         chroot! build_dir, "shinken install ssh", 'Unable to install shinken ssh'

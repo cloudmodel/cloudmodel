@@ -7,7 +7,7 @@ module CloudModel
         # packages = %w(shinken) # Shicken Base
         # packages += %w(shinken-mod-logstore-mongodb shinken-mod-mongodb shinken-mod-retention-mongodb) # Shinken MongoDB
         # packages += %w(shinken-mod-graphite shinken-mod-ui-graphite )
-        packages += %w(mongodb-clients python-pycurl)
+        packages += %w(mongodb-clients python-pycurl python-sqlite python-cherrypy3)
         packages += %w(graphite-carbon graphite-web) # Graphite/Carbon
         # packages += %w(shinken-mod-livestatus) # Livestatus
         packages += %w(python-pip git) # Use pip to install xmpp and shinken
@@ -22,14 +22,28 @@ module CloudModel
         
         chroot! build_path, "useradd shinken", "Failed to add user shinken"
         chroot! build_path, "pip install --upgrade pip", "Failed to update pip"
-        chroot! build_path, "pip install pymongo==2.7.2", "Failed to install pymongo 2.7.2"
-        chroot! build_path, "pip install pycurl", "Failed to install pycurl"
-        chroot! build_path, "pip install shinken==2.0.3 --install-option=\"--install-scripts=/usr/bin\"", "Failed to install shinken 2.0.3"       
+        [
+          "pymongo>=3.0.3",
+          "requests",
+          "arrow",
+          "bottle==0.12.8",
+          "pycurl",
+          "passlib",
+        ].each do |pip_package|
+          chroot! build_path, "pip install #{pip_package}", "Failed to install #{pip_package}"
+        end
+        
+        # chroot! build_path, "pip install pymongo==2.7.2", "Failed to install pymongo 2.7.2"
+        # chroot! build_path, "pip install pycurl", "Failed to install pycurl"
+        # chroot! build_path, "pip install bottle==0.12.8", "Failed to install bottle"
+        chroot! build_path, "pip install shinken --install-option=\"--install-scripts=/usr/bin\"", "Failed to install shinken"       
         chroot! build_path, "shinken --init", "Failed to init shinken"
         
-        %w(livestatus webui mongodb logstore-mongodb mod-mongodb retention-mongodb graphite ui-graphite auth-cfg-password).each do |service|
+        %w(http ssh livestatus webui2 logstore-sqlite mod-mongodb retention-mongodb graphite2 ui-graphite2 auth-cfg-password named-pipe).each do |service|
           chroot! build_path, "shinken install #{service}", "Failed to install shinken mod #{service}"
-        end  
+        end
+        
+        chroot! build_path, "chmod u+s /usr/lib/nagios/plugins/check_icmp", "Failed to suid check_icmp"
         
         puts "        Setup systemd startup files"
         render_to_remote "/cloud_model/guest/etc/tmpfiles.d/shinken.conf", "#{build_path}/etc/tmpfiles.d/shinken.conf"         

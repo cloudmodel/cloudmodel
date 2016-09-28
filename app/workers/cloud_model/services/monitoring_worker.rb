@@ -30,15 +30,15 @@ module CloudModel
       end
       
       def write_config
-        plugins_dir = '/usr/lib/nagios/plugins'
+        #plugins_dir = '/usr/lib/nagios/plugins'
+        plugins_dir = '/var/lib/shinken/libexec'
         
         write_hosts_config
            
         puts "        Write shinken config"
-        #render_to_remote "/cloud_model/guest/etc/shinken/arbiters/arbiter.cfg", "#{@guest.deploy_path}/etc/shinken/arbiters/arbiter.cm.cfg", service: @model
-        render_to_remote "/cloud_model/guest/etc/shinken/brokers/broker.cfg", "#{@guest.deploy_path}/etc/shinken/brokers/broker.cfg", service: @model
-        render_to_remote "/cloud_model/guest/etc/shinken/brokers/commands.cfg", "#{@guest.deploy_path}/etc/shinken/brokers/commands.cfg", service: @model
-        #render_to_remote "/cloud_model/guest/etc/shinken/schedulers/scheduler.cfg", "#{@guest.deploy_path}/etc/shinken/schedulers/scheduler.cm.cfg", service: @model
+        #render_to_remote "/cloud_model/guest/etc/shinken/arbiters/arbiter-master.cfg", "#{@guest.deploy_path}/etc/shinken/arbiters/arbiter-master.cfg", service: @model
+        render_to_remote "/cloud_model/guest/etc/shinken/brokers/broker-master.cfg", "#{@guest.deploy_path}/etc/shinken/brokers/broker-master.cfg", service: @model
+        #render_to_remote "/cloud_model/guest/etc/shinken/schedulers/scheduler-master.cfg", "#{@guest.deploy_path}/etc/shinken/schedulers/scheduler-master.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/livestatus.cfg", "#{@guest.deploy_path}/etc/shinken/modules/livestatus.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/webui.cfg", "#{@guest.deploy_path}/etc/shinken/modules/webui.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/modules/ui-graphite.cfg", "#{@guest.deploy_path}/etc/shinken/modules/ui-graphite.cfg", service: @model
@@ -47,21 +47,21 @@ module CloudModel
         render_to_remote "/cloud_model/guest/etc/graphite/carbon.conf", "#{@guest.deploy_path}/etc/graphite/carbon.conf", 0544
         render_to_remote "/cloud_model/guest/etc/graphite/storage-schemas.conf", "#{@guest.deploy_path}/etc/graphite/storage-schemas.conf", 0544
                           
-        puts "        Write notification config"  
         mkdir_p "#{@guest.deploy_path}/etc/shinken/commands"
         mkdir_p "#{@guest.deploy_path}/etc/shinken/contacts"
         mkdir_p "#{@guest.deploy_path}/etc/shinken/contactgroups"
         mkdir_p "#{@guest.deploy_path}/etc/shinken/notificationways"
         mkdir_p "#{@guest.deploy_path}/etc/shinken/services"
         mkdir_p plugins_dir
-        
+
+        puts "        Write notification config"        
         render_to_remote "/cloud_model/guest/etc/shinken/contactgroups/admin.cfg", "#{@guest.deploy_path}/etc/shinken/contactgroups/admins.cfg", service: @model
         render_to_remote "/cloud_model/guest/etc/shinken/contacts/admin.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/admin.cfg", service: @model
         
         if CloudModel.config.uses_xmpp?
           render_to_remote "/cloud_model/guest/etc/shinken/contacts/xmpp.cfg", "#{@guest.deploy_path}/etc/shinken/contacts/xmpp.cfg", service: @model
           render_to_remote "/cloud_model/guest/etc/shinken/notificationways/xmpp.cfg", "#{@guest.deploy_path}/etc/shinken/notificationways/xmpp.cfg", service: @model
-          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmpp.py", "#{@guest.deploy_path}#{plugins_dir}/notify_by_xmpp.py", 0700
+          #render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmpp.py", "#{@guest.deploy_path}#{plugins_dir}/notify_by_xmpp.py", 0700
           render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/notify_by_xmpp.ini", "#{@guest.deploy_path}#{plugins_dir}/notify_by_xmpp.ini", 0600
         end
             
@@ -72,12 +72,15 @@ module CloudModel
         render_to_remote "/cloud_model/guest/graphite/passenger_wsgi.py", "#{@guest.deploy_path}/usr/lib/python2.7/dist-packages/graphite/passenger_wsgi.py", 0755, service: @model         
            
         render_to_remote "/cloud_model/guest/etc/shinken/shinken.cfg", "#{@guest.deploy_path}/etc/shinken/shinken.cfg"
-        render_to_remote "/cloud_model/guest/etc/shinken/resource.cfg", "#{@guest.deploy_path}/etc/shinken/resource.cfg"
-        render_to_remote "/cloud_model/guest/etc/shinken/timeperiods.cfg", "#{@guest.deploy_path}/etc/shinken/timeperiods.cfg"
-        render_to_remote "/cloud_model/guest/etc/shinken/templates.cfg", "#{@guest.deploy_path}/etc/shinken/templates.cfg"
+        #render_to_remote "/cloud_model/guest/etc/shinken/commands.cfg", "#{@guest.deploy_path}/etc/shinken/commands.cfg", service: @model
+        #render_to_remote "/cloud_model/guest/etc/shinken/resource.cfg", "#{@guest.deploy_path}/etc/shinken/resource.cfg"
+        #render_to_remote "/cloud_model/guest/etc/shinken/timeperiods.cfg", "#{@guest.deploy_path}/etc/shinken/timeperiods.cfg"
+        #render_to_remote "/cloud_model/guest/etc/shinken/templates.cfg", "#{@guest.deploy_path}/etc/shinken/templates.cfg"
 
-        render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/snmp_helpers.rb", "#{@guest.deploy_path}#{plugins_dir}/snmp_helpers.rb", 0700
-        %w(https ssh).each do |check_name|
+        %w(shinken_helpers check_mk_helpers snmp_helpers check_disks_snmp).each do |file_name
+          render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/#{file_name}.rb", "#{@guest.deploy_path}#{plugins_dir}/#{filename}.rb", 0700
+        end
+        %w(https).each do |check_name|
           render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/commands/check_#{check_name}.cfg"
           render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/services/#{check_name}.cfg"
         end

@@ -3,8 +3,7 @@ Description=Shinken Arbiter
 After=syslog.target
 
 [Service]
-Type=forking
-ExecStart=/usr/bin/shinken-arbiter -d -r -c /etc/shinken/shinken.cfg
+ExecStart=/usr/bin/shinken-arbiter -r -c /etc/shinken/shinken.cfg
 
 [Install]
 WantedBy=multi-user.target

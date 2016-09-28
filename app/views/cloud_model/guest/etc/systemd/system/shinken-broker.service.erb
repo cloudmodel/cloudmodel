@@ -3,8 +3,7 @@ Description=Shinken Broker
 After=syslog.target
 
 [Service]
-Type=forking
-ExecStart=/usr/bin/shinken-broker -d -c /etc/shinken/daemons/brokerd.ini
+ExecStart=/usr/bin/shinken-broker -r -c /etc/shinken/daemons/brokerd.ini
 
 [Install]
 WantedBy=multi-user.target
