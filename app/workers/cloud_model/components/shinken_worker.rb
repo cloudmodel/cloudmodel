@@ -4,12 +4,8 @@ module CloudModel
       def build build_path
         puts "        Install shinken and graphite-web"
         packages = %w(nagios-plugins)
-        # packages = %w(shinken) # Shicken Base
-        # packages += %w(shinken-mod-logstore-mongodb shinken-mod-mongodb shinken-mod-retention-mongodb) # Shinken MongoDB
-        # packages += %w(shinken-mod-graphite shinken-mod-ui-graphite )
         packages += %w(mongodb-clients python-pycurl python-sqlite python-cherrypy3)
         packages += %w(graphite-carbon graphite-web) # Graphite/Carbon
-        # packages += %w(shinken-mod-livestatus) # Livestatus
         packages += %w(python-pip git) # Use pip to install xmpp and shinken
         
         packages += %w(ruby-snmp ruby-mongo ruby-nokogiri ruby-redis) # Ruby deps for check scripts
@@ -18,7 +14,6 @@ module CloudModel
         
         chroot! build_path, "apt-get install #{packages * ' '} -y", "Failed to install shinken deps"
         chroot! build_path, "python2 /usr/bin/pip install git+https://github.com/ArchipelProject/xmpppy", 'Unable to install python graphite-web'
-        #chroot! build_path, "python2 /usr/bin/pip install shinken --upgrade", "Failed to upgrade shinken"
         
         chroot! build_path, "useradd shinken", "Failed to add user shinken"
         chroot! build_path, "pip install --upgrade pip", "Failed to update pip"
@@ -33,9 +28,6 @@ module CloudModel
           chroot! build_path, "pip install #{pip_package}", "Failed to install #{pip_package}"
         end
         
-        # chroot! build_path, "pip install pymongo==2.7.2", "Failed to install pymongo 2.7.2"
-        # chroot! build_path, "pip install pycurl", "Failed to install pycurl"
-        # chroot! build_path, "pip install bottle==0.12.8", "Failed to install bottle"
         chroot! build_path, "pip install shinken --install-option=\"--install-scripts=/usr/bin\"", "Failed to install shinken"       
         chroot! build_path, "shinken --init", "Failed to init shinken"
         
