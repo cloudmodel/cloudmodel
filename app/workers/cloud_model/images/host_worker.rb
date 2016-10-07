@@ -62,6 +62,7 @@ module CloudModel
           dev-python/pip
         )
         
+        # SNMP
         emerge! %w(
           net-analyzer/net-snmp
         )
@@ -73,6 +74,20 @@ module CloudModel
         end
         render_to_remote "/cloud_model/host/etc/snmp/snmpd.conf", "#{build_dir}/etc/snmp/snmpd.conf"
         
+        # check_mk
+        emerge! %w(
+          net-analyzer/check_mk
+        )
+        
+        render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk@.service", "#{build_path}/etc/systemd/system/check_mk@.service"     
+        render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk.socket", "#{build_path}/etc/systemd/system/check_mk.socket"     
+        mkdir_p "#{build_path}/etc/systemd/system/sockets.target.wants"
+        chroot! build_path, "ln -s /etc/systemd/system/check_mk.socket /etc/systemd/system/sockets.target.wants/check_mk.socket", "Failed to add check_mk to autostart"
+
+        %w(smart lvm).each do |file|
+          render_to_remote "/cloud_model/host/usr/lib/check_mk_plugins/#{file}", "#{build_dir}/usr/lib/check_mk_plugins/#{file}", 0755
+        end
+
       end
       
       def emerge_fs_tools

@@ -80,10 +80,6 @@ warnings = []
 
 require 'socket'
 
-puts "connect to #{options[:host]}"
-
-   
-
 result = query_check_mk(options[:host], 'df')
 
 data = parse_df result
