@@ -51,7 +51,7 @@ module CloudModel
     
     before_validation :set_dhcp_private_address, :on => :create
     before_validation :set_root_volume_name
-    #after_save :deploy
+    before_destroy    :undefine
     
     VM_STATES = {
       -1 => :undefined,
