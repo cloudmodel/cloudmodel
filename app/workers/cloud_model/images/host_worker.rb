@@ -62,18 +62,6 @@ module CloudModel
           dev-python/pip
         )
         
-        # SNMP
-        emerge! %w(
-          net-analyzer/net-snmp
-        )
-        
-        chroot! build_dir, "python2 /usr/bin/pip install snmp_passpersist", 'Failed to install snmp passpersist'
-        
-        %w(df.py mdstat.py smart.py vg.py vm_info.py).each do |file|
-          render_to_remote "/cloud_model/host/etc/snmp/#{file}", "#{build_dir}/etc/snmp/#{file}", 0755
-        end
-        render_to_remote "/cloud_model/host/etc/snmp/snmpd.conf", "#{build_dir}/etc/snmp/snmpd.conf"
-        
         # check_mk
         emerge! %w(
           net-analyzer/check_mk
@@ -130,7 +118,6 @@ module CloudModel
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/tincd@.service /etc/systemd/system/multi-user.target.wants/tincd@vpn.service", 'Failed to put Tinc daemon to autostart'
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/libvirtd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put libvirt daemon to autostart'
         chroot! build_dir, "ln -sf /usr/lib/systemd/system/ntpd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put ntp daemon to autostart'
-        chroot! build_dir, "ln -sf /usr/lib/systemd/system/snmpd.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put snmp daemon to autostart'
  
         chroot! build_dir, "ln -s /usr/lib/systemd/system/exim.service /etc/systemd/system/multi-user.target.wants/", 'Failed to put exim to autostart'
 
@@ -177,9 +164,6 @@ module CloudModel
 
         mkdir_p "#{build_dir}/etc/system/nullmailer.service.d"
         render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{build_dir}/etc/system/nullmailer.service.d/restart.conf"
-        
-        mkdir_p "#{build_dir}/etc/system/snmpd.service.d"
-        render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{build_dir}/etc/system/snmpd.service.d/restart.conf"
       end
 
       def package_boot

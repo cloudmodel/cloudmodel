@@ -29,7 +29,6 @@ module CloudModel
           sys-apps/iproute2
           net-misc/curl
           dev-vcs/git
-          net-analyzer/net-snmp
           mail-mta/ssmtp
         )
         # Tool for setting serial console size in terminal; call on virsh console to fix terminal size
@@ -158,7 +157,6 @@ host.exec! "echo \"D /var/run/graphite 0755 graphite graphite\" > #{build_dir}/e
         chroot! build_dir, "shinken install http", 'Unable to install shinken http'
         chroot! build_dir, "shinken install ssh", 'Unable to install shinken ssh'
 
-        chroot! build_dir, "gem install snmp", 'Unable to install ruby snmp gem'
         chroot! build_dir, "gem install redis", 'Unable to install ruby redis gem'
         chroot! build_dir, "gem install bson_ext mongo", 'Unable to install ruby mongo gem'
         chroot! build_dir, "gem install nokogiri -- --use-system-libraries", 'Unable to install ruby nokogiri gem'

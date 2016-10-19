@@ -74,7 +74,7 @@ module CloudModel
            
         render_to_remote "/cloud_model/guest/etc/shinken/shinken.cfg", "#{@guest.deploy_path}/etc/shinken/shinken.cfg"
 
-        %w(shinken_helpers check_mk_helpers snmp_helpers).each do |file_name|
+        %w(shinken_helpers check_mk_helpers).each do |file_name|
           render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/#{file_name}.rb", "#{@guest.deploy_path}#{plugins_dir}/#{file_name}.rb", 0700
         end
         %w(https).each do |check_name|

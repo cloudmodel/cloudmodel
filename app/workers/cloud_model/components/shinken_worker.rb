@@ -8,7 +8,7 @@ module CloudModel
         packages += %w(graphite-carbon graphite-web) # Graphite/Carbon
         packages += %w(python-pip git) # Use pip to install xmpp and shinken
         
-        packages += %w(ruby-snmp ruby-mongo ruby-nokogiri ruby-redis) # Ruby deps for check scripts
+        packages += %w(ruby-mongo ruby-nokogiri ruby-redis) # Ruby deps for check scripts
         
         python_site_packages_path = '/usr/lib/python2.7/dist-packages'
         
