@@ -1,0 +1,13 @@
+#!/bin/bash
+
+echo '<<<smart>>>'
+
+for dev in /dev/sd[a-z]; do
+  cmd="smartctl -a $dev"
+  res=`$cmd`
+  smart_state_id="SMART overall-health self-assessment test result: "
+
+  echo "[$dev]"
+  echo "$res" | grep "$smart_state_id" | sed "s|$smart_state_id|  SMART Status: |"
+  echo "$res" | grep Always | sed "s|^[ 0-9]*\([A-Za-z_-]*\).*  \(.*\)$|  \1: \2|" | sed "s|_| |g"
+done 2>/dev/null

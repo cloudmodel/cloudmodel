@@ -1,7 +1,7 @@
 #!/usr/bin/ruby
 
 require 'optparse'
-require File.expand_path('../snmp_helpers', __FILE__)
+require File.expand_path('../check_mk_helpers', __FILE__)
 
 def parse_options
   options = {warn: 80, crit: 90}
@@ -20,80 +20,89 @@ def parse_options
   options
 end
 
-options = parse_options
-
-oid = '1.3.6.1.4.1.2021.13.16'
-
-class RawData
-  def initialize
-    @data = {}
+def parse_sensors data
+  adapter = nil
+  sensor = nil
+  result = {}
+  sensor_result = nil
+  
+  data.lines.each do |line|
+    if adapter.nil?
+      adapter = line
+      next
+    end
     
-    oid = '1.3.6.1.4.1.2021.13.16'
-    @label_filter = /#{oid}.(.+)\.1\.2\.(.+)/
-    @value_filter = /#{oid}.(.+)\.1\.3\.(.+)/
-  end
-  
-  def snmp_type_from_id id
-    {
-      '2' => 'temp',
-      '3' => 'fan',
-      '4' => 'volt',
-      '5' => 'misc'
-    }[id] || "unknown_#{id}"
-  end
-  
-  def transform_data snmp_type, value
-    case snmp_type 
-      when 'temp'
-        if value.to_i > 100000000
-          "#{value.to_f/100000000}"
-        else
-          "#{value.to_f/1000}"
+    if line.strip.empty?
+      adapter = nil
+      next
+    end
+    
+    if adapter
+      k,v = line.strip.split(':')
+    
+      if v.nil?
+        if sensor
+          result[sensor] = sensor_result
         end
-      when 'fan'
-        "#{value.to_i}"
-      when 'volt'
-        "#{value.to_f/1000}"
-      else 
-        value
-    end
-  end
-  
-  def insert snmp_type_id, index, data_type, value
-    snmp_type = snmp_type_from_id(snmp_type_id)
-    
-    @data[snmp_type] ||= {}
-    @data[snmp_type][index] ||= {}
-    @data[snmp_type][index][data_type] = value
-  end
-  
-  def << item
-    name = item.name.to_s
-    value = item.value
-    
-    if res = @label_filter.match(name)
-      insert res[1], res[2], 'label', value
-    end
-    if res = @value_filter.match(name)
-      insert res[1], res[2], 'value', value
-    end
-  end
-  
-  def to_data
-    data = {}
-    @data.each do |snmp_type, items|
-      items.values.each do |item|
-        data["#{snmp_type}_#{item['label'].to_sensor_name}"] = transform_data(snmp_type, item['value'])
+        sensor = k
+        sensor_result = {'adapter' => adapter, 'label' => sensor}
+      else
+        if sensor_result
+          null, type, null, label = k.strip.match(/([a-z]*)([0-9]*_)(.*)/).to_a
+          sensor_result['type'] = type unless type.nil?
+          sensor_result[label] = v.to_f
+        end
       end
     end
-    data
+  end
+  if sensor
+    result[sensor] = sensor_result
+  end
+  
+  result
+end
+
+def perfdata_sensors data
+  result = {}
+  
+  data.each do |k,v|
+    unless v['input'].nil?
+      result[v['type']] ||= {}
+      result[v['type']][v['label']] = v['input'] 
+    end
+  end
+  
+  perfdata result
+end
+
+options = parse_options
+failures = []
+warnings = []
+
+check_mk_result = query_check_mk(options[:host])
+result = filter_check_mk(check_mk_result, 'sensors')
+data = parse_sensors result
+
+
+data.each do |k, sensor|
+  if sensor['input'] and sensor['max'] and sensor['max'] != 0.0 and sensor['input']>sensor['max']
+    failures << "#{k} to high: #{sensor['input']} > #{sensor['max']}"
+  end
+  if sensor['input'] and sensor['min'] and sensor['input']<sensor['min']
+    failures << "#{k} to low: #{sensor['input']} < #{sensor['min']}"
   end
 end
 
-raw_data = RawData.new 
-  
-retrieve_raw_data oid, raw_data, options
-
-puts "OK - OK | #{perfdata raw_data.to_data}"
-exit STATE_OK
+if failures.empty?
+  if warnings.empty?
+    puts "OK - OK | #{perfdata_sensors data}"
+    exit STATE_OK
+  else
+    puts "WARNING - #{warnings * ', '} | #{perfdata_sensors data}"
+    exit STATE_WARNING
+  end
+else
+  puts "CRITICAL - #{(failures+warnings) * ', '} | #{perfdata_sensors data}"
+  exit STATE_CRITICAL
+end
   

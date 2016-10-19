@@ -1,8 +1,17 @@
 define service{
-   service_description           MongoDB
+   service_description           MongoDB Stand-Alone
    use            generic-service
    contact_groups admins
    register       0
-   host_name	  mongodb
-   check_command  check_mongodb
+   host_name	  mongodb-sa
+   check_command  check_mongodb_sa
+}
+
+define service{
+   service_description           MongoDB Replication
+   use            generic-service
+   contact_groups admins
+   register       0
+   host_name	  mongodb-repl
+   check_command  check_mongodb_repl
 }

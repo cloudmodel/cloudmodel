@@ -1,7 +1,7 @@
 #!/usr/bin/ruby
 
 require 'optparse'
-require File.expand_path('../snmp_helpers', __FILE__)
+require File.expand_path('../shinken_helpers', __FILE__)
 require 'net/http'
 require 'openssl'
 require 'nokogiri'

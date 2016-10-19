@@ -71,11 +71,18 @@ module CloudModel
         chroot! build_path, "apt-get install ssh -y", "Failed to install SSH"
       
         puts "    Install check_mk-agent"
-        chroot! build_path, "apt-get install check-mk-agent -y", "Failed to install SSH"
+        chroot! build_path, "apt-get install check-mk-agent -y", "Failed to install CheckMKAgent"
         render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk@.service", "#{build_path}/etc/systemd/system/check_mk@.service"     
         render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk.socket", "#{build_path}/etc/systemd/system/check_mk.socket"     
         mkdir_p "#{build_path}/etc/systemd/system/sockets.target.wants"
         chroot! build_path, "ln -s /etc/systemd/system/check_mk.socket /etc/systemd/system/sockets.target.wants/check_mk.socket", "Failed to add check_mk to autostart"
+        %w(cgroups_mem cgroup_cpu).each do |sensor|
+          render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/#{sensor}", "#{build_path}/usr/lib/check_mk_agent/#{sonsor}", 0755 
+        end
+        render_to_remote "/cloud_model/support/usr/sbin/cgroup_load_writer", "#{build_path}/usr/sbin/cgroup_load_writer", 0755 
+        render_to_remote "/cloud_model/guest/etc/systemd/system/cgroup_load_writer.service", "#{build_path}/etc/systemd/system/cgroup_load_writer.service"     
+        render_to_remote "/cloud_model/guest/etc/systemd/system/cgroup_load_writer.timer", "#{build_path}/etc/systemd/system/cgroup_load_writer.timer"     
+        chroot! build_path, "ln -s /etc/systemd/system/cgroup_load_writer.timer /etc/systemd/system/timers.target.wants/cgroup_load_writer.timer"      
       
         puts '    Packaging'
         template.update_attribute :build_state, :packaging

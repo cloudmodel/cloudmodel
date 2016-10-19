@@ -31,7 +31,7 @@ module CloudModel
         chroot! build_path, "pip install shinken --install-option=\"--install-scripts=/usr/bin\"", "Failed to install shinken"       
         chroot! build_path, "shinken --init", "Failed to init shinken"
         
-        %w(http ssh livestatus webui2 logstore-sqlite mod-mongodb retention-mongodb graphite2 ui-graphite2 auth-cfg-password named-pipe).each do |service|
+        %w(http ssh livestatus webui2 logstore-mongodb mod-mongodb retention-mongodb graphite2 ui-graphite2 auth-cfg-password named-pipe).each do |service|
           chroot! build_path, "shinken install #{service}", "Failed to install shinken mod #{service}"
         end
         

@@ -1,0 +1,5 @@
+#!/bin/bash
+echo "<<<cgroup_mem>>>"
+echo -n "limit_in_bytes "; cat /sys/fs/cgroup/memory/memory.limit_in_bytes
+echo -n "usage_in_bytes "; cat /sys/fs/cgroup/memory/memory.usage_in_bytes
+cat /sys/fs/cgroup/memory/memory.stat

@@ -1,10 +1,10 @@
 #!/usr/bin/ruby
 
 require 'optparse'
-require File.expand_path('../snmp_helpers', __FILE__)
+require File.expand_path('../check_mk_helpers', __FILE__)
 
 def parse_options
-  options = {devices: [], warn: 80, crit: 90}
+  options = {devices: nil, warn: 80, crit: 90}
   
   OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} [options]"
@@ -26,63 +26,38 @@ def parse_options
   options
 end
 
-class VgRawData
-  def initialize
-    @data = {}
+def parse_vgs data
+  result = {
+    'usage' => {},
+    'num_pv' => {},
+    'num_lv' => {},
+    'num_sn' => {},
+    'attr' => {},
+    'vsize' => {},
+    'vfree' => {}
+  }
   
-    oid = '1.3.6.1.4.1.32473.103'
-    @value_labels = {}
-    @label_filter = /#{oid}\.1\.([0-9]+)\.1/
-    @value_label_filter = /#{oid}\.0\.1\.2\.([0-9]+)/
-    @value_filter = /#{oid}\.1\.([0-9]+)\.2\.([0-9]+)/
-  end
-  
-  def insert index, data_type, value
-  
-    @data[index] ||= {}
-    @data[index][data_type] = value
-  end
-
-  def << item
-    name = item.name.to_s
-    value = item.value
-  
-    if res = @label_filter.match(name)
-      insert res[1], 'label', value
-    end
-    if res = @value_label_filter.match(name)
-      @value_labels[res[1]] = value.to_s.underscore
-    end
-    if res = @value_filter.match(name)
-      insert res[1], @value_labels[res[2]], value
-    end
-  end
-
-  def to_data options
-    data = {'usage' => {}}
+  data.lines.each do |line|
+    dev,num_pv,num_lv,num_sn,attr,vsize,vfree = line.strip.split(':')
     
-    @data.each do |k,item|
-      label = item.delete('label') || 'unknown'
-      if options[:devices].empty? or options[:devices].include?(label)
-        item.each do |sk, sv|
-          data[sk] ||= {}
-          data[sk][label] = sv
-        end
-      end
-      data['vsize'][label] = data['vsize'][label].to_i
-      data['vfree'][label] = data['vfree'][label].to_i
-      usage = 100.0 * (data['vsize'][label] - data['vfree'][label]) / data['vsize'][label]
-      data['usage'][label] = usage.round(2)
-    end
-    
-    data
+    result['num_pv'][dev] = num_pv.to_i
+    result['num_lv'][dev] = num_lv.to_i
+    result['num_sn'][dev] = num_sn.to_i
+    result['attr'][dev] = attr
+    result['vsize'][dev] = vsize = vsize.to_i
+    result['vfree'][dev] = vfree = vfree.to_i
+    result['usage'][dev] = (100.0 * (vsize - vfree) / vsize).round(2)
   end
+  
+  result
 end
 
+
 options = parse_options
-raw_data = VgRawData.new 
-retrieve_raw_data '1.3.6.1.4.1.32473.103', raw_data, options
-data = raw_data.to_data options
+
+check_mk_result = query_check_mk(options[:host])
+result = filter_check_mk(check_mk_result, 'lvm_vgs')
+data = parse_vgs result
 
 failures = []
 warnings = []

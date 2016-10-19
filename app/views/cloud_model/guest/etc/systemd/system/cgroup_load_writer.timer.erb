@@ -1,0 +1,10 @@
+[Unit]
+Description=Call cgroup_load_writer on schedule
+
+[Timer]
+OnStartupSec=0
+OnUnitActiveSec=60
+AccuracySec=1
+
+[Install]
+WantedBy=timers.target

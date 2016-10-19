@@ -26,7 +26,8 @@ module CloudModel
         build_dir = guest.base_path
         
         write_hosts_config hosts_dir: "#{build_dir}#{hosts_build_path}", title: " for #{guest.name}"
-        chroot! build_dir, "mv /etc/shinken/hosts #{hosts_old_path} && mv #{hosts_build_path} /etc/shinken/hosts", 'Unable to move hosts config'
+        chroot build_dir, "mv /etc/shinken/hosts #{hosts_old_path}"
+        chroot! build_dir, "mv #{hosts_build_path} /etc/shinken/hosts", 'Unable to move hosts config'
       end
       
       def write_config
@@ -72,19 +73,15 @@ module CloudModel
         render_to_remote "/cloud_model/guest/graphite/passenger_wsgi.py", "#{@guest.deploy_path}/usr/lib/python2.7/dist-packages/graphite/passenger_wsgi.py", 0755, service: @model         
            
         render_to_remote "/cloud_model/guest/etc/shinken/shinken.cfg", "#{@guest.deploy_path}/etc/shinken/shinken.cfg"
-        #render_to_remote "/cloud_model/guest/etc/shinken/commands.cfg", "#{@guest.deploy_path}/etc/shinken/commands.cfg", service: @model
-        #render_to_remote "/cloud_model/guest/etc/shinken/resource.cfg", "#{@guest.deploy_path}/etc/shinken/resource.cfg"
-        #render_to_remote "/cloud_model/guest/etc/shinken/timeperiods.cfg", "#{@guest.deploy_path}/etc/shinken/timeperiods.cfg"
-        #render_to_remote "/cloud_model/guest/etc/shinken/templates.cfg", "#{@guest.deploy_path}/etc/shinken/templates.cfg"
 
-        %w(shinken_helpers check_mk_helpers snmp_helpers check_disks_snmp).each do |file_name|
+        %w(shinken_helpers check_mk_helpers snmp_helpers).each do |file_name|
           render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/#{file_name}.rb", "#{@guest.deploy_path}#{plugins_dir}/#{file_name}.rb", 0700
         end
         %w(https).each do |check_name|
           render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/commands/check_#{check_name}.cfg"
           render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/services/#{check_name}.cfg"
         end
-        %w(cpu disks mem net_usage lm_sensors lvm mdstat smart guest_cpu guest_mem mongodb nginx redis tomcat).each do |check_name|
+        %w(cpu disks mem net_usage lm_sensors lvm mdstat smart cgroup_cpu cgroup_mem mongodb nginx redis tomcat).each do |check_name|
           render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/check_#{check_name}.rb", "#{@guest.deploy_path}#{plugins_dir}/check_#{check_name}.rb", 0700
           render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/commands/check_#{check_name}.cfg"
           render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/services/#{check_name}.cfg"

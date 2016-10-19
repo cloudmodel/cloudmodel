@@ -1,9 +1,9 @@
 define service{
-   service_description           CPU
+   service_description           Memory
    use            generic-service
    contact_groups admins
    register       0
    host_name	  cm-guest
-   check_command  check_guest_cpu
+   check_command  check_cgroup_mem
    aggregation    system
 }

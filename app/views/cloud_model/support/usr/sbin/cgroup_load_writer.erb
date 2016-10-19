@@ -1,0 +1,6 @@
+#!/bin/bash
+mkdir -p /var/cache/cgroup_load
+
+cat /sys/fs/cgroup/cpu/cpuacct.usage_percpu > "/var/cache/cgroup_load/`date +%s%N`"
+
+rm `ls -t /var/cache/cgroup_load/* | awk 'NR>60'`

@@ -13,7 +13,12 @@ module CloudModel
       end
       
       def shinken_services_append
-        ', mongodb'
+        append = ', mongodb'
+        if mongodb_replication_set
+          append += ', mongodb-repl'
+        end
+          
+        append
       end
       
       def livestatus

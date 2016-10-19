@@ -1,8 +1,7 @@
 #!/usr/bin/ruby
 
 require 'optparse'
-require File.expand_path('../snmp_helpers', __FILE__)
-require 'net/http'
+require File.expand_path('../check_mk_helpers', __FILE__)
 
 def parse_options
   options = {warn: 80, crit: 90}
@@ -12,9 +11,6 @@ def parse_options
 
     opts.on("-h", "--host ADDRESS", "address to SNMP server") do |v|
       options[:host] = v
-    end
-    opts.on("-g", "--guest NAME", "name of guest") do |v|
-      options[:guest] = v
     end
     opts.on("-w", "--warn WARNING", "warning level in percent") do |v|
       options[:warn] = v.to_i
@@ -27,15 +23,33 @@ def parse_options
   options
 end
 
+def parse_cgroup_mem data
+  result = {
+    "mem_total" => 0,
+    "mem_free" => 0,
+    "mem_used" => 0,
+    "mem_usage" => 0.0
+  }
+  replacements = {
+    "limit_in_bytes" => "mem_total",
+    "usage_in_bytes" => "mem_used"
+  }
+
+  data.lines.each do |line|
+    k,v = line.split(' ')
+    result[replacements[k] || k] = v.to_i
+  end
+  
+  result
+end
+
 options = parse_options
 
-data = guest_data options
+check_mk_result = query_check_mk(options[:host])
+result = filter_check_mk(check_mk_result, 'cgroup_mem')
+data = parse_cgroup_mem result
 
-data = {
-  'mem_total' => data['mem_total'],
-  'mem_free' => data['mem_total'].to_i - data['mem_used'],
-  'mem_used' => data['mem_used']
-}
+data['mem_free'] = data['mem_total'] - data['mem_used']
 
 mem_usage = (100.0 * (data['mem_total'].to_i - data['mem_free'].to_i) / data['mem_total'].to_i).round(2)
 data['mem_usage'] = "#{mem_usage}"

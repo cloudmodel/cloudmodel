@@ -51,25 +51,29 @@ def parse_df data
 end
 
 def perfdata(data, options = {})  
+  out = []
   if data
     data.map do |k,v| 
-      name = if k == '/'
-        'root'
-      else
-        k.sub(/^\//, '').gsub('_','__').gsub('/','_').to_sensor_name
-      end
+      if options[:disks].empty? or options[:disks].include?(k)
+        name = if k == '/'
+          'root'
+        else
+          k.sub(/^\//, '').gsub('_','__').gsub('/','_').to_sensor_name
+        end
       
-      [
-        "description_#{name}=#{k}",
-        "device_#{name}=#{v['device']}",
-        "usage_#{name}=#{v['usage']}",
-        "total_#{name}=#{v['total']}",
-        "available_#{name}=#{v['available']}",
-        "usage_inodes_#{name}=#{v['usage_inodes']}",
-        "total_inodes_#{name}=#{v['total_inodes']}",
-        "available_inodes_#{name}=#{v['available_inodes']}"
-      ] * ', '
-    end * ', '
+        out << [
+          "description_#{name}=#{k}",
+          "device_#{name}=#{v['device']}",
+          "usage_#{name}=#{v['usage']}",
+          "total_#{name}=#{v['total']}",
+          "available_#{name}=#{v['available']}",
+          "usage_inodes_#{name}=#{v['usage_inodes']}",
+          "total_inodes_#{name}=#{v['total_inodes']}",
+          "available_inodes_#{name}=#{v['available_inodes']}"
+        ] * ', '
+      end
+    end 
+    out * ', '
   end
 end
 
@@ -78,9 +82,8 @@ options = parse_options
 failures = []
 warnings = []
 
-require 'socket'
-
-result = query_check_mk(options[:host], 'df')
+check_mk_result = query_check_mk(options[:host])
+result = filter_check_mk(check_mk_result, 'df')
 
 data = parse_df result
 
@@ -109,13 +112,13 @@ if failures.empty?
   if warnings.empty?
     usage_string = "Highest usage #{max_usage}% on #{max_item}"
     
-    puts "OK - #{usage_string} | #{perfdata data}"
+    puts "OK - #{usage_string} | #{perfdata data, options}"
     exit STATE_OK
   else
-    puts "WARNING - #{warnings * ', '} | #{perfdata data}"
+    puts "WARNING - #{warnings * ', '} | #{perfdata data, options}"
     exit STATE_WARNING
   end
 else
-  puts "CRITICAL - #{(failures+warnings) * ', '} | #{perfdata data}"
+  puts "CRITICAL - #{(failures+warnings) * ', '} | #{perfdata data, options}"
   exit STATE_CRITICAL
 end

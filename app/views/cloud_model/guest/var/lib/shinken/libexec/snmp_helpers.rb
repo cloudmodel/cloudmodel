@@ -10,26 +10,6 @@ def snmpdata_to_hash(data)
   hash
 end
 
-def perfdata(data, options = {})
-  prefix = options[:prefix] || ''
-  
-  if data
-    data.map do |k,v| 
-      if v.class == Array
-        counter = 0
-        v.map do |sv|
-          counter += 1
-          "#{prefix}#{k.to_sensor_name}_#{counter}=#{sv}"
-        end * ', '
-      elsif v.class == Hash
-        perfdata v, prefix: "#{prefix}#{k.to_sensor_name}_"
-      else
-        "#{prefix}#{k.to_sensor_name}=#{v}"
-      end
-    end * ', '
-  end
-end
-
 def retrieve_data oid, options
   data = {}
   begin

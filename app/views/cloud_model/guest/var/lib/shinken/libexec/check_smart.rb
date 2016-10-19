@@ -1,7 +1,7 @@
 #!/usr/bin/ruby
 
 require 'optparse'
-require File.expand_path('../snmp_helpers', __FILE__)
+require File.expand_path('../check_mk_helpers', __FILE__)
 
 def parse_options
   options = {drives: []}
@@ -20,62 +20,30 @@ def parse_options
   options
 end
 
-class SmartRawData
-  def initialize
-    @data = {}
+def parse_smart data
+  result = {}
+  dev = nil
   
-    oid = '1.3.6.1.4.1.32473.101'
-    @value_labels = {}
-    @label_filter = /#{oid}\.1\.([0-9]+)\.1/
-    @value_label_filter = /#{oid}\.0\.1\.2\.2\.([0-9]+)/
-    @value_filter = /#{oid}\.1\.([0-9]+)\.2\.2\.([0-9]+)/
-    @status_value_filter = /#{oid}\.1\.([0-9]+)\.2\.1/
+  data.lines.each do |line|
+    if line[0] == "["
+      dev = line.strip.gsub(/\[\/dev\/(.*)\]/, '\1')
+    else
+      k,v = line.split(':').map(&:strip)
+      k = k.underscore
+      
+      result[k] ||= {}
+      result[k][dev] = v.split(' ').first
+    end
   end
   
-  def insert index, data_type, value
-  
-    @data[index] ||= {}
-    @data[index][data_type] = value
-  end
-
-  def << item
-    name = item.name.to_s
-    value = item.value
-  
-    if res = @label_filter.match(name)
-      insert res[1], 'label', value
-    end
-    if res = @value_label_filter.match(name)
-      @value_labels[res[1]] = value.to_s.underscore
-    end
-    if res = @value_filter.match(name)
-      insert res[1], @value_labels[res[2]], value
-    end
-    if res = @status_value_filter.match(name)
-      insert res[1], 'smart_status', value
-    end
-  end
-
-  def to_data options
-    data = {}
-    
-    @data.each do |k,item|
-      label = item.delete('label') || 'unknown'
-      if options[:drives].empty? or options[:drives].include?(label)
-        item.each do |sk, sv|
-          data[sk] ||= {}
-          data[sk][label] = sv
-        end
-      end
-    end
-    data
-  end
+  result
 end
 
 options = parse_options
-raw_data = SmartRawData.new 
-retrieve_raw_data '1.3.6.1.4.1.32473.101', raw_data, options
-data = raw_data.to_data options
+
+check_mk_result = query_check_mk(options[:host])
+result = filter_check_mk(check_mk_result, 'smart')
+data = parse_smart result
 
 failures = []
 if options[:drives]
@@ -85,7 +53,7 @@ if options[:drives]
 end
 
 data['smart_status'].each do |k,v|
-  failures << "Test on #{k} not passed" unless v.to_s == 'PASSED'
+  failures << "Test on #{k} not passed (#{v})" unless v.to_s == 'PASSED'
 end
 
 if failures.empty?

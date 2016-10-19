@@ -1,7 +1,7 @@
 #!/usr/bin/ruby
 
 require 'optparse'
-require File.expand_path('../snmp_helpers', __FILE__)
+require File.expand_path('../check_mk_helpers', __FILE__)
 require 'net/http'
 
 def parse_options
@@ -24,6 +24,17 @@ def parse_options
   options
 end
 
+def parse_mem data
+  result = {}
+  puts data
+  data.lines.each do |line|
+    line = line.split(':')
+    result[line[0].underscore] = line[1].to_i
+  end
+  
+  result
+end
+
 options = parse_options
 
 begin
@@ -37,16 +48,10 @@ rescue Exception => e
   exit STATE_WARNING
 end
 
-data = retrieve_data_from_oids(
-  {
-    '1.3.6.1.4.1.2021.4.4.0'  => :swap_free,     
-  	'1.3.6.1.4.1.2021.4.3.0'  => :swap_total, 
-  	'1.3.6.1.4.1.2021.4.5.0'  => :mem_total, 
-  	'1.3.6.1.4.1.2021.4.6.0'  => :mem_free,  
-  	'1.3.6.1.4.1.2021.4.15.0' => :mem_cached,
-  	'1.3.6.1.4.1.2021.4.14.0' => :mem_buffers,
-    }, options
-)
+check_mk_result = query_check_mk(options[:host])
+result = filter_check_mk(check_mk_result, 'mem')
+
+data = parse_mem result
 
 data['mem_used'] = data['mem_total'].to_i - data['mem_free'].to_i
 mem_usage = (100.0 * data['mem_used'] / data['mem_total'].to_i).round(2)

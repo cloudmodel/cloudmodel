@@ -3,7 +3,7 @@
 
 define command {
     command_name    check_host_disks
-    command_line    $PLUGINSDIR$/check_disks_snmp.rb -h $HOSTADDRESS$ -d "$_HOSTDISKS$"
+    command_line    $PLUGINSDIR$/check_disks.rb -h $HOSTADDRESS$ -d "$_HOSTDISKS$"
 }
 
 define command {

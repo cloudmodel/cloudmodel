@@ -164,14 +164,6 @@ host.exec! "echo \"D /var/run/graphite 0755 graphite graphite\" > #{build_dir}/e
         chroot! build_dir, "gem install nokogiri -- --use-system-libraries", 'Unable to install ruby nokogiri gem'
 
         chroot! build_dir, "rm -rf /etc/shinken/hosts/localhost.cfg", "Failed to remove localhost example for shinken host"
-
-        # render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/snmp_helpers.rb", "#{build_dir}/var/lib/shinken/libexec/snmp_helpers.rb", 0700
-        # %w(cpu disks mem net_usage sensors lvm mdstat smart mongodb nginx redis tomcat).each do |check_name|
-        #   render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/check_#{check_name}.rb", "#{build_dir}/var/lib/shinken/libexec/check_#{check_name}.rb", 0700
-        #   render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{build_dir}/etc/shinken/commands/check_#{check_name}.cfg"
-        #   render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{build_dir}/etc/shinken/services/#{check_name}.cfg"
-        # end
-        # chroot! build_dir, "chown -R shinken:shinken /var/lib/shinken/libexec/", 'Failed to assign check scripts to shinken user'
       end
           
       def configure_system
