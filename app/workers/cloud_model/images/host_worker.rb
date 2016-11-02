@@ -72,7 +72,7 @@ module CloudModel
         mkdir_p "#{build_path}/etc/systemd/system/sockets.target.wants"
         chroot! build_path, "ln -s /etc/systemd/system/check_mk.socket /etc/systemd/system/sockets.target.wants/check_mk.socket", "Failed to add check_mk to autostart"
 
-        %w(smart lvm cgroups_mem).each do |sensor|
+        %w(smart lvm cgroup_mem).each do |sensor|
           render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/#{sensor}", "#{build_path}/usr/lib/check_mk_agent/#{sensor}", 0755 
         end
       end
