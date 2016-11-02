@@ -37,20 +37,25 @@ module CloudModel
         json_data = socket.gets
         socket.close
 
-        raw_data = JSON.parse json_data
-        data = []
-        header = raw_data.shift
+        puts json_data
 
-        raw_data.each do |raw_line|
-         line = {}
+        data = []
+        begin
+          raw_data = JSON.parse json_data
+          header = raw_data.shift
+
+          raw_data.each do |raw_line|
+            line = {}
  
-         i = 0
-         raw_line.each do |v|
-           line[header[i]] = v
-           i += 1
-         end
+            i = 0
+            raw_line.each do |v|
+              line[header[i]] = v
+              i += 1
+            end
  
-         data << line
+            data << line
+          end
+        rescue
         end
 
         data
