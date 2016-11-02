@@ -61,6 +61,7 @@ en:
     failed: Failed to deploy
      
   cloud_model/services/nginx:
+    deploy_mongodb_replication_set_manual: Manual MongoDB Configuration
     deploy_redis_sentinel_set_manual: Manual Redis Configuration      
       
   mongoid:
@@ -302,6 +303,7 @@ en:
         redeploy_web_image_state: Redeploy Web Image State
         redeploy_web_image_last_issue: Last Web Image Redeploy Issue
         
+        deploy_mongodb_replication_set_id: Use MongoDB Replication Set
         deploy_mongodb_host: Use MongoDB Host
         deploy_mongodb_port: Use MongoDB Port
         deploy_mongodb_database: Use MongoDB Database

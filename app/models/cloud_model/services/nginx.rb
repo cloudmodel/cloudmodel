@@ -31,6 +31,8 @@ module CloudModel
       field :deploy_mongodb_host, type: String
       field :deploy_mongodb_port, type: Integer, default: 27017
       field :deploy_mongodb_database, type: String
+      
+      belongs_to :deploy_mongodb_replication_set, class_name: 'CloudModel::MongodbReplicationSet'
     
       field :deploy_redis_host, type: String
       field :deploy_redis_port, type: Integer, default: 6379

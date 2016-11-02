@@ -61,6 +61,7 @@ de:
     failed: Fehlgeschlagen
 
   cloud_model/services/nginx:
+    deploy_mongodb_replication_set_manual: Eigene MongoDB Konfiguration
     deploy_redis_sentinel_set_manual: Eigene Redis Konfiguration      
       
   mongoid:
@@ -303,6 +304,7 @@ de:
         redeploy_web_image_state: Ausrollstatus
         redeploy_web_image_last_issue: Letztes Problem beim Ausrollen
       
+        deploy_mongodb_replication_set_id: MongoDB Replikationset   
         deploy_mongodb_host: MongoDB Host
         deploy_mongodb_port: MongoDB Port
         deploy_mongodb_database: MongoDB Datenbank
