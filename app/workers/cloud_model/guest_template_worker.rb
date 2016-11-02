@@ -77,7 +77,7 @@ module CloudModel
         mkdir_p "#{build_path}/etc/systemd/system/sockets.target.wants"
         chroot! build_path, "ln -s /etc/systemd/system/check_mk.socket /etc/systemd/system/sockets.target.wants/check_mk.socket", "Failed to add check_mk to autostart"
         %w(cgroup_mem cgroup_cpu).each do |sensor|
-          render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/#{sensor}", "#{build_path}/usr/lib/check_mk_agent/#{sensor}", 0755 
+          render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/plugins/#{sensor}", "#{build_path}/usr/lib/check_mk_agent/plugins/#{sensor}", 0755 
         end
         render_to_remote "/cloud_model/support/usr/sbin/cgroup_load_writer", "#{build_path}/usr/sbin/cgroup_load_writer", 0755 
         render_to_remote "/cloud_model/guest/etc/systemd/system/cgroup_load_writer.service", "#{build_path}/etc/systemd/system/cgroup_load_writer.service"     
