@@ -28,11 +28,11 @@ module CloudModel
       end
       
       def mongodb_replication_set_master?
-        livestatus.perf_data['repl_ismaster'] == 'true'
+        livestatus and livestatus.perf_data and livestatus.perf_data['repl_ismaster'] == 'true'
       end
       
       def mongodb_replication_set_version
-        livestatus.perf_data['repl_set_version']
+        livestatus and livestatus.perf_data and livestatus.perf_data['repl_set_version']
       end
       
       def backupable?
