@@ -13,7 +13,7 @@ module CloudModel
       end
       
       def shinken_services_append
-        append = ', mongodb'
+        append = ', mongodb-core, mongodb-perf'
         if mongodb_replication_set
           append += ', mongodb-repl'
         end

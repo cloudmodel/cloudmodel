@@ -81,8 +81,8 @@ module CloudModel
           render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/commands/check_#{check_name}.cfg"
           render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/services/#{check_name}.cfg"
         end
-        # Disabled: mongodb
-        %w(cpu disks mem net_usage lm_sensors lvm mdstat smart cgroup_cpu cgroup_mem nginx redis tomcat).each do |check_name|
+        
+        %w(cpu disks mem net_usage lm_sensors lvm mdstat mongodb smart cgroup_cpu cgroup_mem nginx redis tomcat).each do |check_name|
           render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/check_#{check_name}.rb", "#{@guest.deploy_path}#{plugins_dir}/check_#{check_name}.rb", 0700
           render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/commands/check_#{check_name}.cfg"
           render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/services/#{check_name}.cfg"

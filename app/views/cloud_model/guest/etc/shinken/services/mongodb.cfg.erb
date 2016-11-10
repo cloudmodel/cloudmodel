@@ -1,17 +1,69 @@
 define service{
-   service_description           MongoDB Stand-Alone
-   use            generic-service
-   contact_groups admins
-   register       0
-   host_name	  mongodb-sa
-   check_command  check_mongodb_sa
+   service_description    Mongodb-connection
+   use                    mongodb-service
+   register               0
+   host_name	          mongodb-core
+   check_command          check_mongodb_connection
 }
 
 define service{
-   service_description           MongoDB Replication
-   use            generic-service
-   contact_groups admins
-   register       0
-   host_name	  mongodb-repl
-   check_command  check_mongodb_repl
+   service_description    Mongodb-flush-time
+   use                    mongodb-service
+   register               0
+   host_name	          mongodb-perf
+   check_command          check_mongodb_flush_time
+   aggregation		  /mongodb/performances
+}
+
+define service{
+   service_description    Mongodb-index-miss-ratio
+   use                    mongodb-service
+   register               0
+   host_name	          mongodb-perf
+   check_command          check_mongodb_index_miss_ratio
+   aggregation		  /mongodb/performances
+}
+
+define service{
+   service_description    Mongodb-last-flush
+   use                    mongodb-service
+   register               0
+   host_name	          mongodb-perf
+   check_command          check_mongodb_last_flush
+   aggregation		  /mongodb/performances
+}
+
+define service{
+   service_description    Mongodb-lock-time
+   use                    mongodb-service
+   register               0
+   host_name	          mongodb-perf
+   check_command          check_mongodb_lock_time
+   aggregation		  /mongodb/performances
+}
+
+define service{
+   service_description    Mongodb-open-connections
+   use                    mongodb-service
+   register               0
+   host_name	          mongodb-core
+   check_command          check_mongodb_open_connections
+}
+
+define service{
+   service_description    Mongodb-replication-lag
+   use                    mongodb-service
+   register               0
+   host_name	          mongodb-repl
+   check_command          check_mongodb_replication_lag
+   aggregation		  mongodb/replicatset
+}
+
+define service{
+   service_description    Mongodb-replicaset
+   use                    mongodb-service
+   register               0
+   host_name	          mongodb-repl
+   check_command          check_mongodb_replicaset
+   aggregation		  mongodb/replicatset
 }
