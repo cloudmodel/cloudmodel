@@ -37,7 +37,7 @@ module CloudModel
         json_data = socket.gets
         socket.close
 
-        puts json_data
+        # puts json_data
 
         data = []
         begin

@@ -23,16 +23,26 @@ module CloudModel
       
       def livestatus
         if guest.livestatus
-          guest.livestatus.services.find{|s| s.description == 'MongoDB'}
+          guest.livestatus.services.find{|s| s.description == 'Mongodb-connection'}
+        end
+      end
+      
+      def full_livestatus
+        if guest.livestatus
+          guest.livestatus.services.select{|s| /^Mongodb/.match s.description}
         end
       end
       
       def mongodb_replication_set_master?
-        livestatus and livestatus.perf_data and livestatus.perf_data['repl_ismaster'] == 'true'
+        if guest.livestatus
+          guest.livestatus.services.find{|s| s.description == 'Mongodb-replicaset'}.perf_data['state'] == '1'
+        end
       end
       
       def mongodb_replication_set_version
-        livestatus and livestatus.perf_data and livestatus.perf_data['repl_set_version']
+        # Not available via new livestatus based in check_mongodb.py
+        # livestatus and livestatus.perf_data and livestatus.perf_data['repl_set_version']
+        "-"
       end
       
       def backupable?
