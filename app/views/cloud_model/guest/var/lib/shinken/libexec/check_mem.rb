@@ -26,7 +26,7 @@ end
 
 def parse_mem data
   result = {}
-  puts data
+
   data.lines.each do |line|
     line = line.split(':')
     result[line[0].underscore] = line[1].to_i

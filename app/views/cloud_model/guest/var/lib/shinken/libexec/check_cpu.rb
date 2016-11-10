@@ -69,9 +69,9 @@ warn = []
 
 usage.each.with_index do |v,i|
   
-  if v*100 > options[:crit][i]
+  if options[:crit][i] and v*100 > options[:crit][i]
     crit << i
-  elsif v*100 > options[:warn][i]
+  elsif options[:warn][i] and v*100 > options[:warn][i]
     warn << i
   end
 end

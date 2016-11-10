@@ -4,7 +4,7 @@ require 'optparse'
 require File.expand_path('../check_mk_helpers', __FILE__)
 
 def parse_options
-  options = {drives: []}
+  options = {}
   
   OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} [options]"
@@ -13,7 +13,7 @@ def parse_options
       options[:host] = v
     end
     opts.on("-d", "--drives DRIVES", "drives to check (don't set for all)") do |v|
-      options[:drives] = v.split(',').map(&:strip)
+      options[:drives] = v.split(',').map(&:strip) if v
     end
   end.parse!
   
@@ -32,7 +32,7 @@ def parse_smart data
       k = k.underscore
       
       result[k] ||= {}
-      result[k][dev] = v.split(' ').first
+      result[k][dev] = v ? v.split(' ').first : '-'
     end
   end
   
@@ -64,14 +64,3 @@ else
   puts "CRITICAL - #{failure_string} | #{perfdata data}"
   exit STATE_CRITICAL
 end
-
-
-# data = retrieve_data '1.3.6.1.4.1.32473.8.1.101', parse_options
-#
-# if data['state']=='PASSED'
-#   puts "OK - PASSED | #{perfdata data}"
-#   exit STATE_OK
-# else
-#   puts "CRITICAL - #{data['state']} | #{perfdata data}"
-#   exit STATE_CRITICAL
-# end

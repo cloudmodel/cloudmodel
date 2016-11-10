@@ -47,7 +47,7 @@ def parse_cgroup_cpu data
   lines = data.lines.to_a
   
   base = lines.shift
-  base_ts, *base_usage = base.split(' ')
+  base_ts, *base_usage = base.split(' ') if base
   
   raw = {}
   lines.reverse.each do |line|
@@ -89,9 +89,9 @@ crit = []
 warn = []
 
 usage.each.with_index do |v,i|
-  if v > options[:crit][i]
+  if options[:crit][i] and v > options[:crit][i]
     crit << i
-  elsif v > options[:warn][i]
+  elsif options[:warn][i] and v > options[:warn][i]
     warn << i
   end
 end

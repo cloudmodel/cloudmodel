@@ -8,13 +8,16 @@ define host{
     _SNMPSERVER         <%= guest.host.private_address %>
     _GUESTNAME          <%= guest.name %>
 
-    _CPU_WARN           80
-    _CPU_CRIT           90
-    _LOAD_WARN          2,2,2
-    _LOAD_CRIT          3,3,3
+    _CPU_WARN           70,60,50
+    _CPU_CRIT           90,80,70
 
+    <% if guest.services.where(_type: "CloudModel::Services::Tomcat").exists? -%>
+    _MEMORY_WARN        99
+    _MEMORY_CRIT        100
+    <% else -%>
     _MEMORY_WARN        90
     _MEMORY_CRIT        95
+    <% end -%>
 
     _NET_IFACES         eth0
     _NET_WARN           90,90,0,0,0,0

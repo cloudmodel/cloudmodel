@@ -3,5 +3,5 @@
 
 define command {
     command_name    check_cgroup_cpu
-    command_line    $PLUGINSDIR$/check_cgroup_cpu.rb -w $_HOSTCHECK_CPU_WARN$ -c $_HOSTCHECK_CPU_CRIT$ -h $HOSTADDRESS$
+    command_line    $PLUGINSDIR$/check_cgroup_cpu.rb -w $_HOSTCPU_WARN$ -c $_HOSTCPU_CRIT$ -h $HOSTADDRESS$
 }
