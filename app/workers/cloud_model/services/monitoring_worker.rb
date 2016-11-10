@@ -87,6 +87,11 @@ module CloudModel
           render_to_remote "/cloud_model/guest/etc/shinken/commands/check_#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/commands/check_#{check_name}.cfg"
           render_to_remote "/cloud_model/guest/etc/shinken/services/#{check_name}.cfg", "#{@guest.deploy_path}/etc/shinken/services/#{check_name}.cfg"
         end
+
+        # Shinken delivers an old version of check_mongodb.py - so we use our own version
+        
+        render_to_remote "/cloud_model/guest/var/lib/shinken/libexec/check_mongodb.py", "#{@guest.deploy_path}#{plugins_dir}/check_mongodb.py", 0700      
+
         chroot! @guest.deploy_path, "chown -R shinken:shinken #{plugins_dir}", 'Failed to assign check scripts to shinken user' 
       end
       
