@@ -8,7 +8,7 @@ module CloudModel
         target = "#{@guest.deploy_path}/var/tomcat" 
         
         puts "        Deploy WAR Image #{@model.deploy_war_image.name} to #{@guest.deploy_path}#{target}"
-        temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
+        temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar.bz2"
         io = StringIO.new(@model.deploy_war_image.file.data)
         @host.sftp.upload!(io, temp_file_name)     
         mkdir_p target

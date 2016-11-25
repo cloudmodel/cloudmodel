@@ -5,10 +5,8 @@ After=network.target
 [Service]
 User=solr
 Group=solr
-Type=forking
-PIDFile=/run/solr/pid
-ExecStart=/usr/sbin/solr start
-ExecStop=/usr/sbin/solr stop
+ExecStart=/opt/solr/bin/solr start -f -m 2g -s /var/solr/solr -p <%= model.port %> -a "-Dsolr.data.dir=/var/solr/data"
+ExecStop=/opt/solr/bin/solr stop -p 8080
 Restart=always
 
 [Install]

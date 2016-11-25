@@ -14,13 +14,13 @@ module CloudModel
       end
       
       def shinken_services_append
-        #', solr'
+        ', solr'
       end
       
       def livestatus
-        # if guest.livestatus
-        #   guest.livestatus.services.find{|s| s.description == 'Tomcat'}
-        # end
+        if guest.livestatus
+          guest.livestatus.services.find{|s| s.description == 'SOLR'}
+        end
       end
     end
   end
