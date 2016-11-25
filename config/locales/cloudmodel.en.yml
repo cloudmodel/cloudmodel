@@ -113,6 +113,9 @@ en:
       cloud_model/web_image:
         one: Web Image
         other: Web Images
+      cloud_model/solr_image:
+        one: SOLR Image
+        other: SOLR Images
       cloud_model/war_image:
         one: WAR Image
         other: WAR Images
@@ -128,6 +131,9 @@ en:
       cloud_model/services/redis:
         one: Redis Service
         other: Redis Services
+      cloud_model/services/solr:
+        one: SOLR Service
+        other: SOLR Services        
       cloud_model/services/ssh:
         one: SSH Service
         other: SSH Services        
@@ -245,6 +251,17 @@ en:
         core_template: Using Core Template
         template_type: Template Type
         created_at: Created at
+      cloud_model/solr_image:
+        name: Name
+        git_server: GIT Server
+        git_repo: GIT Repository
+        git_branch: GIT Branch
+        git_commit: GIT Commit
+        solr_version: SOLR Version
+        updated_at: Last Updated
+        file_size: Package Size
+        build_state: Build State
+        build_last_issue: Last Build Issue
       cloud_model/web_image:
         name: Name
         git_server: GIT Server

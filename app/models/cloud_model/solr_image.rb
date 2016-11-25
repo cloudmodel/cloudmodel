@@ -1,5 +1,12 @@
+# SolrImage model
+#
+# Gets a solr config from a git repository. This repository has to have 2 contents:
+#   SOLR_VERSION - a text file containing the required version of solr
+#   solr - folder containing the solr config
+# every other contents are ignored
+
 module CloudModel
-  class WebImage
+  class SolrImage
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::UsedInGuestsAs
@@ -10,16 +17,12 @@ module CloudModel
     field :git_repo, type: String
     field :git_branch, type: String, default: 'master'
     field :git_commit, type: String
-    field :has_assets, type: Mongoid::Boolean, default: false
-    field :has_mongodb, type: Mongoid::Boolean, default: false    
-    field :has_redis, type: Mongoid::Boolean, default: false    
+    field :solr_version, type: String
     
     enum_field :build_state, values: {
       0x00 => :pending,
       0x01 => :running,
       0x02 => :checking_out,
-      0x03 => :bundling,
-      0x04 => :building_assets,
       0x05 => :packaging,
       0x06 => :storing,
       0xf0 => :finished,
@@ -28,16 +31,6 @@ module CloudModel
     }, default: :not_started
     
     field :build_last_issue, type: String
-    
-    enum_field :redeploy_state, values: {
-      0x00 => :pending,
-      0x01 => :running,
-      0xf0 => :finished,
-      0xf1 => :failed,
-      0xff => :not_started
-    }, default: :not_started
-    
-    field :redeploy_last_issue, type: String
 
     belongs_to :file, class_name: "Mongoid::GridFS::Fs::File"
     
@@ -46,12 +39,12 @@ module CloudModel
     validates :git_repo, presence: true
     validates :git_branch, presence: true
     
-    used_in_guests_as 'services.deploy_web_image_id'
+    used_in_guests_as 'services.deploy_solr_image_id'
     
     def services
       services = []
       used_in_guests.each do |guest| 
-        guest.services.where('deploy_web_image_id': id).each do |service|
+        guest.services.where('deploy_solr_image_id': id).each do |service|
           services << service
         end
       end
@@ -62,18 +55,14 @@ module CloudModel
       file.try :length
     end
     
+    def solr_mirror
+      CloudModel::SolrMirror.find_by(version: solr_version)
+    end
+    
     def build_path 
-      Pathname.new(CloudModel.config.data_directory).join('build', 'web_images', id).to_s
+      Pathname.new(CloudModel.config.data_directory).join('build', 'solr_images', id).to_s
     end
-    
-    def build_gem_home
-      "#{build_path}/shared/bundle/#{Bundler.ruby_scope}"
-    end
-    
-    def build_gemfile
-      "#{build_path}/current/Gemfile"
-    end
-    
+        
     def self.build_state_id_for build_state
       enum_fields[:build_state][:values].invert[build_state]
     end
@@ -102,7 +91,7 @@ module CloudModel
       update_attribute :build_state, :pending
 
       begin
-        CloudModel::call_rake 'cloudmodel:web_image:build', web_image_id: id
+        CloudModel::call_rake 'cloudmodel:solr_image:build', solr_image_id: id
       rescue Exception => e
         update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
@@ -110,42 +99,8 @@ module CloudModel
     end
     
     def build!(options = {})      
-      web_image_worker = CloudModel::WebImageWorker.new self
-      web_image_worker.build options
-    end
-    
-    def self.redeployable_redeploy_states
-      [:finished, :failed, :not_started]
-    end    
-    
-    def redeployable?
-      self.class.redeployable_redeploy_states.include? redeploy_state
-    end
-    
-    def redeploy(options = {})
-      unless redeployable? or options[:force]
-        return false
-      end
-      
-      update_attribute :redeploy_state, :pending
-      
-      services.each do |service|
-        if service.redeployable? or options[:force]
-          service.update_attributes redeploy_web_image_state: :pending
-        end
-      end
-
-      begin
-        CloudModel::call_rake 'cloudmodel:web_image:redeploy', web_image_id: id
-      rescue Exception => e
-        update_attributes redeploy_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
-        CloudModel.log_exception e
-      end
-    end
-    
-    def redeploy!(options = {})
-      web_image_worker = CloudModel::WebImageWorker.new self
-      web_image_worker.redeploy options
+      solr_image_worker = CloudModel::SolrImageWorker.new self
+      solr_image_worker.build options
     end
   end
 end

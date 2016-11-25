@@ -13,11 +13,12 @@ describe CloudModel::Services::Base do
   context '#service_types' do
     it "should return the default service types" do
       expect(CloudModel::Services::Base.service_types).to eq({
-        mongodb: 'CloudModel::Services::Mongodb',
-        nginx: 'CloudModel::Services::Nginx',
-        redis: 'CloudModel::Services::Redis',
-        ssh: 'CloudModel::Services::Ssh',
-        tomcat: 'CloudModel::Services::Tomcat'
+        mongodb: CloudModel::Services::Mongodb,
+        nginx: CloudModel::Services::Nginx,
+        redis: CloudModel::Services::Redis,
+        solr: CloudModel::Services::Solr,
+        ssh: CloudModel::Services::Ssh,
+        tomcat: CloudModel::Services::Tomcat
       })
     end
     

@@ -20,4 +20,13 @@ module CloudModel
     Rails.logger.error "CloudModel: uncaught #{e.class} exception while handling connection: #{e.message}"
     Rails.logger.error "Stack trace:\n#{e.backtrace.map {|l| "  #{l}\n"}.join}"
   end
+  
+  class ExecutionException < Exception
+    attr_accessor :command, :error, :output
+    def initialize(command, error, output)
+      @command = command
+      @error = error
+      @output = output
+    end
+  end
 end

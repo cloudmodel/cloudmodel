@@ -1,0 +1,15 @@
+[Unit]
+Description=SOLR Search Engine
+After=network.target
+
+[Service]
+User=solr
+Group=solr
+Type=forking
+PIDFile=/run/solr/pid
+ExecStart=/usr/sbin/solr start
+ExecStop=/usr/sbin/solr stop
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -13,11 +13,12 @@ module CloudModel
   
       def self.service_types 
         {
-          mongodb: 'CloudModel::Services::Mongodb',
-          nginx: 'CloudModel::Services::Nginx',
-          redis: 'CloudModel::Services::Redis',
-          ssh: 'CloudModel::Services::Ssh',
-          tomcat: 'CloudModel::Services::Tomcat'
+          mongodb: CloudModel::Services::Mongodb,
+          nginx: CloudModel::Services::Nginx,
+          redis: CloudModel::Services::Redis,
+          solr: CloudModel::Services::Solr,
+          ssh: CloudModel::Services::Ssh,
+          tomcat: CloudModel::Services::Tomcat
         }
       end
     

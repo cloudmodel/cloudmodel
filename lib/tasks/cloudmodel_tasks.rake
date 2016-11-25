@@ -136,6 +136,23 @@ namespace :cloudmodel do
       @web_image_worker.redeploy
     end
   end
+
+  namespace :solr_image do
+    task :load_solr_image do
+      raise "No env variable SOLR_IMAGE_ID given" unless ENV['SOLR_IMAGE_ID']
+      @solr_image_worker = CloudModel::SolrImageWorker.new CloudModel::SolrImage.find(ENV['SOLR_IMAGE_ID'])
+    end
+    
+    desc "Build SolrImage"
+    task :build => [:environment, :load_solr_image] do
+      @solr_image_worker.build
+    end
+    
+    desc "Redeploy app to all guests using SolrImage"
+    task :redeploy => [:environment, :load_solr_image] do
+      @solr_image_worker.redeploy
+    end
+  end
   
   namespace :services do
     namespace :nginx do

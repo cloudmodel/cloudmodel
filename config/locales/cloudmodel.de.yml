@@ -110,6 +110,9 @@ de:
       cloud_model/guest_template_type:
         one: Gästtemplateart
         other: Gästtemplatearten
+      cloud_model/solr_image:
+        one: SOLR-Paket
+        other: SOLR-Pakete
       cloud_model/web_image:
         one: Webpaket
         other: Webpakete
@@ -128,6 +131,9 @@ de:
       cloud_model/services/redis:
         one: Redis-Dienst
         other: Redis-Dienste
+      cloud_model/services/solr:
+        one: SOLR-Dienst
+        other: SOLR-Dienste        
       cloud_model/services/ssh:
         one: SSH-Dienst
         other: SSH-Dienste        
@@ -246,6 +252,17 @@ de:
         core_template: Benutztes Kerntemplate
         template_type: Templateart
         created_at: Erzeugt am
+      cloud_model/solr_image:
+        name: Name
+        git_server: GIT Server
+        git_repo: GIT Repository
+        git_branch: GIT Branch
+        git_commit: GIT Commit
+        solr_version: SOLR Version
+        updated_at: Letztes Update
+        file_size: Packetgröße
+        build_state: Erstellungsstatus
+        build_last_issue: Letztes Problem bei der Erstellung
       cloud_model/web_image:
         name: Name
         git_server: GIT Server
