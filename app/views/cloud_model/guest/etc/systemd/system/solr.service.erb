@@ -5,7 +5,9 @@ After=network.target
 [Service]
 User=solr
 Group=solr
-ExecStart=/opt/solr/bin/solr start -f -m 2g -s /var/solr/solr -p <%= model.port %> -a "-Dsolr.data.dir=/var/solr/data"
+PermissionsStartOnly=true
+ExecStartPre=/bin/chown -R solr:solr /var/solr/data
+ExecStart=/opt/solr/bin/solr start -f -m <%= model.heap_size %> -s /var/solr/solr -p <%= model.port %> -a "-Dsolr.data.dir=/var/solr/data -Xloggc:/var/solr/log/solr_gc.log"
 ExecStop=/opt/solr/bin/solr stop -p 8080
 Restart=always
 

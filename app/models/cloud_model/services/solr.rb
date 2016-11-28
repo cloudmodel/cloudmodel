@@ -22,6 +22,10 @@ module CloudModel
           guest.livestatus.services.find{|s| s.description == 'SOLR'}
         end
       end
+      
+      def heap_size
+        "#{guest.memory_size / 1024 / 1024 - 128}m"
+      end
     end
   end
 end
