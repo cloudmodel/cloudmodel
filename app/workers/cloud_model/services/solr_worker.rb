@@ -31,6 +31,8 @@ module CloudModel
 
         # Create log folder
         mkdir_p "#{config_path}/log"
+        mkdir_p "#{config_path}/cache"
+        mkdir_p "#{config_path}/data"
 
         chroot @guest.deploy_path, "chown -R solr:solr /var/solr"
         
