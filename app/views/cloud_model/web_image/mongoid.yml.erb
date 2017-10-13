@@ -12,3 +12,16 @@
         - <%= model.deploy_mongodb_host %>:<%= model.deploy_mongodb_port %>  
       <% end -%>
       database: <%= model.deploy_mongodb_database %>
+  clients:
+    default:
+      hosts: 
+      <% if model.deploy_mongodb_replication_set -%>
+        <% model.deploy_mongodb_replication_set.services.each do |service| -%>
+        - <%= service.guest.private_address %>:<%= service.port %>
+        <% end -%>
+      options:
+        read: :nearest  
+      <% else -%>
+        - <%= model.deploy_mongodb_host %>:<%= model.deploy_mongodb_port %>  
+      <% end -%>
+      database: <%= model.deploy_mongodb_database %>
