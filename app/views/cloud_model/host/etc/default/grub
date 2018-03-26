@@ -1,47 +1,34 @@
-# Copyright 1999-2013 Gentoo Foundation
-# Distributed under the terms of the GNU General Public License v2
-# $Header: /var/cvsroot/gentoo-x86/sys-boot/grub/files/grub.default-2,v 1.4 2013/09/21 18:10:55 floppym Exp $
-#
-# To populate all changes in this file you need to regenerate your
-# grub configuration file afterwards:
-#     'grub2-mkconfig -o /boot/grub/grub.cfg'
-#
-# See the grub info page for documentation on possible variables and
-# their associated values.
-
-GRUB_DISTRIBUTOR="Gentoo"
+# If you change this file, run 'update-grub' afterwards to update
+# /boot/grub/grub.cfg.
+# For full documentation of the options in this file, see:
+#   info -f grub -n 'Simple configuration'
 
 GRUB_DEFAULT=0
 GRUB_HIDDEN_TIMEOUT=0
 GRUB_HIDDEN_TIMEOUT_QUIET=true
-GRUB_TIMEOUT=3
+GRUB_TIMEOUT=10
+GRUB_DISTRIBUTOR=`lsb_release -i -s 2> /dev/null || echo Debian`
+GRUB_CMDLINE_LINUX_DEFAULT="nomodeset swapaccount=1"
+GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"
 
-# Append parameters to the linux kernel command line
-# GRUB_CMDLINE_LINUX=""
-
-# Append parameters to the linux kernel command line for non-recovery entries
-#GRUB_CMDLINE_LINUX_DEFAULT=""
-GRUB_CMDLINE_LINUX_DEFAULT="real_root=<%= root.mapper_device %> domdadm dolvm init=/usr/lib/systemd/systemd rootfstype=ext4"
+# Uncomment to enable BadRAM filtering, modify to suit your needs
+# This works with Linux (no patch required) and with any kernel that obtains
+# the memory map information from GRUB (GNU Mach, kernel of FreeBSD ...)
+#GRUB_BADRAM="0x01234567,0xfefefefe,0x89abcdef,0xefefefef"
 
 # Uncomment to disable graphical terminal (grub-pc only)
-#GRUB_TERMINAL=console
+GRUB_TERMINAL=console
 
-# The resolution used on graphical terminal.
-# Note that you can use only modes which your graphic card supports via VBE.
-# You can see them in real GRUB with the command `vbeinfo'.
+# The resolution used on graphical terminal
+# note that you can use only modes which your graphic card supports via VBE
+# you can see them in real GRUB with the command `vbeinfo'
 #GRUB_GFXMODE=640x480
 
-# Path to theme spec txt file.
-# The starfield is by default provided with use truetype.
-# NOTE: when enabling custom theme, ensure you have required font/etc.
-#GRUB_THEME="/boot/grub/themes/starfield/theme.txt"
-
-# Background image used on graphical terminal.
-# Can be in various bitmap formats.
-#GRUB_BACKGROUND="/boot/grub/mybackground.png"
-
-# Uncomment if you don't want GRUB to pass "root=UUID=xxx" parameter to kernel
+# Uncomment if you don't want GRUB to pass "root=UUID=xxx" parameter to Linux
 #GRUB_DISABLE_LINUX_UUID=true
 
 # Uncomment to disable generation of recovery mode menu entries
-#GRUB_DISABLE_RECOVERY=true
+#GRUB_DISABLE_RECOVERY="true"
+
+# Uncomment to get a beep at grub start
+#GRUB_INIT_TUNE="480 440 1"

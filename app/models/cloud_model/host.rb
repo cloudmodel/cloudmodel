@@ -159,7 +159,7 @@ module CloudModel
       @ssh_connection ||= if initial_root_pw
         Net::SSH.start(primary_address.ip, "root",
           password: initial_root_pw, 
-          paranoid: false
+          verify_host_key: false          
         )
       else  
         Net::SSH.start(private_network.list_ips.first, "root",
@@ -259,8 +259,12 @@ module CloudModel
       data
     end
     
-    def mounted_at? mountpoint, root=''
-      exec('mount')[1].match(/on #{root}#{mountpoint} type/)
+    def mounted_at? mountpoint, root=''      
+      if exec('mount')[1].match(/on #{root.gsub(/[\/]$/, '')}\/#{mountpoint.gsub(/^[\/]/, '')} type/)
+        true
+      else
+        false
+      end
     end
     
     def boot_fs_mounted? root=''
@@ -272,13 +276,19 @@ module CloudModel
       if boot_fs_mounted? root
         return true
       else
-        success, data = exec "mkdir -p #{root}/boot && mount /dev/md127 #{root}/boot"
+        success, data = exec "mkdir -p #{root}/boot && mount /dev/md0 #{root}/boot"
         unless success
-          success, data = exec "mount /dev/md/rescue:127 #{root}/boot"
+          success, data = exec "mount /dev/md/rescue:0 #{root}/boot"
         end
         
         return success
       end
+    end
+    
+    def unmount_boot_fs root=''
+      success, data = exec "umount #{root}/boot"  
+    
+      return success
     end
     
     def list_real_volume_groups
@@ -323,6 +333,10 @@ module CloudModel
       [:finished, :failed, :not_started].include? deploy_state
     end
     
+    def worker
+      CloudModel::HostWorker.new self
+    end
+    
     def deploy(options = {})
       unless deployable? or options[:force]
         return false
@@ -336,6 +350,10 @@ module CloudModel
         update_attributes deploy_state: :failed, deploy_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
       end
+    end
+    
+    def deploy!(options={})
+      worker.deploy options
     end
     
     def redeploy(options = {})
@@ -354,8 +372,7 @@ module CloudModel
     end
     
     def redeploy!(options={})
-      host_worker = CloudModel::HostWorker.new self
-      host_worker.redeploy options
+      worker.redeploy options
     end
     
     def buildable?

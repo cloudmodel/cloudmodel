@@ -3,45 +3,54 @@ module CloudModel
     def initialize(host)
       @host = host
       
+      host_services = {
+        'ssh' => {
+          'port' => 22
+        },
+        'tinc-tcp' => {
+          'port' => 655,
+          'proto' => 'tcp'
+        },
+        'tinc-udp' => {
+          'port' => 655,
+          'proto' => 'udp'
+        }
+      }
+      
       rules = {
         @host.primary_address.ip  => {
           'interface' => 'eth0',
-          'services' => {
-            'ssh' => {
-              'port' => 22
-            },
-            'tinc-tcp' => {
-              'port' => 655,
-              'proto' => 'tcp'
-            },
-            'tinc-udp' => {
-              'port' => 655,
-              'proto' => 'udp'
-            }
-          }
+          'services' => host_services
         }
       }
     
       @host.addresses.each do |address|
-        address.list_ips.each do |ip|
-          rules[ip] = {
+        if address.ip_version == 6
+          rules["#{address.ip}2"] = {
             'interface' => 'eth0',
-            'services' => {}
+            'services' => host_services
           }
+        else
+          address.list_ips.each do |ip|
+            rules[ip] = {
+              'interface' => 'eth0',
+              'services' => {}
+            }
         
-          if guest = @host.guests.where(external_address: ip).first
-            rules[ip]['nat'] = guest.private_address
+            if guest = @host.guests.where(external_address: ip).first
+              rules[ip]['nat'] = guest.private_address
           
-            services = guest.services.where(public_service: true).to_a
-            services.each do |service|
-              rules[ip]['services']["#{service.kind}"] ||= {}
-              rules[ip]['services']["#{service.kind}"]['port'] ||= []
-              rules[ip]['services']["#{service.kind}"]['port'] << service.port
+              services = guest.services.where(public_service: true).to_a
+              services.each do |service|
+                rules[ip]['services']["#{service.kind}"] ||= {}
+                rules[ip]['services']["#{service.kind}"]['port'] ||= []
+                rules[ip]['services']["#{service.kind}"]['port'] << service.port
     
-              if service.try :ssl_port and service.try :ssl_supported
-                rules[ip]['services']["#{service.kind}s"] ||= {}
-                rules[ip]['services']["#{service.kind}s"]['port'] ||= []
-                rules[ip]['services']["#{service.kind}s"]['port'] << service.ssl_port
+                if service.try :ssl_port and service.try :ssl_supported
+                  rules[ip]['services']["#{service.kind}s"] ||= {}
+                  rules[ip]['services']["#{service.kind}s"]['port'] ||= []
+                  rules[ip]['services']["#{service.kind}s"]['port'] << service.ssl_port
+                end
               end
             end
           end
@@ -55,7 +64,7 @@ module CloudModel
     end
 
     def parse_ports(ports)
-      if ports.class == Fixnum
+      if ports.class == Integer
         [ports]
       elsif ports.class == String
         ports.split(' ')#.map{|p| p.to_i}
@@ -278,7 +287,7 @@ module CloudModel
     
         if services = host_options.delete(:services)
           services.each do |protocol, config|
-            parsed = if [Fixnum, String].include? config.class
+            parsed = if [Integer, String].include? config.class
               {port: parse_ports(config)}
             else        
               config.keys.each do |key|

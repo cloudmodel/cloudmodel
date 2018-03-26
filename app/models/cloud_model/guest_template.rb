@@ -50,7 +50,7 @@ module CloudModel
     end
     
     def tarball
-      "/inst/templates/#{template_type_id}/#{id}.tar"
+      "/cloud/templates/#{template_type_id}/#{id}.tar"
     end
   end
 end

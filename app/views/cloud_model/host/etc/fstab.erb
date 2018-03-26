@@ -14,12 +14,12 @@
 # <fs>			<mountpoint>	<type>		<opts>		<dump/pass>
 
 # NOTE: If your BOOT partition is ReiserFS, add the notail option to opts.
-/dev/md127              /boot           ext2            noauto,noatime          0 0
+/dev/md0                /boot           ext2            noauto,noatime          0 0
 #/dev/md/rescue:127      /boot           ext2            noauto,noatime          0 0
-/dev/vg0/root-<%= timestamp %>		/		ext4		noatime			0 0
+/dev/md2            		/		ext4		noatime			0 0
+/dev/md1            		/cloud		btrfs		noatime			0 0
 /dev/sda2		            swap    swap		defaults		0 0
 /dev/sdb2               swap            swap            defaults                0 0
-/dev/vg0/inst		/inst		ext4		noatime			0 0
 
 proc			/proc		proc		defaults		0 0
 sysfs			/sys		sysfs		noauto			0 0

@@ -1,0 +1,13 @@
+#!/bin/sh
+
+export dir=$1
+export user=$2
+export group=$3
+export test_dir=$1$4
+
+if [ -n "$(find $test_dir -user "$user" -group "$group" -print -prune -o -prune)" ]; then
+  echo "The directory $test_dir is owned by the user $user and group $group."
+else
+  echo "Fixing $dir to be owned by user $user and group $group"
+  /bin/chown -R $dir:$group $dir
+fi

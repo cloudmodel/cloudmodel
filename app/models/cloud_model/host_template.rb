@@ -1,5 +1,5 @@
 module CloudModel  
-  class GuestCoreTemplate
+  class HostTemplate
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::ENumFields
@@ -30,11 +30,13 @@ module CloudModel
     end
     
     def self.new_template_to_build host
-      CloudModel::GuestCoreTemplate.create arch: host.arch
+      CloudModel::HostTemplate.create arch: host.arch
     end
     
     def self.build!(host, options={})
-      new_template_to_build(host).build! host, options
+      template = new_template_to_build(host)
+      template.build_state = :pending
+      template.build! host, options
     end
     
     def build(host, options = {})
@@ -45,7 +47,7 @@ module CloudModel
       update_attributes build_state: :pending, arch: host.arch
 
       begin
-        CloudModel::call_rake 'cloudmodel:guest_core_template:build', host_id: host.id, template_id: id
+        CloudModel::call_rake 'cloudmodel:host_template:build', host_id: host.id, template_id: id
       rescue Exception => e
         template.update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
@@ -53,11 +55,11 @@ module CloudModel
     end
     
     def worker host
-      CloudModel::GuestTemplateWorker.new host
+      CloudModel::HostTemplateWorker.new host
     end
   
     def build!(host, options={})
-      worker(host).build_core_template self, options
+      worker(host).build_template self, options
     end  
     
     def self.last_useable(host, options={})
@@ -71,7 +73,7 @@ module CloudModel
     end
     
     def tarball
-      "/cloud/templates/core/#{id}.tar"
+      "/cloud/templates/host/#{id}.tar"
     end
   end
 end

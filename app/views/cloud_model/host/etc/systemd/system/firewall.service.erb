@@ -2,6 +2,7 @@
 Description=Establish firewall rules
 # sounds reasonable to have firewall up before any of the services go up
 Before=network.target
+After=lxd
 Conflicts=shutdown.target
 
 [Service]

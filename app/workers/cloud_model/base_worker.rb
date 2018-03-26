@@ -21,7 +21,7 @@ module CloudModel
     
     # render_to_remote template, remote_file, [[perms], locals]
     def render_to_remote template, remote_file, *param_array
-      perm = if param_array.first.is_a? Fixnum
+      perm = if param_array.first.is_a? Integer
         param_array.shift 
       else
         0600
@@ -46,6 +46,7 @@ module CloudModel
     
     def prepare_chroot chroot_dir, options={}
       @chroot_prepared ||= {}
+      chroot_dir = chroot_dir.gsub(/[\/]$/, '') # Remove tailing slashes from path
       
       return true if @chroot_prepared[chroot_dir] and not options[:force]
       
@@ -67,7 +68,8 @@ module CloudModel
     
     def cleanup_chroot chroot_dir
       @chroot_prepared ||= {}
-
+      chroot_dir = chroot_dir.gsub(/[\/]$/, '') # Remove tailing slashes from path
+      
       if @host.mounted_at? "#{chroot_dir}/dev/pts"
         @host.exec! "umount #{chroot_dir}/dev/pts", 'Failed to unmount dev to build system'
       end
@@ -132,6 +134,7 @@ module CloudModel
     end
     
     def download_template template
+      return if CloudModel.config.skip_sync_images
       # Download build template to local distribution  
       tarball_target = "#{CloudModel.config.data_directory}#{template.tarball}"   
       FileUtils.mkdir_p File.dirname(tarball_target)
@@ -141,6 +144,7 @@ module CloudModel
     end
     
     def upload_template template
+      return if CloudModel.config.skip_sync_images
       # Upload build template to host
       srcball_target = "#{CloudModel.config.data_directory}#{template.tarball}"  
       mkdir_p File.dirname(template.tarball)
@@ -150,6 +154,7 @@ module CloudModel
     end
   
     def upsync_templates
+      return if CloudModel.config.skip_sync_images
       command = "rsync -avz -e 'ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' #{CloudModel.config.data_directory.shellescape}/inst/templates root@#{@host.ssh_address}:/inst/templates"
       Rails.logger.debug command
       local_exec! command, 'Failed to upsync templates'
@@ -201,31 +206,33 @@ module CloudModel
             print "#{' ' * indent}(#{counter_prefix}#{counter}) For #{object.name}"
             
             if skip_to > counter
-              puts " [Skipped]"
+              puts "[Skipped]"
             else
               if options[:pretend]
-                puts " [Done (pretended)]"
+                puts "[Done (pretended)]"
               else
                 ts = Time.now
                 self.send step[1], object
-                puts " [Done in #{distance_of_time_in_words_to_now ts}]"
+                #self.send command, object
+                puts "[Done in #{distance_of_time_in_words_to_now ts}]"
               end
             end
           end
         else
           if options[:pretend]
-            puts " [Done (pretended)]"
+            puts "[Done (pretended)]"
           else
             ts = Time.now
-            self.send step[1]   
-            puts " [Done in #{distance_of_time_in_words_to_now ts}]"   
+            #self.send step[1]   
+            self.send command
+            puts "[Done in #{distance_of_time_in_words_to_now ts}]"   
           end
         end
       rescue Exception => e
         if e.class == RuntimeError and e.message == 'skipped'
-          puts " [Skipped]"
+          puts "[Skipped]"
         else
-          puts " [Failed after #{distance_of_time_in_words_to_now ts}]"
+          puts "[Failed after #{distance_of_time_in_words_to_now ts}]"
           puts ''
           CloudModel.log_exception e
           @host.update_attributes :"#{stage}_state" => :failed, :"#{stage}_last_issue" => "#{e}"
@@ -246,8 +253,45 @@ module CloudModel
       [skip_to_string, skip_to]
     end
     
+    def current_indent
+      @current_indent ||= 2
+    end
+    
+    def set_indent indent
+      unless indent.blank?
+        @current_indent = indent
+      end
+    end
+    
+    def increase_indent
+      @current_indent = current_indent + 2
+    end
+    
+    def decrease_indent
+      @current_indext = current_indent - 2
+    end
+    
+    def current_counter_prefix
+      @current_counter_prefix
+    end
+    
+    def current_counter_prefix=prefix
+      @current_counter_prefix=prefix
+    end
+    
+    def debug message
+      puts ""
+      print "#{' ' * (current_indent + 4)} [#{message}] "
+    end
+    
+    def comment_sub_step message, options = {}
+      comment_indent = options[:indent] || 2
+      puts ""
+      print "#{' ' * (current_indent + comment_indent)}* #{message} "
+    end
+    
     def run_steps stage, steps, options={}
-      indent = options[:indent] || 2
+      set_indent options[:indent] 
       
       counter_prefix = options[:counter_prefix] || ''
       counter = 0
@@ -257,31 +301,38 @@ module CloudModel
       steps.each do |step|
         counter += 1
         
+        current_counter_prefix = "#{counter_prefix}#{counter}."
+        
         step_options = options.merge(
-          indent: indent+2, 
-          counter_prefix: "#{counter_prefix}#{counter}.",
+          #indent: indent+2, 
+          counter_prefix: current_counter_prefix,
           skip_to: skip_to == counter ? skip_to_string : ''
         )
         
         step = [step.to_s.humanize, step] if step.class == Symbol
         
-        print "#{' ' * indent}(#{counter_prefix}#{counter}) #{step[0]}"
+        print "#{' ' * current_indent}(#{counter_prefix}#{counter}) #{step[0]} "
+        
         
         if skip_to > counter
           if step[2] and step[2][:on_skip]
-            print " (Run skip action)"
+            print "(Run skip action #{step[2][:on_skip]})"
             run_step_command stage, step[2][:on_skip], step, step_options
           else
-            puts " [Skipped]"
+            puts "[Skipped]"
           end
         else
           if step[1].class == Array
             puts ':'
+            increase_indent
             run_steps stage, step[1], step_options
+            decrease_indent
           else
             run_step_command stage, step[1], step, step_options
           end
         end
+        
+        
       end   
     end
     

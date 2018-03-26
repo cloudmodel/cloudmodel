@@ -29,7 +29,7 @@ module CloudModel
     end
     
     def ubuntu_mirror
-      @ubuntu_mirror || 'archive.ubuntu.com'
+      @ubuntu_mirror || 'http://archive.ubuntu.com/ubuntu/'
     end
     
     def ubuntu_deb_src

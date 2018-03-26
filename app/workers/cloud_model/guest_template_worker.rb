@@ -15,12 +15,12 @@ module CloudModel
     end
     
     def build_core_template template, options={}
-      ubuntu_version = "16.04.1"
+      ubuntu_version = "16.04.3"
       ubuntu_arch = template.arch
       ubuntu_image = "ubuntu-base-#{ubuntu_version}-base-#{ubuntu_arch}.tar.gz"
       ubuntu_url = "http://cdimage.ubuntu.com/ubuntu-base/releases/#{ubuntu_version}/release/#{ubuntu_image}"
 
-      build_path = "/inst/templates/build/core/#{template.id}"
+      build_path = "/cloud/build/core/#{template.id}"
       
       return false unless template.build_state == :pending or options[:force]
       template.update_attributes build_state: :running, os_version: "ubuntu-#{ubuntu_version}"
@@ -31,7 +31,7 @@ module CloudModel
         begin
           @host.sftp.stat!("/inst/#{ubuntu_image}")
         rescue
-          puts "    Download Ubutu Core #{ubuntu_version}"
+          puts "    Download Ubutu Base #{ubuntu_version}"
           @host.exec! "cd /inst && curl #{ubuntu_url.shellescape} -o /inst/#{ubuntu_image}", "Failed to download ubuntu image"
         end
 
@@ -49,7 +49,7 @@ module CloudModel
         render_to_remote  "/cloud_model/support/etc/dpkg/dpkg.cfg.d/01_nodoc", "#{build_path}/etc/dpkg/dpkg.cfg.d/01_nodoc"
 
         # Update package list
-        puts "    Update core system"
+        puts "    Update base system"
         chroot! build_path, "apt-get update && apt-get upgrade -y", "Failed to update sources"
       
         # Autologin
@@ -112,7 +112,7 @@ module CloudModel
       template.update_attribute :build_state, :running
     
       begin
-        build_path = "/inst/templates/build/#{template.template_type.id}/#{template.id}"      
+        build_path = "/cloud/build/#{template.template_type.id}/#{template.id}"      
         
         mkdir_p build_path
                 

@@ -83,6 +83,7 @@ module CloudModel
     end
     
     def list_ips
+      return [] if ip_version==6 # Don't list ips for IPV6
       if range?
         cidr.enumerate[1..-2]
       else
