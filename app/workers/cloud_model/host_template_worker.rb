@@ -108,6 +108,7 @@ module CloudModel
       chroot! build_path, "apt-get install tinc -y", "Failed to install tinc"
       mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
       chroot! build_path, "ln -s /lib/systemd/system/tinc.service /etc/systemd/system/basic.target.wants/tinc.service", "Failed to add tinc to autostart"
+      chroot! build_path, "echo vpn >> /etc/tinc/nets.boot", "Failed to add vpn to boot networks of tinc"
     end
     
     def install_lxd
