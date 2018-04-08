@@ -31,11 +31,11 @@ ExecStart=/bin/ip route add default via <%= host.primary_address.gateway %>
 
 # Config bridge for guests
 
-# <%- bridge_dev = 'virbr0' -%>
-# ExecStart=/sbin/brctl addbr <%= bridge_dev %>
-# ExecStart=/sbin/brctl stp <%= bridge_dev %> on
-# #ExecStart=/sbin/brctl setfd <%= bridge_dev %> 0
-# ExecStart=/sbin/brctl sethello <%= bridge_dev %> 10
+<%- bridge_dev = 'virbr0' -%>
+ExecStart=/sbin/brctl addbr <%= bridge_dev %>
+ExecStart=/sbin/brctl stp <%= bridge_dev %> on
+#ExecStart=/sbin/brctl setfd <%= bridge_dev %> 0
+ExecStart=/sbin/brctl sethello <%= bridge_dev %> 10
 
 ExecStart=/bin/ip link set <%= bridge_dev %> up
 ExecStart=/bin/ip addr add <%= host.private_network.list_ips.first %>/<%= host.private_network.subnet %> dev <%= bridge_dev %>

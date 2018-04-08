@@ -1,7 +1,8 @@
 module CloudModel
   class Config 
     attr_writer :data_directory, :backup_directory, :bundle_command
-    attr_writer :skip_sync_images, :gentoo_mirrors
+    attr_writer :skip_sync_images
+    attr_accessor :use_external_ip
     attr_writer :xmpp_port
     attr_accessor :xmpp_server, :xmpp_user, :xmpp_password
     attr_writer :ubuntu_mirror, :ubuntu_deb_src

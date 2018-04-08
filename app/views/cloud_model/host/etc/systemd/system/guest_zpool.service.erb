@@ -6,7 +6,7 @@ Conflicts=shutdown.target
 [Service]
 Type=oneshot
 # Try to create guests pool; exists with error code if already exist
-ExecStartPre=/sbin/zpool create guests mirror sda6 sdb6
+ExecStartPre=-/sbin/zpool create guests mirror sda6 sdb6
 # Init lxd if zpool create did not exit with error code aka create success
 ExecStart=/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests
 

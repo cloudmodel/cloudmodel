@@ -162,7 +162,13 @@ module CloudModel
           verify_host_key: false          
         )
       else  
-        Net::SSH.start(private_network.list_ips.first, "root",
+        host_ip = if CloudModel.config.use_external_ip
+          primary_address.ip
+        else
+          private_network.list_ips.first
+        end
+        
+        Net::SSH.start(host_ip, "root",
           keys: ["#{CloudModel.config.data_directory}/keys/id_rsa"],
           keys_only: true,
           password: ''

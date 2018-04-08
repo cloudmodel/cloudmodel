@@ -23,7 +23,7 @@ module CloudModel
     end
     
     def ubuntu_version 
-      "16.04.4"
+      "18.04-beta2"
     end
     
     def ubuntu_kernel_flavour
@@ -39,14 +39,19 @@ module CloudModel
     end
     
     def ubuntu_url
-      "http://cdimage.ubuntu.com/ubuntu-base/releases/#{ubuntu_version}/release/#{ubuntu_image}"
+      if(ubuntu_version =~ /-beta/)
+        version = ubuntu_version.split('-')
+        "http://cdimage.ubuntu.com/ubuntu-base/releases/#{version[0]}/#{version[1].gsub('beta', 'beta-')}/#{ubuntu_image}"
+      else
+        "http://cdimage.ubuntu.com/ubuntu-base/releases/#{ubuntu_version}/release/#{ubuntu_image}"
+      end
     end
-    
     
     def download_ubuntu
       begin
         @host.sftp.stat!("#{download_path}#{ubuntu_image}")
       rescue
+        comment_sub_step "Downloading #{ubuntu_url}"
         @host.exec! "cd #{download_path} && curl #{ubuntu_url.shellescape} -o #{download_path}#{ubuntu_image}", "Failed to download ubuntu image"
       end
     end
@@ -78,18 +83,18 @@ module CloudModel
       comment_sub_step 'Install btrfs'
       chroot! build_path, "apt-get install sudo btrfs-tools -y", "Failed to install btrfs"
       comment_sub_step 'Install zfs'
-      chroot! build_path, "apt-get install sudo zfs -y", "Failed to install zfs"
+      chroot! build_path, "apt-get install sudo zfs-dkms -y", "Failed to install zfs"
       # Init zfspool on first boot if needed
       render_to_remote "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{build_path}/etc/systemd/system/guest_zpool.service"      
       mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
       chroot! build_path, "ln -s /etc/systemd/system/guest_zpool.service /etc/systemd/system/basic.target.wants/guest_zpool.service", "Failed to add guest_zpool to autostart"
+      comment_sub_step 'Install curl'
+      chroot! build_path, "apt-get install sudo curl -y", "Failed to install curl"
     end
     
     def install_network
       comment_sub_step 'Install netbase'
-      chroot! build_path, "apt-get install netbase -y", "Failed to install network base"
-      comment_sub_step 'Install iptables'
-      chroot! build_path, "apt-get install iptables -y", "Failed to install iptables"
+      chroot! build_path, "apt-get install netbase iproute2 iptables -y", "Failed to install network base"
       comment_sub_step 'Install bridge-utils'
       chroot! build_path, "apt-get install bridge-utils -y", "Failed to install bridge-utils"
 
@@ -112,6 +117,8 @@ module CloudModel
     end
     
     def install_lxd
+      comment_sub_step 'Install apparmor'
+      chroot! build_path, "apt-get install apparmor-utils -y", "Failed to install apparmor"
       comment_sub_step 'Install LXD'
       chroot! build_path, "apt-get install lxd -y", "Failed to install LXD"
       
