@@ -2,7 +2,6 @@ module CloudModel
   module Components
     class ShinkenWorker < BaseWorker
       def build build_path
-        puts "        Install shinken and graphite-web"
         packages = %w(nagios-plugins)
         packages += %w(mongodb-clients python-pycurl python-sqlite python-cherrypy3)
         packages += %w(graphite-carbon graphite-web) # Graphite/Carbon

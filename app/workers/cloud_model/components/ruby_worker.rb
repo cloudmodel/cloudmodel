@@ -4,7 +4,6 @@ module CloudModel
       def build build_path
         # Ruby deps needed for most rails projects
         # TODO: Consider separating them to more Components
-        puts "        Install ruby deps"
         packages = %w(ruby git bundler)
         packages += %w(zlib1g-dev libxml2-dev) # Nokogiri
         packages << 'ruby-bcrypt' # bcrypt      

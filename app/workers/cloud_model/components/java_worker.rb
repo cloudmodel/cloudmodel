@@ -2,7 +2,6 @@ module CloudModel
   module Components
     class JavaWorker < BaseWorker
       def build build_path
-        puts "        Install Java"
         # Java needs man directory
         mkdir_p "#{build_path}/usr/share/man/man1/"
         

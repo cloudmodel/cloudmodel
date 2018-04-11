@@ -6,7 +6,7 @@ module CloudModel
     has_many :templates, class_name: 'CloudModel::GuestTemplate'
     
     field :name
-    field :components, type: Array
+    field :components, type: Array, default: []
     
     def new_template host
       core_template = CloudModel::GuestCoreTemplate.last_useable(host)
