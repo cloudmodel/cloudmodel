@@ -1,0 +1,10 @@
+[Unit]
+Description=dhclient on all interfaces
+Wants=network.target
+Before=network.target
+
+[Service]
+ExecStart=/sbin/dhclient -4 -q
+
+[Install]
+WantedBy=multi-user.target

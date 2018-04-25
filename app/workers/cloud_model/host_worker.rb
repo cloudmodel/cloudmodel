@@ -20,8 +20,6 @@ module CloudModel
       #
       
       CloudModel::FirewallWorker.new(@host).write_scripts root: root
-    
-      #@host.exec! "ln -sf /etc/init.d/cloudmodel #{root}/etc/runlevels/default/", 'failed to add firewall to autostart'     
     end
 
     def config_fstab
@@ -30,34 +28,6 @@ module CloudModel
       #
       
       render_to_remote '/cloud_model/host/etc/fstab', "#{root}/etc/fstab", host: @host, timestamp: @timestamp
-    end
-  
-    def config_libvirt_guests
-      #
-      # Configure libvirt guests
-      #
-      
-      FileUtils.rm_rf "#{root}/etc/libvirt/lxc/autostart/"
-      mkdir_p "#{root}/etc/libvirt/lxc/autostart/"
-      @host.guests.each do |guest|
-        #
-        # Generate xml file in /etc/libvirt/lxc/
-        #
-        
-        render_to_remote "/cloud_model/host/etc/libvirt/lxc/guest.xml", "#{root}/etc/libvirt/lxc/#{guest.name}.xml", guest: guest
-
-        #
-        # Link maschine to /etc/libvirt/lxc/autostart/
-        #
-        
-        @host.sftp.symlink! "/etc/libvirt/lxc/#{guest.name}.xml", "#{root}/etc/libvirt/lxc/autostart/#{guest.name}.xml"
-        
-        #
-        # Make dir for vm root
-        #
-        
-        mkdir_p "#{root}/vm/#{guest.name}"
-      end
     end
   
     def boot_deploy_root options={}
@@ -228,27 +198,11 @@ module CloudModel
     end
     
     def use_last_deploy_root
-      # real_volumes = @host.volume_groups.first.list_real_volumes
-     #  raise 'Unable to get real volume list' unless real_volumes
-     #  last_volume = real_volumes.keys.find_all{|i| i.to_s.match /\Aroot-[0-9]*\z/}.sort{|a,b| b.to_s <=> a.to_s}.first
-     #  if last_volume
-     #    @timestamp = last_volume.to_s.sub /\Aroot-([0-9]*)\z/, '\1'
-     #    @deploy_lv = CloudModel::LogicalVolume.where(name: "root-#{@timestamp}").first
-     #    unless @deploy_lv
-     #      @deploy_lv = CloudModel::LogicalVolume.new name: "root-#{@timestamp}", disk_space: real_volumes[last_volume][:l_size], volume_group: @host.volume_groups.first
-     #    end
-     #    @deploy_lv.mount "#{root}"
-     #  else
-     #    raise 'No last deploy root lv found'
-     #  end
-     
-     unless @host.mounted_at? root
-       mkdir_p root
-       @host.exec "umount #{deploy_root_device}"
-       @host.exec! "mount #{deploy_root_device} #{root}", "Failed to mount system fs"
-     end
-     
-     
+      unless @host.mounted_at? root
+        mkdir_p root
+        @host.exec "umount #{deploy_root_device}"
+        @host.exec! "mount #{deploy_root_device} #{root}", "Failed to mount system fs"
+      end    
     end
     
     
@@ -337,6 +291,8 @@ module CloudModel
     
     def config_lxd
       chroot root, "/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests"
+      # lxc storage set default volume.zfs.use_refquota true
+      chroot root, "/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=#{host.private_network} ipv4.nat=true"
     end
     
     def copy_lxd

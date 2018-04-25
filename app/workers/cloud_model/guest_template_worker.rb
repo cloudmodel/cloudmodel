@@ -25,7 +25,10 @@ module CloudModel
     
     def install_network
       comment_sub_step 'Install netbase'
-      chroot! build_path, "apt-get install netbase iproute2 -y", "Failed to install network base"
+      chroot! build_path, "apt-get install netbase iproute2 isc-dhcp-client -y", "Failed to install network base"
+      render_to_remote "/cloud_model/guest/etc/systemd/system/dhclient.service", "#{build_path}/etc/systemd/system/dhclient.service"
+      mkdir_p "#{build_path}/etc/systemd/system/multi-user.target.wants"   
+      chroot! build_path, "ln -s /etc/systemd/system/dhclient.service /etc/systemd/system/multi-user.target.wants/dhclient.service", "Failed to enable dhclient service"     
     end
     
     def install_check_mk_agent

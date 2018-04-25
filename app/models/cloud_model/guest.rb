@@ -13,8 +13,8 @@ module CloudModel
     embeds_many :services, class_name: "CloudModel::Services::Base"    
     embeds_many :lxd_containers, class_name: "CloudModel::LxdContainer"
     
-    has_one :root_volume, class_name: "CloudModel::LogicalVolume", inverse_of: :guest, autobuild: true
-    accepts_nested_attributes_for :root_volume
+    # has_one :root_volume, class_name: "CloudModel::LogicalVolume", inverse_of: :guest, autobuild: true
+    # accepts_nested_attributes_for :root_volume
     has_many :guest_volumes, class_name: "CloudModel::GuestVolume"
     accepts_nested_attributes_for :guest_volumes, allow_destroy: true
     
@@ -23,6 +23,7 @@ module CloudModel
     field :private_address, type: String
     field :external_address, type: String
     
+    field :root_fs_size, type: Integer, default: 10737418240
     field :memory_size, type: Integer, default: 2147483648
     field :cpu_count, type: Integer, default: 2
     
@@ -36,9 +37,9 @@ module CloudModel
     
     field :deploy_last_issue, type: String
     attr_accessor :deploy_path, :deploy_volume
-    def deploy_volume
-      @deploy_volume ||= root_volume
-    end
+    # def deploy_volume
+    #   @deploy_volume ||= root_volume
+    # end
     
     def deploy_path
       @deploy_path ||= base_path
@@ -359,9 +360,9 @@ module CloudModel
       self.private_address = host.dhcp_private_address unless private_address
     end
     
-    def set_root_volume_name
-      root_volume.name = "#{name}-root-#{Time.now.strftime "%Y%m%d%H%M%S"}" unless root_volume.name
-      root_volume.volume_group = host.volume_groups.first unless root_volume.volume_group
-    end
+    # def set_root_volume_name
+    #   root_volume.name = "#{name}-root-#{Time.now.strftime "%Y%m%d%H%M%S"}" unless root_volume.name
+    #   root_volume.volume_group = host.volume_groups.first unless root_volume.volume_group
+    # end
   end
 end

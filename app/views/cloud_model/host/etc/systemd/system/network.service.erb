@@ -31,14 +31,14 @@ ExecStart=/bin/ip route add default via <%= host.primary_address.gateway %>
 
 # Config bridge for guests
 
-<%- bridge_dev = 'virbr0' -%>
-ExecStart=/sbin/brctl addbr <%= bridge_dev %>
-ExecStart=/sbin/brctl stp <%= bridge_dev %> on
-#ExecStart=/sbin/brctl setfd <%= bridge_dev %> 0
-ExecStart=/sbin/brctl sethello <%= bridge_dev %> 10
-
-ExecStart=/bin/ip link set <%= bridge_dev %> up
-ExecStart=/bin/ip addr add <%= host.private_network.list_ips.first %>/<%= host.private_network.subnet %> dev <%= bridge_dev %>
+# <%- bridge_dev = 'virbr0' -%>
+# ExecStart=/sbin/brctl addbr <%= bridge_dev %>
+# ExecStart=/sbin/brctl stp <%= bridge_dev %> on
+# #ExecStart=/sbin/brctl setfd <%= bridge_dev %> 0
+# ExecStart=/sbin/brctl sethello <%= bridge_dev %> 10
+#
+# ExecStart=/bin/ip link set <%= bridge_dev %> up
+# ExecStart=/bin/ip addr add <%= host.private_network.list_ips.first %>/<%= host.private_network.subnet %> dev <%= bridge_dev %>
 
 # Enable forwarding on IPV4 and IPV6
 
@@ -47,9 +47,9 @@ ExecStart=/bin/bash -c '/bin/echo 1 >/proc/sys/net/ipv6/conf/all/forwarding'
 
 # Bring Network down
 
-ExecStop=/bin/ip addr flush dev <%= bridge_dev %>
-ExecStop=/bin/ip link set dev <%= bridge_dev %> down
-ExecStop=/sbin/brctl delbr <%= bridge_dev %>
+# ExecStop=/bin/ip addr flush dev <%= bridge_dev %>
+# ExecStop=/bin/ip link set dev <%= bridge_dev %> down
+# ExecStop=/sbin/brctl delbr <%= bridge_dev %>
 
 ExecStop=/bin/ip addr flush dev eth0
 ExecStop=/bin/ip link set dev eth0 down

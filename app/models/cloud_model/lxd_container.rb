@@ -11,7 +11,10 @@ module CloudModel
     
     
     def before_destroy
-      return false if running?
+      if running?
+        puts "Can't destroy running container; stop it first"
+        return false
+      end
 
       true
     end
@@ -84,6 +87,11 @@ module CloudModel
       set_config 'raw.lxc', "'lxc.mount.auto = cgroup'"
       set_config 'limits.cpu', guest.cpu_count
       set_config 'limits.memory', guest.memory_size
+      
+      puts lxc("config device set #{name} root size #{guest.root_fs_size}") # todo: fix disk quota
+      
+      lxc "network attach lxdbr0 #{name} eth0"
+      puts lxc("config device set #{name} eth0 ipv4.address #{guest.private_address}")
     end
   end
 end
