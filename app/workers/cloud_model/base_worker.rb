@@ -140,7 +140,7 @@ module CloudModel
       FileUtils.mkdir_p File.dirname(tarball_target)
       command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa root@#{@host.ssh_address}:#{template.tarball.shellescape} #{tarball_target.shellescape}"
       Rails.logger.debug command
-      local_exec! command, "Failed to download built template"
+      local_exec! command, "Failed to download archived template"
     end
     
     def upload_template template
@@ -177,7 +177,7 @@ module CloudModel
         params
       end
 
-      cmd = "tar cf #{dst.shellescape} "
+      cmd = "tar czf #{dst.shellescape} "
 
       options.each do |k,v|
         param = k.to_s.gsub('_', '-').shellescape

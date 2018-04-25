@@ -50,7 +50,41 @@ module CloudModel
       tar_template build_path, @template
     end
     
+    def pack_manifest
+      mkdir_p "#{build_path}/templates"
+      render_to_remote "/cloud_model/guest_template/metadata.yaml", "#{build_path}/metadata.yaml", template: @template 
+      %w(hosts.tpl hostname.tpl).each do |file|
+        render_to_remote "/cloud_model/guest_template/#{file}", "#{build_path}/templates/#{file}", template: @template 
+      end
+      
+      @host.exec! "cd #{build_path} && tar czvf #{@template.lxd_image_metadata_tarball} metadata.yaml templates/*", "Failed to write metadata"
+    end
     
+    def download_template template
+      return if CloudModel.config.skip_sync_images
+      
+      super template
+      
+      # Download build template to local distribution  
+      tarball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"   
+      FileUtils.mkdir_p File.dirname(tarball_target)
+      command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape} #{tarball_target.shellescape}"
+      Rails.logger.debug command
+      local_exec! command, "Failed to download archived metadata"
+    end
+    
+    def upload_template template
+      return if CloudModel.config.skip_sync_images
+      
+      super template
+      
+      # Upload build template to host
+      srcball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"  
+      mkdir_p File.dirname(template.tarball)
+      command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa #{srcball_target.shellescape} root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape}"
+      Rails.logger.debug command
+      local_exec! command, "Failed to upload built metadata"
+    end
     
     def build_core_template template, options={}     
       return false unless template.build_state == :pending or options[:force]
@@ -107,7 +141,7 @@ module CloudModel
         comment_sub_step "Downloading core template"
         upload_template @template.core_template
       end
-      @host.exec! "cd #{build_path} && tar xvf #{@template.core_template.tarball.shellescape}", "Failed to unpack core template"
+      @host.exec! "cd #{build_path} && tar xzpf #{@template.core_template.tarball.shellescape}", "Failed to unpack core template"
       # Copy resolv.conf
       @host.exec! "rm #{build_path}/etc/resolv.conf", "Failed to remove old resolve conf"
       @host.exec! "cp /etc/resolv.conf #{build_path}/etc", "Failed to copy resolve conf"
@@ -126,7 +160,7 @@ module CloudModel
         component.build build_path
       end
     end
-    
+        
     def build_template(template, options={})
       return false unless template.build_state == :pending or options[:force]
       
@@ -141,6 +175,7 @@ module CloudModel
         ["Download Core Template #{@template.core_template.id}", :fetch_core_template],
         ["Install Components", :install_components],
         ["Pack template tarball", :pack_template],
+        ["Create lxd manifest", :pack_manifest],
         ["Download template tarball", :download_new_template],
         ["Finalize", :finalize_template]       
       ]

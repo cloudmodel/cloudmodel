@@ -10,7 +10,9 @@ module CloudModel
     include CloudModel::ENumFields
   
     belongs_to :host, class_name: "CloudModel::Host"
-    embeds_many :services, class_name: "CloudModel::Services::Base"
+    embeds_many :services, class_name: "CloudModel::Services::Base"    
+    embeds_many :lxd_containers, class_name: "CloudModel::LxdContainer"
+    
     has_one :root_volume, class_name: "CloudModel::LogicalVolume", inverse_of: :guest, autobuild: true
     accepts_nested_attributes_for :root_volume
     has_many :guest_volumes, class_name: "CloudModel::GuestVolume"
@@ -46,11 +48,11 @@ module CloudModel
       
     validates :name, presence: true, uniqueness: { scope: :host }, format: {with: /\A[a-z0-9\-_]+\z/}
     validates :host, presence: true
-    validates :root_volume, presence: true
+    #validates :root_volume, presence: true
     validates :private_address, presence: true
     
     before_validation :set_dhcp_private_address, :on => :create
-    before_validation :set_root_volume_name
+    #before_validation :set_root_volume_name
     before_destroy    :undefine
     
     VM_STATES = {
@@ -210,6 +212,11 @@ module CloudModel
         update_attributes deploy_state: :failed, deploy_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
       end
+    end
+    
+    def deploy!(options={})
+      guest_worker = CloudModel::GuestWorker.new self
+      guest_worker.deploy options
     end
     
     def redeploy(options = {})

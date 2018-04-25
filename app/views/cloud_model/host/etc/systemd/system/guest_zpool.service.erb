@@ -1,6 +1,6 @@
 [Unit]
 Description=Bootstrap zfs pool for guests
-Before=network.target lxd.service
+Before=network.target lxd.service lxd.socket
 Conflicts=shutdown.target
 
 [Service]

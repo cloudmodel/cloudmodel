@@ -1,0 +1,28 @@
+{
+    "architecture": "<%= template.lxd_arch %>",
+    "creation_date": <%= template.created_at.to_i %>,
+    "properties": {
+        "architecture": "<%= template.lxd_arch %>",
+        "description": "<%= template.name %>",
+        "name": "ubuntu-cloudmodel-<%= template.id %>-<%= CloudModel.config.ubuntu_version %>-<%= CloudModel.config.ubuntu_name.gsub(" ", "").underscore %>-<%= template.arch %>",
+        "os": "ubuntu",
+        "release": "<%= CloudModel.config.ubuntu_name %>",
+        "variant": "<%= CloudModel.config.ubuntu_version %>"
+    },
+    "templates": {
+        "/etc/hostname": {
+            "template": "hostname.tpl",
+            "when": [
+                "create",
+                "copy"
+            ]
+        },
+        "/etc/hosts": {
+            "template": "hosts.tpl",
+            "when": [
+                "create",
+                "copy"
+            ]
+        }
+    }
+}

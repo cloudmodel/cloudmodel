@@ -49,8 +49,29 @@ module CloudModel
       guest_template_worker.build_template self, options
     end
     
+    def lxd_arch
+      case arch
+      when 'amd64'
+        'x86_64'
+      else
+        arch
+      end
+    end
+    
+    def name
+      "#{template_type.name} (#{created_at.strftime("%Y%m%d %H:%M:%S")})"
+    end
+    
+    def lxd_image_metadata_tarball
+      "/cloud/templates/#{template_type_id}/#{id}.lxd.tar.gz"
+    end
+    
+    def lxd_alias
+      "#{template_type_id}/#{id}"
+    end
+    
     def tarball
-      "/cloud/templates/#{template_type_id}/#{id}.tar"
+      "/cloud/templates/#{template_type_id}/#{id}.tar.gz"
     end
   end
 end

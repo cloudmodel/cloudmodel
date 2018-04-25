@@ -5,7 +5,7 @@ module CloudModel
     end
     
     def ubuntu_version 
-      "18.04-beta2"
+      CloudModel.config.ubuntu_version
     end
     
     def ubuntu_kernel_flavour

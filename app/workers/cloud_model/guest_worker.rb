@@ -13,8 +13,77 @@ module CloudModel
     def guest
       @guest
     end
+    
+    def ensure_template
+      @template = @guest.template
+                  
+      begin
+        @host.sftp.stat!("#{@template.tarball}")
+        @host.sftp.stat!("#{@template.lxd_image_metadata_tarball}")
+      rescue
+        puts '      Uploading template'
+        upload_template @template
+      end
+    end
+    
+    def ensure_lcd_image  
+      guest.lxd_containers.new.import_template
+      #@host.exec "lxc image import #{@template.lxd_image_metadata_tarball} #{@template.tarball} --alias #{@template.template_type_id}/#{@template.id}"    
+    end     
+    
+    def create_lxd_container
+      @lxc = guest.lxd_containers.create
+      #@host.exec! "lxc create #{@template.template_type_id}/#{@template.id} #{guest.name.shellescape}", "Failed to launch LXD container"
+    end
+    
+    def config_lxd_container
+      @lxc.config_from_guest
+      #@host.exec! "lxc config set #{guest.name.shellescape} raw.lxc 'lxc.mount.auto = cgroup'"
+      #@host.exec! "lxc config set #{guest.name.shellescape} limits.cpu #{guest.cpu_count}"
+    end
+    
+    def start_lxd_container
+      @lxc.start
+      #@host.exec! "lxc start #{guest.name.shellescape}"
+    end
+         
+    def deploy options={}
+      return false unless @host.deploy_state == :pending or options[:force]
+      
+      @host.update_attributes deploy_state: :running, deploy_last_issue: nil
+      
+      build_start_at = Time.now
+      
+      steps = [
+        ['Sync template', :ensure_template, no_skip: true],
+        ['Ensure LXD image', :ensure_lcd_image, no_skip: true],
+        ['Create LXD container', :create_lxd_container],
+        ['Config LXD container', :config_lxd_container],
+        ['Launch LXD container', :start_lxd_container]
+        
+        # ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
+       #  ['Populate volume with new system image', :populate_deploy_root],
+       #  ['Make crypto keys', :make_keys],
+       #  ['Config new system', :config_deploy_root],
+       #  # TODO: apply existing guests and restore backups
+       #  ['Write boot config and reboot', :boot_deploy_root],
+      ]
+      
+      run_steps :deploy, steps, options
+      
+      @host.update_attributes deploy_state: :finished
+      
+      puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"      
+    end
+  
+    def redeploy options={}
+      deploy options
+    end
+         
+    # -----   
           
-    def deploy
+          
+    def deploy_old
       return false unless @guest.deploy_state == :pending  
       @guest.update_attributes deploy_state: :running, deploy_last_issue: nil
       
@@ -43,7 +112,7 @@ module CloudModel
       end
     end
   
-    def redeploy options={}
+    def redeploy_old options={}
       return false unless @guest.deploy_state == :pending or options[:force]
       @guest.update_attributes deploy_state: :running, deploy_last_issue: nil
       
@@ -172,7 +241,7 @@ module CloudModel
         upload_template template
       end
       
-      @host.exec! "cd #{@guest.deploy_path.shellescape} && tar xf #{template.tarball.shellescape}", 'Failed to unpack template'
+      @host.exec! "cd #{@guest.deploy_path.shellescape} && tar xzf #{template.tarball.shellescape}", 'Failed to unpack template'
     end
 
     def config_guest

@@ -92,7 +92,7 @@ module CloudModel
         # Reboot host
         #
         
-        #@host.exec! 'reboot', 'Failed to reboot host'
+        @host.exec! 'reboot', 'Failed to reboot host'
       end
     end
   
@@ -266,7 +266,7 @@ module CloudModel
       #
       # Populate deploy root with system image
       #
-      @host.exec! "cd #{root} && tar xpf #{tarball}", "Failed to unpack system image!"
+      @host.exec! "cd #{root} && tar xzpf #{tarball}", "Failed to unpack system image!"
     
       mkdir_p "#{root}/inst"
     end
@@ -307,10 +307,9 @@ module CloudModel
   
       config_fstab
       
-      comment_sub_step 'config guests'
-      
-      config_libvirt_guests
-      
+      comment_sub_step 'config open files'
+      render_to_remote "/cloud_model/host/etc/sysctl.conf", "#{root}/etc/sysctl.conf", host: @host
+      render_to_remote "/cloud_model/host/etc/security/limits.conf", "#{root}/etc/security/limits.conf", host: @host      
       
       comment_sub_step 'config ssh keys'
       # Config /root/.ssh/authorized_keys
@@ -332,13 +331,16 @@ module CloudModel
       comment_sub_step 'config lm_sensors'
             
       chroot root, "/usr/sbin/sensors-detect --auto"
-      
-      comment_sub_step 'config LXD'
-      
-      chroot root, "/usr/bin/lxd init --auto"
-      
-      
+            
       return true
+    end
+    
+    def config_lxd
+      chroot root, "/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests"
+    end
+    
+    def copy_lxd
+      @host.exec! "cp -a /var/lib/lxd #{root}/var/lib/ && rm -f #{root}/var/lib/lxd/unix.socket", "Failed to copy lxd files"
     end
 
     def make_keys
@@ -387,8 +389,9 @@ module CloudModel
         ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
         ['Populate volume with new system image', :populate_deploy_root],
         ['Make crypto keys', :make_keys],
-        ['Config new system', :config_deploy_root],         
+        ['Config new system', :config_deploy_root],     
         # TODO: apply existing guests and restore backups
+        ['Config LXD', :config_lxd],
         ['Write boot config and reboot', :boot_deploy_root],        
       ]
       
@@ -411,6 +414,7 @@ module CloudModel
         ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
         ['Populate volume with new system image', :populate_deploy_root],
         ['Config new system', :config_deploy_root],         
+        ['Copy LXD config', :copy_lxd],
         ['Copy crypto keys from old system', :copy_keys],
         ['Write boot config and reboot', :boot_deploy_root],        
       ]

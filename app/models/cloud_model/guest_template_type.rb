@@ -30,5 +30,13 @@ module CloudModel
       end
       template
     end
+    
+    def name
+      if components.empty?
+        "CloudModel Guest Template without compoments"
+      else
+        "CloudModel Guest Template with #{components.map{|c| c.to_s.camelcase} * ', '}"
+      end
+    end
   end
 end

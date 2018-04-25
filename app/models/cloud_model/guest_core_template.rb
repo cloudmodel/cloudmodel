@@ -71,7 +71,7 @@ module CloudModel
     end
     
     def tarball
-      "/cloud/templates/core/#{id}.tar"
+      "/cloud/templates/core/#{id}.tar.gz"
     end
   end
 end

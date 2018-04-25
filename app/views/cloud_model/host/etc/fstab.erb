@@ -37,7 +37,6 @@ shm			/dev/shm	tmpfs		nodev,nosuid,noexec	0 0
 <%- puts "fstab entry for: #{guest.name}" -%>
 
 # BEGIN SpCloud <%= guest.name %>
-<%= "%-31s" % guest.root_volume.device %> <%= "%-31s" % guest.base_path %> <%= "%-9s" % guest.root_volume.disk_format %> noatime,nofail  0 0
 <%- guest.guest_volumes.each do |volume| -%>
 <%- if volume.logical_volume.blank? -%>
 <%- puts "Missing logical_volume for #{volume.mount_point}" -%>

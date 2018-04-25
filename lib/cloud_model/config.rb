@@ -3,6 +3,7 @@ module CloudModel
     attr_writer :data_directory, :backup_directory, :bundle_command
     attr_writer :skip_sync_images
     attr_accessor :use_external_ip
+    attr_writer :dns_servers
     attr_writer :xmpp_port
     attr_accessor :xmpp_server, :xmpp_user, :xmpp_password
     attr_writer :ubuntu_mirror, :ubuntu_deb_src
@@ -46,6 +47,10 @@ module CloudModel
       @skip_sync_images || false
     end
     
+    def dns_servers
+      @dns_servers || %w(1.1.1.1 8.8.8.8 9.9.9.10)
+    end
+    
     def bundle_command
       @bundle_command || 'PATH=/bin:/sbin:/usr/bin:/usr/local/bin bundle'
     end
@@ -60,6 +65,15 @@ module CloudModel
     
     def livestatus_port
       @livestatus_port || 50000
+    end
+    
+    ## Fixed config values, not overwriteable by now
+    def ubuntu_version 
+      "18.04-beta2"
+    end
+    
+    def ubuntu_name
+      "Bionic Beaver"
     end
   end
 end

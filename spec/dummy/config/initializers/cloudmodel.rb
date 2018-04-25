@@ -47,4 +47,7 @@ CloudModel.configure do |config|
   ## Set port of livestatus db
   ## Defaults to 50000
   # config.livestatus_port = 50000
+  
+  ## Use external IP, useful for testing without setting up a tinc VPN for your development box
+  config.use_external_ip = true
 end
