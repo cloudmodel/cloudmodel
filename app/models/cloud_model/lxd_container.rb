@@ -62,6 +62,18 @@ module CloudModel
       end
     end
     
+    def mount
+      guest.host.exec "zfs mount guests/containers/#{name}"
+    end
+    
+    def unmount
+      guest.host.exec "zfs unmount guests/containers/#{name}"
+    end
+    
+    def mountpoint
+      "/var/lib/lxd/storage-pools/default/containers/#{name}"
+    end
+    
     # Get generic infos about the LXD 
     def lxd_info
       success, result = lxc "info"

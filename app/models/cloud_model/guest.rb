@@ -44,6 +44,10 @@ module CloudModel
     def deploy_path
       @deploy_path ||= base_path
     end
+    
+    def deploy_path=path
+      @deploy_path = path
+    end
         
     accept_size_strings_for :memory_size
       
