@@ -4,11 +4,16 @@ module CloudModel
     include Mongoid::Timestamps
     
     embedded_in :guest, class_name: "CloudModel::Guest"
+    belongs_to :guest_template, class_name: "CloudModel::GuestTemplate"
     
+    before_create :set_template_to_guest
     after_create :create_container
     before_destroy :before_destroy
     after_destroy :destroy_container
     
+    def set_template_to_guest
+      self.guest_template = guest.template
+    end
     
     def before_destroy
       if running?
@@ -35,11 +40,12 @@ module CloudModel
     
     
     def import_template
-      lxc "image import #{guest.template.lxd_image_metadata_tarball} #{guest.template.tarball} --alias #{guest.template.lxd_alias}"    
+      set_template_to_guest if guest_template.blank?
+      lxc "image import #{guest_template.lxd_image_metadata_tarball} #{guest_template.tarball} --alias #{guest_template.lxd_alias}"    
     end
     
     def create_container
-      lxc! "init #{guest.template.lxd_alias} #{name}", "Failed to init LXD container"     
+      lxc! "init #{guest_template.lxd_alias} #{name}", "Failed to init LXD container"     
     end
     
     def destroy_container

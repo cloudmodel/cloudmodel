@@ -69,7 +69,7 @@ module CloudModel
     
     ## Fixed config values, not overwriteable by now
     def ubuntu_version 
-      "18.04-beta2"
+      "18.04"
     end
     
     def ubuntu_name
