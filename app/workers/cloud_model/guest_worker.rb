@@ -28,23 +28,18 @@ module CloudModel
     
     def ensure_lcd_image  
       guest.lxd_containers.new.import_template
-      #@host.exec "lxc image import #{@template.lxd_image_metadata_tarball} #{@template.tarball} --alias #{@template.template_type_id}/#{@template.id}"    
     end     
     
     def create_lxd_container
       @lxc = guest.lxd_containers.create
-      #@host.exec! "lxc create #{@template.template_type_id}/#{@template.id} #{guest.name.shellescape}", "Failed to launch LXD container"
     end
     
     def config_lxd_container
       @lxc.config_from_guest
-      #@host.exec! "lxc config set #{guest.name.shellescape} raw.lxc 'lxc.mount.auto = cgroup'"
-      #@host.exec! "lxc config set #{guest.name.shellescape} limits.cpu #{guest.cpu_count}"
     end
     
     def start_lxd_container
       @lxc.start
-      #@host.exec! "lxc start #{guest.name.shellescape}"
     end
     
     

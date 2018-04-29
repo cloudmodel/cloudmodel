@@ -106,10 +106,15 @@ module CloudModel
       set_config 'limits.cpu', guest.cpu_count
       set_config 'limits.memory', guest.memory_size
       
-      puts lxc("config device set #{name} root size #{guest.root_fs_size}") # todo: fix disk quota
+      lxc "config device set #{name} root size #{guest.root_fs_size}" # todo: fix disk quota
       
       lxc "network attach lxdbr0 #{name} eth0"
-      puts lxc("config device set #{name} eth0 ipv4.address #{guest.private_address}")
+      lxc "config device set #{name} eth0 ipv4.address #{guest.private_address}"
+      
+      # Attach custom storage volumes
+      guest.lxd_custom_volumes.each do |volume|
+        lxc "storage volume attach default #{volume.name} #{name} #{volume.mount_point}"
+      end
     end
   end
 end

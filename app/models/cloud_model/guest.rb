@@ -12,6 +12,7 @@ module CloudModel
     belongs_to :host, class_name: "CloudModel::Host"
     embeds_many :services, class_name: "CloudModel::Services::Base"    
     embeds_many :lxd_containers, class_name: "CloudModel::LxdContainer"
+    embeds_many :lxd_custom_volumes, class_name: "CloudModel::LxdCustomVolume"
     
     # has_one :root_volume, class_name: "CloudModel::LogicalVolume", inverse_of: :guest, autobuild: true
     # accepts_nested_attributes_for :root_volume

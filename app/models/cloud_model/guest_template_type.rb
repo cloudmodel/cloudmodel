@@ -33,7 +33,7 @@ module CloudModel
     
     def name
       if components.empty?
-        "CloudModel Guest Template without compoments"
+        "CloudModel Guest Template without components"
       else
         "CloudModel Guest Template with #{components.map{|c| c.to_s.camelcase} * ', '}"
       end
