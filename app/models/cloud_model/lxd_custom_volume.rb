@@ -2,6 +2,7 @@ module CloudModel
   class LxdCustomVolume
     include Mongoid::Document
     include Mongoid::Timestamps
+    include CloudModel::AcceptSizeStrings
     
     embedded_in :guest, class_name: "CloudModel::Guest"
     
@@ -15,6 +16,8 @@ module CloudModel
     validates :mount_point, presence: true
     validates :mount_point, uniqueness: { scope: :guest }, if: :guest
     validates :mount_point, format: {with: /\A[A-Za-z0-9][A-Za-z0-9\-_\/]*\z/}
+
+    accept_size_strings_for :disk_space
 
     before_validation :set_volume_name       
     after_create :create_volume

@@ -232,6 +232,9 @@ module CloudModel
       
       render_to_remote "/cloud_model/host/etc/systemd/system/network.service", "#{root}/etc/systemd/system/network.service", host: @host
       chroot root, "ln -sf /etc/systemd/system/network.service /etc/systemd/system/multi-user.target.wants/"
+      @host.exec "rm -f #{root}/etc/resolve.conf"
+      render_to_remote "/cloud_model/host/etc/resolve.conf", "#{root}/etc/resolve.conf", host: @host
+      chroot! root, "systemd-resolve -i eth0#{CloudModel.config.dns_servers.each{|dns_server| " --set-dns #{dns_server}"}} ", "Failed to set DNS Servers"
             
       comment_sub_step 'config hostname and machine info'      
                   
@@ -276,6 +279,8 @@ module CloudModel
       mkdir_p ssh_dir
             
       @host.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "#{ssh_dir}/authorized_keys"
+      
+      render_to_remote "/cloud_model/host/etc/ssh/sshd_config", "#{root}/etc/ssh/sshd_config", host: @host
       
       comment_sub_step 'config exim mailer'  
           
