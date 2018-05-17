@@ -15,8 +15,9 @@ module CloudModel
       end
       
       def auto_start
-        super
+        mkdir_p overlay_path
         render_to_remote "/cloud_model/guest/etc/systemd/system/mongodb.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"
+        super
       end
     end
   end

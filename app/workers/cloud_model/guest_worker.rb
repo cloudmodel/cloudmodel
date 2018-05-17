@@ -61,7 +61,8 @@ module CloudModel
         end
       end
       mkdir_p "#{@guest.deploy_path}/usr/share/cloud_model/"
-      render_to_remote "/cloud_model/guest/usr/share/cloud_model/fix_permissions.sh", "#{@guest.deploy_path}/usr/share/cloud_model/fix_permissions.sh", 0755, guest: guest 
+      render_to_remote "/cloud_model/guest/usr/share/cloud_model/fix_permissions.sh", "#{@guest.deploy_path}/usr/share/cloud_model/fix_permissions.sh", 0755, guest: guest
+      @host.exec! "chown -R 100000:100000 #{@guest.deploy_path}/usr/share/cloud_model/", "failed to set owner for fix_permissions script"
       @host.exec! "rm -f #{@guest.deploy_path}/usr/sbin/policy-rc.d", "Failed to remove policy-rc.d"
       
       @lxc.unmount
@@ -75,16 +76,16 @@ module CloudModel
     end
     
     def config_monitoring
-      puts "    Configure Monitoring"
-      CloudModel::Guest.where('services._type' => 'CloudModel::Services::Monitoring').each do |guest|
-        puts "      on guest #{guest.name}"
-        begin 
-          service = guest.services.find_by(_type: 'CloudModel::Services::Monitoring').update_hosts_config!
-          guest.exec! "/bin/systemctl restart shinken-arbiter", "Failed to restart shinken"
-        rescue
-          puts "        failed!"
-        end
-      end      
+      # puts "    Configure Monitoring"
+      # CloudModel::Guest.where('services._type' => 'CloudModel::Services::Monitoring').each do |guest|
+      #   puts "      on guest #{guest.name}"
+      #   begin
+      #     service = guest.services.find_by(_type: 'CloudModel::Services::Monitoring').update_hosts_config!
+      #     guest.exec! "/bin/systemctl restart shinken-arbiter", "Failed to restart shinken"
+      #   rescue
+      #     puts "        failed!"
+      #   end
+      # end     
     end
          
     def deploy options={}

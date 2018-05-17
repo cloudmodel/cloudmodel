@@ -97,7 +97,7 @@ module CloudModel
       
       def components_needed
         if passenger_supported or capistrano_supported
-          [:nginx, :ruby]
+          [:ruby, :nginx]
         else
           [:nginx]
         end

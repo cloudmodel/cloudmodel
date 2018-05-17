@@ -8,7 +8,7 @@ module CloudModel
       end
       
       def components_needed
-        [:shinken]
+        [:icinga]
       end
       
       def port

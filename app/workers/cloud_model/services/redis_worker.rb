@@ -29,14 +29,17 @@ module CloudModel
                 
         overlay_path = "#{@guest.deploy_path.shellescape}/etc/systemd/system/redis_server.service.d"
         mkdir_p overlay_path
-        render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{overlay_path}/restart.conf"           
+        render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{overlay_path}/restart.conf"
+        @host.exec  "chown -R 100000:100000 #{overlay_path}"
+     
                 
         if @model.redis_sentinel_set_id
           @host.exec "ln -sf /lib/systemd/system/redis_sentinel.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
 
           overlay_path = "#{@guest.deploy_path.shellescape}/etc/systemd/system/redis_sentinel.service.d"
           mkdir_p overlay_path
-          render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{overlay_path}/restart.conf"           
+          render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{overlay_path}/restart.conf"
+          @host.exec  "chown -R 100000:100000 #{overlay_path}"     
         end
       end
       

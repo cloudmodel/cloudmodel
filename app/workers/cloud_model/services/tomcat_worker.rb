@@ -53,6 +53,7 @@ module CloudModel
         mkdir_p overlay_path
         render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{overlay_path}/restart.conf"
         render_to_remote "/cloud_model/guest/etc/systemd/system/tomcat8.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"
+        @host.exec  "chown -R 100000:100000 #{overlay_path}"
       end
     end
   end

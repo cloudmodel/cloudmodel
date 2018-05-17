@@ -47,8 +47,10 @@ module CloudModel
           f.write CloudModel::SshPubKey.all.to_a * "\n"
         end
   
-        # TODO: Reenable after config for ngix done
+        # TODO: Reenable after config for nginx done
         # chroot! @guest.deploy_path, "chown -R www:www /var/www/.ssh", "Failed to change owner of www client keys to user www (1001)"
+        @host.exec! "chown -R 100000:100000 #{ssh_host_key_target.shellescape}/ssh", "Failed to change owner of server keys to user root"
+        @host.exec! "chown -R 101001:101001 #{ssh_target}", "Failed to change owner of www client keys to user www"
       end
     
       def service_name

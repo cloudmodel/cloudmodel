@@ -1,4 +1,7 @@
 [Service]
 PermissionsStartOnly=true
+ExecStartPre=/bin/mkdir -p /var/log/nginx
+ExecStartPre=/bin/chown -R www:www /var/log/nginx
+ExecStartPre=/bin/chmod 2770 /var/log/nginx
 ExecStartPre=/bin/chown -R www:www /var/www
 ExecStartPre=-/usr/bin/sudo -u www RAILS_ENV=<%= model.passenger_env %> /var/www/rails/current/script/prestart

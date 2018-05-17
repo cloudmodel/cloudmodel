@@ -3,6 +3,8 @@ worker_processes                  6;
 
 error_log                         /var/log/nginx/error_log info;
 
+include /etc/nginx/modules-enabled/*.conf;
+
 events {
   worker_connections              512;
   use                             epoll;
@@ -44,16 +46,19 @@ http {
   tcp_nodelay                     on;
 
   keepalive_timeout               75 20;
+  types_hash_max_size 2048;
 
   ignore_invalid_headers          on;
 
   index                           index.html;
 <%- if model.passenger_supported? %>
 #  include                         passenger.conf;
-  passenger_root /usr/lib/ruby/vendor_ruby/phusion_passenger/locations.ini;
-  passenger_ruby /usr/bin/passenger_free_ruby;
+#  passenger_root /usr/lib/ruby/vendor_ruby/phusion_passenger/locations.ini;
+#  passenger_ruby /usr/bin/passenger_free_ruby;
 <% end -%>
 
+  include /etc/nginx/conf.d/*.conf;
+#  include /etc/nginx/sites-enabled/*;
 <%-
   protocols = []
   protocols << :http unless model.ssl_supported? and model.ssl_only? 
@@ -62,7 +67,7 @@ http {
 <%- protocols.each do |protocol| -%>
 
   server {
-    listen                        <%= protocol == :https ? "#{model.ssl_port} ssl spdy deferred" : model.port %>;
+    listen                        <%= protocol == :https ? "#{model.ssl_port} ssl http2 deferred" : model.port %>;
 <%- if protocol == :http and model.ssl_supported? and model.ssl_enforce? -%>
     add_header                    Cache-Control "public, must-revalidate";
     expires                       90d;

@@ -67,7 +67,7 @@ module CloudModel
 
           @host.exec! "cd #{unroll_path} && tar c . | virsh lxc-enter-namespace #{@model.guest.name.shellescape} --noseclabel -- /bin/tar x", "Failed to transfer files"
           @host.exec "rm -rf #{unroll_path}"
-          @model.guest.exec! "/bin/chown -R www:www #{@model.www_root}/#{deploy_id}", "Failed to set user to www "
+          @model.guest.exec! "/bin/chown -R 101001:101001 #{@model.www_root}/#{deploy_id}", "Failed to set user to www "
           
           @model.guest.exec! "/bin/rm -f #{@model.www_root}/current", "Failed to remove old current"
           @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"
@@ -124,12 +124,13 @@ module CloudModel
         deploy_web_image
               
         @host.exec "chmod -R 2775 #{@guest.deploy_path}#{@model.www_root}"
-        chroot @guest.deploy_path, "chown -R www:www #{@model.www_root}"
+        @host.exec "chown -R 101001:101001 #{@guest.deploy_path}#{@model.www_root}"
+        @host.exec "chown -R 100000:100000 #{@guest.deploy_path}/etc/nginx/ssl #{@guest.deploy_path}/etc/default/rails"
         
-        log_dir_path = "/var/log/nginx/"
-        mkdir_p log_dir_path
+        log_dir_path = "/var/log/nginx"
+        mkdir_p "#{@guest.deploy_path}#{log_dir_path}"
         @host.exec  "chmod -R 2770 #{@guest.deploy_path}#{log_dir_path}"
-        chroot @guest.deploy_path, "chown -R www:www #{log_dir_path}"
+        @host.exec  "chown -R 101001:101001 #{@guest.deploy_path}#{log_dir_path}"
       end
     
       def auto_restart
@@ -137,8 +138,9 @@ module CloudModel
       end
       
       def auto_start
-        super
+        mkdir_p overlay_path
         render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf", guest: @guest, model: @model
+        @host.exec  "chown -R 100000:100000 #{overlay_path}"
         # TODO: Resolve dependencies
         # Services::Ssh.new(@host, @options).write_config
         
@@ -147,8 +149,10 @@ module CloudModel
           render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.timer", "#{@guest.deploy_path}/etc/systemd/system/rake@.timer"
           mkdir_p "#{@guest.deploy_path}/etc/systemd/system/timers.target.wants"
           chroot @guest.deploy_path, "ln -s /etc/systemd/system/rake@.timer /etc/systemd/system/timers.target.wants/rake@#{@model.daily_rake_task.shellescape}.timer"
+          @host.exec "chown -R 100000:100000 #{@guest.deploy_path}/etc/systemd/system/rake@.service #{@guest.deploy_path}/etc/systemd/system/rake@.timer"
         end
         
+        super        
       end
     end
   end

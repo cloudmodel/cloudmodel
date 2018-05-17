@@ -38,6 +38,7 @@ module CloudModel
           mkdir_p overlay_path
           render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{overlay_path}/restart.conf"
         end
+        @host.exec  "chown -R 100000:100000 #{overlay_path}"
       end
       
     end
