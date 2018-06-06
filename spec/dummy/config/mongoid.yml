@@ -1,6 +1,6 @@
 test:
   sessions:
-    default:
+    clients:
       database: cloud_model_test
       hosts:
         - localhost:27017
@@ -10,7 +10,7 @@ test:
         max_retries: 1
         retry_interval: 0
 development:
-  sessions:
+  clients:
     default:
       database: cloud_model_development
       hosts:

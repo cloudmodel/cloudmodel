@@ -3,9 +3,37 @@ require 'net/sftp'
 
 module CloudModel
   class Host
+    
+    module SmartGettersAndSetters
+      def cpu_count
+       if super < 0
+         success, result = exec 'grep processor.*:\ [0-9] /proc/cpuinfo | wc -l'
+         self.cpu_count = result.to_i
+       end 
+       super
+      end
+
+      def primary_address=(value)
+        if value.class == String
+         value = CloudModel::Address.from_str(value)
+        end
+
+        super value
+      end
+
+      def private_network_with_strings=(value)
+        if value.class == String
+          value = CloudModel::Address.from_str(value)
+        end
+      
+        super value
+      end
+    end
+    
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::ENumFields
+    prepend SmartGettersAndSetters
   
     field :name, type: String
     field :tinc_public_key, type: String
@@ -70,15 +98,6 @@ module CloudModel
     validates :primary_address, presence: true
     validates :private_network, presence: true    
    
-    def cpu_count_with_get_info
-     if cpu_count_without_get_info < 0
-       success, result = exec 'grep processor.*:\ [0-9] /proc/cpuinfo | wc -l'
-       self.cpu_count = result.to_i
-     end 
-     cpu_count_without_get_info
-    end
-    alias_method_chain :cpu_count, :get_info
-   
     def default_root_volume_group
       volume_groups.first
     end
@@ -94,23 +113,6 @@ module CloudModel
       end
     end
    
-    def primary_address_with_strings=(value)
-      if value.class == String
-       value = CloudModel::Address.from_str(value)
-      end
-
-      self.primary_address_without_strings = value
-    end
-    alias_method_chain :primary_address=, :strings
-    
-    def private_network_with_strings=(value)
-      if value.class == String
-        value = CloudModel::Address.from_str(value)
-      end
-      
-      self.private_network_without_strings = value
-    end
-    alias_method_chain :private_network=, :strings
   
     def available_private_address_collection
       all = private_network.list_ips - [private_network.gateway]

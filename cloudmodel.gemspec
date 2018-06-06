@@ -17,9 +17,9 @@ Gem::Specification.new do |s|
   s.files = Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
   # s.test_files = Dir["spec/**/*"]
 
-  s.add_dependency 'rails', '~> 4.1', '>= 4.1.0'
-  s.add_dependency 'mongoid', '~> 4.0', '>= 4.0.0'
-  s.add_dependency 'mongoid-grid_fs', '~> 2.0.0', '>= 2.0.0'
+  s.add_dependency 'rails', '~> 5.0', '>= 5.1.0'
+  s.add_dependency 'mongoid', '~> 6.0', '>= 6.1.0'
+  s.add_dependency 'mongoid-grid_fs', '~> 2.3', '>= 2.3.0'
   
   s.add_dependency 'bcrypt-ruby', '~> 3.0', '>= 3.0.0'
   s.add_dependency 'netaddr', '~> 1.5', '>=1.5.0'
