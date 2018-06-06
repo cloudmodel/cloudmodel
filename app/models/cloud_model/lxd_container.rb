@@ -2,19 +2,16 @@ module CloudModel
   class LxdContainer
     include Mongoid::Document
     include Mongoid::Timestamps
+    include ActiveModel::Validations::Callbacks
     
     embedded_in :guest, class_name: "CloudModel::Guest"
     belongs_to :guest_template, class_name: "CloudModel::GuestTemplate"
     
-    before_create :set_template_to_guest
+    before_validation :ensure_template_is_set
     after_create :create_container
     before_destroy :before_destroy
     after_destroy :destroy_container
-    
-    def set_template_to_guest
-      self.guest_template = guest.template
-    end
-    
+        
     def before_destroy
       if running?
         puts "Can't destroy running container; stop it first"
@@ -38,13 +35,26 @@ module CloudModel
       guest.host.exec! "lxc #{command}", error
     end
     
+    def ensure_template_is_set
+      if guest_template.blank?
+        #Rails.logger.debug "Set template to #{self.guest.template.name}"
+        self.update_attribute :guest_template, self.guest.template 
+      end
+      self
+    end
     
     def import_template
-      set_template_to_guest if guest_template.blank?
-      lxc "image import #{guest_template.lxd_image_metadata_tarball} #{guest_template.tarball} --alias #{guest_template.lxd_alias}"    
+      ensure_template_is_set
+      
+      Rails.logger.debug "Import #{guest_template.name} to lxd"
+      lxc "image import #{guest_template.lxd_image_metadata_tarball} #{guest_template.tarball} --alias #{guest_template.lxd_alias}"
+      
+      # TODO: check if import worked or failed with {1=>"Error: Image with same fingerprint already exists\n"}      
+      true
     end
     
     def create_container
+      Rails.logger.debug "Create lxd container #{name} from #{guest_template.lxd_alias} "
       lxc! "init #{guest_template.lxd_alias} #{name}", "Failed to init LXD container"     
     end
     
@@ -52,19 +62,19 @@ module CloudModel
       lxc! "delete #{name}", "Failed to destroy LXD container"     
     end
       
-    
     def start
       # Shutdown previous running container of guest
       guest.lxd_containers.each do |c|
         c.stop if c.running?
       end
-      
+      lxc "config device set #{name} eth0 ipv4.address #{guest.private_address}"
       lxc "start #{name}"
     end
     
     def stop options={}
       if options[:force] or running?
         lxc "stop #{name}"
+        lxc "config device unset #{name} eth0 ipv4.address"
       end
     end
     
@@ -109,7 +119,8 @@ module CloudModel
       lxc "config device set #{name} root size #{guest.root_fs_size}" # todo: fix disk quota
       
       lxc "network attach lxdbr0 #{name} eth0"
-      lxc "config device set #{name} eth0 ipv4.address #{guest.private_address}"
+      #lxc "network set lxdbr0 hwaddr 00:FF:AA:00:00:01"
+      lxc "config set #{name} volatile.lxdbr0.hwaddr #{guest.mac_address}"
       
       # Attach custom storage volumes
       guest.lxd_custom_volumes.each do |volume|

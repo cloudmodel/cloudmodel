@@ -13,6 +13,7 @@ module CloudModel
     embeds_many :services, class_name: "CloudModel::Services::Base"    
     embeds_many :lxd_containers, class_name: "CloudModel::LxdContainer"
     embeds_many :lxd_custom_volumes, class_name: "CloudModel::LxdCustomVolume"
+    field :current_lxd_container_id, type: BSON::ObjectId
     
     # has_one :root_volume, class_name: "CloudModel::LogicalVolume", inverse_of: :guest, autobuild: true
     # accepts_nested_attributes_for :root_volume
@@ -23,6 +24,7 @@ module CloudModel
     
     field :private_address, type: String
     field :external_address, type: String
+    field :mac_address, type: String
     
     field :root_fs_size, type: Integer, default: 10737418240
     field :memory_size, type: Integer, default: 2147483648
@@ -37,18 +39,16 @@ module CloudModel
     }, default: :not_started
     
     field :deploy_last_issue, type: String
-    attr_accessor :deploy_path, :deploy_volume
-    # def deploy_volume
-    #   @deploy_volume ||= root_volume
+    field :deploy_path, type: String
+    # attr_accessor :deploy_path
+    #
+    # def deploy_path
+    #   @deploy_path ||= base_path
     # end
-    
-    def deploy_path
-      @deploy_path ||= base_path
-    end
-    
-    def deploy_path=path
-      @deploy_path = path
-    end
+    #
+    # def deploy_path=path
+    #   @deploy_path = path
+    # end
         
     accept_size_strings_for :memory_size
       
@@ -58,6 +58,7 @@ module CloudModel
     validates :private_address, presence: true
     
     before_validation :set_dhcp_private_address, :on => :create
+    before_validation :set_mac_address, :on => :create
     #before_validation :set_root_volume_name
     before_destroy    :undefine
     
@@ -79,6 +80,10 @@ module CloudModel
     
     def vm_state_to_id state
       VM_STATES.invert[state.to_sym] || -1
+    end
+    
+    def current_lxd_container
+      lxd_containers.where(id: current_lxd_container_id).first
     end
     
     def base_path
@@ -109,10 +114,6 @@ module CloudModel
       "%02x" % SecureRandom.random_number(256)
     end
     
-    def mac_address
-      "52:54:00:#{random_2_digit_hex}:#{random_2_digit_hex}:#{random_2_digit_hex}"
-    end
-    
     def to_param
       name
     end
@@ -137,20 +138,6 @@ module CloudModel
         false
       end
     end
-    
-    def virsh cmd, options = []
-      option_string = ''
-      options = [options] if options.is_a? String
-      options.each do |option|
-        option_string = "#{option_string}--#{option.shellescape} "
-      end
-      success, data = host.exec("LANG=en.UTF-8 /usr/bin/virsh #{cmd.shellescape} #{option_string}#{name.shellescape}")
-      if success 
-        return data
-      else
-        return false
-      end
-    end 
     
     def has_service?(service_type)
       services.select{|s| s._type == service_type}.count > 0
@@ -305,9 +292,20 @@ module CloudModel
       end
     end
     
-    def start
+    def start(lxd_container = nil)
+      unless lxd_container.blank?
+        lxd_container_id = if lxd_container.is_a? CloudModel::LxdContainer
+          lxd_container.id
+        else
+          lxd_container
+        end
+        collection.update_one({_id:  id}, '$set' => { 'current_lxd_container_id': lxd_container_id })
+        #self.write_attribute database_field_name(:current_lxd_container_id), lxd_container_id
+        #save
+      end
+      
       begin
-        return virsh('autostart') && virsh('start')
+        return current_lxd_container.start
       rescue
         return false
       end
@@ -315,7 +313,9 @@ module CloudModel
     
     def stop
       begin
-        return virsh('shutdown') && virsh('autostart', 'disable')
+        lxd_containers.each do |c|
+          c.stop if c.running?
+        end
       rescue
         return false
       end
@@ -360,9 +360,26 @@ module CloudModel
       success
     end
     
+    def generate_mac_address
+      def format_mac_address_postfix(i)
+        "00:16:3e:#{host.mac_address_prefix}:#{i.to_s(16).rjust(2,'0').upcase}"
+      end
+      
+      i=1      
+      while(i<2**8 and host.guests.where(mac_address: format_mac_address_postfix(i), :_id.ne => id).count > 0)
+        i += 1
+      end
+
+      self.mac_address = format_mac_address_postfix(i)
+    end
+    
     private  
     def set_dhcp_private_address
-      self.private_address = host.dhcp_private_address unless private_address
+      self.private_address = host.dhcp_private_address if private_address.blank?
+    end
+    
+    def set_mac_address
+      generate_mac_address if mac_address.blank?
     end
     
     # def set_root_volume_name

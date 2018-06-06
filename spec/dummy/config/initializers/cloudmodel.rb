@@ -11,17 +11,7 @@ CloudModel.configure do |config|
   ## Defaults to false
   config.skip_sync_images = true
   
-  ## Set gentoo mirrors to be used by portage
-  ## To find out good servers, run    
-  ##   mirrorselect -s4 -H -o 
-  ## on a machine running gentoo within the same network as your hosts.  
-  ## Defaults to nil
-  config.gentoo_mirrors = %w(
-    http://linux.rz.ruhr-uni-bochum.de/download/gentoo-mirror/
-    http://ftp.fi.muni.cz/pub/linux/gentoo/
-    http://ftp-stud.fht-esslingen.de/pub/Mirrors/gentoo/
-    http://mirror.netcologne.de/gentoo/
-  )
+  config.host_mac_address_prefix_init = "44:23"
   
   ## Set custom bundle command call 
   ## Defaults to 'PATH=/bin:/sbin:/usr/bin:/usr/local/bin bundle'

@@ -3,7 +3,7 @@ module CloudModel
     attr_writer :data_directory, :backup_directory, :bundle_command
     attr_writer :skip_sync_images
     attr_accessor :use_external_ip
-    attr_writer :dns_servers
+    attr_writer :dns_servers, :host_mac_address_prefix_init
     attr_writer :xmpp_port
     attr_accessor :xmpp_server, :xmpp_user, :xmpp_password
     attr_writer :ubuntu_mirror, :ubuntu_deb_src
@@ -49,6 +49,10 @@ module CloudModel
     
     def dns_servers
       @dns_servers || %w(1.1.1.1 8.8.8.8 9.9.9.10)
+    end
+    
+    def host_mac_address_prefix_init
+      @host_mac_address_prefix_init || '00:00'
     end
     
     def bundle_command

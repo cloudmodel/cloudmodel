@@ -40,6 +40,7 @@ module CloudModel
     field :initial_root_pw, type: String
     field :cpu_count, type: Integer, default: -1
     field :arch, default: 'amd64'
+    field :mac_address_prefix, type: String
 
     enum_field :stage, values: {
       0x00 => :pending,
@@ -97,7 +98,10 @@ module CloudModel
     validates :name, presence: true, uniqueness: true, format: {with: /\A[a-z0-9\-_]+\z/}
     validates :primary_address, presence: true
     validates :private_network, presence: true    
-   
+    validates :mac_address_prefix, presence: true, uniqueness: true
+    
+    before_create :generate_mac_address_prefix
+      
     def default_root_volume_group
       volume_groups.first
     end
@@ -405,6 +409,24 @@ module CloudModel
     def build!(options={})      
       host_worker = CloudModel::Images::HostWorker.new self
       host_worker.build_image options
+    end
+    
+    def generate_mac_address_prefix
+      def format_mac_address_prefix(i)
+        i.to_s(16).rjust(4,'0').upcase.scan(/.{1,2}/) * ':'
+      end
+      i = CloudModel.config.host_mac_address_prefix_init.gsub(':', '').hex
+      
+      while(i<2**16 and CloudModel::Host.where(mac_address_prefix: format_mac_address_prefix(i), :_id.ne => id).count > 0)
+        i += 1
+      end
+      
+      self.mac_address_prefix = format_mac_address_prefix(i)
+    end
+    
+    private
+    def set_mac_address_prefix
+      generate_mac_address_prefix if mac_address_prefix.blank?
     end
   end
 end

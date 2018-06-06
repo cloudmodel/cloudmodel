@@ -31,7 +31,7 @@ module CloudModel
     end     
     
     def create_lxd_container
-      @lxc = guest.lxd_containers.create
+      @lxc = guest.lxd_containers.create! guest_template: guest.template, created_at: Time.now, updated_at: Time.now
     end
     
     def config_lxd_container
@@ -39,7 +39,7 @@ module CloudModel
     end
     
     def start_lxd_container
-      @lxc.start
+      @guest.start @lxc
     end
     
     
