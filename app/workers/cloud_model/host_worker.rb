@@ -232,9 +232,8 @@ module CloudModel
       
       render_to_remote "/cloud_model/host/etc/systemd/system/network.service", "#{root}/etc/systemd/system/network.service", host: @host
       chroot root, "ln -sf /etc/systemd/system/network.service /etc/systemd/system/multi-user.target.wants/"
-      @host.exec "rm -f #{root}/etc/resolve.conf"
-      render_to_remote "/cloud_model/host/etc/resolve.conf", "#{root}/etc/resolve.conf", host: @host
-      chroot! root, "systemd-resolve -i eth0#{CloudModel.config.dns_servers.each{|dns_server| " --set-dns #{dns_server}"}} ", "Failed to set DNS Servers"
+      render_to_remote "/cloud_model/support/etc/systemd/resolved.conf", "#{root}/etc/systemd/resolved.conf", host: @host
+      #chroot! root, "systemd-resolve -i eth0#{CloudModel.config.dns_servers.each{|dns_server| " --set-dns #{dns_server}"}} ", "Failed to set DNS Servers"
             
       comment_sub_step 'config hostname and machine info'      
                   

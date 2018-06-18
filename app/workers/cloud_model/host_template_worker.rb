@@ -45,7 +45,8 @@ module CloudModel
       chroot! build_path, "apt-get install lxd -y", "Failed to install LXD"
       
       mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
-      chroot! build_path, "ln -s /lib/systemd/system/lxd.service /etc/systemd/system/basic.target.wants/lxd.service", "Failed to add lxd to autostart"
+      chroot! build_path, "ln -s /lib/systemd/system/lxd.socket /etc/systemd/system/basic.target.wants/lxd.socket", "Failed to add lxd to autostart"
+      chroot! build_path, "ln -s /lib/systemd/system/lxd-containers.service /etc/systemd/system/basic.target.wants/lxd-containers.service", "Failed to add lxd to autostart"
       
       
       comment_sub_step 'Create guests directory'

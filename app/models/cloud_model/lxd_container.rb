@@ -36,9 +36,13 @@ module CloudModel
     end
     
     def ensure_template_is_set
-      if guest_template.blank?
-        #Rails.logger.debug "Set template to #{self.guest.template.name}"
-        self.update_attribute :guest_template, self.guest.template 
+      if guest_template.blank? 
+        if self.persisted?
+          #Rails.logger.debug "Set template to #{self.guest.template.name}"
+          self.update_attribute :guest_template, self.guest.template 
+        else
+          self.guest_template = self.guest.template
+        end
       end
       self
     end
@@ -67,14 +71,14 @@ module CloudModel
       guest.lxd_containers.each do |c|
         c.stop if c.running?
       end
-      lxc "config device set #{name} eth0 ipv4.address #{guest.private_address}"
+      #lxc "config device set #{name} eth0 ipv4.address #{guest.private_address}"
       lxc "start #{name}"
     end
     
     def stop options={}
       if options[:force] or running?
         lxc "stop #{name}"
-        lxc "config device unset #{name} eth0 ipv4.address"
+        #lxc "config device unset #{name} eth0 ipv4.address"
       end
     end
     
@@ -119,8 +123,7 @@ module CloudModel
       lxc "config device set #{name} root size #{guest.root_fs_size}" # todo: fix disk quota
       
       lxc "network attach lxdbr0 #{name} eth0"
-      #lxc "network set lxdbr0 hwaddr 00:FF:AA:00:00:01"
-      lxc "config set #{name} volatile.lxdbr0.hwaddr #{guest.mac_address}"
+      #lxc "config set #{name} volatile.lxdbr0.hwaddr #{guest.mac_address}"
       
       # Attach custom storage volumes
       guest.lxd_custom_volumes.each do |volume|

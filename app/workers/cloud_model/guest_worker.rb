@@ -14,12 +14,17 @@ module CloudModel
       @guest
     end
     
+    def render_to_remote template, remote_file, *param_array
+      super template, remote_file, *param_array
+      host.exec! "chown -R 100000:100000 #{remote_file}", "failed to set owner for #{remote_file}"
+    end
+    
     def ensure_template
-      @template = @guest.template
+      @template = guest.template
                   
       begin
-        @host.sftp.stat!("#{@template.tarball}")
-        @host.sftp.stat!("#{@template.lxd_image_metadata_tarball}")
+        host.sftp.stat!("#{@template.tarball}")
+        host.sftp.stat!("#{@template.lxd_image_metadata_tarball}")
       rescue
         puts '      Uploading template'
         upload_template @template
@@ -39,19 +44,19 @@ module CloudModel
     end
     
     def start_lxd_container
-      @guest.start @lxc
+      guest.start @lxc
     end
     
     
     def config_services
       @lxc.mount
-      @guest.deploy_path = "#{@lxc.mountpoint}/rootfs"
+      guest.deploy_path = "#{@lxc.mountpoint}/rootfs"
       
-      @guest.services.each do |service|
+      guest.services.each do |service|
         begin
           puts "      #{service.class.model_name.element.camelcase} '#{service.name}'"
           service_worker_class = "CloudModel::Services::#{service.class.model_name.element.camelcase}Worker".constantize
-          service_worker = service_worker_class.new @guest, service
+          service_worker = service_worker_class.new guest, service
 
           service_worker.write_config
           service_worker.auto_start
@@ -60,19 +65,29 @@ module CloudModel
           raise "Failed to configure service #{service.class.model_name.element.camelcase} '#{service.name}'"
         end
       end
-      mkdir_p "#{@guest.deploy_path}/usr/share/cloud_model/"
-      render_to_remote "/cloud_model/guest/usr/share/cloud_model/fix_permissions.sh", "#{@guest.deploy_path}/usr/share/cloud_model/fix_permissions.sh", 0755, guest: guest
-      @host.exec! "chown -R 100000:100000 #{@guest.deploy_path}/usr/share/cloud_model/", "failed to set owner for fix_permissions script"
-      @host.exec! "rm -f #{@guest.deploy_path}/usr/sbin/policy-rc.d", "Failed to remove policy-rc.d"
+      mkdir_p "#{guest.deploy_path}/usr/share/cloud_model/"
+      render_to_remote "/cloud_model/guest/usr/share/cloud_model/fix_permissions.sh", "#{guest.deploy_path}/usr/share/cloud_model/fix_permissions.sh", 0755, guest: guest
+      #host.exec! "chown -R 100000:100000 #{guest.deploy_path}/usr/share/cloud_model/", "failed to set owner for fix_permissions script"
+      host.exec! "rm -f #{guest.deploy_path}/usr/sbin/policy-rc.d", "Failed to remove policy-rc.d"
       
       @lxc.unmount
     end 
     
+    def config_network
+      render_to_remote "/cloud_model/support/etc/systemd/network/eth0.network", "#{guest.deploy_path}/etc/systemd/network/eth0.network", address: guest.private_address, subnet: host.private_network.subnet, gateway: host.private_address
+      
+      chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.service /etc/systemd/system/dbus-org.freedesktop.network1.service"
+      chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.service /etc/systemd/system/multi-user.target.wants/systemd-networkd.service"
+      chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.socket /etc/systemd/system/sockets.target.wants/systemd-networkd.socket"
+      mkdir_p "#{guest.deploy_path}/etc/systemd/system/network-online.target.wants"
+      chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd-wait-online.service /etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service"
+    end
+    
     def config_firewall
       puts "    Configure Firewall"
-      CloudModel::FirewallWorker.new(@host).write_scripts
+      CloudModel::FirewallWorker.new(host).write_scripts
       puts "      Restart Firewall"
-      @host.exec! "/etc/cloud_model/firewall_stop && /etc/cloud_model/firewall_start", "Failed to restart Firewall!"
+      host.exec! "/etc/cloud_model/firewall_stop && /etc/cloud_model/firewall_start", "Failed to restart Firewall!"
     end
     
     def config_monitoring
@@ -89,9 +104,9 @@ module CloudModel
     end
          
     def deploy options={}
-      return false unless @host.deploy_state == :pending or options[:force]
+      return false unless host.deploy_state == :pending or options[:force]
       
-      @host.update_attributes deploy_state: :running, deploy_last_issue: nil
+      host.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       build_start_at = Time.now
       
@@ -101,6 +116,7 @@ module CloudModel
         ['Create LXD container', :create_lxd_container],
         ['Config LXD container', :config_lxd_container],
         ['Config guest services', :config_services],
+        ['Config network', :config_network],
         ['Config firewall', :config_firewall],
         ['Launch LXD container', :start_lxd_container],
         ['Config monitoring', :config_monitoring]
@@ -115,7 +131,7 @@ module CloudModel
       
       run_steps :deploy, steps, options
       
-      @host.update_attributes deploy_state: :finished
+      host.update_attributes deploy_state: :finished
       
       puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"      
     end
@@ -128,8 +144,8 @@ module CloudModel
           
           
     def deploy_old
-      return false unless @guest.deploy_state == :pending  
-      @guest.update_attributes deploy_state: :running, deploy_last_issue: nil
+      return false unless guest.deploy_state == :pending  
+      guest.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       begin
         mk_root_fs
@@ -142,26 +158,26 @@ module CloudModel
         config_firewall
         
         define_guest
-        @guest.start || raise("Failed to start VM")
-        @guest.update_attribute :deploy_state, :finished
+        guest.start || raise("Failed to start VM")
+        guest.update_attribute :deploy_state, :finished
         
         # update hosts for shinken
         config_monitoring
         
         return true
       rescue Exception => e
-        @guest.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
+        guest.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
         CloudModel.log_exception e
         return false
       end
     end
   
     def redeploy_old options={}
-      return false unless @guest.deploy_state == :pending or options[:force]
-      @guest.update_attributes deploy_state: :running, deploy_last_issue: nil
+      return false unless guest.deploy_state == :pending or options[:force]
+      guest.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       begin
-        @guest.deploy_path = "/vm/build/#{@guest.name}"
+        guest.deploy_path = "/vm/build/#{guest.name}"
     
         mk_root_lv
         mk_root_fs
@@ -174,57 +190,57 @@ module CloudModel
     
         umount_all
     
-        old_volume = @guest.root_volume
-        @guest.root_volume = @guest.deploy_volume
+        old_volume = guest.root_volume
+        guest.root_volume = guest.deploy_volume
     
-        unless @guest.save
+        unless guest.save
           raise "Failed to set new root filesystem!"
         end
     
-        @guest.deploy_path = nil
-        @guest.deploy_volume= nil
+        guest.deploy_path = nil
+        guest.deploy_volume= nil
     
         write_fstab
 
         ## TODO: One shot to update admin guest
-        @guest.stop!
-        @guest.undefine || raise("Failed to undefine guest")
+        guest.stop!
+        guest.undefine || raise("Failed to undefine guest")
     
         umount_all
         mount_root_fs
         mount_all
 
         define_guest
-        @guest.start || raise("Failed to start guest")
+        guest.start || raise("Failed to start guest")
     
         ## TODO: This should be called after one-shot update of admin guest
         puts "    Destroy old root LV #{old_volume.name}"
-        @host.exec "lvremove -f #{old_volume.device}"
+        host.exec "lvremove -f #{old_volume.device}"
       
         # Get rid of old volumes
-        CloudModel::LogicalVolume.where(guest_id: @guest.id).ne(_id: @guest.root_volume.id).destroy
+        CloudModel::LogicalVolume.where(guest_id: guest.id).ne(_id: guest.root_volume.id).destroy
       
-        @guest.update_attributes deploy_state: :finished
+        guest.update_attributes deploy_state: :finished
         
         # update hosts for shinken
         config_monitoring
         
         return true
       rescue Exception => e
-        @guest.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
+        guest.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
         CloudModel.log_exception e
         return false
       end
     end
 
-    def config_guest
+    def config_guest_old
       puts "  Prepare VM"
 
       begin
         puts "    Write network config"
-        mkdir_p "#{@guest.deploy_path}/etc/network/interfaces.d"
-        render_to_remote "/cloud_model/guest/etc/network/interfaces.d/lo", "#{@guest.deploy_path}/etc/network/interfaces.d/lo"
-        render_to_remote "/cloud_model/guest/etc/network/interfaces.d/eth0", "#{@guest.deploy_path}/etc/network/interfaces.d/eth0", host: @host, guest: @guest
+        mkdir_p "#{guest.deploy_path}/etc/network/interfaces.d"
+        render_to_remote "/cloud_model/guest/etc/network/interfaces.d/lo", "#{guest.deploy_path}/etc/network/interfaces.d/lo"
+        render_to_remote "/cloud_model/guest/etc/network/interfaces.d/eth0", "#{guest.deploy_path}/etc/network/interfaces.d/eth0", host: host, guest: guest
       rescue Exception => e
         CloudModel.log_exception e
         raise "Failed to configure network!"
@@ -232,8 +248,8 @@ module CloudModel
       
       begin
         puts "    Write hostname"
-        render_to_remote "/cloud_model/support/etc/hostname", "#{@guest.deploy_path}/etc/hostname", host: @guest
-        render_to_remote "/cloud_model/support/etc/machine_info", "#{@guest.deploy_path}/etc/machine-info", host: @guest     
+        render_to_remote "/cloud_model/support/etc/hostname", "#{guest.deploy_path}/etc/hostname", host: guest
+        render_to_remote "/cloud_model/support/etc/machine_info", "#{guest.deploy_path}/etc/machine-info", host: guest     
       rescue Exception => e
         CloudModel.log_exception e
         raise "Failed to configure hostname!"
@@ -241,10 +257,10 @@ module CloudModel
 
       begin
         puts "    Write hosts file"
-        @host.sftp.file.open("#{@guest.deploy_path}/etc/hosts", 'w') do | f |
+        host.sftp.file.open("#{guest.deploy_path}/etc/hosts", 'w') do | f |
           f.puts "127.0.0.1       localhost"
           f.puts "::1             localhost"
-          @host.guests.each do |guest|
+          host.guests.each do |guest|
             f.puts "#{"%-15s" % guest.private_address} #{guest.name} #{guest.external_hostname}" 
           end
         end
