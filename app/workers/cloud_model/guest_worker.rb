@@ -14,6 +14,11 @@ module CloudModel
       @guest
     end
     
+    def mkdir_p path
+      super path
+      host.exec! "chown -R 100000:100000 #{path}", "failed to set owner for #{path}"
+    end
+    
     def render_to_remote template, remote_file, *param_array
       super template, remote_file, *param_array
       host.exec! "chown -R 100000:100000 #{remote_file}", "failed to set owner for #{remote_file}"
@@ -74,7 +79,8 @@ module CloudModel
     end 
     
     def config_network
-      render_to_remote "/cloud_model/support/etc/systemd/network/eth0.network", "#{guest.deploy_path}/etc/systemd/network/eth0.network", address: guest.private_address, subnet: host.private_network.subnet, gateway: host.private_address
+      mkdir_p "#{guest.deploy_path}/etc/systemd/network"
+      render_to_remote "/cloud_model/support/etc/systemd/network/eth0.network", "#{guest.deploy_path}/etc/systemd/network/eth0.network", 0644, address: guest.private_address, subnet: host.private_network.subnet, gateway: host.private_address
       
       chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.service /etc/systemd/system/dbus-org.freedesktop.network1.service"
       chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.service /etc/systemd/system/multi-user.target.wants/systemd-networkd.service"

@@ -171,7 +171,11 @@ module CloudModel
       
       services_string
     end
-     
+    
+    def worker
+      CloudModel::GuestWorker.new self
+    end
+    
     def self.deploy_state_id_for deploy_state
       enum_fields[:deploy_state][:values].invert[deploy_state]
     end
@@ -300,6 +304,7 @@ module CloudModel
           lxd_container
         end
         collection.update_one({_id:  id}, '$set' => { 'current_lxd_container_id': lxd_container_id })
+        self.current_lxd_container_id = lxd_container_id
         #self.write_attribute database_field_name(:current_lxd_container_id), lxd_container_id
         #save
       end

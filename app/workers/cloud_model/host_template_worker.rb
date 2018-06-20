@@ -6,11 +6,12 @@ module CloudModel
               
     def install_utils
       comment_sub_step 'Install mdadm'
-      chroot! build_path, "apt-get install sudo mdadm -y", "Failed to install mdadm"
-      comment_sub_step 'Install btrfs'
-      chroot! build_path, "apt-get install sudo btrfs-tools -y", "Failed to install btrfs"
+      chroot! build_path, "apt-get install mdadm -y", "Failed to install mdadm"
+      # comment_sub_step 'Install btrfs'
+      # chroot! build_path, "apt-get install sudo btrfs-tools -y", "Failed to install btrfs"
       comment_sub_step 'Install zfs'
-      chroot! build_path, "apt-get install sudo zfs-dkms -y", "Failed to install zfs"
+      #chroot! build_path, "apt-get install zfs-dkms -y", "Failed to install zfs"
+      chroot! build_path, "apt-get install zfs-initramfs -y", "Failed to install zfs"
       # Init zfspool on first boot if needed
       render_to_remote "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{build_path}/etc/systemd/system/guest_zpool.service"      
       mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
@@ -45,7 +46,8 @@ module CloudModel
       chroot! build_path, "apt-get install lxd -y", "Failed to install LXD"
       
       mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
-      chroot! build_path, "ln -s /lib/systemd/system/lxd.socket /etc/systemd/system/basic.target.wants/lxd.socket", "Failed to add lxd to autostart"
+      #mkdir_p "#{build_path}/etc/systemd/system/sockets.target.wants"
+      #chroot! build_path, "ln -s /lib/systemd/system/lxd.socket /etc/systemd/system/sockets.target.wants/lxd.socket", "Failed to add lxd to autostart"
       chroot! build_path, "ln -s /lib/systemd/system/lxd-containers.service /etc/systemd/system/basic.target.wants/lxd-containers.service", "Failed to add lxd to autostart"
       
       

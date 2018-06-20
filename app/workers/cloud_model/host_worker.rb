@@ -96,7 +96,8 @@ module CloudModel
         "-n 3:67635200:134744063 -t 3:fd00 -c 3:root_a " +
         "-n 4:134744064:201852927 -t 4:fd00 -c 4:root_b " +
         "-n 5:201852928:403179519 -t 5:fd00 -c 5:cloud " +
-        "-N 6 -t 6:8300 -c 6:guests "
+        "-n 6:403179520:453511168 -t 6:fd00 -c 6:lxd " +
+        "-N 7 -t 6:8300 -c 6:guests "
       
       @host.exec! part_cmd + "/dev/sda", "Failed to create partitions on /dev/sda"
       @host.exec! part_cmd + "/dev/sdb", "Failed to create partitions on /dev/sdb"
@@ -130,7 +131,13 @@ module CloudModel
         unless md_data =~ /md1 \: active raid1 sdb4\[1\] sda4\[0\]/
           @host.exec 'mdadm --zero-superblock /dev/sda4 /dev/sdb4'
           @host.exec 'mdadm --create -e1 -f /dev/md3 --level=1 --raid-devices=2 /dev/sda4 /dev/sdb4'         
-        end          
+        end
+        
+        comment_sub_step 'Init md4 (lxd)', indent: 4
+        unless md_data =~ /md1 \: active raid1 sdb4\[1\] sda4\[0\]/
+          @host.exec 'mdadm --zero-superblock /dev/sda6 /dev/sdb6'
+          @host.exec 'mdadm --create -e1 -f /dev/md4 --level=1 --raid-devices=2 /dev/sda6 /dev/sdb6'         
+        end
       else
         raise 'Failed to stat md data'
       end                 
@@ -153,11 +160,15 @@ module CloudModel
       @host.exec! 'mkfs.ext2 /dev/md0', 'Failed to create fs for boot'
 
       comment_sub_step 'Format cloud array'
-      # make btrfs
-      @host.exec! 'mkfs.btrfs -f /dev/md1', 'Failed to create btrfs'    
+      
+      # make ext4 ls
+      # @host.exec! 'mkfs.ext4 /dev/md1', 'Failed to create root_a fs'
       @host.exec 'mkdir -p /cloud'
       @host.exec! 'mount /dev/md1 /cloud', 'Failed to mount /cloud'      
       
+      @host.exec! 'mkfs.ext4 /dev/md4', 'Failed to create lxd fs'
+      @host.exec 'mkdir -p /var/lib/lxd'
+      @host.exec! 'mount /dev/md4 /var/lib/lxd', 'Failed to mount /cloud'      
       
       #
       # The rest is quite similar to redeploy
@@ -195,6 +206,8 @@ module CloudModel
       
       @host.exec! "mkfs.ext4 #{deploy_root_device}", "Failed to create system fs"
       @host.exec! "mount #{deploy_root_device} #{root}", "Failed to mount system fs"
+      mkdir_p "#{root}/var/lib/lxd"
+      @host.exec! "mount /dev/md4 #{root}/var/lib/lxd", "Failed to mount system fs"
     end
     
     def use_last_deploy_root
@@ -299,10 +312,10 @@ module CloudModel
       chroot root, "/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=#{host.private_network} ipv4.nat=true"
     end
     
-    def copy_lxd
-      @host.exec! "cp -a /var/lib/lxd #{root}/var/lib/ && rm -f #{root}/var/lib/lxd/unix.socket", "Failed to copy lxd files"
-    end
-
+    # def copy_lxd
+    #   @host.exec! "cp -a /var/lib/lxd #{root}/var/lib/ && rm -f #{root}/var/lib/lxd/unix.socket", "Failed to copy lxd files"
+    # end
+    #
     def make_keys
       mkdir_p "#{root}/etc/tinc/vpn/"
       render_to_remote "/cloud_model/host/etc/tinc/rsa_key.priv", "#{root}/etc/tinc/vpn/rsa_key.priv", 0600, host: @host
@@ -374,7 +387,7 @@ module CloudModel
         ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
         ['Populate volume with new system image', :populate_deploy_root],
         ['Config new system', :config_deploy_root],         
-        ['Copy LXD config', :copy_lxd],
+        #['Copy LXD config', :copy_lxd],
         ['Copy crypto keys from old system', :copy_keys],
         ['Write boot config and reboot', :boot_deploy_root],        
       ]

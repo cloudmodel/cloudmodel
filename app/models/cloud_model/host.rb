@@ -165,7 +165,7 @@ module CloudModel
       @ssh_connection ||= if initial_root_pw
         Net::SSH.start(primary_address.ip, "root",
           password: initial_root_pw, 
-          verify_host_key: false          
+          verify_host_key: :never          
         )
       else  
         host_ip = if CloudModel.config.use_external_ip
