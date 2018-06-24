@@ -21,7 +21,11 @@ module CloudModel
     end
     
     def x509
-      OpenSSL::X509::Certificate.new crt
+      begin
+        OpenSSL::X509::Certificate.new crt
+      rescue
+        OpenSSL::X509::Certificate.new
+      end
     end
     
     def pkey
@@ -37,11 +41,15 @@ module CloudModel
     end
     
     def common_name
-      x509.subject.to_a.find{|x| x[0] == "CN"}[1]
+      unless x509.subject.to_a.blank?
+        x509.subject.to_a.find{|x| x[0] == "CN"}[1]
+      end
     end
     
     def issuer
-      x509.issuer.to_a.find{|x| x[0] == "CN"}[1]
+      unless x509.issuer.to_a.blank?
+        x509.issuer.to_a.find{|x| x[0] == "CN"}[1]
+      end
     end
     
     def check_key

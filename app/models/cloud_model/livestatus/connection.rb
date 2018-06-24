@@ -8,6 +8,7 @@ module CloudModel
       end
 
       def socket
+        return nil if CloudModel.config.livestatus_host.blank?
         begin
           @socket ||= TCPSocket.new(CloudModel.config.livestatus_host, CloudModel.config.livestatus_port)
         rescue
