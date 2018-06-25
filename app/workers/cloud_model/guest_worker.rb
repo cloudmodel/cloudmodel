@@ -36,12 +36,13 @@ module CloudModel
       end
     end
     
-    def ensure_lcd_image  
+    def ensure_lxd_image  
       guest.lxd_containers.new.import_template
     end     
     
     def create_lxd_container
       @lxc = guest.lxd_containers.create! guest_template: guest.template, created_at: Time.now, updated_at: Time.now
+      @lxc.mount
     end
     
     def config_lxd_container
@@ -49,12 +50,13 @@ module CloudModel
     end
     
     def start_lxd_container
+      @lxc.unmount
       guest.start @lxc
     end
     
     
     def config_services
-      @lxc.mount
+      #@lxc.mount
       guest.deploy_path = "#{@lxc.mountpoint}/rootfs"
       
       guest.services.each do |service|
@@ -75,7 +77,7 @@ module CloudModel
       #host.exec! "chown -R 100000:100000 #{guest.deploy_path}/usr/share/cloud_model/", "failed to set owner for fix_permissions script"
       host.exec! "rm -f #{guest.deploy_path}/usr/sbin/policy-rc.d", "Failed to remove policy-rc.d"
       
-      @lxc.unmount
+      #@lxc.unmount
     end 
     
     def config_network
@@ -118,7 +120,7 @@ module CloudModel
       
       steps = [
         ['Sync template', :ensure_template, no_skip: true],
-        ['Ensure LXD image', :ensure_lcd_image, no_skip: true],
+        ['Ensure LXD image', :ensure_lxd_image, no_skip: true],
         ['Create LXD container', :create_lxd_container],
         ['Config LXD container', :config_lxd_container],
         ['Config guest services', :config_services],

@@ -204,7 +204,7 @@ module CloudModel
       end
       
       # TODO: make work with initial root pw
-      command = "rsync -avz -e 'ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' #{CloudModel.config.data_directory.shellescape}/inst/ root@#{ssh_address}:/inst"
+      command = "rsync -avz -e 'ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' #{CloudModel.config.data_directory.shellescape}/cloud/ root@#{ssh_address}:/cloud"
       Rails.logger.debug command
       `#{command}`
     end

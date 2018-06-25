@@ -71,12 +71,14 @@ module CloudModel
       
       super template
       
-      # Download build template to local distribution  
-      tarball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"   
-      FileUtils.mkdir_p File.dirname(tarball_target)
-      command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape} #{tarball_target.shellescape}"
-      Rails.logger.debug command
-      local_exec! command, "Failed to download archived metadata"
+      unless template.is_a? CloudModel::GuestCoreTemplate
+        # Download build template to local distribution  
+        tarball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"   
+        FileUtils.mkdir_p File.dirname(tarball_target)
+        command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape} #{tarball_target.shellescape}"
+        Rails.logger.debug command
+        local_exec! command, "Failed to download archived metadata"
+      end
     end
     
     def upload_template template
@@ -84,12 +86,14 @@ module CloudModel
       
       super template
       
-      # Upload build template to host
-      srcball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"  
-      mkdir_p File.dirname(template.tarball)
-      command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa #{srcball_target.shellescape} root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape}"
-      Rails.logger.debug command
-      local_exec! command, "Failed to upload built metadata"
+      unless template.is_a? CloudModel::GuestCoreTemplate
+        # Upload build template to host
+        srcball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"  
+        mkdir_p File.dirname(template.tarball)
+        command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa #{srcball_target.shellescape} root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape}"
+        Rails.logger.debug command
+        local_exec! command, "Failed to upload built metadata"
+      end
     end
     
     def build_core_template template, options={}     
