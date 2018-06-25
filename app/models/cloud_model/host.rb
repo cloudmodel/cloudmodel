@@ -100,7 +100,7 @@ module CloudModel
     validates :private_network, presence: true    
     validates :mac_address_prefix, presence: true, uniqueness: true
     
-    before_create :generate_mac_address_prefix
+    before_validation :generate_mac_address_prefix
       
     def default_root_volume_group
       volume_groups.first

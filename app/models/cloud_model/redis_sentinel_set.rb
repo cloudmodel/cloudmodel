@@ -4,7 +4,7 @@ module CloudModel
     include Mongoid::Timestamps
     
     field :name, type: String
-    belongs_to :master_service, class_name: "CloudModel::Services::Redis"
+    belongs_to :master_service, class_name: "CloudModel::Services::Redis", optional: true
 
     def services
       CloudModel::Guest.where("services.redis_sentinel_set_id" => id).map{ |guest| 

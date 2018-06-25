@@ -122,19 +122,19 @@ module CloudModel
         end       
            
         comment_sub_step 'Init md2 (root_a)', indent: 4
-        unless md_data =~ /md1 \: active raid1 sdb3\[1\] sda3\[0\]/
+        unless md_data =~ /md2 \: active raid1 sdb3\[1\] sda3\[0\]/
           @host.exec 'mdadm --zero-superblock /dev/sda3 /dev/sdb3'
           @host.exec 'mdadm --create -e1 -f /dev/md2 --level=1 --raid-devices=2 /dev/sda3 /dev/sdb3'         
         end     
              
         comment_sub_step 'Init md3 (root_b)', indent: 4
-        unless md_data =~ /md1 \: active raid1 sdb4\[1\] sda4\[0\]/
+        unless md_data =~ /md3 \: active raid1 sdb4\[1\] sda4\[0\]/
           @host.exec 'mdadm --zero-superblock /dev/sda4 /dev/sdb4'
           @host.exec 'mdadm --create -e1 -f /dev/md3 --level=1 --raid-devices=2 /dev/sda4 /dev/sdb4'         
         end
         
         comment_sub_step 'Init md4 (lxd)', indent: 4
-        unless md_data =~ /md1 \: active raid1 sdb4\[1\] sda4\[0\]/
+        unless md_data =~ /md4 \: active raid1 sdb6\[1\] sda6\[0\]/
           @host.exec 'mdadm --zero-superblock /dev/sda6 /dev/sdb6'
           @host.exec 'mdadm --create -e1 -f /dev/md4 --level=1 --raid-devices=2 /dev/sda6 /dev/sdb6'         
         end
@@ -162,9 +162,11 @@ module CloudModel
       comment_sub_step 'Format cloud array'
       
       # make ext4 ls
-      # @host.exec! 'mkfs.ext4 /dev/md1', 'Failed to create root_a fs'
+      @host.exec! 'mkfs.ext4 /dev/md1', 'Failed to create cloud fs'
       @host.exec 'mkdir -p /cloud'
       @host.exec! 'mount /dev/md1 /cloud', 'Failed to mount /cloud'      
+
+      comment_sub_step 'Format lxd array'
       
       @host.exec! 'mkfs.ext4 /dev/md4', 'Failed to create lxd fs'
       @host.exec 'mkdir -p /var/lib/lxd'

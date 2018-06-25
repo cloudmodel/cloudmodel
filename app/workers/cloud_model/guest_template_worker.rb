@@ -13,6 +13,9 @@ module CloudModel
       comment_sub_step 'Install gnupg'
       chroot! build_path, "apt-get install sudo gnupg -y", "Failed to install gnupg"
       
+      comment_sub_step 'Install rsync'
+      chroot! build_path, "apt-get install sudo rsync -y", "Failed to install rsync"
+      
       comment_sub_step 'Configre autologin'
       # Autologin
       mkdir_p "#{build_path}/etc/systemd/system/console-getty.service.d"
