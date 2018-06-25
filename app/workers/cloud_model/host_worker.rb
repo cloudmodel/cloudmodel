@@ -311,7 +311,7 @@ module CloudModel
     def config_lxd
       chroot root, "/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests"
       # lxc storage set default volume.zfs.use_refquota true
-      chroot root, "/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=#{host.private_network} ipv4.nat=true"
+      chroot root, "/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=#{host.private_address}/#{host.private_network.subnet} ipv4.nat=true"
     end
     
     # def copy_lxd

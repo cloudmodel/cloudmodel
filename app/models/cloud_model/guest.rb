@@ -18,7 +18,7 @@ module CloudModel
     # has_one :root_volume, class_name: "CloudModel::LogicalVolume", inverse_of: :guest, autobuild: true
     # accepts_nested_attributes_for :root_volume
     has_many :guest_volumes, class_name: "CloudModel::GuestVolume"
-    accepts_nested_attributes_for :guest_volumes, allow_destroy: true
+    accepts_nested_attributes_for :lxd_custom_volumes, allow_destroy: true
     
     field :name, type: String
     
