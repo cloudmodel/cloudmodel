@@ -8,14 +8,14 @@ module CloudModel
       field :ssl_only, type: Mongoid::Boolean, default: false
       field :ssl_enforce, type: Mongoid::Boolean, default: false
       field :ssl_port, type: Integer, default: 443
-      belongs_to :ssl_cert, class_name: 'CloudModel::Certificate', inverse_of: :services
+      belongs_to :ssl_cert, class_name: 'CloudModel::Certificate', inverse_of: :services, optional: true
       
       field :passenger_supported, type: Mongoid::Boolean, default: false
       field :passenger_env, type: String, default: 'production'
       
       field :capistrano_supported, type: Mongoid::Boolean, default: false
       
-      belongs_to :deploy_web_image, class_name: 'CloudModel::WebImage', inverse_of: :services
+      belongs_to :deploy_web_image, class_name: 'CloudModel::WebImage', inverse_of: :services, optional: true
       
       enum_field :redeploy_web_image_state, values: {
         0x00 => :pending,
@@ -32,12 +32,12 @@ module CloudModel
       field :deploy_mongodb_port, type: Integer, default: 27017
       field :deploy_mongodb_database, type: String
       
-      belongs_to :deploy_mongodb_replication_set, class_name: 'CloudModel::MongodbReplicationSet'
+      belongs_to :deploy_mongodb_replication_set, class_name: 'CloudModel::MongodbReplicationSet', optional: true
     
       field :deploy_redis_host, type: String
       field :deploy_redis_port, type: Integer, default: 6379
       
-      belongs_to :deploy_redis_sentinel_set, class_name: 'CloudModel::RedisSentinelSet'
+      belongs_to :deploy_redis_sentinel_set, class_name: 'CloudModel::RedisSentinelSet', optional: true
             
       field :daily_rake_task, type: String, default: nil
     
