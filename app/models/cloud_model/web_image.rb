@@ -39,7 +39,7 @@ module CloudModel
     
     field :redeploy_last_issue, type: String
 
-    belongs_to :file, class_name: "Mongoid::GridFS::Fs::File"
+    belongs_to :file, class_name: "Mongoid::GridFS::Fs::File", optional: true
     
     validates :name, presence: true, uniqueness: true
     validates :git_server, presence: true
