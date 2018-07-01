@@ -49,7 +49,8 @@ module CloudModel
            
       #render_to_remote "/cloud_model/host/etc/default/grub", "#{root}/etc/default/grub", root: @deploy_lv
       
-      comment_sub_step 'Setup grub bootloader'    
+      comment_sub_step 'Setup grub bootloader'
+      chroot! root, "update-initramfs -u", "Failed to update initram" 
       chroot! root, "grub-install  --no-floppy --recheck /dev/sda", 'Failed to install grub on sda'
       chroot! root, "grub-mkconfig -o /boot/grub/grub.cfg", 'Failed to config grub'
       chroot! root, "grub-install --no-floppy /dev/sdb", 'Failed to install grub on sda'

@@ -13,6 +13,10 @@ module CloudModel
       @host = host
     end
     
+    def host
+      @host
+    end
+    
     def render template, locals={}
       av = ActionView::Base.new
       av.view_paths = ActionController::Base.view_paths

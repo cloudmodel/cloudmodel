@@ -88,7 +88,7 @@ module CloudModel
     def pack_template
       @template.update_attribute :build_state, :packaging
       
-      host.exec "rm #{build_path}/etc/udev/rules.d/70-persistent-cd.rules #{build_path}/etc/udev/rules.d/70-persistent-net.rules #{build_path}/etc/mdadm/mdadm.cfg"
+      host.exec "rm #{build_path}/etc/udev/rules.d/70-persistent-cd.rules #{build_path}/etc/udev/rules.d/70-persistent-net.rules #{build_path}/etc/mdadm/mdadm.conf"
       chroot! build_path, "mv /boot /kernel", "Failed to move boot to kernel"
       tar_template build_path, @template
       chroot! build_path, "mv /kernel /boot", "Failed to move kernal back to boot"      
