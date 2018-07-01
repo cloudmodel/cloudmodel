@@ -6,7 +6,7 @@ module CloudModel
     field :version, type: String
 
     has_many :solr_images, class_name: "CloudModel::SolrImage"
-    belongs_to :file, class_name: "Mongoid::GridFS::Fs::File"
+    belongs_to :file, class_name: "Mongoid::GridFS::Fs::File", optional: true
     
     validates :version, presence: true, uniqueness: true
     
