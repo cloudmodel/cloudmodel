@@ -24,6 +24,29 @@ module CloudModel
       host.exec! "chown -R 100000:100000 #{remote_file}", "failed to set owner for #{remote_file}"
     end
     
+    def download_template template
+      return if CloudModel.config.skip_sync_images
+      super template
+      # Download build template to local distribution  
+      tarball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"   
+      #FileUtils.mkdir_p File.dirname(tarball_target)
+      command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape} #{tarball_target.shellescape}"
+      Rails.logger.debug command
+      local_exec! command, "Failed to download archived template"
+    end
+    
+    def upload_template template
+      return if CloudModel.config.skip_sync_images
+      super template
+      # Upload build template to host
+      srcball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"  
+      #mkdir_p File.dirname(template.tarball)
+      command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa #{srcball_target.shellescape} root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape}"
+      Rails.logger.debug command
+      local_exec! command, "Failed to upload built template"
+    end
+    
+    
     def ensure_template
       @template = guest.template
                   
