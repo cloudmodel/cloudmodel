@@ -14,7 +14,11 @@ module CloudModel
     
     used_in_guests_as 'services.ssl_cert_id'
     
-    scope :valid, -> { where(:valid_thru.gt => Time.now) }
+    #scope :valid, -> { where(:valid_thru.gt => Time.now) }
+    
+    def self.valid
+      all.select{|c| c.valid_now?}
+    end
     
     def to_s
       name
@@ -38,6 +42,10 @@ module CloudModel
     
     def valid_thru
       x509.not_after
+    end
+    
+    def valid_now?
+      valid_from < Time.now and Time.now < valid_thru
     end
     
     def common_name
