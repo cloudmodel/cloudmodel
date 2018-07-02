@@ -14,5 +14,20 @@ module CloudModel
     def add_service service
       service.update_attributes mongodb_replication_set_id: id
     end
+    
+    def init_rs_cmd
+      cmd = "rs.initiate( {\n" + 
+            "   _id : \"#{name}\",\n" +
+            "   members: [\n"
+
+      services.each_with_index do |service,i|
+        cmd += "      { _id: #{i}, host: \"#{service.guest.private_address}:#{service.port}\" },\n"
+      end
+      
+      cmd += "   ]\n" +
+             "})\n"
+             
+      puts cmd
+    end
   end
 end
