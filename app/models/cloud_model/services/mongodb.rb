@@ -2,7 +2,7 @@ module CloudModel
   module Services
     class Mongodb < Base
       field :port, type: Integer, default: 27017
-      belongs_to :mongodb_replication_set, class_name: "CloudModel::MongodbReplicationSet"
+      belongs_to :mongodb_replication_set, class_name: "CloudModel::MongodbReplicationSet", optional: true
       
       def kind
         :mongodb
