@@ -16,6 +16,16 @@ module CloudModel
         @host
       end
   
+      def mkdir_p path
+        super path
+        host.exec! "chown -R 100000:100000 #{path}", "failed to set owner for #{path}"
+      end
+    
+      def render_to_remote template, remote_file, *param_array
+        super template, remote_file, *param_array
+        host.exec! "chown -R 100000:100000 #{remote_file}", "failed to set owner for #{remote_file}"
+      end
+  
       def write_config
       end
   

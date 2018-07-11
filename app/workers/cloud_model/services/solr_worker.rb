@@ -34,9 +34,9 @@ module CloudModel
         mkdir_p "#{config_path}/cache"
         mkdir_p "#{config_path}/data"
 
-        chroot @guest.deploy_path, "chown -R solr:solr /var/solr"
+        chroot @guest.deploy_path, "chown -R 100999:100999 /var/solr"
         
-        render_to_remote "/cloud_model/guest/etc/systemd/system/solr.service", "#{@guest.deploy_path}/etc/systemd/system/solr.service", guest: @guest, model: @model 
+        render_to_remote "/cloud_model/guest/etc/systemd/system/solr.service", "#{@guest.deploy_path}/etc/systemd/system/solr.service", 0755, guest: @guest, model: @model 
       end
     
       def service_name
