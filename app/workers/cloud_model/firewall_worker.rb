@@ -111,7 +111,8 @@ module CloudModel
       ports.each do |port|
         if(options[:trust])
           parse_ports(options[:trust]).each do |s|
-            commands << "#{iptables} -A INPUT -i #{interface} -m conntrack --ctstate NEW -p tcp -s #{s} -d #{host} --dport #{port} -j ACCEPT"
+            #commands << "#{iptables} -A INPUT -i #{interface} -m conntrack --ctstate NEW -p tcp -s #{s} -d #{host} --dport #{port} -j ACCEPT"
+            commands << "#{iptables} -A INPUT -m conntrack --ctstate NEW -p tcp -s #{s} -d #{host} --dport #{port} -j ACCEPT"
           end
         end
 
@@ -136,21 +137,10 @@ module CloudModel
 
     def masq_private(options)
       commands = []
-      # Forward bridged IPv4 network
       
-      # commands << "#{ip4tables_bin} -A INPUT -i virbr0 -p udp -m udp --dport 53 -j ACCEPT"
-      # commands << "#{ip4tables_bin} -A INPUT -i virbr0 -p tcp -m tcp --dport 53 -j ACCEPT"
-      # commands << "#{ip4tables_bin} -A INPUT -i virbr0 -p udp -m udp --dport 67 -j ACCEPT"
-      # commands << "#{ip4tables_bin} -A INPUT -i virbr0 -p tcp -m tcp --dport 67 -j ACCEPT"
-      
-      # commands << "#{ip4tables_bin} -A FORWARD -d #{@host.private_network} -o virbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"
-      # commands << "#{ip4tables_bin} -A FORWARD -s #{@host.private_network} -i virbr0 -j ACCEPT"
-      # commands << "#{ip4tables_bin} -A FORWARD -i virbr0 -o virbr0 -j ACCEPT"
-      
-      # commands << "#{ip4tables_bin} -A FORWARD -o virbr0 -j REJECT --reject-with icmp-port-unreachable"
-      # commands << "#{ip4tables_bin} -A FORWARD -i virbr0 -j REJECT --reject-with icmp-port-unreachable"
-      
-      #commands << "#{ip4tables_bin} -A OUTPUT -o virbr0 -p udp -m udp --dport 68 -j ACCEPT"
+      @host.addresses.each do |address|
+        commands << "#{ip4tables_bin} -I FORWARD -o lxdbr0 -d #{address.to_s} -j ACCEPT"
+      end
       
       # Handle multicast
       commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} -d 224.0.0.0/24 -j RETURN"
@@ -159,7 +149,11 @@ module CloudModel
       # Masquerading
       commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network.tinc_network}/#{@host.private_network.tinc_subnet} -p tcp -j MASQUERADE --to-ports 1024-65535"
       commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network.tinc_network}/#{@host.private_network.tinc_subnet} -p udp -j MASQUERADE --to-ports 1024-65535"
-      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network.tinc_network}/#{@host.private_network.tinc_subnet} -j MASQUERADE" 
+      commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} ! -d #{@host.private_network.tinc_network}/#{@host.private_network.tinc_subnet} -j MASQUERADE"
+      # # Local forward
+      # commands << "#{ip4tables_bin} -A FORWARD -o lxdbr0 -m state --state RELATED,ESTABLISHED -j ACCEPT"
+      # commands << "#{ip4tables_bin} -A FORWARD -i lxdbr0 -o eth0 -j ACCEPT"
+      # commands << "#{ip4tables_bin} -A FORWARD -i lxdbr0 -o lo -j ACCEPT"
     end
 
     def nat(host, interface, port, proto, nat_host)
@@ -167,8 +161,15 @@ module CloudModel
   
       commands = []
   
+      # nat external request
       commands << "#{iptables} -t nat -A PREROUTING -p #{proto} -d #{host} --dport #{port} -j DNAT --to-destination #{nat_host}:#{port}"
-      commands << "#{iptables} -t nat -A POSTROUTING -p #{proto} -d #{host} --dport #{port} -j MASQUERADE"
+      # nat request from host
+      commands << "#{iptables} -t nat -A OUTPUT -p #{proto} -o lo -d #{host} --dport #{port} -j DNAT --to #{nat_host}:#{port}"
+      # nat request from bridge
+      commands << "#{iptables} -t nat -A OUTPUT -p #{proto} -o lxdbr0 -d #{host} --dport #{port} -j DNAT --to #{nat_host}:#{port}"      
+      # postrouting
+      #commands << "#{iptables} -t nat -A POSTROUTING -p #{proto} -s #{host} --sport #{port} -j MASQUERADE"
+      commands << "#{iptables} -t nat -A POSTROUTING -d #{nat_host} -j SNAT --to-source #{host}"
   
       commands
     end
@@ -184,7 +185,8 @@ module CloudModel
         proto = options[:proto] || 'tcp'
     
         commands = ["#{iptables} -A INPUT -i #{interface} -m conntrack --ctstate NEW -p #{proto}"]
-  
+        #commands = ["#{iptables} -A INPUT -m conntrack --ctstate NEW -p #{proto}"]
+
         if options[:shost] and options[:shost] != 'any'
           cmds = []
           commands.each do |c|
@@ -260,6 +262,7 @@ module CloudModel
         commands << "echo"        
         
         commands << "#{iptables} -L"
+        commands << "#{iptables} -t nat -L"
       end  
       commands * "\n"
     end
@@ -268,6 +271,9 @@ module CloudModel
       commands = []
       interfaces = []
   
+      commands << "#{ip4tables_bin} -A FORWARD -i lxdbr0 -j ACCEPT"
+      commands << "#{ip4tables_bin} -A FORWARD -o lxdbr0 -j ACCEPT"
+      
       if ssh_deep_inspect?
         # Create SSH attack chains
         iptables_bins.each do |iptables|
@@ -327,9 +333,9 @@ module CloudModel
         commands << "#{ip4tables_bin} -A OUTPUT -o #{interface} -p icmp --icmp-type timestamp-reply -j DROP"
       end
   
-      #commands * "\n"
+      commands * "\n"
       
-      commands.map{|c| "echo '#{c}'\n#{c}"} * "\n"
+      #commands.map{|c| "echo '#{c}'\n#{c}"} * "\n"
     end
     
     def write_scripts options = {root: ''}
