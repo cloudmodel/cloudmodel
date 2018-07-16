@@ -142,6 +142,17 @@ module CloudModel
         commands << "#{ip4tables_bin} -I FORWARD -o lxdbr0 -d #{address.to_s} -j ACCEPT"
       end
       
+      @host.guests.where(:external_address.exists => true).each do |guest|
+        unless guest.external_address.empty?
+          #commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{guest.private_address} ! -d #{tinc_network} -j SNAT --to-source #{guest.external_address}"
+          #commands << "#{ip4tables_bin} -t nat -A POSTROUTING -o eth0 -s #{guest.private_address} -j SNAT --to-source #{guest.external_address}"
+          #commands << "#{ip4tables_bin} -t nat -A POSTROUTING -d #{guest.private_address} -j SNAT --to-source #{guest.external_address}"
+          
+          commands << "#{ip4tables_bin} -t nat -A POSTROUTING -o eth0 -s #{guest.private_address} -j SNAT --to #{guest.external_address}"
+          commands << "#{ip4tables_bin} -t nat -A POSTROUTING -o lxdbr0 -s #{guest.private_address} -j SNAT --to #{guest.external_address}"
+        end
+      end
+      
       # Handle multicast
       commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} -d 224.0.0.0/24 -j RETURN"
       # Handle broadcast
@@ -169,7 +180,7 @@ module CloudModel
       commands << "#{iptables} -t nat -A OUTPUT -p #{proto} -o lxdbr0 -d #{host} --dport #{port} -j DNAT --to #{nat_host}:#{port}"      
       # postrouting
       #commands << "#{iptables} -t nat -A POSTROUTING -p #{proto} -s #{host} --sport #{port} -j MASQUERADE"
-      commands << "#{iptables} -t nat -A POSTROUTING ! -s #{@host.private_network.tinc_network}/#{@host.private_network.tinc_subnet} -d #{nat_host} -j SNAT --to-source #{host}"
+      #commands << "#{iptables} -t nat -A POSTROUTING -s #{nat_host} -j SNAT --to #{host}"
   
       commands
     end
