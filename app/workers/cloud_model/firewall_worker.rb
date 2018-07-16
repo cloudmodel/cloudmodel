@@ -169,7 +169,7 @@ module CloudModel
       commands << "#{iptables} -t nat -A OUTPUT -p #{proto} -o lxdbr0 -d #{host} --dport #{port} -j DNAT --to #{nat_host}:#{port}"      
       # postrouting
       #commands << "#{iptables} -t nat -A POSTROUTING -p #{proto} -s #{host} --sport #{port} -j MASQUERADE"
-      commands << "#{iptables} -t nat -A POSTROUTING -d #{nat_host} -j SNAT --to-source #{host}"
+      commands << "#{iptables} -t nat -A POSTROUTING ! -s #{@host.private_network.tinc_network}/#{@host.private_network.tinc_subnet} -d #{nat_host} -j SNAT --to-source #{host}"
   
       commands
     end
