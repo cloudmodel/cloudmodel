@@ -53,7 +53,7 @@ module CloudModel
       
     def package_build
       begin
-        run_step "Packaging", "tar -cpjf #{@solr_image.build_path.shellescape}-building.tar.bz2 --directory #{@solr_image.build_path.shellescape}/solr --exclude={'.git','./.gitignore','./.gitmodules','./tmp/**/*','./log/**/*','./spec','./features','.rspec','.gitkeep','./bundle/#{Bundler.ruby_scope}/cache','.bundle/#{Bundler.ruby_scope}/doc'} ."
+        run_step "Packaging", "/bin/tar -cpjf #{@solr_image.build_path.shellescape}-building.tar.bz2 --directory #{@solr_image.build_path.shellescape}/solr --exclude={'.git','./.gitignore','./.gitmodules','./tmp/**/*','./log/**/*','./spec','./features','.rspec','.gitkeep','./bundle/#{Bundler.ruby_scope}/cache','.bundle/#{Bundler.ruby_scope}/doc'} ."
       rescue CloudModel::ExecutionException => e
         CloudModel.log_exception e
         @solr_image.update_attributes build_state: :failed, build_last_issue: 'Unable to package image.'      

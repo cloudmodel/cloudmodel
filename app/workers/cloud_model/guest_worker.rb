@@ -135,9 +135,9 @@ module CloudModel
     end
          
     def deploy options={}
-      return false unless host.deploy_state == :pending or options[:force]
+      return false unless guest.deploy_state == :pending or options[:force]
       
-      host.update_attributes deploy_state: :running, deploy_last_issue: nil
+      guest.update_attributes deploy_state: :running, deploy_last_issue: nil
       
       build_start_at = Time.now
       
@@ -162,7 +162,7 @@ module CloudModel
       
       run_steps :deploy, steps, options
       
-      host.update_attributes deploy_state: :finished
+      guest.update_attributes deploy_state: :finished
       
       puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"      
     end

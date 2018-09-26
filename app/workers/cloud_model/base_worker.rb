@@ -181,7 +181,7 @@ module CloudModel
         params
       end
 
-      cmd = "tar czf #{dst.shellescape} "
+      cmd = "/bin/tar czf #{dst.shellescape} "
 
       options.each do |k,v|
         param = k.to_s.gsub('_', '-').shellescape

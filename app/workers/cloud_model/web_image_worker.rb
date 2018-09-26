@@ -74,7 +74,7 @@ module CloudModel
     
     def package_build
       begin
-        run_within_build_env "Packaging", "tar -cpjf #{@web_image.build_path.shellescape}-building.tar.bz2 --directory #{@web_image.build_path.shellescape} --exclude={'.git','./.gitignore','./tmp/**/*','./log/**/*','./spec','./features','.rspec','.gitkeep','./bundle/#{Bundler.ruby_scope}/cache','.bundle/#{Bundler.ruby_scope}/doc'} ."
+        run_within_build_env "Packaging", "/bin/tar -cpjf #{@web_image.build_path.shellescape}-building.tar.bz2 --directory #{@web_image.build_path.shellescape} --exclude={'.git','./.gitignore','./tmp/**/*','./log/**/*','./spec','./features','.rspec','.gitkeep','./bundle/#{Bundler.ruby_scope}/cache','.bundle/#{Bundler.ruby_scope}/doc'} ."
       rescue CloudModel::ExecutionException => e
         CloudModel.log_exception e
         @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to package image.'      
@@ -178,6 +178,7 @@ module CloudModel
       Bundler.with_original_env do
         ENV.delete_if { | k, _ | k[0, 7] == "BUNDLE_" } 
         ENV["BUNDLE_GEMFILE"] = "#{@web_image.build_path}/Gemfile"
+        ENV["PATH"] ||= "/usr/bin:/bin:/usr/sbin:/sbin"
         ENV["PATH"] += ':/usr/local/bin'
         ENV["GEM_PATH"] ||= ''
         ENV["GEM_PATH"] += ":/usr/local/lib/ruby/gems/#{Gem.ruby_api_version}:/usr/lib/ruby/gems/#{Gem.ruby_api_version}"
@@ -189,7 +190,7 @@ module CloudModel
         #puts "----"
         #puts command
         #puts "----"
-        #puts ENV.to_json
+        Rails.logger.debug ENV.to_json
         
         run_step step, command
       end
@@ -197,9 +198,11 @@ module CloudModel
       
     def run_step step, command      
       Rails.logger.debug "### #{step}: #{command}"
+      command = "PATH=/bin:#{ENV["PATH"]} #{command}"
       c_out = `#{command}`
       unless $?.success?
         Rails.logger.error "Error running command:\n  #{command}\n  #{$?}\n#{c_out.lines.map{|l| "    #{l}"} * ""}\n#----"
+        Rails.logger.error $?
         
         raise ExecutionException.new command, "#{step} failed (#{$?})", c_out
       end
