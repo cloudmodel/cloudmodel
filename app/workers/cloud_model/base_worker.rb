@@ -17,6 +17,10 @@ module CloudModel
       @host
     end
     
+    def error_log_object
+      host
+    end
+    
     def render template, locals={}
       av = ActionView::Base.new
       av.view_paths = ActionController::Base.view_paths
@@ -239,7 +243,7 @@ module CloudModel
           puts "[Failed after #{distance_of_time_in_words_to_now ts}]"
           puts ''
           CloudModel.log_exception e
-          @host.update_attributes :"#{stage}_state" => :failed, :"#{stage}_last_issue" => "#{e}"
+          error_log_object.update_attributes :"#{stage}_state" => :failed, :"#{stage}_last_issue" => "#{e}"
           raise e
         end
       end

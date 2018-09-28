@@ -14,6 +14,10 @@ module CloudModel
       @guest
     end
     
+    def error_log_object
+      guest
+    end
+     
     def mkdir_p path
       super path
       host.exec! "chown -R 100000:100000 #{path}", "failed to set owner for #{path}"
