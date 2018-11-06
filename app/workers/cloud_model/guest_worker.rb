@@ -110,15 +110,22 @@ module CloudModel
     def config_guest_certificates
       guest.guest_certificates.each do |cert|
         unless cert.path_to_crt.blank?
-          @host.sftp.file.open(File.expand_path("#{cert.path_to_crt}", @guest.deploy_path), 'w') do |f|
+          crt_file = "#{guest.deploy_path}#{cert.path_to_crt}"
+          mkdir_p File.dirname(crt_file)
+          @host.sftp.file.open(crt_file, 'w') do |f|
             f.write cert.certificate.crt
           end
+          host.exec! "chown 100000:100000 #{crt_file}", "failed to set owner for #{crt_file}"
         end
       
         unless cert.path_to_key.blank?
-          @host.sftp.file.open(File.expand_path("#{cert.path_to_key}", @guest.deploy_path), 'w') do |f|
+          key_file = "#{guest.deploy_path}#{cert.path_to_key}"
+          mkdir_p File.dirname(key_file)
+          @host.sftp.file.open(key_file, 'w') do |f|
             f.write cert.certificate.key
           end
+          host.exec! "chown 100000:100000 #{key_file}", "failed to set owner for #{key_file}"
+          host.exec! "chmod 0700 #{key_file}", "failed to limit rights for #{key_file}"
         end
       end
     end
