@@ -107,6 +107,22 @@ module CloudModel
       #@lxc.unmount
     end 
     
+    def config_guest_certificates
+      guest.guest_certificates.each do |cert|
+        unless cert.path_to_crt.blank?
+          @host.sftp.file.open(File.expand_path("#{cert.path_to_crt}", @guest.deploy_path), 'w') do |f|
+            f.write cert.certificate.crt
+          end
+        end
+      
+        unless cert.path_to_key.blank?
+          @host.sftp.file.open(File.expand_path("#{cert.path_to_key}", @guest.deploy_path), 'w') do |f|
+            f.write cert.certificate.key
+          end
+        end
+      end
+    end
+    
     def config_network
       mkdir_p "#{guest.deploy_path}/etc/systemd/network"
       render_to_remote "/cloud_model/support/etc/systemd/network/eth0.network", "#{guest.deploy_path}/etc/systemd/network/eth0.network", 0644, address: guest.private_address, subnet: host.private_network.subnet, gateway: host.private_address
@@ -151,6 +167,7 @@ module CloudModel
         ['Create LXD container', :create_lxd_container],
         ['Config LXD container', :config_lxd_container],
         ['Config guest services', :config_services],
+        ['Config guest certificates', :config_guest_certificates],
         ['Config network', :config_network],
         ['Config firewall', :config_firewall],
         ['Launch LXD container', :start_lxd_container],

@@ -49,7 +49,9 @@ module CloudModel
     # end
         
     accept_size_strings_for :memory_size
-      
+    
+    has_many :guest_certificates, class_name: "CloudModel::GuestCertificate"
+
     validates :name, presence: true, uniqueness: { scope: :host }, format: {with: /\A[a-z0-9\-_]+\z/}
     validates :host, presence: true
     #validates :root_volume, presence: true
@@ -135,6 +137,19 @@ module CloudModel
         puts res[1]
         false
       end
+    end
+    
+    def certificates
+      ids = guest_certificates.pluck(:certificate_id)
+      services.each do |service|
+        ids << service.ssl_cert_id if service.respond_to?(:ssl_cert_id) and service.ssl_cert_id
+      end
+      
+      CloudModel::Certificate.where(:id.in => ids)
+    end
+    
+    def has_certificates?
+      certificates.count > 0
     end
     
     def has_service?(service_type)

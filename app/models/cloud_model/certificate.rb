@@ -3,6 +3,18 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::UsedInGuestsAs
+    # Add guests connected via GuestCertificates
+    module CertificateUsedInGuest
+      def used_in_guests
+        guest_ids = guest_certificates.pluck(:guest_id)
+        if guest_ids.blank?
+          super
+        else
+          CloudModel::Guest.or(super, :id.in => guest_ids)
+        end
+      end
+    end
+    include CertificateUsedInGuest
     
     field :name, type: String
     field :ca, type: String
@@ -10,9 +22,9 @@ module CloudModel
     field :crt, type: String
     field :valid_thru, type: Date
     
-    #has_many :services
-    
     used_in_guests_as 'services.ssl_cert_id'
+    
+    has_many :guest_certificates, class_name: "CloudModel::GuestCertificate"
     
     #scope :valid, -> { where(:valid_thru.gt => Time.now) }
     
