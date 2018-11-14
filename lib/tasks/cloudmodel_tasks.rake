@@ -1,7 +1,13 @@
 namespace :cloudmodel do
   desc "Backup marked services and volumes"
   task :backup => [:environment] do
-    CloudModel::Guest.all.map{|guest| guest.backup}
+    CloudModel::Guest.all.each do |guest|
+      begin
+        guest.backup
+      rescue
+        puts "Backup of Guest #{guest.name} failed"
+      end
+    end
   end
   
   namespace :host_image do
@@ -102,7 +108,7 @@ namespace :cloudmodel do
         
     desc "Backup guest"
     task :backup => [:environment, :load_guest] do
-      @guest.backup
+      @guest_worker.guest.backup
     end
     
     # Perfect for call by crontab
@@ -110,7 +116,11 @@ namespace :cloudmodel do
     desc "Backup all guest"
     task :backup_all => [:environment] do
       CloudModel::Guest.all.each do |guest|
-        guest.backup
+        begin
+          guest.backup
+        rescue
+          puts "Backup of Guest #{guest.name} failed"
+        end
       end
     end    
     

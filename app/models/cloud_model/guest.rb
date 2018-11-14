@@ -367,9 +367,9 @@ module CloudModel
     def backup
       success = true
       
-      guest_volumes.where(has_backups: true).each do |volume|
-        Rails.logger.debug "V #{volume.mount_point}: #{success &&= volume.backup}" 
-      end
+      # guest_volumes.where(has_backups: true).each do |volume|
+      #   Rails.logger.debug "V #{volume.mount_point}: #{success &&= volume.backup}"
+      # end
 
       services.where(has_backups: true).each do |service|
         Rails.logger.debug "S #{service._type}: #{success &&= service.backup}" 
