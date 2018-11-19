@@ -12,7 +12,7 @@ module CloudModel
     belongs_to :host, class_name: "CloudModel::Host"
     embeds_many :services, class_name: "CloudModel::Services::Base", :cascade_callbacks => true
     embeds_many :lxd_containers, class_name: "CloudModel::LxdContainer", :cascade_callbacks => true
-    embeds_many :lxd_custom_volumes, class_name: "CloudModel::LxdCustomVolume"#, :cascade_callbacks => true
+    embeds_many :lxd_custom_volumes, class_name: "CloudModel::LxdCustomVolume", :cascade_callbacks => true
     field :current_lxd_container_id, type: BSON::ObjectId
     
     #has_many :guest_volumes, class_name: "CloudModel::GuestVolume"
