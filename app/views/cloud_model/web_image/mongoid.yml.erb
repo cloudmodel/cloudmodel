@@ -20,7 +20,8 @@
         - <%= service.guest.private_address %>:<%= service.port %>
         <% end -%>
       options:
-        read: :nearest  
+        read:
+          mode: :nearest   
       <% else -%>
         - <%= model.deploy_mongodb_host %>:<%= model.deploy_mongodb_port %>  
       <% end -%>
