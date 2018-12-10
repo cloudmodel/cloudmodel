@@ -147,6 +147,10 @@ module CloudModel
       
       hostname
     end
+    
+    def name_with_stage
+      "[#{stage}] #{name}"
+    end
   
     def tinc_private_key
       require 'openssl'
