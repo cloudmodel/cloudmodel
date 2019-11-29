@@ -1,0 +1,25 @@
+[Unit]
+Description=Delayed Job Worker
+After=syslog.target network.target
+AssertPathExists=/var/www/rails/current
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/rails/current
+
+ExecStart=/bin/bash -lc 'RAILS_ENV=<%= model.passenger_env %> bundle exec rake jobs:work'
+KillSignal=SIGINT
+User=www
+Group=www
+UMask=0002
+
+# Restart after 1 minute delay
+Restart=on-failure
+RestartSec=60
+
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=dj_worker
+
+[Install]
+WantedBy=multi-user.target

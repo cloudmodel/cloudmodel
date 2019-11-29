@@ -12,6 +12,7 @@ module CloudModel
       
       field :passenger_supported, type: Mongoid::Boolean, default: false
       field :passenger_env, type: String, default: 'production'
+      field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
       
       field :capistrano_supported, type: Mongoid::Boolean, default: false
       
