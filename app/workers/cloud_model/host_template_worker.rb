@@ -16,8 +16,8 @@ module CloudModel
       render_to_remote "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{build_path}/etc/systemd/system/guest_zpool.service"      
       mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
       chroot! build_path, "ln -s /etc/systemd/system/guest_zpool.service /etc/systemd/system/basic.target.wants/guest_zpool.service", "Failed to add guest_zpool to autostart"
-      comment_sub_step 'Install curl'
-      chroot! build_path, "apt-get install sudo curl -y", "Failed to install curl"
+      comment_sub_step 'Install curl and nano'
+      chroot! build_path, "apt-get install sudo curl nano -y", "Failed to install curl and nano"
     end
     
     def install_network
