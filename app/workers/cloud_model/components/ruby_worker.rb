@@ -10,6 +10,7 @@ module CloudModel
         packages << 'nodejs' # JS interpreter 
         packages << 'imagemagick' # imagemagick (TODO: needed for some rails projects, make this configurable)
         packages << 'libxml2-utils' # xmllint (TODO: needed for some rails projects, make this configurable)
+        packages << 'libxslt-dev ' # libxml (TODO: needed for some rails projects, make this configurable)
         chroot! build_path, "apt-get install #{packages * ' '} -y", "Failed to install packeges for deployment of rails app"  
       end
     end
