@@ -311,6 +311,7 @@ en:
         passenger: Passenger/Rack Server
         passenger_supported: Support Rack Server?
         passenger_env: Rails Environment
+        delayed_jobs_supported: "Support Delayed::Job Service?"
           
         deployment: Project Deployment
         capistrano_supported: Support Capistrano?

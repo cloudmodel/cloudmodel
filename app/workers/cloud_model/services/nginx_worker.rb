@@ -91,6 +91,12 @@ module CloudModel
         puts "        Make nginx root"
         mkdir_p "#{@guest.deploy_path}#{@model.www_root}"
       
+        if @model.delayed_jobs_supported
+          puts "        Write Delayed::Jobs systemd"
+          render_to_remote "/cloud_model/guest/etc/systemd/system/delayed_jobs.service", "#{@guest.deploy_path}/etc/systemd/system/delayed_jobs.service", guest: @guest, model: @model      
+          chroot! @guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs.service /etc/systemd/system/multi-user.target.wants/delayed_jobs.service", "Failed to enable delayed_jobs service" 
+        end
+      
         if @model.ssl_supported?
           puts "        Write SSL files"
           ssl_base_dir = File.expand_path("etc/nginx/ssl", @guest.deploy_path)

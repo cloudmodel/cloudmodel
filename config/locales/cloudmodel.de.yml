@@ -312,6 +312,7 @@ de:
         passenger: Passenger/Rack Dienst
         passenger_supported: Rack unterstützen
         passenger_env: Rails-Umgebung
+        delayed_jobs_supported: "Delayed::Job Service unterstützen"
 
         deployment: Projekt deployen
         capistrano_supported: Capistrano unterstützen
