@@ -111,7 +111,7 @@ GEM
     net-ssh (5.2.0)
     netaddr (2.0.4)
     nio4r (2.5.2)
-    nokogiri (1.10.5)
+    nokogiri (1.10.8)
       mini_portile2 (~> 2.4.0)
     pry (0.12.2)
       coderay (~> 1.1.0)
