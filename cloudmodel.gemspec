@@ -22,6 +22,6 @@ Gem::Specification.new do |s|
   s.add_dependency 'mongoid-grid_fs', '~> 2.3', '>= 2.3.0'
   
   s.add_dependency 'bcrypt-ruby', '~> 3.0', '>= 3.0.0'
-  s.add_dependency 'netaddr', '>= 1.5.0', '< 3.0'
+  s.add_dependency 'netaddr', '>= 1.5.0', '< 2.0'
   s.add_dependency 'net-sftp', '~> 2.1', '>= 2.1.0'
 end
