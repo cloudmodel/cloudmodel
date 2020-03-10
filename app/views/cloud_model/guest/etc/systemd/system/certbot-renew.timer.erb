@@ -1,0 +1,11 @@
+[Unit]
+Description=Call certbot-renew on schedule
+
+[Timer]
+OnBootSec=180
+# run 3 minutes after boot time
+OnCalendar=03:00
+AccuracySec=600
+
+[Install]
+WantedBy=timers.target
