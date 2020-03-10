@@ -8,6 +8,7 @@ module CloudModel
       field :ssl_only, type: Mongoid::Boolean, default: false
       field :ssl_enforce, type: Mongoid::Boolean, default: false
       field :ssl_port, type: Integer, default: 443
+      field :ssl_certbot, type: Mongoid::Boolean, default: false
       belongs_to :ssl_cert, class_name: 'CloudModel::Certificate', inverse_of: :services, optional: true
       
       field :passenger_supported, type: Mongoid::Boolean, default: false

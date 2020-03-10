@@ -308,6 +308,7 @@ de:
         ssl_enforce: Auf HTTPS umleiten
         ssl_port: HTTPS Port
         ssl_cert: SSL Zertifikat
+        ssl_certbot: Let's Encrypt Zertifikat nutzen
 
         passenger: Passenger/Rack Dienst
         passenger_supported: Rack unterstützen
