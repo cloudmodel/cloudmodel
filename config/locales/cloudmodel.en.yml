@@ -307,6 +307,7 @@ en:
         ssl_enforce: Enfore use of HTTPS?
         ssl_port: HTTPS Port
         ssl_cert: SSL Certificate
+        ssl_certbot: Use Let's Encrypt Certificate?
         
         passenger: Passenger/Rack Server
         passenger_supported: Support Rack Server?

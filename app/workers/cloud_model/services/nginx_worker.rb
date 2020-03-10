@@ -98,6 +98,12 @@ module CloudModel
         end
       
         if @model.ssl_supported?
+          if @model.ssl_certbot?
+            puts "        Write certbot systemd"
+            mkdir_p overlay_path
+            render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service.d/certbot_init.conf", "#{overlay_path}/certbot_init.conf", guest: @guest, model: @model      
+          end
+          
           puts "        Write SSL files"
           ssl_base_dir = File.expand_path("etc/nginx/ssl", @guest.deploy_path)
           mkdir_p ssl_base_dir
@@ -113,7 +119,7 @@ module CloudModel
           @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.ca.crt", ssl_base_dir), 'w') do |f|
             f.write @model.ssl_cert.ca
           end
-          
+                    
           host_source_dir = "/inst/hosts_by_ip/#{@guest.private_address}"
           ssh_host_key_source = "#{host_source_dir}/etc/nginx/ssl"
           key_file = File.expand_path("dhparam.pem", ssh_host_key_source)
