@@ -172,12 +172,14 @@ en:
         deploy_state: Deploy State
         deploy_last_issue: Last Deploy Issue
       cloud_model/guest:
-        name: Host Name
+        name: Hostname
         host: Hardware Host
         address: Network Address
         services: Services
         private_address: VPN Address
         external_address: External Address
+        external_hostname: External Hostname
+        external_alt_names: External Alternative Names
         memory_size: RAM
         memory_used: RAM used
         cpu_count: CPUs

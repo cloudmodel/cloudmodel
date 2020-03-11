@@ -178,6 +178,8 @@ de:
         services: Dienste
         private_address: VPN-Adresse
         external_address: Externe Adresse
+        external_hostname: Externer Hostname
+        external_alt_names: Externe alternative Namen
         memory_size: RAM
         memory_used: RAM benutzt
         cpu_count: CPUs

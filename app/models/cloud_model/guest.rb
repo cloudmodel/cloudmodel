@@ -23,6 +23,7 @@ module CloudModel
     field :private_address, type: String
     field :external_address, type: String
     field :mac_address, type: String
+    field :external_alt_names, type: Array, default: []
     
     field :root_fs_size, type: Integer, default: 10737418240
     field :memory_size, type: Integer, default: 2147483648
@@ -104,6 +105,14 @@ module CloudModel
     
     def external_hostname
       @external_hostname ||= external_address.blank? ? '' : CloudModel::Address.from_str(external_address).hostname
+    end
+    
+    def external_alt_names_string
+      external_alt_names * ','
+    end
+    
+    def external_alt_names_string=(string)
+      self.external_alt_names = string.split(',').map &:strip
     end
     
     def uuid

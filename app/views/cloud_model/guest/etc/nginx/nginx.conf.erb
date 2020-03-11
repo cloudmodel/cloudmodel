@@ -69,7 +69,7 @@ http {
   server {
     listen                        <%= protocol == :https ? "#{model.ssl_port} ssl http2 deferred" : model.port %>;
 <%- if model.ssl_certbot? -%>
-    server_name                   <%= model.guest.external_hostname %>;
+    server_name                   <%= ([model.guest.external_hostname] + model.guest.external_alt_names) * ' ' %>;
 <%- end -%>
 
 <%- if protocol == :http and model.ssl_supported? and model.ssl_enforce? -%>
