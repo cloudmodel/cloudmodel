@@ -1,2 +1,2 @@
 [Service]
-ExecStartPost=/usr/bin/certbot --nginx --agree-tos --email <%= CloudModel.config.admin_email %> --domains <%= guest.external_hostname %> -n
+ExecStartPost=/usr/bin/certbot --nginx --agree-tos --email <%= CloudModel.config.admin_email %> --domains <%= ([guest.external_hostname] + guest.external_alt_names) * ',' %> -n

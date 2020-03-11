@@ -40,6 +40,10 @@ module CloudModel
       lxc! "storage volume delete default #{name}", "Failed to destroy LXD volume"     
     end
     
+    def to_param
+      name
+    end
+    
     # Get infos about the volume
     def lxc_show
       success, result = lxc "storage volume show default #{name}"
@@ -49,7 +53,6 @@ module CloudModel
     def used?
       lxc_show['used_by'] && lxc_show['used_by'].size > 0
     end
-    
     
     # Backup 
     
