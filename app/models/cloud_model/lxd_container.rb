@@ -63,7 +63,7 @@ module CloudModel
     end
     
     def destroy_container
-      lxc! "delete #{name}", "Failed to destroy LXD container"     
+      lxc "delete #{name}"#, "Failed to destroy LXD container"     
     end
       
     def start

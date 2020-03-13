@@ -190,9 +190,12 @@ module CloudModel
       
       run_steps :deploy, steps, options
       
-      guest.update_attributes deploy_state: :finished
+      #guest.update_attributes deploy_state: :finished
+      guest.collection.update_one({_id:  guest.id}, '$set' => { 'deploy_state_id': 0xf0 })
+      #guest.update_attribute :deploy_state, :finished
       
-      puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"      
+      puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"
+      Rails.logger.debug "GUEST_WORKER: Deploy guest #{guest.name} on container #{@lxc.name} done in #{Time.now - build_start_at}"    
     end
   
     def redeploy options={}

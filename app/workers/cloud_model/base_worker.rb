@@ -233,7 +233,8 @@ module CloudModel
             ts = Time.now
             #self.send step[1]   
             self.send command
-            puts "[Done in #{distance_of_time_in_words_to_now ts}]"   
+            puts "[Done in #{distance_of_time_in_words_to_now ts}]"
+            Rails.logger.debug "STEP FINISH: (#{counter_prefix}#{counter}) #{step[0]}, #{Time.now - ts}"
           end
         end
       rescue Exception => e
@@ -242,6 +243,7 @@ module CloudModel
         else
           puts "[Failed after #{distance_of_time_in_words_to_now ts}]"
           puts ''
+          Rails.logger.debug "STEP FAILED: (#{counter_prefix}#{counter}) #{step[0]}, #{Time.now - ts}"
           CloudModel.log_exception e
           error_log_object.update_attributes :"#{stage}_state" => :failed, :"#{stage}_last_issue" => "#{e}"
           raise e
@@ -320,7 +322,7 @@ module CloudModel
         step = [step.to_s.humanize, step] if step.class == Symbol
         
         print "#{' ' * current_indent}(#{counter_prefix}#{counter}) #{step[0]} "
-        
+        Rails.logger.debug "STEP START: (#{counter_prefix}#{counter}) #{step[0]}"
         
         if skip_to > counter
           if step[2] and step[2][:on_skip]
