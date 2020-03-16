@@ -92,6 +92,12 @@ de:
       cloud_model/guest_volume:
         one: Gastlaufwerk
         other: Gastlaufwerke
+      cloud_model/lxd_container:
+        one: LXD Container
+        other: LXD Container
+      cloud_model/lxd_custom_volume:
+        one: LXD Gastlaufwerk
+        other: LXD Gastlaufwerke
       cloud_model/certificate:
         one: Zertifikat
         other: Zertifikate
@@ -186,6 +192,9 @@ de:
         cpu_time: Prozessornutzung
         root_volume: Systemlaufwerk
         guest_volumes: Andere Laufwerke
+        certificates: Zertifikate
+        lxd_containers: LXD Container
+        lxd_custom_volumes: LXD Gastlaufwerke
         state: Status
         vm_state: VM Status
         deploy_state: Installationsstatus
@@ -213,6 +222,50 @@ de:
         mount_point: Einhängpunkt
         writeable: Beschreibbar?
         has_backups: Laufwerkdaten sichern?
+      cloud_model/lxd_container:
+        name: Containername
+        guest_template: Gästetemplate
+        current_lxd_container: Aktueller Container?
+        status: Containerstatus
+        pid: Prozess-ID
+        processes: Prozesse
+        profiles: Profile
+        ephemeral: Flüchtig?
+        stateful: Zustandsorientiert?
+        description: Beschreibung
+        location: Ablageort
+        created_at: Erzeugt am
+        last_used_at: Zuletzt gestartet am
+        cpu: Prozessor
+        memory: Arbeitsspeicher
+        network_device: Netzwerkgerät
+        disk_device: Ablagegerät
+        architecture: Architektur
+        limit: Begrenzung
+        usage: Gebrauch
+        usage_peak: Maximaler Gebrauch
+        swap_usage: Auslagerungsgebrauch
+        swap_usage_peak: Maximaler Auslagerungsgebrauch
+        nictype: Netzwerkart
+        type: Typ
+        state: Status
+        parent: Übergeordnet
+        mtu: MTU
+        addresses: Adressen
+        sent: Gesendet
+        received: Empfangen
+        packets: Pakete
+        hwaddr: Hardwareadresse
+        host_name: Hostname
+        path: Pfad
+        pool: Pool
+        device_name: Gerätename
+      cloud_model/lxd_custom_volume:
+        name: Laufwerksname
+        mount_point: Einhängpunkt
+        disk_space: Laufwerksgröße
+        writeable: Schreibbar?
+        has_backups: Backups?
       cloud_model/certificate:
         name: Name
         name: Name

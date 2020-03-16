@@ -59,7 +59,7 @@ module CloudModel
     end
     
     def name
-      "#{template_type.name} (#{created_at.strftime("%Y%m%d %H:%M:%S")})"
+      "#{template_type.name} (#{created_at.strftime("%Y-%m-%d %H:%M:%S")})"
     end
     
     def lxd_image_metadata_tarball

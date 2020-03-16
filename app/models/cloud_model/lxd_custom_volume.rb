@@ -20,7 +20,7 @@ module CloudModel
     accept_size_strings_for :disk_space
 
     before_validation :set_volume_name       
-    after_create :create_volume
+    after_create :create_volume!
     before_destroy :before_destroy
     
     def before_destroy
@@ -32,7 +32,16 @@ module CloudModel
       destroy_volume
     end
     
+    def volume_exists?
+      res, output = lxc "storage volume show default #{name}"
+      not(res == false and output == "Error: not found\n")
+    end
+    
     def create_volume
+      lxc "storage volume create default #{name}"
+    end
+    
+    def create_volume!
       lxc! "storage volume create default #{name}", "Failed to init LXD volume"     
     end
     
