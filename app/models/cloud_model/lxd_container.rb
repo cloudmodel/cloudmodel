@@ -102,8 +102,36 @@ module CloudModel
     
     # Get infos about the container
     def lxc_info
-      success, result = lxc "info #{name}"
-      YAML.load(result).deep_transform_keys { |key| key.to_s.underscore }
+      success, result = lxc "list #{name} --format json"
+      if success
+        result = JSON.parse(result).first
+        
+        %w(config expanded_config).each do |field|
+          config = {}
+          result[field].each do |k,v|
+            keys = k.split('.')
+            prev = config
+            keys.each_with_index do |sk,i|
+              prev[sk] ||= {}
+              if i + 1 == keys.size
+                prev[sk] = v  
+              else
+                prev = prev[sk]
+              end
+            end
+          end
+        
+          if config['volatile'] and config['volatile']['id_map']
+            config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
+            config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
+          
+          end
+          result[field] = config
+        end        
+        result
+      else
+        {}
+      end
     end
     
     def running?

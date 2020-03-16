@@ -92,6 +92,12 @@ en:
       cloud_model/guest_volume:
         one: Guest Volume
         other: Guest Volumes  
+      cloud_model/lxd_container:
+        one: LXD Container
+        other: LXD Containers
+      cloud_model/lxd_custom_volume:
+        one: LXD Custom Volume
+        other: LXD Custom Volumes
       cloud_model/certificate:
         one: Certificate
         other: Certificates  
@@ -186,6 +192,9 @@ en:
         cpu_time: CPU Time
         root_volume: Root Volume
         guest_volumes: Other Volumes
+        certificates: Certificates
+        lxd_containers: LXD Containers
+        lxd_custom_volumes: LXD Custom Volumes
         state: State
         vm_state: VM State
         deploy_state: Deploy State
@@ -213,6 +222,50 @@ en:
         mount_point: Mountpoint
         writeable: Writeable?
         has_backups: Backup Volume Data?
+      cloud_model/lxd_container:
+        name: Container Name
+        guest_template: Guest Template
+        current_lxd_container: Current Container?
+        status: Container Status
+        pid: Process ID
+        processes: Processes
+        profiles: Profiles
+        ephemeral: Ephemeral?
+        stateful: Stateful?
+        description: Description
+        location: Location
+        created_at: Created at
+        last_used_at: Last started at
+        cpu: CPU
+        memory: Memory
+        network_device: Network Device
+        disk_device: Disk Device
+        architecture: Architecture
+        limit: Limit
+        usage: Usage
+        usage_peak: Peak Usage
+        swap_usage: Swap Usage
+        swap_usage_peak: Peak Swap Usage
+        nictype: NIC Type
+        type: Type
+        state: Status
+        parent: Parent
+        mtu: MTU
+        addresses: Adresses
+        sent: Sent
+        received: Received
+        packets: Packets
+        hwaddr: Hardware Address
+        host_name: Hostname
+        path: Path
+        pool: Pool
+        device_name: Device Name
+      cloud_model/lxd_custom_volume:
+        name: Volume Name
+        mount_point: Mount Point
+        disk_space: Disk Space
+        writeable: Writeable?
+        has_backups: Backups?        
       cloud_model/certificate:
         name: Name
         ca: Certificate Authority
