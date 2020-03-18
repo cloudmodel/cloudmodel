@@ -13,10 +13,6 @@ module CloudModel
       end
     end
     
-    def to_s
-      key
-    end
-    
     def name
       key.split(' ').last
     end

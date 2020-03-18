@@ -44,7 +44,7 @@ module CloudModel
         
         # Write authorized keys from database entries
         @host.sftp.file.open("#{ssh_target}/authorized_keys", 'w') do |f|
-          f.write CloudModel::SshPubKey.all.to_a * "\n"
+          f.write CloudModel::SshPubKey.all.map(&:key) * "\n"
         end
   
         # TODO: Reenable after config for nginx done
