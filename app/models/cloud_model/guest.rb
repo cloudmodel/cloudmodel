@@ -16,7 +16,6 @@ module CloudModel
     embeds_many :lxd_custom_volumes, class_name: "CloudModel::LxdCustomVolume", :cascade_callbacks => true
     field :current_lxd_container_id, type: BSON::ObjectId
     
-    #has_many :guest_volumes, class_name: "CloudModel::GuestVolume"
     accepts_nested_attributes_for :lxd_custom_volumes, allow_destroy: true
     
     field :name, type: String

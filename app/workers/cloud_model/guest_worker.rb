@@ -287,10 +287,7 @@ module CloudModel
         ## TODO: This should be called after one-shot update of admin guest
         puts "    Destroy old root LV #{old_volume.name}"
         host.exec "lvremove -f #{old_volume.device}"
-      
-        # Get rid of old volumes
-        CloudModel::LogicalVolume.where(guest_id: guest.id).ne(_id: guest.root_volume.id).destroy
-      
+            
         guest.update_attributes deploy_state: :finished
         
         # update hosts for shinken

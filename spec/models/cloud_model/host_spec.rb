@@ -33,8 +33,6 @@ describe CloudModel::Host do
   it { expect(subject).to accept_nested_attributes_for(:primary_address) }
   it { expect(subject).to embed_one(:private_network).of_type CloudModel::Address }
   it { expect(subject).to accept_nested_attributes_for(:private_network) }
-  it { expect(subject).to have_many(:volume_groups).of_type CloudModel::VolumeGroup }
-  it { expect(subject).to accept_nested_attributes_for(:volume_groups) }
   
   it { expect(subject).to validate_presence_of(:name) }
   it { expect(subject).to validate_uniqueness_of(:name) }
