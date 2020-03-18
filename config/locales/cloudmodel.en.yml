@@ -278,10 +278,12 @@ en:
       cloud_model/ssh_pub_key:
         name: Key Name
         key: Public Key
+        created_at: Created At
       cloud_model/vpn_client:
         name: Client Name
         tinc_public_key: Public Key
         address: IP Address
+        created_at: Created At
       cloud_model/mongodb_replication_set:
         name: Set Name
         services: Services

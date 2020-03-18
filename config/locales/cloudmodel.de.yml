@@ -153,8 +153,8 @@ de:
         one: Sicherungsdienst
         other: Sicherungsdienste
       cloud_model/ssh_pub_key:
-        one: SSH öffentlicher Schlüssel
-        other: SSH öffentliche Schlüssel
+        one: Öffentlicher SSH Schlüssel
+        other: Öffentliche SSH Schlüssel
       cloud_model/vpn_client:
         one: VPN Client
         other: VPN Clients
@@ -279,10 +279,12 @@ de:
       cloud_model/ssh_pub_key:
         name: Schlüsselname
         key: Öffentlicher Schlüssel
+        created_at: Erzeugt am
       cloud_model/vpn_client:
         name: Clientname
         tinc_public_key: Öffentlicher Schlüssel
         address: Netzwerkadresse
+        created_at: Erzeugt am
       cloud_model/mongodb_replication_set:
         name: Setname
         services: Dienste
