@@ -93,9 +93,6 @@ module CloudModel
     embeds_one :private_network, class_name: "CloudModel::Address", autobuild: true, inverse_of: :host
     accepts_nested_attributes_for :private_network
   
-    has_many :volume_groups, class_name: "CloudModel::VolumeGroup", inverse_of: :host
-    accepts_nested_attributes_for :volume_groups
-    
     validates :name, presence: true, uniqueness: true, format: {with: /\A[a-z0-9\-_]+\z/}
     validates :primary_address, presence: true
     validates :private_network, presence: true    

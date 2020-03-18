@@ -7,10 +7,6 @@ describe CloudModel::Guest do
 
   it { expect(subject).to belong_to(:host).of_type CloudModel::Host }
   it { expect(subject).to embed_many(:services).of_type CloudModel::Services::Base }
-  it { expect(subject).to have_one(:root_volume).of_type CloudModel::LogicalVolume }
-  it { expect(subject).to accept_nested_attributes_for :root_volume }
-  it { expect(subject).to have_many(:guest_volumes).of_type CloudModel::GuestVolume }
-  it { expect(subject).to accept_nested_attributes_for :guest_volumes }
   
   it { expect(subject).to have_field(:name).of_type String }
   
