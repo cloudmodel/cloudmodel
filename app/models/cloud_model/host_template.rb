@@ -3,7 +3,8 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::ENumFields
-        
+    prepend CloudModel::SmartToString
+
     field :os_version
     field :arch
     

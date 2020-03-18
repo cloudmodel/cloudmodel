@@ -11,6 +11,7 @@ module CloudModel
     include Mongoid::Timestamps
     include CloudModel::UsedInGuestsAs
     include CloudModel::ENumFields
+    prepend CloudModel::SmartToString
         
     field :name, type: String
     field :git_server, type: String

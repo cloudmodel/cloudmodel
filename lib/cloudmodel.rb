@@ -6,6 +6,7 @@ require "cloud_model/enum_fields"
 require "cloud_model/accept_size_strings"
 require "cloud_model/used_in_guests_as"
 require "cloud_model/backup_tools"
+require "cloud_model/smart_to_string"
 
 module CloudModel  
   def self.config

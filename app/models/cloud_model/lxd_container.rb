@@ -2,6 +2,7 @@ module CloudModel
   class LxdContainer
     include Mongoid::Document
     include Mongoid::Timestamps
+    prepend CloudModel::SmartToString
     include ActiveModel::Validations::Callbacks
     
     embedded_in :guest, class_name: "CloudModel::Guest"
