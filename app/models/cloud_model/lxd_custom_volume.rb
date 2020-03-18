@@ -3,6 +3,7 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::AcceptSizeStrings
+    prepend CloudModel::SmartToString
     
     embedded_in :guest, class_name: "CloudModel::Guest"
     

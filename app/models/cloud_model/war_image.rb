@@ -3,7 +3,8 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::UsedInGuestsAs
-    
+    prepend CloudModel::SmartToString
+   
     field :name, type: String
     belongs_to :file, class_name: "Mongoid::GridFS::Fs::File"
 

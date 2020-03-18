@@ -8,6 +8,7 @@ module CloudModel
     
     include CloudModel::AcceptSizeStrings
     include CloudModel::ENumFields
+    prepend CloudModel::SmartToString
   
     belongs_to :host, class_name: "CloudModel::Host"
     embeds_many :services, class_name: "CloudModel::Services::Base", :cascade_callbacks => true

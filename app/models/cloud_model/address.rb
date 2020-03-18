@@ -38,7 +38,7 @@ module CloudModel
       self.new ip: cidr.ip(Short: true), subnet: cidr.bits
     end
    
-    def to_s
+    def to_s options={}
       if ip and subnet
         "#{ip}/#{subnet}"
       else

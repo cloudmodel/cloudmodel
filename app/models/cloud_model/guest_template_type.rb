@@ -2,6 +2,7 @@ module CloudModel
   class GuestTemplateType
     include Mongoid::Document
     include Mongoid::Timestamps
+    prepend CloudModel::SmartToString
 
     has_many :templates, class_name: 'CloudModel::GuestTemplate'
     

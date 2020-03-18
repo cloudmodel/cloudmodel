@@ -3,6 +3,7 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::UsedInGuestsAs
+    prepend CloudModel::SmartToString
     # Add guests connected via GuestCertificates
     module CertificateUsedInGuest
       def used_in_guests

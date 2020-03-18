@@ -2,6 +2,7 @@ module CloudModel
   class MongodbReplicationSet
     include Mongoid::Document
     include Mongoid::Timestamps
+    prepend CloudModel::SmartToString
     
     field :name, type: String
 

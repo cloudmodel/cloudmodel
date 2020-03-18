@@ -33,6 +33,7 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::ENumFields
+    prepend CloudModel::SmartToString
     prepend SmartGettersAndSetters
   
     field :name, type: String

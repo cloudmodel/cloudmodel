@@ -2,7 +2,8 @@ module CloudModel
   class VpnClient
     include Mongoid::Document
     include Mongoid::Timestamps
-  
+    prepend CloudModel::SmartToString
+ 
     field :name, type: String
     field :tinc_public_key, type: String
     field :address, type: String
