@@ -2,6 +2,7 @@ module CloudModel
   class SolrMirror
     include Mongoid::Document
     include Mongoid::Timestamps
+    include CloudModel::ModelHasIssues
     prepend CloudModel::SmartToString
         
     field :version, type: String

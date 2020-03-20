@@ -104,20 +104,7 @@ module CloudModel
           [:nginx]
         end
       end
-      
-      def shinken_services_append
-        services_string = ''
-        unless ssl_only
-          services_string += ', nginx'
-        end
-        
-        if ssl_supported
-          services_string += ', https'
-        end
-        
-        services_string
-      end
-      
+            
       def livestatus
         if guest.livestatus
           guest.livestatus.services.find{|s| s.description == 'Nginx'} || guest.livestatus.services.find{|s| s.description == 'HttpsCertificate'}

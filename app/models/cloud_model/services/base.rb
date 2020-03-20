@@ -4,6 +4,7 @@ module CloudModel
       include Mongoid::Document
       include Mongoid::Timestamps
       include CloudModel::BackupTools
+      include CloudModel::ModelHasIssues
   
       field :name, type: String    
       field :public_service, type: Mongoid::Boolean, default: false
@@ -18,7 +19,9 @@ module CloudModel
           redis: CloudModel::Services::Redis,
           solr: CloudModel::Services::Solr,
           ssh: CloudModel::Services::Ssh,
-          tomcat: CloudModel::Services::Tomcat
+          tomcat: CloudModel::Services::Tomcat,
+          backup: CloudModel::Services::Backup,
+          monitoring: CloudModel::Services::Monitoring,
         }
       end
     
@@ -40,10 +43,6 @@ module CloudModel
       
       def components_needed
         []
-      end
-      
-      def shinken_services_append
-        nil
       end
       
       def livestatus

@@ -12,15 +12,6 @@ module CloudModel
         [:mongodb]
       end
       
-      def shinken_services_append
-        append = ', mongodb-core, mongodb-perf'
-        if mongodb_replication_set
-          append += ', mongodb-repl'
-        end
-          
-        append
-      end
-      
       def livestatus
         if guest.livestatus
           guest.livestatus.services.find{|s| s.description == 'Mongodb-connection'}

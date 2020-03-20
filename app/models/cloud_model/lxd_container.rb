@@ -103,7 +103,7 @@ module CloudModel
     
     # Get infos about the container
     def lxc_info
-      success, result = lxc "list #{name} --format json"
+      success, result = lxc "list #{name.shellescape} --format json"
       if success
         result = JSON.parse(result).first
         

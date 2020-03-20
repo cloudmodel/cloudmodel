@@ -13,10 +13,6 @@ module CloudModel
         [:java, :tomcat]
       end
       
-      def shinken_services_append
-        ', tomcat'
-      end
-      
       def livestatus
         if guest.livestatus
           guest.livestatus.services.find{|s| s.description == 'Tomcat'}

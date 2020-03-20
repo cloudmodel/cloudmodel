@@ -9,8 +9,9 @@ module CloudModel
     include AbstractController::Rendering
     include ActionView::Helpers::DateHelper
 
-    def initialize(host)
+    def initialize host, options={}
       @host = host
+      @options = options
     end
     
     def host

@@ -1,7 +1,11 @@
 module CloudModel
   class HostTemplateWorker < TemplateWorker    
-    def build_path 
-      "/cloud/build/host/#{@template.id}/"
+    def build_path
+      if @options[:build_path]
+         @options[:build_path]
+       else
+         "/cloud/build/host/#{@template.id}/"
+       end
     end
               
     def install_utils
@@ -64,16 +68,21 @@ module CloudModel
     end
     
     def install_check_mk_agent
-      chroot! build_path, "apt-get install check-mk-agent -y", "Failed to install CheckMKAgent"
-      render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk@.service", "#{build_path}/etc/systemd/system/check_mk@.service"     
-      render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk.socket", "#{build_path}/etc/systemd/system/check_mk.socket"     
+      chroot! build_path, "apt-get install check-mk-agent lm-sensors smartmontools -y", "Failed to install CheckMKAgent"
+
+      render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/plugins/lxd", "#{build_path}/usr/lib/check_mk_agent/plugins/lxd", 0755 
+      render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/plugins/sensors", "#{build_path}/usr/lib/check_mk_agent/plugins/sensors", 0755 
+      render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/plugins/smart", "#{build_path}/usr/lib/check_mk_agent/plugins/smart", 0755 
+
+      render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk@.service", "#{build_path}/etc/systemd/system/check_mk@.service"
+      render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk.socket", "#{build_path}/etc/systemd/system/check_mk.socket"
       mkdir_p "#{build_path}/etc/systemd/system/sockets.target.wants"
       chroot! build_path, "ln -s /etc/systemd/system/check_mk.socket /etc/systemd/system/sockets.target.wants/check_mk.socket", "Failed to add check_mk to autostart"
-      
-      render_to_remote "/cloud_model/support/usr/sbin/cgroup_load_writer", "#{build_path}/usr/sbin/cgroup_load_writer", 0755 
-      render_to_remote "/cloud_model/guest/etc/systemd/system/cgroup_load_writer.service", "#{build_path}/etc/systemd/system/cgroup_load_writer.service"     
-      render_to_remote "/cloud_model/guest/etc/systemd/system/cgroup_load_writer.timer", "#{build_path}/etc/systemd/system/cgroup_load_writer.timer"     
-      chroot! build_path, "ln -s /etc/systemd/system/cgroup_load_writer.timer /etc/systemd/system/timers.target.wants/cgroup_load_writer.timer", "Failed to enable cgroup_load_writer service"     
+
+      render_to_remote "/cloud_model/support/usr/sbin/cgroup_load_writer", "#{build_path}/usr/sbin/cgroup_load_writer", 0755
+      render_to_remote "/cloud_model/guest/etc/systemd/system/cgroup_load_writer.service", "#{build_path}/etc/systemd/system/cgroup_load_writer.service"
+      render_to_remote "/cloud_model/guest/etc/systemd/system/cgroup_load_writer.timer", "#{build_path}/etc/systemd/system/cgroup_load_writer.timer"
+      chroot! build_path, "ln -s /etc/systemd/system/cgroup_load_writer.timer /etc/systemd/system/timers.target.wants/cgroup_load_writer.timer", "Failed to enable cgroup_load_writer service"
     end
     
     def install_kernel

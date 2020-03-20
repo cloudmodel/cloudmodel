@@ -3,6 +3,7 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::AcceptSizeStrings
+    include CloudModel::ModelHasIssues
     prepend CloudModel::SmartToString
     
     embedded_in :guest, class_name: "CloudModel::Guest"
@@ -13,7 +14,7 @@ module CloudModel
     field :mount_point, type: String
     field :writeable, type: Mongoid::Boolean, default: true    
     field :has_backups, type: Mongoid::Boolean, default: false
-    
+        
     validates :mount_point, presence: true
     validates :mount_point, uniqueness: { scope: :guest }, if: :guest
     validates :mount_point, format: {with: /\A[A-Za-z0-9][A-Za-z0-9\-_\/]*\z/}
