@@ -33,6 +33,13 @@ en:
     finished: Finished
     failed: Failed to deploy
 
+  cloud_model/item_issue/severity:
+    info: Info
+    task: Task
+    warning: Warning
+    critical: Critical
+    fatal: Fatal  
+    
   cloud_model/web_image/build_state:
     not_started: Not started
     pending: Scheduled for execution
@@ -83,12 +90,9 @@ en:
       cloud_model/address:
         one: Address/Subnet
         other: Addresses/Subnets
-      cloud_model/volume_group:
-        one: Logical Volume Group
-        other: Logical Volume Groups
-      cloud_model/logical_volume:
-        one: Logical Volume
-        other: Logical Volumes
+      cloud_model/item_issue:
+        one: Issue
+        other: Issues
       cloud_model/guest_volume:
         one: Guest Volume
         other: Guest Volumes  
@@ -199,25 +203,13 @@ en:
         vm_state: VM State
         deploy_state: Deploy State
         deploy_last_issue: Last Deploy Issue
-      cloud_model/volume_group:
-        name: Group Name
-        device: Device
-        disk_space: Group Size
-        available_space: Available Size
-        logical_volumes: Logical Volumes
-        uuid: UUID
-        attr: Attributes
-        device: Device
-      cloud_model/logical_volume:
-        name: Volume Name
-        disk_space: Volume Size
-        disk_format: Disk Format
-        volume_group: Volume Group
-        exists?: Defined
-        uuid: UUID
-        attr: Attributes
-        device: Device
-        used_in_guest: Used within Guest
+      cloud_model/item_issue:
+        title: Title
+        message: Message
+        severity: Severity
+        subject: Subject
+        key: Key Value
+        created_at: Created At
       cloud_model/guest_volume:
         mount_point: Mountpoint
         writeable: Writeable?
@@ -390,3 +382,20 @@ en:
       cloud_model/services/tomcat:
         deployment: Project Deployment
         deploy_war_image: Deploy WAR Image
+  
+  issues:
+    sysinfo: &sysinfo_issues
+      sys_info_available: Unable to access system information
+      cpu_usage: CPU usage of %{value}
+      mem_usage: Memory usage of %{value}
+      disks_usage: Disk usage up to %{value}
+    cloud_model/host:
+      <<: *sysinfo_issues
+      mdtools: RAID has issues
+      sensors: Sensors reported critial values
+      smart: SMART reports issues
+    cloud_model/guest: 
+      <<: *sysinfo_issues
+    cloud_model/lxd_custom_volume:
+      existence: The defined LXD Volume does not exist on Server
+    

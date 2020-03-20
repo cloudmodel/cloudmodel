@@ -3,6 +3,7 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::UsedInGuestsAs
+    include CloudModel::ModelHasIssues
     prepend CloudModel::SmartToString
    
     field :name, type: String

@@ -33,6 +33,7 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::ENumFields
+    include CloudModel::ModelHasIssues
     prepend CloudModel::SmartToString
     prepend SmartGettersAndSetters
   
@@ -328,6 +329,26 @@ module CloudModel
       rescue Exception => e
         CloudModel.log_exception e
         return false
+      end
+    end
+    
+    def system_info
+      unless Net::Ping::External.new.ping(private_network.list_ips.first)
+        {'error' => 'No network connect to host private address'}
+      end
+      
+      success, result = exec('check_mk_agent')
+      if success
+        success, df_result = exec('df -k -T')
+        if success
+          result.gsub! "<<<df>>>", "<<<df_check_mk>>>"
+          df_result = df_result.lines
+          df_result.shift
+          result += "<<<df>>>\n" + (df_result * "")
+        end
+        CloudModel::CheckMkParser.parse result
+      else
+        {'error' => result}
       end
     end
     

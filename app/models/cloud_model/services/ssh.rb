@@ -13,11 +13,7 @@ module CloudModel
       def components_needed
         [] # ssh is default to core
       end
-      
-      def shinken_services_append
-        ', ssh'
-      end
-      
+            
       def livestatus
         if guest.livestatus
           guest.livestatus.services.find{|s| s.description == 'Ssh'}

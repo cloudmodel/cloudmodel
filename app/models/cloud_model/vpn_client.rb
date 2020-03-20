@@ -2,6 +2,7 @@ module CloudModel
   class VpnClient
     include Mongoid::Document
     include Mongoid::Timestamps
+    include CloudModel::ModelHasIssues
     prepend CloudModel::SmartToString
  
     field :name, type: String

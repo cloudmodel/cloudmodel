@@ -2,6 +2,7 @@ module CloudModel
   class SshPubKey
     include Mongoid::Document
     include Mongoid::Timestamps
+    include CloudModel::ModelHasIssues
     prepend CloudModel::SmartToString
     
     field :key, type: String

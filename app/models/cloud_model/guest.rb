@@ -1,3 +1,5 @@
+require 'net/ping'
+
 module CloudModel
   class Guest    
     require 'resolv'
@@ -5,9 +7,9 @@ module CloudModel
 
     include Mongoid::Document
     include Mongoid::Timestamps
-    
     include CloudModel::AcceptSizeStrings
     include CloudModel::ENumFields
+    include CloudModel::ModelHasIssues
     prepend CloudModel::SmartToString
   
     belongs_to :host, class_name: "CloudModel::Host"
@@ -61,7 +63,7 @@ module CloudModel
     before_validation :set_dhcp_private_address, :on => :create
     before_validation :set_mac_address, :on => :create
     #before_validation :set_root_volume_name
-    before_destroy    :undefine
+    before_destroy    :stop
     
     VM_STATES = {
       -1 => :undefined,
@@ -128,11 +130,11 @@ module CloudModel
     end
     
     def exec command
-      host.exec "LANG=en.UTF-8 /usr/bin/virsh lxc-enter-namespace --noseclabel #{name.shellescape} -- #{command}"
+      host.exec "/usr/bin/lxc exec #{current_lxd_container.name.shellescape} -- #{command}"
     end
     
     def exec! command, message
-      host.exec! "LANG=en.UTF-8 /usr/bin/virsh lxc-enter-namespace --noseclabel #{name.shellescape} -- #{command}", message
+      host.exec! "/usr/bin/lxc exec #{current_lxd_container.name.shellescape} -- #{command}", message
     end
     
     def ls directory
@@ -180,18 +182,6 @@ module CloudModel
     
     def template
       template_type.last_useable(host)
-    end
-    
-    def shinken_services_append
-      services_string = ''
-      
-      services.each do |service|
-        if service_string = service.shinken_services_append
-          services_string += service_string
-        end
-      end
-      
-      services_string
     end
     
     def worker
@@ -274,11 +264,40 @@ module CloudModel
       end
     end
     
+    def system_info
+      if current_lxd_container.blank?
+        {'error' => 'No current lxd container for guest'}
+      end
+      unless Net::Ping::External.new.ping(private_address)
+        {'error' => 'No network connect to guest private address'}
+      end
+      
+      success, result = exec('check_mk_agent')
+      if success
+        success, df_result = exec('df -k -T')
+        if success
+          result.gsub! "<<<df>>>", "<<<df_check_mk>>>"
+          df_result = df_result.lines
+          df_result.shift
+          result += "<<<df>>>\n" + (df_result * "")
+        end
+        
+        CloudModel::CheckMkParser.parse result
+      else
+        {"error" => result}
+      end
+    end
+    
+    def lxc_info
+      current_lxd_container.lxc_info
+    end
+    
     def livestatus
       @livestatus ||= CloudModel::Livestatus::Host.find("#{host.name}.#{name}", only: %w(host_name description state plugin_output perf_data))
     end
     
     def state
+      return -1
       if livestatus
         livestatus.state
       else
@@ -327,8 +346,6 @@ module CloudModel
         end
         collection.update_one({_id:  id}, '$set' => { 'current_lxd_container_id': lxd_container_id })
         self.current_lxd_container_id = lxd_container_id
-        #self.write_attribute database_field_name(:current_lxd_container_id), lxd_container_id
-        #save
       end
       
       begin
@@ -354,22 +371,6 @@ module CloudModel
       while vm_state != -1 and timeout > 0 do
         sleep 0.1
         timeout -= 1
-      end
-    end
-    
-    def undefine
-      begin
-        # Return true if the domain is not defined before
-        if VM_STATES[vm_state] == :undefined
-          Rails.logger.debug "Domain #{self.name} was not defined before"
-          return true
-        end
-        
-        # If not started shutdown will fail, but if it fails the undefine will fail anyway
-        stop!
-        return virsh('undefine')
-      rescue
-        return false
       end
     end
     
@@ -408,10 +409,5 @@ module CloudModel
     def set_mac_address
       generate_mac_address if mac_address.blank?
     end
-    
-    # def set_root_volume_name
-    #   root_volume.name = "#{name}-root-#{Time.now.strftime "%Y%m%d%H%M%S"}" unless root_volume.name
-    #   root_volume.volume_group = host.volume_groups.first unless root_volume.volume_group
-    # end
   end
 end

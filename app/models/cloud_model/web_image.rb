@@ -4,6 +4,7 @@ module CloudModel
     include Mongoid::Timestamps
     include CloudModel::UsedInGuestsAs
     include CloudModel::ENumFields
+    include CloudModel::ModelHasIssues
     prepend CloudModel::SmartToString
 
     field :name, type: String

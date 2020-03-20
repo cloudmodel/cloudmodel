@@ -33,6 +33,13 @@ de:
     finished: Abgeschlossen
     failed: Fehlgeschlagen
     
+  cloud_model/item_issue/severity:
+    info: Information
+    task: Aufgabe
+    warning: Warnung
+    critical: Kritisch
+    fatal: Fatal  
+    
   cloud_model/web_image/build_state:
     not_started: Nicht beauftragt
     pending: Geplant
@@ -83,12 +90,9 @@ de:
       cloud_model/address:
         one: Adresse/Subnetz
         other: Adressen/Subnetze
-      cloud_model/volume_group:
-        one: Logische Laufwerksgruppe
-        other: Logische Laufwerksgruppen
-      cloud_model/logical_volume:
-        one: Logisches Laufwerk
-        other: Logische Laufwerke
+      cloud_model/item_issue:
+        one: Problemfall
+        other: Problemfälle
       cloud_model/guest_volume:
         one: Gastlaufwerk
         other: Gastlaufwerke
@@ -199,25 +203,13 @@ de:
         vm_state: VM Status
         deploy_state: Installationsstatus
         deploy_last_issue: Letztes Problem bei der Installation
-      cloud_model/volume_group:
-        name: Gruppenname
-        device: Gerät
-        disk_space: Größe
-        available_space: Verfügbare Größe
-        logical_volumes: Logische Laufwerke
-        uuid: UUID
-        attr: Attribute
-        device: Gerät
-      cloud_model/logical_volume:
-        name: Laufwerksname
-        disk_space: Laufwerksgröße
-        disk_format: Laufwerksformatierung   
-        volume_group: Laufwerksgruppe
-        exists?: Vorhanden
-        uuid: UUID
-        attr: Attribute
-        device: Gerät
-        used_in_guest: Benutzt in Gast
+      cloud_model/item_issue:
+        title: Titel
+        message: Nachricht
+        severity: Schwere
+        subject: Betreffend
+        key: Schlüsselwert
+        created_at: Erzeugt Am
       cloud_model/guest_volume:
         mount_point: Einhängpunkt
         writeable: Beschreibbar?
@@ -391,3 +383,17 @@ de:
       cloud_model/services/tomcat:
         deployment: Projekt deployen
         deploy_war_image: WAR Image installieren
+        
+  issues:
+    sysinfo: &sysinfo_issues
+      sys_info_available: Kann die Systeminformationen nicht zugreifen
+      cpu_usage: Prozessorauslastung von %{value}
+      mem_usage: Speicherverbrauch von %{value}
+      disks_usage: Plattennutzung bis zu %{value}
+    cloud_model/host:
+      <<: *sysinfo_issues
+      mdtools: RAID hat Probleme
+    cloud_model/guest: 
+      <<: *sysinfo_issues
+    cloud_model/lxd_custom_volume:
+      existence: Das definierte LXD Laufwerk existiert nicht auf dem Server
