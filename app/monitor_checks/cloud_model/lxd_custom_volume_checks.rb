@@ -1,7 +1,7 @@
 module CloudModel
   class LxdCustomVolumeChecks < CloudModel::BaseChecks
     def initialize host, guest, lxd_custom_volume, options = {}
-      puts "    [LXD Logical Volume #{lxd_custom_volume.name}]"
+      puts "    [LXD Custom Volume #{lxd_custom_volume.name}]"
       @indent = 4
       @host = host
       @guest = guest

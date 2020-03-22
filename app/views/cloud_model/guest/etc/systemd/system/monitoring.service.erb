@@ -1,0 +1,25 @@
+[Unit]
+Description=CloudModel Monitoring Worker
+After=syslog.target network.target
+AssertPathExists=/var/www/rails/current
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/rails/current
+
+ExecStart=/bin/bash -lc 'RAILS_ENV=production bundle exec rake cloudmodel:monitoring:check'
+KillSignal=SIGINT
+User=www
+Group=www
+UMask=0002
+
+# Restart after 1 minute delay
+Restart=always
+RestartSec=180
+
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=cloudmodel_monitoring
+
+[Install]
+WantedBy=multi-user.target

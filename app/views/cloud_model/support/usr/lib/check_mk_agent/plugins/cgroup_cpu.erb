@@ -21,7 +21,7 @@ do
 
   age_s=$(expr $age / 1000000000)
 
-  if [ "$age_s" -lt "960" ] && [ "$c1" -lt "$now_c1" ] # 15 min + 1 min overlap
+  if [ "$age_s" -lt "960" ] && [ "$c1" -le "$now_c1" ] # 15 min + 1 min overlap
   then
     echo "$ts $cau"
   fi

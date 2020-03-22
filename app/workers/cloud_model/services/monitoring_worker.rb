@@ -5,9 +5,9 @@ module CloudModel
       end
     
       def auto_start
-        puts "        Add Monitoring to runlevel default"
-        mkdir_p "#{@guest.deploy_path}/etc/systemd/system/timers.target.wants"
-        @host.exec "ln -sf /etc/systemd/system/rake@.timer #{@guest.deploy_path.shellescape}/etc/systemd/system/timers.target.wants/rake@cloudmodel:monitoring:check.timer"
+        puts "        Write Monitoring systemd"
+        render_to_remote "/cloud_model/guest/etc/systemd/system/monitoring.service", "#{@guest.deploy_path}/etc/systemd/system/monitoring.service", guest: @guest, model: @model      
+        chroot! @guest.deploy_path, "ln -s /etc/systemd/system/monitoring.service /etc/systemd/system/multi-user.target.wants/monitoring.service", "Failed to enable monitoring service" 
       end
     end
   end

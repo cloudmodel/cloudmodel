@@ -1,5 +1,57 @@
 module CloudModel
   class CheckMkParser
+    def self.parse_cgroup_cpu result, cpus
+      calc_usage = proc do |base, data|
+        if base.blank? or data.blank?
+          [nil,nil] 
+        else
+          age = base[0].to_i - data[0].to_i
+          
+          usage = 0
+          usage_by_cpus = []
+  
+          data[1].each.with_index do |d,i|
+            used = base[1][i].to_i - d.to_i
+            usage_by_cpus << (100.0 * used / age).round(4)
+          end
+  
+          usage = (usage_by_cpus.inject(0, :+) / cpus.to_i).round(2)
+  
+          [usage, usage_by_cpus]
+        end
+      end
+
+      data = result['data']
+  
+      lines = data.lines.to_a
+  
+      base = lines.shift
+      base_ts, *base_usage = base.split(' ') if base
+  
+      raw = {}
+      lines.reverse.each do |line|
+        ts,*usage = line.split(' ')
+    
+        age = 1.0*(base_ts.to_i - ts.to_i)/1000000000
+        
+        if age <= 15 * 60
+          raw[15] = [ts, usage]
+        end
+        if age <= 5 * 60
+          raw[5] = [ts, usage]
+        end
+        if age <= 1 * 60
+          raw[1] = [ts, usage]
+        end
+      end
+    
+      result['cpus'] = cpus #raw[1][1].size
+  
+      result['last_minute_percentage'], result['last_minute_percentage_by_cpus'] = calc_usage.call [base_ts, base_usage], raw[1]
+      result['last_5_minutes_percentage'], result['last_5_minutes_percentage_by_cpus'] = calc_usage.call [base_ts, base_usage], raw[5]
+      result['last_15_minutes_percentage'], result['last_15_minutes_percentage_by_cpus'] = calc_usage.call [base_ts, base_usage], raw[15]
+      result
+    end
     
     def self.parse result
       hash = {}
@@ -141,6 +193,15 @@ module CloudModel
                   end
                 end
               end
+            when 'systemd'
+              parts = line.strip.split(' ')
+              hash[context] ||= {}
+              unit = parts.shift
+              hash[context][unit] ||= {}
+              hash[context][unit]['load'] = parts.shift
+              hash[context][unit]['active'] = parts.shift
+              hash[context][unit]['sub'] = parts.shift
+              hash[context][unit]['description'] = parts * ' '              
             when 'lxd'
               lxd_yaml << line
             else
@@ -155,6 +216,8 @@ module CloudModel
           #hash[context][:_debug] << line
         end
       end
+      
+      parse_cgroup_cpu hash['cgroup_cpu'], hash['cpu']['cpus'] if hash['cgroup_cpu']
       
       hash
     end
