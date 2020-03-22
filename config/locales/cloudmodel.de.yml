@@ -387,7 +387,9 @@ de:
   issues:
     sysinfo: &sysinfo_issues
       sys_info_available: Kann die Systeminformationen nicht zugreifen
-      cpu_usage: Prozessorauslastung von %{value}
+      cpu_minute_usage: Prozessorauslastung in der letzten Minute von %{value}
+      cpu_5_minutes_usage: Prozessorauslastung in den letzten 5 Minuten von %{value}
+      cpu_15_minutes_usage: Prozessorauslastung in den letzten 15 Minuten von %{value}
       mem_usage: Speicherverbrauch von %{value}
       disks_usage: Plattennutzung bis zu %{value}
     cloud_model/host:

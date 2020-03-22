@@ -386,7 +386,9 @@ en:
   issues:
     sysinfo: &sysinfo_issues
       sys_info_available: Unable to access system information
-      cpu_usage: CPU usage of %{value}
+      cpu_minute_usage: CPU usage in the last minute of %{value}
+      cpu_5_minutes_usage: CPU usage in the last 5 minutes of %{value}
+      cpu_15_minutes_usage: CPU usage in the last 15 minutes of %{value}
       mem_usage: Memory usage of %{value}
       disks_usage: Disk usage up to %{value}
     cloud_model/host:

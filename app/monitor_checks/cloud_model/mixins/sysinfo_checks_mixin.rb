@@ -2,13 +2,17 @@ module CloudModel
   module Mixins
     module SysinfoChecksMixin
       def check_cpu_usage
-        if sys_info = @result[:system] and sys_info["cpu"]
-          usage = 100.0 * sys_info["cpu"]["last_5_minutes_load"].to_f / sys_info["cpu"]["cpus"].to_i
-        
-          do_check_value :cpu_usage, usage, {
-            critical: 90,
-            warning: 70
-            }, unit: '%', name: 'CPU usage'
+        if sys_info = @result[:system] and sys_info["cgroup_cpu"]
+          %w(minute 5_minutes 15_minutes).each do |t|
+            if sys_info["cgroup_cpu"]["last_#{t}_percentage"]
+              usage = sys_info["cgroup_cpu"]["last_#{t}_percentage"].to_f
+            
+              do_check_value "cpu_#{t}_usage".to_sym, usage, {
+                critical: 90,
+                warning: 70
+                }, unit: '%', name: "CPU usage (#{t.humanize})"
+            end
+          end
         end
       end
       
