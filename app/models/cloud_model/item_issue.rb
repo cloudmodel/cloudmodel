@@ -45,6 +45,8 @@ module CloudModel
     
     belongs_to :subject, optional: true, polymorphic: true
     
+    after_create :notify
+    
     def self.open
       scoped.where(resolved_at: nil)
     end
@@ -59,6 +61,14 @@ module CloudModel
     
     def resolved?
       not resolved_at.blank?
+    end
+    
+    def notify
+      CloudModel.config.monitoring_notifiers.each do |notifier|
+        if notifier[:severity] and notifier[:severity].include?(severity)
+          result = notifier[:notifier].send_message "[#{severity.to_s.upcase}] #{subject}: #{title}", message
+        end
+      end
     end
   end
 end
