@@ -74,27 +74,28 @@ module CloudModel
             hash['lxd'] = YAML.load lxd_yaml unless lxd_yaml.blank?
             
             hash['lxd'].each do |container|
-            if container['container']
-              %w(config expanded_config).each do |field|
-                config = {}
-                container['container'][field].each do |k,v|
-                  keys = k.split('.')
-                  prev = config
-                  keys.each_with_index do |sk,i|
-                    prev[sk] ||= {}
-                    if i + 1 == keys.size
-                      prev[sk] = v  
-                    else
-                      prev = prev[sk]
+              if container['container']
+                %w(config expanded_config).each do |field|
+                  config = {}
+                  container['container'][field].each do |k,v|
+                    keys = k.split('.')
+                    prev = config
+                    keys.each_with_index do |sk,i|
+                      prev[sk] ||= {}
+                      if i + 1 == keys.size
+                        prev[sk] = v  
+                      else
+                        prev = prev[sk]
+                      end
                     end
                   end
-                end
       
-                if config['volatile'] and config['volatile']['id_map']
-                  config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
-                  config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
+                  if config['volatile'] and config['volatile']['id_map']
+                    config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
+                    config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
+                  end
+                  container['container'][field] = config
                 end
-                container['container'][field] = config
               end
             end
           end
