@@ -288,6 +288,10 @@ module CloudModel
       end
     end
     
+    def live_lxc_info
+      current_lxd_container.live_lxc_info
+    end
+    
     def lxc_info
       current_lxd_container.lxc_info
     end
