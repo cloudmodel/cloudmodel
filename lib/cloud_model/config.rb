@@ -12,6 +12,8 @@ module CloudModel
     attr_accessor :livestatus_host
     attr_writer :livestatus_port
     
+    attr_accessor :monitoring_notifiers
+    
     def initialize(&block) 
       configure(&block) if block_given?
     end
@@ -65,6 +67,10 @@ module CloudModel
     
     def uses_xmpp?
       xmpp_server && xmpp_user && admin_xmpp
+    end
+    
+    def monitoring_notifiers
+      @monitoring_notifiers || []
     end
     
     def livestatus_port
