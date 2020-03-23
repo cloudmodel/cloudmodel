@@ -102,14 +102,14 @@ module CloudModel
     end
     
     # Get infos about the container
-    def lxc_info
-      success, result = lxc "list #{name.shellescape} --format json"
+    def live_lxc_info
+      success, result = lxc "list #{name.shellescape} --format yaml"
       if success
-        result = JSON.parse(result).first
+        result = YAML.load(result).first
         
         %w(config expanded_config).each do |field|
           config = {}
-          result[field].each do |k,v|
+          result['container'][field].each do |k,v|
             keys = k.split('.')
             prev = config
             keys.each_with_index do |sk,i|
@@ -125,15 +125,19 @@ module CloudModel
           if config['volatile'] and config['volatile']['id_map']
             config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
             config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
-          
           end
-          result[field] = config
+          result['container'][field] = config
         end        
         result
       else
         {}
       end
     end
+    
+    def lxc_info
+      guest.host.monitoring_last_check_result['system']['lxd'].find{|c| c['container']['name'] == name}
+    end
+    
     
     def running?
       lxc_info['status'] == "Running"
