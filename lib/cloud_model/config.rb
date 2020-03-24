@@ -8,10 +8,7 @@ module CloudModel
     attr_accessor :xmpp_server, :xmpp_user, :xmpp_password
     attr_writer :ubuntu_mirror, :ubuntu_deb_src
 
-    attr_accessor :admin_email, :admin_xmpp, :email_domain, :gentoo_mirrors
-    attr_accessor :livestatus_host
-    attr_writer :livestatus_port
-    
+    attr_accessor :admin_email, :admin_xmpp, :email_domain, :gentoo_mirrors    
     attr_accessor :monitoring_notifiers
     
     def initialize(&block) 
@@ -71,10 +68,6 @@ module CloudModel
     
     def monitoring_notifiers
       @monitoring_notifiers || []
-    end
-    
-    def livestatus_port
-      @livestatus_port || 50000
     end
     
     ## Fixed config values, not overwriteable by now

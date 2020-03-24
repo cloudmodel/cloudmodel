@@ -1,7 +1,0 @@
-## Check memory usage on guest
-## This plugin tests memory usage of a guest
-
-define command {
-    command_name    check_cgroup_mem
-    command_line    $PLUGINSDIR$/check_cgroup_mem.rb -h $HOSTADDRESS$ -w $_HOSTMEMORY_WARN$ -c $_HOSTMEMORY_CRIT$
-}

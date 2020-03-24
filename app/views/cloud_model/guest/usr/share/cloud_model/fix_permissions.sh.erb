@@ -3,6 +3,3 @@
 <%- if guest.has_service?('CloudModel::Services::Mongodb') -%>
 <%= render 'cloud_model/guest/usr/share/cloud_model/fix_permissions/mongodb.sh' %>
 <%- end -%>
-<%- if guest.has_service?('CloudModel::Services::Monitoring') -%>
-<%= render 'cloud_model/guest/usr/share/cloud_model/fix_permissions/monitoring.sh' %>
-<%- end -%>

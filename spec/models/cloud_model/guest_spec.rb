@@ -43,52 +43,6 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'state_to_id' do
-    it 'should return -1 for state :undefined' do
-      expect(subject.state_to_id :undefined).to eq -1
-    end
-  
-    it 'should return 0 for state :no_state' do
-      expect(subject.state_to_id :no_state).to eq 0
-    end
-  
-    it 'should return 1 for state :running' do
-      expect(subject.state_to_id :running).to eq 1
-    end
-  
-    it 'should return 2 for state :blocked' do
-      expect(subject.state_to_id :blocked).to eq 2
-    end
-  
-    it 'should return 3 for state :paused' do
-      expect(subject.state_to_id :paused).to eq 3
-    end
-  
-    it 'should return 4 for state :shutdown' do
-      expect(subject.state_to_id :shutdown).to eq 4
-    end
-  
-    it 'should return 5 for state :shutoff' do
-      expect(subject.state_to_id :shutoff).to eq 5
-    end
-  
-    it 'should return 6 for state :crashed' do
-      expect(subject.state_to_id :crashed).to eq 6
-    end
-  
-    it 'should return 7 for state :suspended' do
-      expect(subject.state_to_id :suspended).to eq 7
-    end
-    
-    it 'should return 1 for state "running"' do
-      expect(subject.state_to_id 'running').to eq 1
-    end
-  
-    it 'should return -1 (:undefined) for state "this_state_does_not_exist"' do
-      expect(subject.state_to_id 'this_state_does_not_exist').to eq -1
-    end
-  end
-  
   context 'base_path' do
     it 'should have base path based on name' do
       subject.name = 'test-host'
@@ -314,92 +268,7 @@ describe CloudModel::Guest do
   context 'state' do
     it 'should get the current state as id from virsh' do
       subject.should_receive(:virsh).with('domstate').and_return 'state_string'
-      subject.should_receive(:state_to_id).with('state_string').and_return 42
       expect(subject.state).to eq 42
-    end
-  end
-  
-  context 'vm_info' do
-    let(:return_string) { 
-        "Id:             19211\n" +
-        "Name:           test\n" +
-        "UUID:           7c7fadc2-53f0-4b26-a382-c1d0b04d9fc2\n" +
-        "OS Type:        exe\n" +
-        "State:          state_string\n" +
-        "CPU(s):         2\n" +
-        "CPU time:       262.8s\n" +
-        "Max memory:     2097152 KiB\n" +
-        "Used memory:    36840 KiB\n" +
-        "Persistent:     yes\n" +
-        "Autostart:      enable\n" +
-        "Managed save:   unknown\n" +
-        "Security model: none\n" +
-        "Security DOI:   0\n" 
-    }
-    
-    before do
-      subject.stub(:virsh).with('dominfo').and_return return_string
-    end
-
-    it 'should get the current id as id from virsh' do
-      expect(subject.vm_info['id']).to eq '19211'
-    end
-
-    it 'should get the current name as id from virsh' do
-      expect(subject.vm_info['name']).to eq 'test'
-    end
-
-    it 'should get the current uuid as id from virsh' do
-      expect(subject.vm_info['uuid']).to eq '7c7fadc2-53f0-4b26-a382-c1d0b04d9fc2'
-    end
-
-    it 'should get the current os_type as id from virsh' do
-      expect(subject.vm_info['os_type']).to eq 'exe'
-    end
-    
-    it 'should get the current state as id from virsh' do
-      subject.should_receive(:state_to_id).with('state_string').and_return 42
-      expect(subject.vm_info['state']).to eq 42
-    end
-    
-    it 'should get the current cpu_time as id from virsh' do
-      expect(subject.vm_info['cpu_time']).to eq '262.8s'
-    end
-    
-    it 'should get the current persistent as id from virsh' do
-      expect(subject.vm_info['persistent']).to eq 'yes'
-    end
-    
-    it 'should get the current autostart as id from virsh' do
-      expect(subject.vm_info['autostart']).to eq 'enable'
-    end
-    
-    it 'should get the current managed_save as id from virsh' do
-      expect(subject.vm_info['managed_save']).to eq 'unknown'
-    end
-    
-    it 'should get the current securty_model as id from virsh' do
-      expect(subject.vm_info['security_model']).to eq 'none'
-    end
-    
-    it 'should get the current security_doi as id from virsh' do
-      expect(subject.vm_info['security_doi']).to eq '0'
-    end
-
-    it 'should get the current memory as id from virsh' do
-      expect(subject.vm_info['memory']).to eq 37724160
-    end
-
-    it 'should get the current max_mem as id from virsh' do
-      expect(subject.vm_info['max_mem']).to eq 2147483648
-    end
-
-    it 'should get the current cpus as id from virsh' do
-      expect(subject.vm_info['cpus']).to eq 2
-    end
-
-    it 'should get the current active as id from virsh' do
-      expect(subject.vm_info['active']).to eq false
     end
   end
   

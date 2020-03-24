@@ -45,18 +45,6 @@ module CloudModel
         []
       end
       
-      def livestatus
-        nil
-      end
-      
-      def state
-        if livestatus
-          livestatus.state
-        else
-          -1
-        end
-      end
-      
       def backupable?
         false
       end

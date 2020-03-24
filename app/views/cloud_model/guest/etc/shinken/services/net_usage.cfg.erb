@@ -1,9 +1,0 @@
-define service{
-   service_description           Network
-   use            generic-service
-   contact_groups admins
-   register       0
-   host_name	  cm-host-future
-   check_command  check_net_usage
-   aggregation    system
-}

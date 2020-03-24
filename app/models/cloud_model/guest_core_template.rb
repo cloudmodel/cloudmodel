@@ -30,6 +30,10 @@ module CloudModel
       self.class.buildable_build_states.include? build_state
     end
     
+    def self.latest_created_at
+      where(build_state_id: 0xf0).max(:created_at)
+    end
+    
     def self.new_template_to_build host
       CloudModel::GuestCoreTemplate.create arch: host.arch
     end

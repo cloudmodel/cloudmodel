@@ -1,9 +1,0 @@
-define service{
-   service_description           LVM
-   use            generic-service
-   contact_groups admins
-   register       0
-   host_name	  lvm
-   check_command  check_lvm
-   aggregation    system
-}

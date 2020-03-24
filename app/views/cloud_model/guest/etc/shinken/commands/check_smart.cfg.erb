@@ -1,7 +1,0 @@
-## Check S.M.A.R.T health
-## This plugin tests the S.M.A.R.T-status of disk
-
-define command {
-    command_name    check_smart
-    command_line    $PLUGINSDIR$/check_smart.rb -d "$_HOSTSMART_DISKS$" -h $HOSTADDRESS$
-}

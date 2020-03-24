@@ -20,27 +20,24 @@ module CloudModel
       def components_needed
         [:redis]
       end
-      
-      def livestatus
-        if guest.livestatus
-          guest.livestatus.services.find{|s| s.description == 'Redis'}
+            
+      def redis_sentinel_master?
+        if monitoring_last_check_result
+          monitoring_last_check_result['role'] == 'master'
+        else
+          if redis_sentinel_set
+            redis_sentinel_set.try(:master_service) == self 
+          else
+            false
+          end
         end
       end
       
-      def redis_sentinel_master?
-        redis_sentinel_set.try(:master_service) == self       
-      end
-      
       def redis_sentinel_slave?
-        if redis_sentinel_set
-          redis_sentinel_set.master_service != self
-        else
-          # If not member of a set, it can't be a slave
-          false
-        end       
+        not redis_sentinel_master?
       end
       
-      def redis_sentinel_set_version
+      def redis_sentinel_set_version 
         'N/A'
       end
       

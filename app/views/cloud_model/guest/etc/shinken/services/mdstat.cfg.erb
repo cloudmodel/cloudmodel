@@ -1,9 +1,0 @@
-define service{
-   service_description           RAID
-   use            generic-service
-   contact_groups admins
-   register       0
-   host_name	    mdstat
-   check_command  check_mdstat
-   aggregation    system
-}

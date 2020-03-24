@@ -1,7 +1,0 @@
-## Check cpu usage on guest
-## This plugin tests cpu usage of a guest
-
-define command {
-    command_name    check_cgroup_cpu
-    command_line    $PLUGINSDIR$/check_cgroup_cpu.rb -w $_HOSTCPU_WARN$ -c $_HOSTCPU_CRIT$ -h $HOSTADDRESS$
-}
