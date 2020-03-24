@@ -168,6 +168,8 @@ en:
         guests: Guest Systems
         volume_groups: Logical Volume Groups
         state: State
+        memory_size: RAM
+        cpu_count: CPUs
         deploy_state: Deploy State
         deploy_last_issue: Last Deploy Issue
       cloud_model/guest:

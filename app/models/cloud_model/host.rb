@@ -352,6 +352,26 @@ module CloudModel
       end
     end
     
+    def memory_size
+      if check_result = monitoring_last_check_result and sys_info = check_result['system'] and mem_info = sys_info['mem']
+        mem_info['mem_total'].to_i
+      end
+    end
+    
+    def mem_usage
+      if check_result = monitoring_last_check_result and sys_info = check_result['system'] and mem_info = sys_info['mem']
+        total = mem_info['mem_total'].to_i
+        available = mem_info['mem_available'].to_i
+        100.0 * (total - available) / total
+      end
+    end
+        
+    def cpu_usage 
+      if check_result = monitoring_last_check_result and sys_info = check_result['system'] and cpu_info = sys_info['cgroup_cpu']
+        cpu_info['last_5_minutes_percentage']
+      end
+    end
+    
     def deployable?
       [:finished, :failed, :not_started].include? deploy_state
     end

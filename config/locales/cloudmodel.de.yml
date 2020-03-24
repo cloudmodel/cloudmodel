@@ -168,6 +168,8 @@ de:
         guests: Gastsysteme
         volume_groups: Logische Laufwerksgruppen
         state: Status
+        memory_size: RAM
+        cpu_count: CPUs
         deploy_state: Installationsstatus
         deploy_last_issue: Letztes Problem bei der Installation
       cloud_model/guest:
