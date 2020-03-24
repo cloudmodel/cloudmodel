@@ -264,6 +264,29 @@ module CloudModel
       end
     end
     
+    def check_mk_agent
+      if Net::Ping::TCP.new(private_address, 6556).ping
+        begin
+          s = TCPSocket.new private_address, 6556
+          result = ''
+          started = false
+          while line = s.gets
+            result << line
+          end
+          s.close
+        rescue Errno::ECONNREFUSED
+          return [false, "Connection refused"]
+        end  
+        [true, result]
+      else
+        return [false, "Connection refused"]
+      end
+    end
+    
+    def check_mk_agent_via_exec
+      exec('check_mk_agent')
+    end
+    
     def system_info
       if current_lxd_container.blank?
         {'error' => 'No current lxd container for guest'}
@@ -272,15 +295,20 @@ module CloudModel
         {'error' => 'No network connect to guest private address'}
       end
       
-      success, result = exec('check_mk_agent')
+      success, result = check_mk_agent
       if success
-        success, df_result = exec('df -k -T')
-        if success
-          result.gsub! "<<<df>>>", "<<<df_check_mk>>>"
-          df_result = df_result.lines
-          df_result.shift
-          result += "<<<df>>>\n" + (df_result * "")
-        end
+        #puts result
+        
+        # success, df_result = exec('df -k -T')
+        # if success
+        #   result.gsub! "<<<df>>>", "<<<df_check_mk>>>"
+        #   df_result = df_result.lines
+        #   df_result.shift
+        #   result += "<<<df>>>\n" + (df_result * "")
+        # end
+        
+        result.gsub! "<<<df>>>", "<<<df_check_mk>>>"
+        result.gsub! "<<<df_k>>>", "<<<df>>>"
         
         CloudModel::CheckMkParser.parse result
       else

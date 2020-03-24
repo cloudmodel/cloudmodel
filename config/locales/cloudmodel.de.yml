@@ -385,6 +385,8 @@ de:
         deploy_war_image: WAR Image installieren
         
   issues:
+    general:
+      no_check: '%{value} existiert nicht'
     sysinfo: &sysinfo_issues
       sys_info_available: Kann die Systeminformationen nicht zugreifen
       cpu_minute_usage: Prozessorauslastung in der letzten Minute von %{value}
@@ -397,5 +399,29 @@ de:
       mdtools: RAID hat Probleme
     cloud_model/guest: 
       <<: *sysinfo_issues
+    cloud_model/services/redis:
+      not_reachable: Dienst nicht erreichbar
+    cloud_model/services/mongodb:
+      not_reachable: Dienst nicht erreichbar
+    cloud_model/services/nginx:
+      not_reachable: Dienst nicht erreichbar
+      parse_result: Dienststatus nicht interpretierbar
+      ngnix_status_forbidden: Zugriff auf Dienststatus nicht erlaubt
+      no_nginx_status: Dienststatus nicht gefunden
+    cloud_model/services/solr:
+      not_reachable: Dienst nicht erreichbar
+      parse_result: Dienststatus nicht interpretierbar
+      solr_status_forbidden: Zugriff auf Dienststatus nicht erlaubt
+      no_solr_status: Dienststatus nicht gefunden
+      mem_usage: Speicherverbrauch von %{value}
+    cloud_model/services/ssh:
+      not_reachable: Dienst nicht erreichbar
+    cloud_model/services/tomcat:
+      not_reachable: Dienst nicht erreichbar
+      parse_result: Dienststatus nicht interpretierbar
+      tomcat_status_forbidden: Zugriff auf Dienststatus nicht erlaubt
+      no_tomcat_status: Dienststatus nicht gefunden
+      mem_usage: Speicherverbrauch von %{value}
+      thread_usage: Threadverbrauch von %{value}
     cloud_model/lxd_custom_volume:
       existence: Das definierte LXD Laufwerk existiert nicht auf dem Server

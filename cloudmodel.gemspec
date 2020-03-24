@@ -20,6 +20,7 @@ Gem::Specification.new do |s|
   s.add_dependency 'rails', '~> 5.0', '>= 5.1.0'
   s.add_dependency 'mongoid', '~> 6.0', '>= 6.1.0'
   s.add_dependency 'mongoid-grid_fs', '~> 2.3', '>= 2.3.0'
+  s.add_dependency 'redis'
   
   s.add_dependency 'bcrypt-ruby', '~> 3.0', '>= 3.0.0'
   s.add_dependency 'netaddr', '>= 1.5.0', '< 2.0'
