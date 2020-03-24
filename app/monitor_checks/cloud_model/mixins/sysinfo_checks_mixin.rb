@@ -3,15 +3,31 @@ module CloudModel
     module SysinfoChecksMixin
       def check_cpu_usage
         if sys_info = @result[:system] and sys_info["cgroup_cpu"]
-          %w(minute 5_minutes 15_minutes).each do |t|
-            if sys_info["cgroup_cpu"]["last_#{t}_percentage"]
-              usage = sys_info["cgroup_cpu"]["last_#{t}_percentage"].to_f
-            
-              do_check_value "cpu_#{t}_usage".to_sym, usage, {
-                critical: 90,
-                warning: 70
-                }, unit: '%', name: "CPU usage (#{t.humanize})"
-            end
+          if sys_info["cgroup_cpu"]["last_minute_percentage"]
+            usage = sys_info["cgroup_cpu"]["last_minute_percentage"].to_f
+          
+            do_check_value "cpu_minute_usage".to_sym, usage, {
+              critical: 98,
+              warning: 95
+              }, unit: '%', name: "CPU usage (1 Minute)"
+          end
+          
+          if sys_info["cgroup_cpu"]["last_5_minutes_percentage"]
+            usage = sys_info["cgroup_cpu"]["last_5_minutes_percentage"].to_f
+          
+            do_check_value "cpu_5_minutes_usage".to_sym, usage, {
+              critical: 95,
+              warning: 80
+              }, unit: '%', name: "CPU usage (5 Minutes)"
+          end
+          
+          if sys_info["cgroup_cpu"]["last_15_minutes_percentage"]
+            usage = sys_info["cgroup_cpu"]["last_15_minutes_percentage"].to_f
+          
+            do_check_value "cpu_15_minutes_usage".to_sym, usage, {
+              critical: 90,
+              warning: 70
+              }, unit: '%', name: "CPU usage (15 Minutes)"
           end
         end
       end
@@ -24,7 +40,7 @@ module CloudModel
         
           do_check_value :mem_usage, usage, {
             critical: 90,
-            warning: 70
+            warning: 80
             }, unit: '%'
         end
       end
