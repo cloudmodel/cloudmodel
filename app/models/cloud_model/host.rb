@@ -354,14 +354,14 @@ module CloudModel
     
     def memory_size
       if check_result = monitoring_last_check_result and sys_info = check_result['system'] and mem_info = sys_info['mem']
-        mem_info['mem_total'].to_i
+        mem_info['mem_total'].to_i * 1024
       end
     end
     
     def mem_usage
       if check_result = monitoring_last_check_result and sys_info = check_result['system'] and mem_info = sys_info['mem']
-        total = mem_info['mem_total'].to_i
-        available = mem_info['mem_available'].to_i
+        total = memory_size
+        available = mem_info['mem_available'].to_i * 1024
         100.0 * (total - available) / total
       end
     end
