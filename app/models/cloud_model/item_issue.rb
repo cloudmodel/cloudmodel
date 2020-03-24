@@ -15,7 +15,7 @@ module CloudModel
     def title
       result = super
       if result.blank? and key
-        I18n.t("issues.#{subject_type.try :underscore}.#{key}", value: value)
+        I18n.t "issues.#{subject_type.try :underscore}.#{key}", value: value, default: :"issues.general.#{key}"
       else
         result
       end

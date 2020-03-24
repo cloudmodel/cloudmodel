@@ -68,6 +68,18 @@ module CloudModel
         :http
       end
       
+      def external_uri
+        "http#{ssl_supported ? 's' : ''}://#{guest.private_address}:#{ssl_supported ? ssl_port : port}/"
+      end
+
+      def internal_uri
+        "http#{ssl_supported ? 's' : ''}://#{guest.private_address}:#{ssl_supported ? ssl_port : port}/"
+      end
+      
+      def status_uri
+        "#{internal_uri}/nginx_status"
+      end
+      
       def self.redeployable_redeploy_web_image_states
         [:finished, :failed, :not_started]
       end    

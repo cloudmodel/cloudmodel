@@ -42,5 +42,18 @@ module CloudModel
       
       do_check key, name, checks, message: message, value: human_value
     end
+    
+    def do_check_for_errors_on result, error_cases
+      
+      error_cases.each do |key, name|
+        if result[:key] == key
+          severity = result[:severity] || :warning
+        
+          do_check result[:key], name, {severity => true}, message: result[:error]
+        else
+          do_check key, name, {}
+        end
+      end
+    end
   end
 end
