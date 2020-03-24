@@ -1,7 +1,0 @@
-## Check Tomcat health
-## This plugin tests the Tomcat service on the specified host
-
-define command {
-    command_name    check_tomcat
-    command_line    $PLUGINSDIR$/check_tomcat.rb -h $HOSTADDRESS$
-}

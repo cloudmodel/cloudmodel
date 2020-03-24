@@ -1,9 +1,0 @@
-[Unit]
-Description=Shinken Reactionner
-After=syslog.target
-
-[Service]
-ExecStart=/usr/bin/shinken-reactionner -r -c /etc/shinken/daemons/reactionnerd.ini
-
-[Install]
-WantedBy=multi-user.target

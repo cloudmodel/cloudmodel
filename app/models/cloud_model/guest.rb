@@ -65,26 +65,6 @@ module CloudModel
     #before_validation :set_root_volume_name
     before_destroy    :stop
     
-    VM_STATES = {
-      -1 => :undefined,
-      0 => :no_state,
-      1 => :running,
-      2	=> :blocked,
-      3 => :paused,
-      4 => :shutdown,
-      5 => :shutoff,
-      6 => :crashed,
-      7 => :suspended
-    }
-   
-    def state_to_id state
-      CloudModel::Livestatus::STATES.invert[state.to_sym] || -1
-    end
-    
-    def vm_state_to_id state
-      VM_STATES.invert[state.to_sym] || -1
-    end
-    
     def current_lxd_container
       lxd_containers.where(id: current_lxd_container_id).first
     end
@@ -322,51 +302,6 @@ module CloudModel
     
     def lxc_info
       current_lxd_container.lxc_info
-    end
-    
-    def livestatus
-      @livestatus ||= CloudModel::Livestatus::Host.find("#{host.name}.#{name}", only: %w(host_name description state plugin_output perf_data))
-    end
-    
-    def state
-      return -1
-      if livestatus
-        livestatus.state
-      else
-        -1
-      end
-    end
-    
-    def vm_state
-      @real_state unless @real_state.blank?
-      begin
-        @real_state = vm_state_to_id virsh('domstate').strip
-      rescue
-        -1
-      end
-    end
-    
-    def vm_info
-      @real_vm_info unless @real_vm_info.blank?
-      begin
-        vm_info={}
-        res = virsh('dominfo')
-    
-        res.lines.each do |line|
-          k,v = line.split(':')
-          vm_info[k.gsub(' ', '_').underscore] = v.try(:strip)
-        end
-    
-        vm_info['memory']  = vm_info.delete('used_memory').to_i * 1024
-        vm_info['max_mem'] = vm_info.delete('max_memory').to_i * 1024
-        vm_info['state']   = vm_state_to_id(vm_info['state'])
-        vm_info['cpus']    = vm_info.delete("cpu(s)").to_i
-        vm_info['active']  = (vm_info['state'] == 1)
-        
-        vm_info
-      rescue
-        {"state" => -1}
-      end
     end
     
     def start(lxd_container = nil)

@@ -25,9 +25,13 @@ module CloudModel
     def self.buildable_build_states
       [:finished, :failed, :not_started]
     end
-    
+        
     def buildable?
       self.class.buildable_build_states.include? build_state
+    end
+    
+    def self.latest_created_at
+      where(build_state_id: 0xf0).max(:created_at)
     end
     
     def build(host, options = {})

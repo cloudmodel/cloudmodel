@@ -12,13 +12,7 @@ module CloudModel
       def components_needed
         [:java, :tomcat]
       end
-      
-      def livestatus
-        if guest.livestatus
-          guest.livestatus.services.find{|s| s.description == 'Tomcat'}
-        end
-      end
-      
+            
       def heap_size
         "#{guest.memory_size / 1024 / 1024 - 128}m"
       end

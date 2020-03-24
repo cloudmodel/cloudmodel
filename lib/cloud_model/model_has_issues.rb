@@ -9,5 +9,17 @@ module CloudModel
   
     module ClassMethods  
     end
+    
+    def state
+      if monitoring_last_check_result.blank?
+        :undefined
+      else
+        if item_issues.open.count == 0
+          :running
+        else
+          item_issues.open.desc(:severity_id).first.severity
+        end
+      end
+    end
   end
 end

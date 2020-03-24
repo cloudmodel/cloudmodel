@@ -1,7 +1,0 @@
-## Check a md raid device
-## This plugin tests the raid service on the specified host using mdadm
-
-define command {
-    command_name    check_mdstat
-    command_line    $PLUGINSDIR$/check_mdstat.rb -d "$_HOSTRAID_ARRAYS$" -h $HOSTADDRESS$
-}

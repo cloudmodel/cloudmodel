@@ -14,11 +14,6 @@ module CloudModel
         [] # ssh is default to core
       end
             
-      def livestatus
-        if guest.livestatus
-          guest.livestatus.services.find{|s| s.description == 'Ssh'}
-        end
-      end
     end
   end
 end

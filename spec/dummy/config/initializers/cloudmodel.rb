@@ -29,15 +29,6 @@ CloudModel.configure do |config|
   ## Defaults to nil
   # config.email_domain = 'example.com'
   
-  ## Configure where to find livestatus db
-  ## Set host of livestatus db
-  ## Defaults to nil
-  config.livestatus_host = '10.99.0.253'
-  
-  ## Set port of livestatus db
-  ## Defaults to 50000
-  # config.livestatus_port = 50000
-  
   ## Use external IP, useful for testing without setting up a tinc VPN for your development box
   config.use_external_ip = true
 end

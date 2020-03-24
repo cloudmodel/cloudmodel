@@ -7,17 +7,6 @@ de:
     unknown: Unbekannt
     dependent: Abhängigkeit
     
-  cloud_model/guest/vm_state:
-    undefined: Nicht Definiert
-    no_state: Ohne Status
-    running: Läuft
-    blocked: Blockiert
-    paused: Pausiert
-    shutdown: Ausschaltend
-    shutoff: Ausgeschaltet
-    crashed: Abgestürzt
-    suspended: Ruhezustand
-    
   cloud_model/guest/deploy_state:
     not_started: Nicht beauftragt
     pending: Geplant
@@ -200,7 +189,6 @@ de:
         lxd_containers: LXD Container
         lxd_custom_volumes: LXD Gastlaufwerke
         state: Status
-        vm_state: VM Status
         deploy_state: Installationsstatus
         deploy_last_issue: Letztes Problem bei der Installation
       cloud_model/item_issue:
@@ -210,10 +198,6 @@ de:
         subject: Betreffend
         key: Schlüsselwert
         created_at: Erzeugt Am
-      cloud_model/guest_volume:
-        mount_point: Einhängpunkt
-        writeable: Beschreibbar?
-        has_backups: Laufwerkdaten sichern?
       cloud_model/lxd_container:
         name: Containername
         guest_template: Gästetemplate
@@ -264,10 +248,11 @@ de:
         ca: Zertifizierungsstelle
         key: Privater Schlüssel
         crt: Öffentlicher Schlüssel
-        valid_from: Gültig von
+        valid_from: Gültig ab
         valid_thru: Gültig bis
         issuer: Aussteller
         common_name: Allgemeiner Name
+        used_in_guests: In Gästen genutzt
       cloud_model/ssh_pub_key:
         name: Schlüsselname
         key: Öffentlicher Schlüssel
@@ -293,6 +278,7 @@ de:
       cloud_model/guest_template_type:
         name: Templateart
         components: Komponenten beinhaltet
+        last_created_at: Zuletzt erzeugt am
       cloud_model/guest_template:
         id: Bezeichner
         build_state: Erstellungsstatus
