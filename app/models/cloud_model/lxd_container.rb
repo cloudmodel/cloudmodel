@@ -107,9 +107,15 @@ module CloudModel
       if success
         result = YAML.load(result).first
         
+        base = if result['container']
+          result.delete 'container'
+        else
+          result
+        end
+        
         %w(config expanded_config).each do |field|
           config = {}
-          result['container'][field].each do |k,v|
+          base[field].each do |k,v|
             keys = k.split('.')
             prev = config
             keys.each_with_index do |sk,i|
@@ -126,7 +132,7 @@ module CloudModel
             config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
             config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
           end
-          result['container'][field] = config
+          result[field] = config
         end        
         result
       else
@@ -135,12 +141,17 @@ module CloudModel
     end
     
     def lxc_info
-      guest.host.monitoring_last_check_result['system']['lxd'].find{|c| c['container']['name'] == name}
+      guest.host.monitoring_last_check_result['system']['lxd'].find{|c| c['name'] == name}
+      end
     end
     
     
     def running?
-      lxc_info['status'] == "Running"
+      if state = live_lxc_info['state']
+        state['status'] == "Running"
+      else
+        false
+      end
     end
     
     
