@@ -142,7 +142,6 @@ module CloudModel
     
     def lxc_info
       guest.host.monitoring_last_check_result['system']['lxd'].find{|c| c['name'] == name}
-      end
     end
     
     
