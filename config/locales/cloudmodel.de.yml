@@ -393,9 +393,11 @@ de:
       not_reachable: Dienst nicht erreichbar
     cloud_model/services/nginx:
       not_reachable: Dienst nicht erreichbar
-      parse_result: Dienststatus nicht interpretierbar
-      ngnix_status_forbidden: Zugriff auf Dienststatus nicht erlaubt
-      no_nginx_status: Dienststatus nicht gefunden
+      parse_nginx_result: Dienststatus für Nginx nicht interpretierbar
+      ngnix_status_forbidden: Zugriff auf Dienststatus für Nginx nicht erlaubt
+      no_nginx_status: Dienststatus für Nginx nicht gefunden
+      parse_passenger_result: Dienststatus für Passenger nicht interpretierbar
+      no_passenger_status: Dienststatus für Passenger nicht gefunden
     cloud_model/services/solr:
       not_reachable: Dienst nicht erreichbar
       parse_result: Dienststatus nicht interpretierbar

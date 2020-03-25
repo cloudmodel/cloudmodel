@@ -7,7 +7,7 @@ module CloudModel
         @guest = guest
         @subject = service
 
-        @result = get_result
+        @result = @subject.service_status
 
         store_check_result
       end

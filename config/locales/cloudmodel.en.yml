@@ -394,9 +394,11 @@ en:
       not_reachable: Service not reachable
     cloud_model/services/nginx:
       not_reachable: Service not reachable
-      parse_result: Service status not parsable
-      ngnix_status_forbidden: Access to service status forbidden
-      no_nginx_status: Service status not found
+      parse_nginx_result: Nginx status not parsable
+      ngnix_status_forbidden: Nginx to service status forbidden
+      no_nginx_status: Nginx status not found
+      parse_passenger_result: Passenger status not parsable
+      no_passenger_status: Passenger status not found
     cloud_model/services/solr:
       not_reachable: Service not reachable
       parse_result: Service status not parsable

@@ -45,6 +45,10 @@ module CloudModel
         []
       end
       
+      def service_status
+        false
+      end
+      
       def backupable?
         false
       end

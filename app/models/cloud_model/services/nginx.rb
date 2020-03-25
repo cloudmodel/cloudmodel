@@ -80,6 +80,76 @@ module CloudModel
         "#{internal_uri}/nginx_status"
       end
       
+      def service_status
+        data = {}
+        uri = URI(status_uri)
+
+        http = Net::HTTP.new(uri.host, uri.port)
+        if ssl_supported
+          http.use_ssl = true
+          http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+        end
+        request = Net::HTTP::Get.new(uri.request_uri)
+
+        begin
+          res = http.request(request)
+        rescue Exception => e
+          return {key: :not_reachable, error: "#{e.class}\n\n#{e.to_s}", severity: :critical}
+        end
+  
+        begin  
+          data['http_version'] = res.http_version
+          data['active'] = res.body.lines[0].gsub('Active connections: ', '').to_i
+          data['accepted'], data['handled'], data['requests'] = res.body.lines[2].strip.split(' ').map(&:to_i)
+
+          res.body.lines[3].gsub(/\W*:\W*/, ':').split(' ').each do |pair|
+            k,v = pair.split ':'
+            data["#{k.downcase}"] = v
+          end
+        rescue Exception => e
+           return {key: :parse_nginx_result, error: "#{e.class}\n\n#{e.to_s}", severity: :warning}
+        end
+
+        if res.code == '404'
+          return {key: :no_nginx_status, error: "404: nginx_status not found on server, but server running", severity: :warning}
+        end
+        if res.code == '403'
+          return {key: :ngnix_status_forbidden, error: "403: no privileges to access nginx_status on server", severity: :warning}
+        end
+        
+        if passenger_supported
+          success, passenger_data = guest.exec('passenger-status --show xml')
+          
+          if success
+            data['passenger'] = Hash.from_xml(passenger_data)['info']
+            
+            begin
+              if data['passenger']['supergroups'] and data['passenger']['supergroups']['supergroup']
+                supergroups = data['passenger']['supergroups']['supergroup']
+                supergroups = [supergroups] unless supergroups.is_a? Array
+              
+                supergroups.each do |supergroup|
+                  if supergroup['group'] and supergroup['group']['processes']
+                    processes = supergroup['group']['processes']['process']
+                    processes = [processes] unless processes.is_a? Array
+                    supergroup['group']['processes'] = processes
+                  end
+                end
+              
+                data['passenger']['supergroups'] = supergroups
+              end
+            rescue => e
+              return {key: :parse_passenger_result, error: "#{e.class}\n\n#{e.to_s}", severity: :warning}
+            end
+          else
+            return {key: :no_passenger_status, error: "passenger_status not found on server", severity: :warning}
+          end
+          
+        end
+        
+        data
+      end
+      
       def self.redeployable_redeploy_web_image_states
         [:finished, :failed, :not_started]
       end    
