@@ -74,10 +74,16 @@ module CloudModel
             hash['lxd'] = YAML.load lxd_yaml unless lxd_yaml.blank?
             
             hash['lxd'].each do |container|
-              if container['container']
+              base = if container['container']
+                container.delete 'container'
+              else
+                container
+              end
+              
+              if base
                 %w(config expanded_config).each do |field|
                   config = {}
-                  container['container'][field].each do |k,v|
+                  base[field].each do |k,v|
                     keys = k.split('.')
                     prev = config
                     keys.each_with_index do |sk,i|
@@ -94,7 +100,7 @@ module CloudModel
                     config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
                     config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
                   end
-                  container['container'][field] = config
+                  container[field] = config
                 end
               end
             end
