@@ -65,6 +65,10 @@ module CloudModel
       lxc_show['used_by'] && lxc_show['used_by'].size > 0
     end
     
+    def host_path
+      "/var/lib/lxd/storage-pools/default/custom/#{name}/"
+    end
+    
     # Backup 
     
     def backup_directory

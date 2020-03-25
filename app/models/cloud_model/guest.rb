@@ -117,6 +117,10 @@ module CloudModel
       host.exec! "/usr/bin/lxc exec #{current_lxd_container.name.shellescape} -- #{command}", message
     end
     
+    def host_root_path
+      "/var/lib/lxd/containers/#{current_lxd_container.name}/rootfs/"
+    end
+    
     def ls directory
       res = exec("/bin/ls -l #{directory.shellescape}")
       
@@ -352,6 +356,75 @@ module CloudModel
       while vm_state != -1 and timeout > 0 do
         sleep 0.1
         timeout -= 1
+      end
+    end
+    
+    def fix_lxd_custom_volumes
+      fixed_volumes = []
+      print "Finding not existing volumes on guest... "
+      lxd_custom_volumes.each do |volume|
+        unless volume.volume_exists?
+          fixed_volumes << volume
+        end
+      end
+      puts '[Done]'
+      
+      unless fixed_volumes.blank?
+        print "Stopping guest #{name}... "
+        stop
+        puts '[Done]'
+        
+        print "Mounting container root... "
+        host.exec "zfs mount guests/containers/#{current_lxd_container.name}"
+        puts '[Done]'
+        
+        fixed_volumes.each do |volume|
+          print "Creating Volume #{volume}... "
+          volume.create_volume!
+          puts '[Done]'
+          
+          print "Mounting volume... "
+          host.exec "zfs mount guests/custom/#{volume.name}"
+          puts '[Done]'
+          
+          guest_dir = "#{host_root_path}#{volume.mount_point.gsub(/\/$/, '')}"
+          
+          print "Copying data from guest root to Volume... "
+          cmd = "cp -ra #{guest_dir}/. #{volume.host_path.gsub(/\/$/, '')}"
+          #puts cmd
+          host.exec cmd 
+          puts '[Done]'
+          
+          print "Moving data on guest root to backup folder... "
+          host.exec "mv #{guest_dir} #{guest_dir}.backup"
+          puts '[Done]'
+          
+          print "Creating mountpoint on guest root... "
+          host.exec "mkdir #{guest_dir}"
+          host.exec "chown 100000:100000 #{guest_dir}"
+          puts '[Done]'
+          
+          print "Unmounting volume... "
+            host.exec "zfs unmount guests/custom/#{volume.name}"
+          puts '[Done]'
+                    
+          print "Attaching Volume to Guest... "
+          current_lxd_container.lxc "storage volume attach default #{volume.name} #{current_lxd_container.name} #{volume.mount_point}"
+          puts '[Done]'
+        end
+        
+        print "Unmounting container root... "
+        host.exec "zfs unmount guests/containers/#{current_lxd_container.name}"
+        puts '[Done]'
+        
+        print "Starting guest #{name}... "
+        success, result = start
+        if 
+          puts '[Done]'
+        else
+          puts '[Failed]'
+          puts result
+        end
       end
     end
     
