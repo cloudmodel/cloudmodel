@@ -6,9 +6,16 @@ module CloudModel
       @host = host
       @guest = guest
       @subject = lxd_custom_volume
-      @result = @subject.lxc_show 
       
-      store_check_result
+      if options[:cached]
+        @result = @subject.monitoring_last_check_result
+      else
+        print "      * Acqire data ..."
+        @result = @subject.lxc_show 
+        puts "[Done]"
+      
+        store_check_result
+      end
     end
     
     def check_existence

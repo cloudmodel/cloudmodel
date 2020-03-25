@@ -7,9 +7,15 @@ module CloudModel
         @guest = guest
         @subject = service
 
-        @result = @subject.service_status
-
-        store_check_result
+        if options[:cached]
+          @result = @subject.monitoring_last_check_result
+        else
+          print "      * Acqire data ..."
+          @result = @subject.service_status
+          puts "[Done]"
+      
+          store_check_result
+        end
       end
       
       def get_result
