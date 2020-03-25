@@ -107,15 +107,14 @@ module CloudModel
       if success
         result = YAML.load(result).first
         
-        base = if result['container']
-          result.delete 'container'
-        else
-          result
+        if result['container']
+          container = result.delete('container')
+          result = result.merge(container)
         end
         
         %w(config expanded_config).each do |field|
           config = {}
-          base[field].each do |k,v|
+          result[field].each do |k,v|
             keys = k.split('.')
             prev = config
             keys.each_with_index do |sk,i|
@@ -141,7 +140,7 @@ module CloudModel
     end
     
     def lxc_info
-      guest.host.monitoring_last_check_result['system']['lxd'].find{|c| c['name'] == name}
+      guest.host.monitoring_last_check_result['system']['lxd'].find{|c| c['name'] == name} || {'name' => name, 'status' => 'Unknown'}
     end
     
     

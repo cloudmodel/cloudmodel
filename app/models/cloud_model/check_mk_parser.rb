@@ -61,7 +61,7 @@ module CloudModel
       sensor = nil
       sensor_result = nil
       lxd_yaml = ''
-    
+
       result.lines.each do |line|
         if line[0..2] == '<<<'
           if context == 'sensors'
@@ -74,34 +74,31 @@ module CloudModel
             hash['lxd'] = YAML.load lxd_yaml unless lxd_yaml.blank?
             
             hash['lxd'].each do |container|
-              base = if container['container']
-                container.delete 'container'
-              else
-                container
+              if container['container']
+                c = container.delete('container')
+                container.merge! c
               end
-              
-              if base
-                %w(config expanded_config).each do |field|
-                  config = {}
-                  base[field].each do |k,v|
-                    keys = k.split('.')
-                    prev = config
-                    keys.each_with_index do |sk,i|
-                      prev[sk] ||= {}
-                      if i + 1 == keys.size
-                        prev[sk] = v  
-                      else
-                        prev = prev[sk]
-                      end
+                            
+              %w(config expanded_config).each do |field|
+                config = {}
+                container[field].each do |k,v|
+                  keys = k.split('.')
+                  prev = config
+                  keys.each_with_index do |sk,i|
+                    prev[sk] ||= {}
+                    if i + 1 == keys.size
+                      prev[sk] = v  
+                    else
+                      prev = prev[sk]
                     end
                   end
-      
-                  if config['volatile'] and config['volatile']['id_map']
-                    config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
-                    config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
-                  end
-                  container[field] = config
                 end
+    
+                if config['volatile'] and config['volatile']['id_map']
+                  config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
+                  config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
+                end
+                container[field] = config
               end
             end
           end
