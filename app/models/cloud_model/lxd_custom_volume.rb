@@ -55,6 +55,10 @@ module CloudModel
       name
     end
     
+    def item_issue_chain
+      [guest.host, guest, self]
+    end
+    
     # Get infos about the volume
     def lxc_show
       success, result = lxc "storage volume show default #{name}"

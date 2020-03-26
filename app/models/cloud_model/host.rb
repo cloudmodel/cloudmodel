@@ -100,6 +100,8 @@ module CloudModel
     validates :mac_address_prefix, presence: true, uniqueness: true
     
     before_validation :generate_mac_address_prefix
+    
+    index _id: 1
       
     def default_root_volume_group
       volume_groups.first

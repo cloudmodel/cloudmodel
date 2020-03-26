@@ -10,6 +10,14 @@ module CloudModel
     module ClassMethods  
     end
     
+    def item_issue_chain
+      [self]
+    end
+    
+    def linked_item_issues
+      CloudModel::ItemIssue.where('subject_chain_ids': {'$elemMatch': {type: self.class.to_s, id: id}})
+    end
+    
     def state
       if monitoring_last_check_result.blank?
         :undefined
