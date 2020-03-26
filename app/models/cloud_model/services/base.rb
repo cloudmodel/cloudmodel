@@ -32,7 +32,11 @@ module CloudModel
       def host
         guest.host
       end
-    
+      
+      def item_issue_chain
+        [host, guest, self]
+      end
+      
       def used_ports
         [port]
       end

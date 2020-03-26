@@ -37,7 +37,9 @@ module CloudModel
       
       checks = {}
       thresholds.each do |k,v|
-        checks[k] = value > v
+        if v
+          checks[k] = value > v
+        end
       end
       
       do_check key, name, checks, message: message, value: human_value

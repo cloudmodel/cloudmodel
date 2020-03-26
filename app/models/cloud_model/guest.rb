@@ -109,6 +109,10 @@ module CloudModel
       name
     end
     
+    def item_issue_chain
+      [host, self]
+    end
+    
     def exec command
       host.exec "/usr/bin/lxc exec #{current_lxd_container.name.shellescape} -- #{command}"
     end
