@@ -14,7 +14,7 @@ module CloudModel
         @result = {
           system: @subject.system_info
         }
-        puts "[Done]"
+        puts "[\e[32mDone\e[39m]"
       
         store_check_result
       end

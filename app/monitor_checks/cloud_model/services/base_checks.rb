@@ -12,7 +12,7 @@ module CloudModel
         else
           print "      * Acqire data ..."
           @result = @subject.service_status
-          puts "[Done]"
+          puts "[\e[32mDone\e[39m]"
       
           store_check_result
         end
