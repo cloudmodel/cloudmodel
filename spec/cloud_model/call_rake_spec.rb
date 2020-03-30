@@ -14,7 +14,7 @@ describe 'CloudModel#call_rake' do
     Rails.stub(:root).and_return '/path/to/rails'
     Rails.stub(:env).and_return(double Object, test?: false, development?: false, to_s: 'production')
     # stubbing on system on Kernel (stub it on the Module itself)
-    CloudModel.should_receive(:system).with('PATH=/bin:/sbin:/usr/bin /usr/local/bin/bundle exec rake rspec RAILS_ENV=\'production\' --trace >>/path/to/rails/log/production-rake.log 2>&1 &').and_return ''
+    CloudModel.should_receive(:system).with("bundle exec rake rspec RAILS_ENV='production' --trace >>/path/to/rails/log/production-rake.log 2>&1 &").and_return ''
     CloudModel::call_rake 'rspec'
   end
   

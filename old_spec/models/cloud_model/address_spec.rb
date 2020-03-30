@@ -3,7 +3,7 @@
 require 'spec_helper'
 
 describe CloudModel::Address do
-  it { is_expected.to have_timestamps }
+  it { expect(subject).to be_timestamped_document }  
   
   it { expect(subject).to be_embedded_in(:host).of_type CloudModel::Host }
   
@@ -11,24 +11,11 @@ describe CloudModel::Address do
   it { expect(subject).to have_field(:subnet).of_type Integer }
   it { expect(subject).to have_field(:gateway).of_type String }
   
-  # context '#initialize' do
-  #   it 'should call #from_str if options is a string' do
-  #     #expect(CloudModel::Address).to receive(:from_str).with('10.42.23.1/28').and_call_original
-  #     CloudModel::Address.new '10.42.23.1/28'
-  #   end
-  # end
-  
   context '#from_str' do
-    it "should accept IPV4 address without subnet" do
-      address = CloudModel::Address.from_str('10.42.23.1')
-      expect(address.ip).to eq '10.42.23.1'
-      expect(address.subnet).to eq 32
-    end
-    
     it "should accept IPV4 address with subnet" do
-      address = CloudModel::Address.from_str('10.42.23.1/16')
+      address = CloudModel::Address.from_str('10.42.23.1/28')
       expect(address.ip).to eq '10.42.23.1'
-      expect(address.subnet).to eq 16
+      expect(address.subnet).to eq 28
     end
     
     it "should accept IPV4 address with netmask" do
@@ -38,8 +25,8 @@ describe CloudModel::Address do
     end
     
     it "should accept IPV6 address with subnet" do
-      address = CloudModel::Address.from_str('fec0::1/64')
-      expect(address.ip).to eq 'fec0::1'
+      address = CloudModel::Address.from_str('fec0::/64')
+      expect(address.ip).to eq 'fec0::'
       expect(address.subnet).to eq 64
     end
   end
@@ -58,19 +45,6 @@ describe CloudModel::Address do
     end
   end
   
-  context 'hostname' do
-    it 'should return set hostname if given' do
-      subject.hostname = 'some.host.name'
-      expect(subject.hostname).to eq 'some.host.name'
-    end
-    
-    it 'should resolve ip if not hostname is given' do
-      subject.ip = '10.42.23.1'
-      expect(Resolv).to receive(:getname).with('10.42.23.1').and_return 'some.host.name'
-      expect(subject.hostname).to eq 'some.host.name'
-    end
-  end
-  
   context 'network' do
     it "should get IPV4 netmask" do
       subject.ip = '10.42.23.130'
@@ -81,7 +55,7 @@ describe CloudModel::Address do
     it "should get IPV6 netmask" do
       subject.ip = 'fec0::'
       subject.subnet = 64
-      expect(subject.network).to eq 'fec0::'
+      expect(subject.network).to eq 'fec0:0000:0000:0000:0000:0000:0000:0000'
     end
   end  
   
@@ -95,7 +69,7 @@ describe CloudModel::Address do
     it "should get IPV6 netmask" do
       subject.ip = 'fec0::'
       subject.subnet = 64
-      expect(subject.netmask).to eq '/64'
+      expect(subject.netmask).to eq 'ffff:ffff:ffff:ffff:0000:0000:0000:0000'
     end
   end
   
@@ -152,20 +126,6 @@ describe CloudModel::Address do
       subject.ip = '10.42.23.2'
       subject.subnet = 30
       expect(subject.list_ips).to eq ["10.42.23.2"]
-    end
-  end
-  
-  context 'tinc_subnet' do
-    it 'should return 16 (always for now)' do
-      expect(subject.tinc_subnet).to eq 16
-    end
-  end
-  
-  context 'tinc_network' do
-    it 'should get private network from last host and return base address for tinc_subnet' do
-      network = CloudModel::Address.new ip: '10.42.23.16', subnet: 24
-      allow(CloudModel::Host).to receive(:last).and_return(double :host, private_network: network)
-      expect(subject.tinc_network).to eq "10.42.0.0"
     end
   end
   
