@@ -15,12 +15,19 @@ module CloudModel
         issue.message = options[:message]
         issue.value = options[:value]
         issue.save
-        puts "[#{severity.to_s.upcase}]"
+        severity_colors = {
+          info: 94,
+          task: 34,
+          warning: 33,
+          critical: 31,
+          fatal: 35
+        }
+        puts "[\e[#{severity_colors[severity]}m#{severity.to_s.upcase}\e[39m]"
         false
       else
         issue.resolved_at = Time.now
         issue.save if issue.persisted?
-        puts "[OK]"
+        puts "[\e[32mOK\e[39m]"
         true
       end
     end
