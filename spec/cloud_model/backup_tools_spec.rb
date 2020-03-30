@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-describe CloudModel::AcceptSizeStrings do
+describe CloudModel::BackupTools do
   class TestBackupToolsModel
     include Mongoid::Document
     include CloudModel::BackupTools

@@ -23,7 +23,7 @@ Gem::Specification.new do |s|
   s.add_dependency 'redis'
   
   s.add_dependency 'bcrypt-ruby', '~> 3.0', '>= 3.0.0'
-  s.add_dependency 'netaddr', '>= 1.5.0', '< 3.0'
+  s.add_dependency 'netaddr', '~> 2.0', '>= 2.0.4'
   s.add_dependency 'net-sftp', '~> 2.1', '>= 2.1.0'
   s.add_dependency 'net-ping', '~> 2.0'
 end
