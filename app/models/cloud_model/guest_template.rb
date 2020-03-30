@@ -5,7 +5,7 @@ module CloudModel
     include CloudModel::ENumFields
     prepend CloudModel::SmartToString
 
-    field :arch
+    field :arch, type: String
 
     belongs_to :template_type, class_name: "CloudModel::GuestTemplateType"
     belongs_to :core_template, class_name: "CloudModel::GuestCoreTemplate"
@@ -20,7 +20,7 @@ module CloudModel
       0xff => :not_started
     }, default: :not_started
 
-    field :build_last_issue
+    field :build_last_issue, type: String
     
     def self.buildable_build_states
       [:finished, :failed, :not_started]
@@ -31,7 +31,11 @@ module CloudModel
     end
     
     def self.latest_created_at
-      where(build_state_id: 0xf0).max(:created_at)
+      scoped.where(build_state_id: 0xf0).max(:created_at)
+    end
+    
+    def worker host
+      CloudModel::GuestTemplateWorker.new host
     end
     
     def build(host, options = {})
@@ -44,14 +48,17 @@ module CloudModel
       begin
         CloudModel::call_rake 'cloudmodel:guest_template:build', host_id: host.id, template_id: id
       rescue Exception => e
-        template.update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
+        update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
       end
     end
   
     def build!(host, options={})
-      guest_template_worker = CloudModel::GuestTemplateWorker.new host
-      guest_template_worker.build_template self, options
+      unless buildable? or options[:force]
+        return false
+      end
+
+      worker(host).build_template self, options
     end
     
     def lxd_arch
@@ -64,7 +71,11 @@ module CloudModel
     end
     
     def name
-      "#{template_type.name} (#{created_at.strftime("%Y-%m-%d %H:%M:%S")})"
+      if created_at
+        "#{template_type.name} (#{created_at.strftime("%Y-%m-%d %H:%M:%S")})"
+      else
+        "#{template_type.name} (not saved)"
+      end
     end
     
     def lxd_image_metadata_tarball

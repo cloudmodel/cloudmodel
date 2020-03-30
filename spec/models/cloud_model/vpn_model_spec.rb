@@ -3,7 +3,7 @@
 require 'spec_helper'
 
 describe CloudModel::VpnClient do
-  it { expect(subject).to be_timestamped_document }  
+  it { expect(subject).to have_timestamps }  
   it { expect(subject).to have_field(:name).of_type String }
   it { expect(subject).to have_field(:tinc_public_key).of_type String }
   it { expect(subject).to have_field(:address).of_type String }
