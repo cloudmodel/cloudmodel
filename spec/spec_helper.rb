@@ -4,7 +4,6 @@ ENV["RAILS_ENV"] ||= 'test'
 require "rails/mongoid"
 require File.expand_path("../dummy/config/environment", __FILE__)
 require 'rspec/rails'
-require 'rspec/autorun'
 require 'mongoid-rspec'
 require 'timecop'
 
@@ -30,3 +29,4 @@ RSpec.configure do |config|
   config.order = "random"
 end
 
+RSpec::Mocks.configuration.allow_message_expectations_on_nil = true

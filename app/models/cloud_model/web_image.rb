@@ -76,6 +76,10 @@ module CloudModel
       "#{build_path}/current/Gemfile"
     end
     
+    def worker
+      CloudModel::WebImageWorker.new self
+    end
+    
     def self.build_state_id_for build_state
       enum_fields[:build_state][:values].invert[build_state]
     end
@@ -92,8 +96,8 @@ module CloudModel
       self.class.buildable_build_states.include? build_state
     end
     
-    def self.buildable?
-      where :build_state_id.in => buildable_build_state_ids
+    def self.buildable
+      scoped.where :build_state_id.in => buildable_build_state_ids
     end
     
     def build(options = {})
@@ -110,10 +114,13 @@ module CloudModel
         CloudModel.log_exception e
       end
     end
-    
-    def build!(options = {})      
-      web_image_worker = CloudModel::WebImageWorker.new self
-      web_image_worker.build options
+        
+    def build!(options = {})
+      unless buildable? or options[:force]
+        return false
+      end
+      
+      worker.build options
     end
     
     def self.redeployable_redeploy_states
@@ -146,8 +153,11 @@ module CloudModel
     end
     
     def redeploy!(options = {})
-      web_image_worker = CloudModel::WebImageWorker.new self
-      web_image_worker.redeploy options
+      unless redeployable? or options[:force]
+        return false
+      end
+
+      worker.redeploy options
     end
   end
 end

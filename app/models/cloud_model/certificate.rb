@@ -22,16 +22,19 @@ module CloudModel
     field :ca, type: String
     field :key, type: String
     field :crt, type: String
-    field :valid_thru, type: Date
+    field :valid_from, type: Time
+    field :valid_thru, type: Time
     
     used_in_guests_as 'services.ssl_cert_id'
     
     has_many :guest_certificates, class_name: "CloudModel::GuestCertificate"
     
+    before_save :set_valid_dates
+    
     #scope :valid, -> { where(:valid_thru.gt => Time.now) }
     
     def self.valid
-      all.select{|c| c.valid_now?}
+      scoped.select{|c| c.valid_now?}
     end
     
     def to_s
@@ -50,13 +53,18 @@ module CloudModel
       OpenSSL::PKey.read key
     end
     
-    def valid_from
-      x509.not_before
+    def set_valid_dates
+      self.valid_from = x509.not_before
+      self.valid_thru = x509.not_after
     end
     
-    def valid_thru
-      x509.not_after
-    end
+    # def valid_from
+    #   x509.not_before
+    # end
+    #
+    # def valid_thru
+    #   x509.not_after
+    # end
     
     def valid_now?
       valid_from < Time.now and Time.now < valid_thru

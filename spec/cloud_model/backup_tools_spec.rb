@@ -23,7 +23,7 @@ describe CloudModel::BackupTools do
     ]
     backups = keep_backups + disposable_backups
     
-    subject.stub(:list_backups).and_return backups
+    allow(subject).to receive(:list_backups).and_return backups
     expect(subject.list_disposable_backups).to match_array disposable_backups
   end
   
@@ -42,7 +42,7 @@ describe CloudModel::BackupTools do
     ]
     backups = keep_backups + disposable_backups
     
-    subject.stub(:list_backups).and_return backups
+    allow(subject).to receive(:list_backups).and_return backups
     expect(subject.list_disposable_backups).to match_array disposable_backups
   end
   
@@ -65,7 +65,7 @@ describe CloudModel::BackupTools do
     ]
     backups = keep_backups + disposable_backups
     
-    subject.stub(:list_backups).and_return backups
+    allow(subject).to receive(:list_backups).and_return backups
     expect(subject.list_disposable_backups).to match_array disposable_backups
   end
 end
