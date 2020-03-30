@@ -29,13 +29,13 @@ describe CloudModel::BackupTools do
   
   it "should keep all backups of the last 3 days" do
     keep_backups = [
-      (Time.now-1.days).strftime("%Y%m%d%H%M%S"),
-      (Time.now-36.hours).strftime("%Y%m%d%H%M%S"),
-      (Time.now-2.days).strftime("%Y%m%d%H%M%S"),
-      (Time.now-60.hours).strftime("%Y%m%d%H%M%S"),
+      (Time.now-1.days).strftime("%Y%m%d%H%M%S"),   # less than 3 days old
+      (Time.now-36.hours).strftime("%Y%m%d%H%M%S"), # less than 3 days old
+      (Time.now-2.days).strftime("%Y%m%d%H%M%S"),   # less than 3 days old
+      (Time.now-60.hours).strftime("%Y%m%d%H%M%S"), # less than 3 days old
     ]
     disposable_backups = [
-      (Time.now-3.days).strftime("%Y%m%d%H%M%S"),
+      (Time.now-3.days-5.minutes).strftime("%Y%m%d%H%M%S"), # from the last week, but less than 4 days ago
       (Time.now-8.years).strftime("%Y%m%d%H%M%S"),    
       (Time.now-13.years).strftime("%Y%m%d%H%M%S"), 
       (Time.now-15.years).strftime("%Y%m%d%H%M%S"),    
@@ -56,9 +56,9 @@ describe CloudModel::BackupTools do
       (Time.now-6.days).strftime("%Y%m%d%H%M%S"),
       (Time.now-7.days).strftime("%Y%m%d%H%M%S"),
       (Time.now-14.days).strftime("%Y%m%d%H%M%S"),
+      (Time.now-45.hours).strftime("%Y%m%d%H%M%S"),    
     ]
     disposable_backups = [
-      (Time.now-45.hours).strftime("%Y%m%d%H%M%S"),    
       (Time.now-8.days).strftime("%Y%m%d%H%M%S"),    
       (Time.now-13.days).strftime("%Y%m%d%H%M%S"), 
       (Time.now-15.days).strftime("%Y%m%d%H%M%S"),    

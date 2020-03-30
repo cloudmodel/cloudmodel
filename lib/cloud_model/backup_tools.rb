@@ -11,28 +11,43 @@ module CloudModel
     def list_disposable_backups
       backups = list_backups.sort{|a,b| b<=>a}
       
+      #puts "\n ALL #{backups * ', '}"
+      
+      now = Time.now
+      
       keep_backups = backups[0..2] # always keep last 3 updates
       
       # keep all backups in the last 3 days
-      keep_backups << backups.select{|x| x > (Time.now - 3.days).strftime("%Y%m%d%H%M%S")}.first
+      keep_backups += backups.select{|x| x >= (now - 3.days).strftime("%Y%m%d%H%M%S")}
       
-      # keep one backup in the last 7 days
-      (4..7).each do |n|
-        keep_backups << backups.select{|x| x > (Time.now - n.days).strftime("%Y%m%d%H%M%S")}.last
+      # limit backups to the last 6 month (exept less than 3)
+      last_backups = backups.select{|x| x >= (now - 6.month).strftime("%Y%m%d%H%M%S")}
+      
+      # keep one backup each for the last 6 days
+      (3..6).each do |n|
+        keep = last_backups.select{|x| x <= (now - (n+1).days).strftime("%Y%m%d%H%M%S")}.first
+        #puts "Keep for Day    #{n} (#{(now - (n+1).days).strftime("%Y%m%d%H%M%S")}): #{keep}"
+        keep_backups << keep
       end
       
-      # keep one backup in the last 6 weeks
-      (2..6).each do |n|
-        keep_backups << backups.select{|x| x.between? (Time.now - n.weeks).strftime("%Y%m%d%H%M%S"), (Time.now - (n+1).weeks).strftime("%Y%m%d%H%M%S")}.last
+      # keep one backup each for the last 6 weeks
+      (1..6).each do |n|
+        keep = last_backups.select{|x| x <= (now - (n+1).weeks).strftime("%Y%m%d%H%M%S")}.first
+        #puts "Keep for Week   #{n} (#{(now - (n+1).weeks).strftime("%Y%m%d%H%M%S")}): #{keep}"
+        keep_backups << keep
       end
-      # keep one backup in the last 12 month
-      (2..12).each do |n|
-        keep_backups << backups.select{|x| x.between? (Time.now - n.months).strftime("%Y%m%d%H%M%S"), (Time.now - (n+1).months).strftime("%Y%m%d%H%M%S")}.first
+      # keep one backup each for the last 6 month
+      (1..6).each do |n|
+        keep = last_backups.select{|x| x <= (now - (n+1).month).strftime("%Y%m%d%H%M%S")}.first
+        #puts "Keep for Month #{"%2d" % n} (#{(now - (n+1).month).strftime("%Y%m%d%H%M%S")}): #{keep}"
+        keep_backups << keep
       end
       disposible_backups = backups - keep_backups
       
       Rails.logger.debug "Keep backups: #{keep_backups.uniq * ', '}"
       Rails.logger.debug "Dispose backups: #{disposible_backups * ', '}"
+      #puts "KEEP #{keep_backups.uniq * ', '}"
+      #puts "DISP #{disposible_backups * ', '}"
       
       disposible_backups
     end
