@@ -7,7 +7,7 @@ PATH
       mongoid-grid_fs (~> 2.3)
       net-ping (~> 2.0)
       net-sftp (~> 2.1, >= 2.1.0)
-      netaddr (>= 1.5.0, < 2.0)
+      netaddr (>= 1.5.0, < 3.0)
       rails (~> 6.0.2.2, ~> 6.0)
       redis
 
@@ -125,7 +125,7 @@ GEM
     net-sftp (2.1.2)
       net-ssh (>= 2.6.5)
     net-ssh (5.2.0)
-    netaddr (1.5.1)
+    netaddr (2.0.4)
     nio4r (2.5.2)
     nokogiri (1.10.9)
       mini_portile2 (~> 2.4.0)
