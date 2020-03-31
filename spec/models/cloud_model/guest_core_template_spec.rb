@@ -19,7 +19,7 @@ describe CloudModel::GuestCoreTemplate do
   ).with_default_value_of(:not_started) }
   it { expect(subject).to have_field(:build_last_issue).of_type(String) }
   
-  let(:host) { double CloudModel::Host, id: BSON::ObjectId.new, arch: 'x128'}
+  let(:host) { double CloudModel::Host, id: BSON::ObjectId.new, arch: 'MOS6502'}
   
   context '#buildable_build_states' do
     it 'should return buildable states' do
@@ -55,7 +55,7 @@ describe CloudModel::GuestCoreTemplate do
   context '#new_template_to_build' do
     it 'should create new GuestTemplateWorker' do
       template = double
-      expect(CloudModel::GuestCoreTemplate).to receive(:create).with(arch: 'x128').and_return template
+      expect(CloudModel::GuestCoreTemplate).to receive(:create).with(arch: 'MOS6502').and_return template
       expect(CloudModel::GuestCoreTemplate.new_template_to_build host).to eq template
     end
   end
@@ -135,6 +135,36 @@ describe CloudModel::GuestCoreTemplate do
       expect(worker).to receive(:build_core_template).with(subject, debug: true).and_return true
       
       expect(subject.build! host, debug: true).to eq true
+    end
+  end
+  
+  # def self.last_useable(host, options={})
+  #   template = self.where(arch: host.arch, build_state_id: 0xf0).last
+  #   unless template
+  #     template = new_template_to_build host
+  #     template.build_state = :pending
+  #     template.build!(host, options)
+  #   end
+  #   template
+  # end
+  
+  context '#last_useable' do
+    it 'should get latest finished template for given host arch' do
+      template = double subject.class
+      expect(subject.class).to receive(:where).with(arch: 'MOS6502', build_state_id: 0xf0).and_return [template]
+      expect(subject.class.last_useable host).to eq template
+    end
+    
+    it 'should build new template if non is found' do
+      template = double subject.class
+      options = double
+      expect(subject.class).to receive(:where).with(arch: 'MOS6502', build_state_id: 0xf0).and_return []
+      expect(subject.class).to receive(:new_template_to_build).with(host).and_return template
+      
+      expect(template).to receive(:build_state=).with :pending
+      expect(template).to receive(:build!).with(host, options)
+      
+      expect(subject.class.last_useable host, options).to eq template
     end
   end
   

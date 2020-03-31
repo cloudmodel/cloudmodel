@@ -52,7 +52,7 @@ module CloudModel
       ensure_template_is_set
       
       Rails.logger.debug "Import #{guest_template.name} to lxd"
-      lxc "image import #{guest_template.lxd_image_metadata_tarball} #{guest_template.tarball} --alias #{guest_template.lxd_alias}"
+      lxc "image import #{guest_template.lxd_image_metadata_tarball.shellescape} #{guest_template.tarball.shellescape} --alias #{guest_template.lxd_alias.shellescape}"
       
       # TODO: check if import worked or failed with {1=>"Error: Image with same fingerprint already exists\n"}      
       true
@@ -60,7 +60,7 @@ module CloudModel
     
     def create_container
       Rails.logger.debug "Create lxd container #{name} from #{guest_template.lxd_alias} "
-      lxc! "init #{guest_template.lxd_alias} #{name}", "Failed to init LXD container"     
+      lxc! "init #{guest_template.lxd_alias.shellescape} #{name}", "Failed to init LXD container"     
     end
     
     def destroy_container
@@ -70,16 +70,15 @@ module CloudModel
     def start
       # Shutdown previous running container of guest
       guest.lxd_containers.each do |c|
-        c.stop if c.running?
+        c.stop
       end
-      #lxc "config device set #{name} eth0 ipv4.address #{guest.private_address}"
+
       lxc "start #{name}"
     end
     
     def stop options={}
       if options[:force] or running?
         lxc "stop #{name}"
-        #lxc "config device unset #{name} eth0 ipv4.address"
       end
     end
     
@@ -103,7 +102,7 @@ module CloudModel
     
     # Get infos about the container
     def live_lxc_info
-      success, result = lxc "list #{name.shellescape} --format yaml"
+      success, result = lxc "list #{name} --format yaml"
       if success
         result = YAML.load(result).first
         
@@ -148,13 +147,13 @@ module CloudModel
       if state = live_lxc_info['state']
         state['status'] == "Running"
       else
-        false
+        nil
       end
     end
     
     
     def set_config key, value
-      lxc "config set #{name} #{key} #{value}"
+      lxc "config set #{name} #{key.to_s.shellescape} #{value.to_s.shellescape}"
     end
     
     def config_from_guest

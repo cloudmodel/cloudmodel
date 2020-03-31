@@ -6,7 +6,7 @@ module CloudModel
 
     has_many :templates, class_name: 'CloudModel::GuestTemplate'
     
-    field :name
+    field :name, type: String
     field :components, type: Array, default: []
     
     def new_template host

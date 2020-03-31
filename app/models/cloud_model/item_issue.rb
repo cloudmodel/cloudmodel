@@ -4,9 +4,17 @@ module CloudModel
       Rails.logger.debug "+++ #{subject_type}"
 
       if subject_type =~ /CloudModel::Services::/
-        CloudModel::Guest.find_by('services'=>{'$elemMatch' =>{'_id'=>subject_id}}).services.find(subject_id)
+        begin
+          CloudModel::Guest.find_by('services'=>{'$elemMatch' =>{'_id'=>subject_id}}).services.find(subject_id)
+        rescue
+          nil
+        end
       elsif subject_type == "CloudModel::LxdCustomVolume"
-        CloudModel::Guest.find_by('lxd_custom_volumes'=>{'$elemMatch' =>{'_id'=>subject_id}}).lxd_custom_volumes.find(subject_id)
+        begin
+          CloudModel::Guest.find_by('lxd_custom_volumes'=>{'$elemMatch' =>{'_id'=>subject_id}}).lxd_custom_volumes.find(subject_id)
+        rescue
+          nil
+        end
       else
         super
       end
@@ -57,7 +65,7 @@ module CloudModel
     end
     
     def self.resolved
-      scoped.where(:resolved_at.ne nil)
+      scoped.where(resolved_at: {"$ne" => nil})
     end
     
     def name
@@ -98,7 +106,7 @@ module CloudModel
     def notify
       CloudModel.config.monitoring_notifiers.each do |notifier|
         if notifier[:severity] and notifier[:severity].include?(severity)
-          result = notifier[:notifier].send_message "[#{severity.to_s.upcase}] #{subject}: #{title}", message
+          result = notifier[:notifier].send_message "[#{severity.to_s.upcase}] #{subject ? "#{subject}: " : ''}#{title}", message
         end
       end
     end
