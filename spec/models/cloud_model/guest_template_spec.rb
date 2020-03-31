@@ -18,7 +18,7 @@ describe CloudModel::GuestTemplate do
   ).with_default_value_of(:not_started) }
   it { expect(subject).to have_field(:build_last_issue).of_type(String) }
   
-  let(:host) { double CloudModel::Host, id: BSON::ObjectId.new, arch: 'x128'}
+  let(:host) { double CloudModel::Host, id: BSON::ObjectId.new, arch: 'MOS6502'}
   let(:guest_template_type) { double CloudModel::GuestTemplateType, id: BSON::ObjectId.new }
   
   context '#buildable_build_states' do
