@@ -43,15 +43,18 @@ module CloudModel
             
       field :daily_rake_task, type: String, default: nil
     
-      
-      def www_home
-        "/var/www"
+      def kind
+        :http
       end
       
-      def www_root
-        "#{www_home}/rails"
+      def components_needed
+        if passenger_supported or capistrano_supported
+          [:ruby, :nginx]
+        else
+          [:nginx]
+        end
       end
-      
+            
       def used_ports
         if ssl_supported?
           if ssl_only?
@@ -63,11 +66,7 @@ module CloudModel
           super
         end
       end
-      
-      def kind
-        :http
-      end
-      
+            
       def external_uri
         "http#{ssl_supported ? 's' : ''}://#{guest.private_address}:#{ssl_supported ? ssl_port : port}/"
       end
@@ -150,6 +149,14 @@ module CloudModel
         data
       end
       
+      def www_home
+        "/var/www"
+      end
+      
+      def www_root
+        "#{www_home}/rails"
+      end
+      
       def self.redeployable_redeploy_web_image_states
         [:finished, :failed, :not_started]
       end    
@@ -158,6 +165,9 @@ module CloudModel
         self.class.redeployable_redeploy_web_image_states.include? redeploy_web_image_state
       end
     
+      def worker
+        CloudModel::Services::NginxWorker.new self.guest, self
+      end
     
       def redeploy(options = {})
         unless redeployable? or options[:force]
@@ -175,16 +185,11 @@ module CloudModel
       end
     
       def redeploy!(options = {})
-        worker = CloudModel::Services::NginxWorker.new self.guest, self
-        worker.redeploy_web_image options
-      end
-      
-      def components_needed
-        if passenger_supported or capistrano_supported
-          [:ruby, :nginx]
-        else
-          [:nginx]
+        unless redeployable? or options[:force]
+          return false
         end
+
+        worker.redeploy_web_image options
       end
       
     end

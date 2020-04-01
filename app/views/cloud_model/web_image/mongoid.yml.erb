@@ -4,7 +4,7 @@
       hosts: 
       <% if model.deploy_mongodb_replication_set -%>
         <% model.deploy_mongodb_replication_set.services.each do |service| -%>
-        - <%= service.guest.private_address %>:<%= service.port %>
+        - <%= service.private_address %>:<%= service.port %>
         <% end -%>
       options:
         read: :nearest  
@@ -17,7 +17,7 @@
       hosts: 
       <% if model.deploy_mongodb_replication_set -%>
         <% model.deploy_mongodb_replication_set.services.each do |service| -%>
-        - <%= service.guest.private_address %>:<%= service.port %>
+        - <%= service.private_address %>:<%= service.port %>
         <% end -%>
       options:
         read:

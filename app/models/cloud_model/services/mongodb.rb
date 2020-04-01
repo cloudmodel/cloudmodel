@@ -52,7 +52,6 @@ module CloudModel
       end
             
       def mongodb_replication_set_master?
-        # guest.livestatus.services.find{|s| s.description == 'Mongodb-replicaset'}.perf_data['state'] == '1'
         if monitoring_last_check_result and monitoring_last_check_result['repl'] and monitoring_last_check_result['repl']['primary']
           monitoring_last_check_result['repl']['primary'] == "#{guest.private_address}:#{port}"
         else
@@ -64,8 +63,7 @@ module CloudModel
         if monitoring_last_check_result and monitoring_last_check_result['repl']
           monitoring_last_check_result['repl']['setVersion']
         else
-        # Not available via new livestatus based in check_mongodb.py
-        # livestatus and livestatus.perf_data and livestatus.perf_data['repl_set_version']
+          # Not available via monitoring for some reasons
           "-"
         end
       end

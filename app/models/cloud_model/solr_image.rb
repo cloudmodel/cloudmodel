@@ -81,8 +81,8 @@ module CloudModel
       self.class.buildable_build_states.include? build_state
     end
     
-    def self.buildable?
-      where :build_state_id.in => buildable_build_state_ids
+    def self.buildable
+      scoped.where :build_state_id.in => buildable_build_state_ids
     end
     
     def build(options = {})
@@ -100,9 +100,16 @@ module CloudModel
       end
     end
     
+    def worker
+      CloudModel::SolrImageWorker.new self
+    end
+    
     def build!(options = {})      
-      solr_image_worker = CloudModel::SolrImageWorker.new self
-      solr_image_worker.build options
+      unless buildable? or options[:force]
+        return false
+      end
+
+      worker.build options
     end
   end
 end

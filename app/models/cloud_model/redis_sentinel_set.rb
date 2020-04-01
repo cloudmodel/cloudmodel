@@ -10,12 +10,12 @@ module CloudModel
 
     def services
       CloudModel::Guest.where("services.redis_sentinel_set_id" => id).map{ |guest| 
-        guest.services.where("redis_sentinel_set_id" => id).to_a
+        guest.services.where(redis_sentinel_set_id: id).to_a
       }.flatten   
     end
     
     def add_service service
-      service.update_attributes redis_sentinel_set_id: id
+      service.update_attribute :redis_sentinel_set_id, id
     end
     
     def master_service
@@ -26,17 +26,17 @@ module CloudModel
       end
     end
     
-    def master_address
-      master_service.guest.private_address
-    end
-    
     def master_node
       master_service.guest
     end
     
+    def master_address
+      master_node.private_address
+    end
+    
     def sentinel_hosts
       services.map do |s| 
-        {'ip' => s.guest.private_address, 'port' => s.redis_sentinel_port}
+        {'ip' => s.private_address, 'port' => s.redis_sentinel_port}
       end
     end
   end

@@ -22,6 +22,10 @@ module CloudModel
       true
     end
         
+    def host
+      guest.host
+    end    
+      
     def name
       "#{guest.name.shellescape}-#{created_at.try :strftime, "%Y%m%d%H%M%S"}"
     end
@@ -29,11 +33,11 @@ module CloudModel
     # Command definitions
     
     def lxc command
-      guest.host.exec "lxc #{command}"
+      host.exec "lxc #{command}"
     end
     
     def lxc! command, error
-      guest.host.exec! "lxc #{command}", error
+      host.exec! "lxc #{command}", error
     end
     
     def ensure_template_is_set
@@ -83,11 +87,11 @@ module CloudModel
     end
     
     def mount
-      guest.host.exec "zfs mount guests/containers/#{name}"
+      host.exec "zfs mount guests/containers/#{name}"
     end
     
     def unmount
-      guest.host.exec "zfs unmount guests/containers/#{name}"
+      host.exec "zfs unmount guests/containers/#{name}"
     end
     
     def mountpoint
@@ -139,7 +143,7 @@ module CloudModel
     end
     
     def lxc_info
-      guest.host.monitoring_last_check_result['system']['lxd'].find{|c| c['name'] == name} || {'name' => name, 'status' => 'Unknown'}
+      host.monitoring_last_check_result['system']['lxd'].find{|c| c['name'] == name} || {'name' => name, 'status' => 'Unknown'}
     end
     
     
@@ -150,7 +154,6 @@ module CloudModel
         nil
       end
     end
-    
     
     def set_config key, value
       lxc "config set #{name} #{key.to_s.shellescape} #{value.to_s.shellescape}"

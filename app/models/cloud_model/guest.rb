@@ -17,6 +17,7 @@ module CloudModel
     embeds_many :lxd_containers, class_name: "CloudModel::LxdContainer", :cascade_callbacks => true
     embeds_many :lxd_custom_volumes, class_name: "CloudModel::LxdCustomVolume", :cascade_callbacks => true
     field :current_lxd_container_id, type: BSON::ObjectId
+    has_many :guest_certificates, class_name: "CloudModel::GuestCertificate"
     
     accepts_nested_attributes_for :lxd_custom_volumes, allow_destroy: true
     
@@ -30,6 +31,8 @@ module CloudModel
     field :root_fs_size, type: Integer, default: 10737418240
     field :memory_size, type: Integer, default: 2147483648
     field :cpu_count, type: Integer, default: 2
+    accept_size_strings_for :root_fs_size
+    accept_size_strings_for :memory_size
     
     enum_field :deploy_state, values: {
       0x00 => :pending,
@@ -41,40 +44,17 @@ module CloudModel
     
     field :deploy_last_issue, type: String
     field :deploy_path, type: String
-    # attr_accessor :deploy_path
-    #
-    # def deploy_path
-    #   @deploy_path ||= base_path
-    # end
-    #
-    # def deploy_path=path
-    #   @deploy_path = path
-    # end
-        
-    accept_size_strings_for :memory_size
-    
-    has_many :guest_certificates, class_name: "CloudModel::GuestCertificate"
 
     validates :name, presence: true, uniqueness: { scope: :host }, format: {with: /\A[a-z0-9\-_]+\z/}
     validates :host, presence: true
-    #validates :root_volume, presence: true
     validates :private_address, presence: true
     
     before_validation :set_dhcp_private_address, :on => :create
     before_validation :set_mac_address, :on => :create
-    #before_validation :set_root_volume_name
     before_destroy    :stop
     
     def current_lxd_container
       lxd_containers.where(id: current_lxd_container_id).first
-    end
-    
-    def base_path
-      "/vm/#{name}"
-    end
-   
-    def config_root_path
-      "#{base_path}/etc"
     end
 
     def available_private_address_collection
@@ -125,19 +105,6 @@ module CloudModel
       "/var/lib/lxd/containers/#{current_lxd_container.name}/rootfs/"
     end
     
-    def ls directory
-      res = exec("/bin/ls -l #{directory.shellescape}")
-      
-      pp res
-      
-      if res[0]
-        res[1].split("\n")
-      else
-        puts res[1]
-        false
-      end
-    end
-    
     def certificates
       ids = guest_certificates.pluck(:certificate_id)
       services.each do |service|
@@ -151,7 +118,8 @@ module CloudModel
       certificates.count > 0
     end
     
-    def has_service?(service_type)
+    def has_service_type?(service_type)
+      service_type = service_type.to_s unless service_type.is_a? String
       services.select{|s| s._type == service_type}.count > 0
     end
     
@@ -192,8 +160,8 @@ module CloudModel
       self.class.deployable_deploy_states.include? deploy_state
     end
     
-    def self.deployable?
-      where :deploy_state_id.in => deployable_deploy_state_ids
+    def self.deployable
+      scoped.where :deploy_state_id.in => deployable_deploy_state_ids
     end
     
     def deploy(options = {})
@@ -257,7 +225,6 @@ module CloudModel
         begin
           s = TCPSocket.new private_address, 6556
           result = ''
-          started = false
           while line = s.gets
             result << line
           end
@@ -269,10 +236,6 @@ module CloudModel
       else
         return [false, "Connection refused"]
       end
-    end
-    
-    def check_mk_agent_via_exec
-      exec('check_mk_agent')
     end
     
     def system_info
@@ -319,11 +282,11 @@ module CloudModel
     end
     
     def live_lxc_info
-      current_lxd_container.live_lxc_info
+      current_lxd_container.try :live_lxc_info
     end
     
     def lxc_info
-      current_lxd_container.lxc_info
+      current_lxd_container.try :lxc_info
     end
     
     def start(lxd_container = nil)
