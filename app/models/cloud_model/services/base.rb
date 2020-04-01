@@ -33,6 +33,16 @@ module CloudModel
         guest.host
       end
       
+      def private_address
+        guest.private_address
+      end
+      
+      def external_address
+        if public_service
+          guest.external_address
+        end
+      end
+      
       def item_issue_chain
         [host, guest, self]
       end
@@ -62,7 +72,7 @@ module CloudModel
       end
       
       def backup_directory
-        "#{CloudModel.config.backup_directory}/#{guest.host.id}/#{guest._id}/services/#{_id}"
+        "#{CloudModel.config.backup_directory}/#{guest.host.id}/#{guest.id}/services/#{id}"
       end
       
       def backup

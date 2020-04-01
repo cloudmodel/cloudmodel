@@ -11,6 +11,9 @@ describe CloudModel::Address do
   it { expect(subject).to have_field(:subnet).of_type Integer }
   it { expect(subject).to have_field(:gateway).of_type String }
   
+  it { expect(subject).to validate_presence_of(:ip) }
+  it { expect(subject).to validate_presence_of(:subnet) }
+
   # context '#initialize' do
   #   it 'should call #from_str if options is a string' do
   #     #expect(CloudModel::Address).to receive(:from_str).with('10.42.23.1/28').and_call_original

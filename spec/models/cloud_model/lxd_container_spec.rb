@@ -31,6 +31,14 @@ describe CloudModel::LxdContainer do
     end
   end
   
+  context 'host' do
+    it 'should return host of guest' do
+      subject.guest = guest
+      
+      expect(subject.host).to eq host
+    end
+  end  
+  
   context 'name' do
     it 'should give the lxc name of the container' do
       subject.created_at = '2020-03-31 13:37:42.23'.to_time

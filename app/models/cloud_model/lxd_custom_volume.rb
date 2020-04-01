@@ -15,8 +15,12 @@ module CloudModel
     field :writeable, type: Mongoid::Boolean, default: true    
     field :has_backups, type: Mongoid::Boolean, default: false
         
+    validates :name, presence: true
+    validates :name, uniqueness: { scope: :host }
+    validates :name, format: {with: /\A[A-Za-z0-9][A-Za-z0-9\-_]*\z/}
+    
     validates :mount_point, presence: true
-    validates :mount_point, uniqueness: { scope: :guest }, if: :guest
+    validates :mount_point, uniqueness: { scope: :guest }
     validates :mount_point, format: {with: /\A[A-Za-z0-9][A-Za-z0-9\-_\/]*\z/}
 
     accept_size_strings_for :disk_space
@@ -25,30 +29,38 @@ module CloudModel
     after_create :create_volume!
     before_destroy :before_destroy
     
+    def host
+      guest.host
+    end
+    
     def before_destroy
       if used?
         puts "Can't destroy attached volume; unattach it first"
         return false
       end
 
-      destroy_volume
+      success, output = destroy_volume
+      unless success
+        puts "Failed to destroy LXD volume"
+      end
+      success
     end
     
     def volume_exists?
-      res, output = lxc "storage volume show default #{name}"
-      not(res == false and output == "Error: not found\n")
+      success, output = lxc "storage volume show default #{name.shellescape}"
+      not(success == false and output == "Error: not found\n")
     end
     
     def create_volume
-      lxc "storage volume create default #{name}"
+      lxc "storage volume create default #{name.shellescape}"
     end
     
     def create_volume!
-      lxc! "storage volume create default #{name}", "Failed to init LXD volume"     
+      lxc! "storage volume create default #{name.shellescape}", "Failed to init LXD volume"     
     end
     
     def destroy_volume
-      lxc! "storage volume delete default #{name}", "Failed to destroy LXD volume"     
+      lxc "storage volume delete default #{name.shellescape}" 
     end
     
     def to_param
@@ -56,17 +68,22 @@ module CloudModel
     end
     
     def item_issue_chain
-      [guest.host, guest, self]
+      [host, guest, self]
     end
     
     # Get infos about the volume
     def lxc_show
-      success, result = lxc "storage volume show default #{name}"
-      YAML.load(result).deep_transform_keys { |key| key.to_s.underscore }
+      success, result = lxc "storage volume show default #{name.shellescape}"
+      if success
+        YAML.load(result).deep_transform_keys { |key| key.to_s.underscore }
+      else
+        nil
+      end
     end
     
     def used?
-      lxc_show['used_by'] && lxc_show['used_by'].size > 0
+      result = lxc_show
+      result && result['used_by'] && result['used_by'].size > 0
     end
     
     def host_path
@@ -76,7 +93,7 @@ module CloudModel
     # Backup 
     
     def backup_directory
-      "#{CloudModel.config.backup_directory}/#{guest.host.id}/#{guest._id}/volumes/#{_id}"
+      "#{CloudModel.config.backup_directory}/#{host.id}/#{guest.id}/volumes/#{id}"
     end
     
     def backup
@@ -86,7 +103,7 @@ module CloudModel
       command = "rsync -avz " +
         "-e 'ssh -o StrictHostKeyChecking=no -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' " +
         "--partial --link-dest=#{backup_directory.shellescape}/latest " +
-        "root@#{guest.host.private_network.list_ips.first}:#{guest.base_path.shellescape}/#{mount_point.shellescape}/ " +
+        "root@#{host.private_network.list_ips.first}:#{host_path.shellescape}/ " +
         "#{backup_directory.shellescape}/#{timestamp}"
         
       Rails.logger.debug command
@@ -110,7 +127,7 @@ module CloudModel
         "-e 'ssh -o StrictHostKeyChecking=no -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' "+
         "--delete " +
         "#{backup_directory.shellescape}/#{timestamp}/ "+
-        "root@#{guest.host.private_network.list_ips.first}:#{guest.base_path.shellescape}/#{mount_point.shellescape}"
+        "root@#{host.private_network.list_ips.first}:#{host_path.shellescape}"
         
       Rails.logger.debug command
       Rails.logger.debug `#{command}`
@@ -123,11 +140,11 @@ module CloudModel
     end
     
     def lxc command
-      guest.host.exec "lxc #{command}"
+      host.exec "lxc #{command}"
     end
     
     def lxc! command, error
-      guest.host.exec! "lxc #{command}", error
+      host.exec! "lxc #{command}", error
     end    
   end
 end

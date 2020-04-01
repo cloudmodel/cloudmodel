@@ -9,12 +9,12 @@ module CloudModel
 
     def services
       CloudModel::Guest.where("services.mongodb_replication_set_id" => id).map{ |guest| 
-        guest.services.where("mongodb_replication_set_id" => id).to_a
+        guest.services.where(mongodb_replication_set_id: id).to_a
       }.flatten   
     end
     
     def add_service service
-      service.update_attributes mongodb_replication_set_id: id
+      service.update_attribute :mongodb_replication_set_id, id
     end
     
     def init_rs_cmd
@@ -23,7 +23,7 @@ module CloudModel
             "   members: [\n"
 
       services.each_with_index do |service,i|
-        cmd += "      { _id: #{i}, host: \"#{service.guest.private_address}:#{service.port}\" },\n"
+        cmd += "      { _id: #{i}, host: \"#{service.private_address}:#{service.port}\" },\n"
       end
       
       cmd += "   ]\n" +
