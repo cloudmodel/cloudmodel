@@ -41,9 +41,9 @@ describe CloudModel::LxdContainer do
   
   context 'name' do
     it 'should give the lxc name of the container' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       
-      expect(subject.name).to eq 'some_guest-20200331113742'
+      expect(subject.name).to eq 'some_guest-20200331133742'
     end
   end
   
@@ -88,7 +88,7 @@ describe CloudModel::LxdContainer do
   context 'import_template' do
     it 'should ensure template and call lxc image import' do
       subject.guest_template = template
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
 
       expect(subject).to receive(:ensure_template_is_set)
       expect(subject).to receive(:lxc).with("image import #{template.lxd_image_metadata_tarball} #{template.tarball} --alias #{template.lxd_alias}")
@@ -100,9 +100,9 @@ describe CloudModel::LxdContainer do
   context 'create_container' do
     it 'should call lxc create' do
       subject.guest_template = template
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       
-      expect(subject).to receive(:lxc!).with("init #{template.template_type.id}/#{template.id} some_guest-20200331113742", 'Failed to init LXD container')
+      expect(subject).to receive(:lxc!).with("init #{template.template_type.id}/#{template.id} some_guest-20200331133742", 'Failed to init LXD container')
       
       subject.create_container
     end
@@ -115,9 +115,9 @@ describe CloudModel::LxdContainer do
   
   context 'destroy_container' do
     it 'should call lxc delete' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       
-      expect(subject).to receive(:lxc).with("delete some_guest-20200331113742")
+      expect(subject).to receive(:lxc).with("delete some_guest-20200331133742")
       
       subject.destroy_container
     end
@@ -130,16 +130,16 @@ describe CloudModel::LxdContainer do
   
   context 'start' do
     it 'should call lxc start' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       
       expect(guest).to receive(:lxd_containers).and_return []
-      expect(subject).to receive(:lxc).with("start some_guest-20200331113742")
+      expect(subject).to receive(:lxc).with("start some_guest-20200331133742")
       
       subject.start
     end
     
     it 'should stop other guest´s containers' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       
       container1 = double
       container2 = double
@@ -147,7 +147,7 @@ describe CloudModel::LxdContainer do
       expect(container2).to receive(:stop)
       
       expect(guest).to receive(:lxd_containers).and_return [container1, container2]
-      expect(subject).to receive(:lxc).with("start some_guest-20200331113742")
+      expect(subject).to receive(:lxc).with("start some_guest-20200331133742")
       
       subject.start
     end
@@ -155,27 +155,27 @@ describe CloudModel::LxdContainer do
   
   context 'stop' do
     it 'should call lxc stop' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return true
       
-      expect(subject).to receive(:lxc).with("stop some_guest-20200331113742")
+      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742")
       
       subject.stop
     end
     
     it 'should not call lxc stop if container not running' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return false
       
-      expect(subject).not_to receive(:lxc).with("stop some_guest-20200331113742")
+      expect(subject).not_to receive(:lxc).with("stop some_guest-20200331133742")
       
       subject.stop
     end
     it 'should call lxc stop if container not running, but option is force' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return false
       
-      expect(subject).to receive(:lxc).with("stop some_guest-20200331113742")
+      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742")
       
       subject.stop force: true
     end
@@ -183,8 +183,8 @@ describe CloudModel::LxdContainer do
   
   context 'mount' do
     it 'should mount zfs container´s fs' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
-      expect(host).to receive(:exec).with('zfs mount guests/containers/some_guest-20200331113742')
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(host).to receive(:exec).with('zfs mount guests/containers/some_guest-20200331133742')
       
       subject.mount
     end
@@ -192,8 +192,8 @@ describe CloudModel::LxdContainer do
   
   context 'unmount' do
     it 'should unmount zfs container´s fs' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
-      expect(host).to receive(:exec).with('zfs unmount guests/containers/some_guest-20200331113742')
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(host).to receive(:exec).with('zfs unmount guests/containers/some_guest-20200331133742')
       
       subject.unmount
     end
@@ -202,8 +202,8 @@ describe CloudModel::LxdContainer do
   
   context 'mountpoint' do
     it 'should return the container´s mountpoint in host' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
-      expect(subject.mountpoint).to eq '/var/lib/lxd/storage-pools/default/containers/some_guest-20200331113742'
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(subject.mountpoint).to eq '/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742'
     end
   end
   
@@ -230,18 +230,18 @@ describe CloudModel::LxdContainer do
   
   context 'lxc_info' do
     it 'should get lxc info from host´s monitoring_last_check_result' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       
       expect(host).to receive(:monitoring_last_check_result).and_return(
         'system' => {
           'lxd' => [
             {'name' => 'some_guest-20191224234217', 'status' => 'Stopped'},
-            {'name' => 'some_guest-20200331113742', 'status' => 'Running'}
+            {'name' => 'some_guest-20200331133742', 'status' => 'Running'}
           ]
         }
       )
       
-      expect(subject.lxc_info).to eq('name' => 'some_guest-20200331113742', 'status' => 'Running')
+      expect(subject.lxc_info).to eq('name' => 'some_guest-20200331133742', 'status' => 'Running')
     end
   end
   
@@ -264,19 +264,19 @@ describe CloudModel::LxdContainer do
   
   context 'set_config' do
     it 'should call lxc config set' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return true
       
-      expect(subject).to receive(:lxc).with("config set some_guest-20200331113742 some_setting true")
+      expect(subject).to receive(:lxc).with("config set some_guest-20200331133742 some_setting true")
       
       subject.set_config :some_setting, true
     end
     
     it 'should escape variables for shell' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return true
       
-      expect(subject).to receive(:lxc).with('config set some_guest-20200331113742 some\ setting something\ like\ true')
+      expect(subject).to receive(:lxc).with('config set some_guest-20200331133742 some\ setting something\ like\ true')
       
       subject.set_config 'some setting', 'something like true'
     end      
@@ -284,7 +284,7 @@ describe CloudModel::LxdContainer do
   
   context 'config_from_guest' do
     it 'should setup container according to guest' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       guest.cpu_count = 1
       guest.memory_size = 64 * 1024
       guest.root_fs_size = 170 * 1024
@@ -292,20 +292,20 @@ describe CloudModel::LxdContainer do
       expect(subject).to receive(:set_config).with('raw.lxc', "'lxc.mount.auto = cgroup'")
       expect(subject).to receive(:set_config).with('limits.cpu',1)
       expect(subject).to receive(:set_config).with('limits.memory', 65536)
-      expect(subject).to receive(:lxc).with("config device set some_guest-20200331113742 root size 174080")
-      expect(subject).to receive(:lxc).with("network attach lxdbr0 some_guest-20200331113742 eth0")
+      expect(subject).to receive(:lxc).with("config device set some_guest-20200331133742 root size 174080")
+      expect(subject).to receive(:lxc).with("network attach lxdbr0 some_guest-20200331133742 eth0")
       
       subject.config_from_guest
     end
     
     it 'should attach guest´s custom volumes' do
-      subject.created_at = '2020-03-31 13:37:42.23'.to_time
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       volume = Factory.build :lxd_custom_volume, mount_point: 'floppies/cbm1541'
       allow(volume).to receive(:lxc!) # prevent from really trying to create a volume
       guest.lxd_custom_volumes << volume
       
       allow(subject).to receive(:lxc)
-      expect(subject).to receive(:lxc).with('storage volume attach default some_guest-floppies-cbm1541 some_guest-20200331113742 floppies/cbm1541')
+      expect(subject).to receive(:lxc).with('storage volume attach default some_guest-floppies-cbm1541 some_guest-20200331133742 floppies/cbm1541')
       
       subject.config_from_guest
     end
