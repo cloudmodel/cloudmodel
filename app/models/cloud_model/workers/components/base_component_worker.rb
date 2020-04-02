@@ -1,7 +1,7 @@
 module CloudModel
   module Workers
     module Components
-      class BaseWorker < CloudModel::Workers::BaseWorker
+      class BaseComponentWorker < CloudModel::Workers::BaseWorker
       
       end
     end

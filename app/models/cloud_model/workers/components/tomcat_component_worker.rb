@@ -1,7 +1,7 @@
 module CloudModel
   module Workers
     module Components
-      class TomcatWorker < BaseWorker
+      class TomcatComponentWorker < BaseComponentWorker
         def build build_path
           chroot! build_path, "apt-get install tomcat8 tomcat8-admin -y", "Failed to install tomcat"
           # Fix Ubuntu bug
