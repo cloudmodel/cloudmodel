@@ -18,4 +18,10 @@ group :development, :test do
   gem "pry"
   gem 'miniskirt'
   gem 'faker'
+  gem 'yard'
+  if true
+    gem 'yard-mongoid', git: 'git@github.com:cloudmodel/yard-mongoid.git'
+  else
+    gem 'yard-mongoid', path: '../yard-mongoid'
+  end
 end

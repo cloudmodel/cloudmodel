@@ -91,7 +91,6 @@ module CloudModel
     
     
     def config_services
-      #@lxc.mount
       guest.deploy_path = "#{@lxc.mountpoint}/rootfs"
       
       guest.services.each do |service|
@@ -109,10 +108,7 @@ module CloudModel
       end
       mkdir_p "#{guest.deploy_path}/usr/share/cloud_model/"
       render_to_remote "/cloud_model/guest/usr/share/cloud_model/fix_permissions.sh", "#{guest.deploy_path}/usr/share/cloud_model/fix_permissions.sh", 0755, guest: guest
-      #host.exec! "chown -R 100000:100000 #{guest.deploy_path}/usr/share/cloud_model/", "failed to set owner for fix_permissions script"
       host.exec! "rm -f #{guest.deploy_path}/usr/sbin/policy-rc.d", "Failed to remove policy-rc.d"
-      
-      #@lxc.unmount
     end 
     
     def config_guest_certificates

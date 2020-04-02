@@ -5,7 +5,7 @@ module CloudModel
     include CloudModel::ModelHasIssues
     prepend CloudModel::SmartToString
     
-    field :name, type: String
+    field :name, type: String # Name of the replication set
 
     def services
       CloudModel::Guest.where("services.mongodb_replication_set_id" => id).map{ |guest| 

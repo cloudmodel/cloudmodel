@@ -1,3 +1,10 @@
+GIT
+  remote: git@github.com:cloudmodel/yard-mongoid.git
+  revision: 230b87ab7e5316a9e218425c6a4c34469661589d
+  specs:
+    yard-mongoid (0.1.0.1)
+      yard (>= 0.8.4)
+
 PATH
   remote: .
   specs:
@@ -200,6 +207,7 @@ GEM
     websocket-driver (0.7.1)
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.4)
+    yard (0.9.24)
     zeitwerk (2.3.0)
 
 PLATFORMS
@@ -214,6 +222,8 @@ DEPENDENCIES
   pry
   rspec-rails
   timecop
+  yard
+  yard-mongoid!
 
 BUNDLED WITH
    1.17.3
