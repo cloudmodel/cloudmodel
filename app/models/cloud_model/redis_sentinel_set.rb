@@ -2,8 +2,8 @@ module CloudModel
   class RedisSentinelSet
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::ModelHasIssues
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::HasIssues
+    prepend CloudModel::Mixins::SmartToString
   
     field :name, type: String
     belongs_to :master_service, class_name: "CloudModel::Services::Redis", optional: true

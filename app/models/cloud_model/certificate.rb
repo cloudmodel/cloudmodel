@@ -3,9 +3,9 @@ module CloudModel
   class Certificate
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::UsedInGuestsAs
-    include CloudModel::ModelHasIssues
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::UsedInGuestsAs
+    include CloudModel::Mixins::HasIssues
+    prepend CloudModel::Mixins::SmartToString
     # Add guests connected via GuestCertificates
     module CertificateUsedInGuest
       # Get Guests using this certificate

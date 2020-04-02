@@ -53,7 +53,7 @@ describe CloudModel::GuestCoreTemplate do
   end
   
   context '#new_template_to_build' do
-    it 'should create new GuestTemplateWorker' do
+    it 'should create new GuestTemplate' do
       template = double
       expect(CloudModel::GuestCoreTemplate).to receive(:create).with(arch: 'MOS6502').and_return template
       expect(CloudModel::GuestCoreTemplate.new_template_to_build host).to eq template
@@ -96,15 +96,15 @@ describe CloudModel::GuestCoreTemplate do
   
   context 'worker' do
     it 'should return worker for GuestCoreTemplate' do
-      worker = double CloudModel::GuestTemplateWorker, build_core_template: true
-      expect(CloudModel::GuestTemplateWorker).to receive(:new).with(host).and_return worker
+      worker = double CloudModel::Workers::GuestTemplateWorker, build_core_template: true
+      expect(CloudModel::Workers::GuestTemplateWorker).to receive(:new).with(host).and_return worker
       expect(subject.worker host).to eq worker
     end
   end
   
   context 'build!' do
     it 'should call worker to build GuestCoreTemplate' do
-      worker = double CloudModel::GuestTemplateWorker, build_core_template: true
+      worker = double CloudModel::Workers::GuestTemplateWorker, build_core_template: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return true
       
@@ -120,7 +120,7 @@ describe CloudModel::GuestCoreTemplate do
     end
     
     it 'should allow to force build if not buildable' do
-      worker = double CloudModel::GuestTemplateWorker, build_core_template: true
+      worker = double CloudModel::Workers::GuestTemplateWorker, build_core_template: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return false
       
@@ -128,7 +128,7 @@ describe CloudModel::GuestCoreTemplate do
     end
     
     it 'should pass template type and options to worker build_template' do
-      worker = double CloudModel::GuestTemplateWorker, build_template: true
+      worker = double CloudModel::Workers::GuestTemplateWorker, build_template: true
       allow(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return true
       

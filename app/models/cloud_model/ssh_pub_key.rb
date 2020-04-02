@@ -2,8 +2,8 @@ module CloudModel
   class SshPubKey
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::ModelHasIssues
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::HasIssues
+    prepend CloudModel::Mixins::SmartToString
     
     field :key, type: String
     validates :key, presence: true, uniqueness: true

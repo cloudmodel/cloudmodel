@@ -96,15 +96,15 @@ describe CloudModel::HostTemplate do
   
   context 'worker' do
     it 'should return worker for HostTemplate' do
-      worker = double CloudModel::HostTemplateWorker
-      expect(CloudModel::HostTemplateWorker).to receive(:new).with(host).and_return worker
+      worker = double CloudModel::Workers::HostTemplateWorker
+      expect(CloudModel::Workers::HostTemplateWorker).to receive(:new).with(host).and_return worker
       expect(subject.worker host).to eq worker
     end
   end
   
   context 'build!' do
     it 'should call worker to build HostTemplate' do
-      worker = double CloudModel::HostTemplateWorker, build_template: true
+      worker = double CloudModel::Workers::HostTemplateWorker, build_template: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return true
       
@@ -120,7 +120,7 @@ describe CloudModel::HostTemplate do
     end
     
     it 'should allow to force build if not buildable' do
-      worker = double CloudModel::HostTemplateWorker, build_template: true
+      worker = double CloudModel::Workers::HostTemplateWorker, build_template: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return false
       
@@ -128,7 +128,7 @@ describe CloudModel::HostTemplate do
     end
     
     it 'should pass template type and options to worker build_template' do
-      worker = double CloudModel::HostTemplateWorker, build_template: true
+      worker = double CloudModel::Workers::HostTemplateWorker, build_template: true
       allow(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return true
       

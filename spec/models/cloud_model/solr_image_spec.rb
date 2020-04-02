@@ -117,8 +117,8 @@ describe CloudModel::SolrImage do
   
   context 'worker' do
     it 'should return worker for SolrImage' do
-      worker = double CloudModel::SolrImageWorker, build: true
-      expect(CloudModel::SolrImageWorker).to receive(:new).with(subject).and_return worker
+      worker = double CloudModel::Workers::SolrImageWorker, build: true
+      expect(CloudModel::Workers::SolrImageWorker).to receive(:new).with(subject).and_return worker
       expect(subject.worker).to eq worker
     end
   end
@@ -194,7 +194,7 @@ describe CloudModel::SolrImage do
   
   context 'build!' do
     it 'should call worker to build SolrImage' do
-      worker = double CloudModel::SolrImageWorker, build: true
+      worker = double CloudModel::Workers::SolrImageWorker, build: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return true
       
@@ -210,7 +210,7 @@ describe CloudModel::SolrImage do
     end
     
     it 'should allow to force build if not buildable' do
-      worker = double CloudModel::SolrImageWorker, build: true
+      worker = double CloudModel::Workers::SolrImageWorker, build: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return false
       
