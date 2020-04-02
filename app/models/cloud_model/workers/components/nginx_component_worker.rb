@@ -1,7 +1,7 @@
 module CloudModel
   module Workers
     module Components
-      class NginxWorker < BaseWorker
+      class NginxComponentWorker < BaseComponentWorker
         def build build_path
           ### TODO; Test build in nginx
           ### if running: remove /cloud_model/guest/etc/apt/sources.list.d/passenger.list

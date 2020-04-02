@@ -1,7 +1,7 @@
 module CloudModel
   module Workers
     module Components
-      class JavaWorker < BaseWorker
+      class JavaComponentWorker < BaseComponentWorker
         def build build_path
           # Java needs man directory
           mkdir_p "#{build_path}/usr/share/man/man1/"

@@ -8,7 +8,7 @@ GIT
 PATH
   remote: .
   specs:
-    cloudmodel (0.1.0)
+    cloudmodel (0.2.0)
       bcrypt-ruby (~> 3.0, >= 3.0.0)
       mongoid (~> 7.1.0, ~> 7.0)
       mongoid-grid_fs (~> 2.3)

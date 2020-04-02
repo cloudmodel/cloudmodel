@@ -1,7 +1,7 @@
 module CloudModel
   module Workers
     module Components
-      class RubyWorker < BaseWorker
+      class RubyComponentWorker < BaseComponentWorker
         def build build_path
           # Ruby deps needed for most rails projects
           # TODO: Consider separating them to more Components

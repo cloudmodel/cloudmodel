@@ -1,6 +1,6 @@
 module CloudModel
   module Components
-    class Base
+    class BaseComponent
       def name
         self.class.name.demodulize.underscore.to_sym
       end
