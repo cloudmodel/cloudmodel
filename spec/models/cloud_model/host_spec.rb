@@ -633,8 +633,8 @@ describe CloudModel::Host do
   
   context 'worker' do
     it 'should return worker for host' do
-      worker = double CloudModel::HostWorker
-      expect(CloudModel::HostWorker).to receive(:new).with(subject).and_return worker  
+      worker = double CloudModel::Workers::HostWorker
+      expect(CloudModel::Workers::HostWorker).to receive(:new).with(subject).and_return worker  
       
       expect(subject.worker).to eq worker
     end
@@ -662,7 +662,7 @@ describe CloudModel::Host do
   
   context 'deploy!' do
     it 'should call worker to deploy Host' do
-      worker = double CloudModel::HostWorker, deploy: true
+      worker = double CloudModel::Workers::HostWorker, deploy: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:deployable?).and_return true
       
@@ -678,7 +678,7 @@ describe CloudModel::Host do
     end
     
     it 'should allow to force deploy if not deployable' do
-      worker = double CloudModel::HostWorker, deploy: true
+      worker = double CloudModel::Workers::HostWorker, deploy: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:deployable?).and_return false
       
@@ -708,7 +708,7 @@ describe CloudModel::Host do
   
   context 'redeploy!' do
     it 'should call worker to deploy Host' do
-      worker = double CloudModel::HostWorker, redeploy: true
+      worker = double CloudModel::Workers::HostWorker, redeploy: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:deployable?).and_return true
       
@@ -724,7 +724,7 @@ describe CloudModel::Host do
     end
     
     it 'should allow to force deploy if not deployable' do
-      worker = double CloudModel::HostWorker, redeploy: true
+      worker = double CloudModel::Workers::HostWorker, redeploy: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:deployable?).and_return false
       

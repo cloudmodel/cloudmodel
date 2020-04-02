@@ -7,10 +7,10 @@ module CloudModel
 
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::AcceptSizeStrings
-    include CloudModel::ENumFields
-    include CloudModel::ModelHasIssues
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::AcceptSizeStrings
+    include CloudModel::Mixins::ENumFields
+    include CloudModel::Mixins::HasIssues
+    prepend CloudModel::Mixins::SmartToString
   
     belongs_to :host, class_name: "CloudModel::Host"
     embeds_many :services, class_name: "CloudModel::Services::Base", :cascade_callbacks => true
@@ -141,7 +141,7 @@ module CloudModel
     end
     
     def worker
-      CloudModel::GuestWorker.new self
+      CloudModel::Workers::GuestWorker.new self
     end
     
     def self.deploy_state_id_for deploy_state

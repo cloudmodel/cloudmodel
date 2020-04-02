@@ -9,10 +9,10 @@ module CloudModel
   class SolrImage
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::UsedInGuestsAs
-    include CloudModel::ENumFields
-    include CloudModel::ModelHasIssues
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::UsedInGuestsAs
+    include CloudModel::Mixins::ENumFields
+    include CloudModel::Mixins::HasIssues
+    prepend CloudModel::Mixins::SmartToString
         
     field :name, type: String
     field :git_server, type: String
@@ -101,7 +101,7 @@ module CloudModel
     end
     
     def worker
-      CloudModel::SolrImageWorker.new self
+      CloudModel::Workers::SolrImageWorker.new self
     end
     
     def build!(options = {})      

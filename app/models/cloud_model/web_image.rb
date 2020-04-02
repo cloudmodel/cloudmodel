@@ -2,10 +2,10 @@ module CloudModel
   class WebImage
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::UsedInGuestsAs
-    include CloudModel::ENumFields
-    include CloudModel::ModelHasIssues
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::UsedInGuestsAs
+    include CloudModel::Mixins::ENumFields
+    include CloudModel::Mixins::HasIssues
+    prepend CloudModel::Mixins::SmartToString
 
     field :name, type: String
     field :git_server, type: String
@@ -77,7 +77,7 @@ module CloudModel
     end
     
     def worker
-      CloudModel::WebImageWorker.new self
+      CloudModel::Workers::WebImageWorker.new self
     end
     
     def self.build_state_id_for build_state

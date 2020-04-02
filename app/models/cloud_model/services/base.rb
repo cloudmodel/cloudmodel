@@ -3,8 +3,8 @@ module CloudModel
     class Base
       include Mongoid::Document
       include Mongoid::Timestamps
-      include CloudModel::BackupTools
-      include CloudModel::ModelHasIssues
+      include CloudModel::Mixins::BackupTools
+      include CloudModel::Mixins::HasIssues
   
       field :name, type: String    
       field :public_service, type: Mongoid::Boolean, default: false

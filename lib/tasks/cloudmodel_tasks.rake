@@ -10,20 +10,9 @@ namespace :cloudmodel do
     end
   end
   
-  namespace :host_image do
-    task :load_host do
-      @host_worker = CloudModel::Images::HostWorker.new CloudModel::Host.find(ENV['HOST_ID'])
-    end
-    
-    desc "Build host image"
-    task :build_image => [:environment, :load_host] do
-      @host_worker.build_image
-    end
-  end
-  
   namespace :host do
     task :load_host do
-      @host_worker = CloudModel::HostWorker.new CloudModel::Host.find(ENV['HOST_ID'])
+      @host_worker = CloudModel::Workers::HostWorker.new CloudModel::Host.find(ENV['HOST_ID'])
     end
     
     desc "Deploy host"
@@ -46,7 +35,7 @@ namespace :cloudmodel do
     task :load_host do
       @host = CloudModel::Host.find(ENV['HOST_ID'])
       @template = CloudModel::GuestCoreTemplate.find(ENV['TEMPLATE_ID'])
-      @guest_template_worker = CloudModel::GuestTemplateWorker.new @host
+      @guest_template_worker = CloudModel::Workers::GuestTemplateWorker.new @host
     end
     
     desc "Build guest core template"
@@ -59,7 +48,7 @@ namespace :cloudmodel do
     task :load_host do
       @host = CloudModel::Host.find(ENV['HOST_ID'])
       @template = CloudModel::GuestTemplate.find(ENV['TEMPLATE_ID'])
-      @guest_template_worker = CloudModel::GuestTemplateWorker.new @host
+      @guest_template_worker = CloudModel::Workers::GuestTemplateWorker.new @host
     end
     
     desc "Build guest template"
@@ -70,7 +59,7 @@ namespace :cloudmodel do
   
   namespace :guest do
     task :load_guest do
-      @guest_worker = CloudModel::GuestWorker.new CloudModel::Guest.find(ENV['GUEST_ID'])
+      @guest_worker = CloudModel::Workers::GuestWorker.new CloudModel::Guest.find(ENV['GUEST_ID'])
     end
     
     desc "Deploy guest with id given as guest_id"
@@ -100,7 +89,7 @@ namespace :cloudmodel do
         puts "** Deploy on Host #{host_id}"
         guests.each do |guest|
           puts "=> Redeploy Guest '#{guest.name}'"
-          @guest_worker = CloudModel::GuestWorker.new guest
+          @guest_worker = CloudModel::Workers::GuestWorker.new guest
           @guest_worker.redeploy
         end
       end
@@ -133,7 +122,7 @@ namespace :cloudmodel do
   namespace :web_image do
     task :load_web_image do
       raise "No env variable WEB_IMAGE_ID given" unless ENV['WEB_IMAGE_ID']
-      @web_image_worker = CloudModel::WebImageWorker.new CloudModel::WebImage.find(ENV['WEB_IMAGE_ID'])
+      @web_image_worker = CloudModel::Workers::WebImageWorker.new CloudModel::WebImage.find(ENV['WEB_IMAGE_ID'])
     end
     
     desc "Build WebImage"
@@ -150,7 +139,7 @@ namespace :cloudmodel do
   namespace :solr_image do
     task :load_solr_image do
       raise "No env variable SOLR_IMAGE_ID given" unless ENV['SOLR_IMAGE_ID']
-      @solr_image_worker = CloudModel::SolrImageWorker.new CloudModel::SolrImage.find(ENV['SOLR_IMAGE_ID'])
+      @solr_image_worker = CloudModel::Workers::SolrImageWorker.new CloudModel::SolrImage.find(ENV['SOLR_IMAGE_ID'])
     end
     
     desc "Build SolrImage"
@@ -173,7 +162,7 @@ namespace :cloudmodel do
         @nginx_service = @guest.services.find ENV['SERVICE_ID']
         raise "Not an nginx service with webimage" unless @nginx_service._type == "CloudModel::Services::Nginx" and @nginx_service.web_image_id
         
-        @nginx_worker = CloudModel::Services::NginxWorker.new @nginx_service
+        @nginx_worker = CloudModel::Workers::Services::NginxWorker.new @nginx_service
       end
         
       desc "Redeploy app to Nginx"

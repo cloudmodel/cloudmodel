@@ -32,9 +32,9 @@ module CloudModel
     
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::ENumFields
-    include CloudModel::ModelHasIssues
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::ENumFields
+    include CloudModel::Mixins::HasIssues
+    prepend CloudModel::Mixins::SmartToString
     prepend SmartGettersAndSetters
   
     field :name, type: String
@@ -332,7 +332,7 @@ module CloudModel
     end
     
     def worker
-      CloudModel::HostWorker.new self
+      CloudModel::Workers::HostWorker.new self
     end
     
     def deploy(options = {})

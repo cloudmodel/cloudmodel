@@ -2,9 +2,9 @@ module CloudModel
   class WarImage
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::UsedInGuestsAs
-    include CloudModel::ModelHasIssues
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::UsedInGuestsAs
+    include CloudModel::Mixins::HasIssues
+    prepend CloudModel::Mixins::SmartToString
    
     field :name, type: String
     belongs_to :file, class_name: "Mongoid::GridFS::Fs::File"

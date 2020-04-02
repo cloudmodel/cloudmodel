@@ -2,8 +2,8 @@ module CloudModel
   class MongodbReplicationSet
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::ModelHasIssues
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::HasIssues
+    prepend CloudModel::Mixins::SmartToString
     
     field :name, type: String # Name of the replication set
 

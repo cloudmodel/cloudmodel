@@ -33,8 +33,8 @@ module CloudModel
   class ItemIssue
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::ENumFields
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::ENumFields
+    prepend CloudModel::Mixins::SmartToString
     prepend ItemIssueSubjectMapper
 
     field :title, type: String

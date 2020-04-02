@@ -2,7 +2,7 @@ module CloudModel
   class GuestCertificate
     include Mongoid::Document
     include Mongoid::Timestamps
-    prepend CloudModel::SmartToString
+    prepend CloudModel::Mixins::SmartToString
 
     belongs_to :guest, class_name: "CloudModel::Guest"
     belongs_to :certificate, class_name: "CloudModel::Certificate"

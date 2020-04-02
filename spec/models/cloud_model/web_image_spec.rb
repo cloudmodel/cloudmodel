@@ -137,8 +137,8 @@ describe CloudModel::WebImage do
   
   context 'worker' do
     it 'should return worker for WebImage' do
-      worker = double CloudModel::WebImageWorker, build: true
-      expect(CloudModel::WebImageWorker).to receive(:new).with(subject).and_return worker
+      worker = double CloudModel::Workers::WebImageWorker, build: true
+      expect(CloudModel::Workers::WebImageWorker).to receive(:new).with(subject).and_return worker
       expect(subject.worker).to eq worker
     end
   end
@@ -214,7 +214,7 @@ describe CloudModel::WebImage do
   
   context 'build!' do
     it 'should call worker to build WebImage' do
-      worker = double CloudModel::WebImageWorker, build: true
+      worker = double CloudModel::Workers::WebImageWorker, build: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return true
       
@@ -230,7 +230,7 @@ describe CloudModel::WebImage do
     end
     
     it 'should allow to force build if not buildable' do
-      worker = double CloudModel::WebImageWorker, build: true
+      worker = double CloudModel::Workers::WebImageWorker, build: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return false
       
@@ -292,7 +292,7 @@ describe CloudModel::WebImage do
   
   context 'redeploy!' do
     it 'should call worker to redeploy WebImage' do
-      worker = double CloudModel::WebImageWorker, redeploy: true
+      worker = double CloudModel::Workers::WebImageWorker, redeploy: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:redeployable?).and_return true
       
@@ -308,7 +308,7 @@ describe CloudModel::WebImage do
     end
     
     it 'should allow to force redeploy if not redeployable' do
-      worker = double CloudModel::WebImageWorker, redeploy: true
+      worker = double CloudModel::Workers::WebImageWorker, redeploy: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:redeployable?).and_return false
       

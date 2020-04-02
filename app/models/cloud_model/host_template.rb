@@ -2,8 +2,8 @@ module CloudModel
   class HostTemplate
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::ENumFields
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::ENumFields
+    prepend CloudModel::Mixins::SmartToString
 
     field :os_version, type: String
     field :arch, type: String
@@ -60,7 +60,7 @@ module CloudModel
     end
     
     def worker host
-      CloudModel::HostTemplateWorker.new host
+      CloudModel::Workers::HostTemplateWorker.new host
     end
   
     def build!(host, options={})

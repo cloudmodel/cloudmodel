@@ -1,7 +1,7 @@
 module CloudModel
   module Services
     class Nginx < Base
-      include CloudModel::ENumFields
+      include CloudModel::Mixins::ENumFields
 
       field :port, type: Integer, default: 80
       field :ssl_supported, type: Mongoid::Boolean#, default: false
@@ -166,7 +166,7 @@ module CloudModel
       end
     
       def worker
-        CloudModel::Services::NginxWorker.new self.guest, self
+        CloudModel::Workers::Services::NginxWorker.new self.guest, self
       end
     
       def redeploy(options = {})

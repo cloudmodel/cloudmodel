@@ -2,9 +2,9 @@ module CloudModel
   class LxdCustomVolume
     include Mongoid::Document
     include Mongoid::Timestamps
-    include CloudModel::AcceptSizeStrings
-    include CloudModel::ModelHasIssues
-    prepend CloudModel::SmartToString
+    include CloudModel::Mixins::AcceptSizeStrings
+    include CloudModel::Mixins::HasIssues
+    prepend CloudModel::Mixins::SmartToString
     
     embedded_in :guest, class_name: "CloudModel::Guest"
     
