@@ -166,7 +166,6 @@ en:
         private_network: VPN Network
         addresses: Addresses/Subnets
         guests: Guest Systems
-        volume_groups: Logical Volume Groups
         state: State
         memory_size: RAM
         cpu_count: CPUs

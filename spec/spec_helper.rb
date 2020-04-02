@@ -26,7 +26,9 @@ RSpec.configure do |config|
   config.filter_run focus: true
   config.run_all_when_everything_filtered = true
   config.infer_base_class_for_anonymous_controllers = false
-  config.order = "random"
+  #config.order = "random"
+  
+  config.include SshHelpers, type: :ssh  
 end
 
 RSpec::Mocks.configuration.allow_message_expectations_on_nil = true

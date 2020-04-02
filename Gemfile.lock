@@ -1,5 +1,5 @@
 GIT
-  remote: git@github.com:cloudmodel/yard-mongoid.git
+  remote: https://github.com/cloudmodel/yard-mongoid.git
   revision: 230b87ab7e5316a9e218425c6a4c34469661589d
   specs:
     yard-mongoid (0.1.0.1)

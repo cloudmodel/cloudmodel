@@ -180,8 +180,11 @@ module CloudModel
     end
     
     def deploy!(options={})
-      guest_worker = CloudModel::GuestWorker.new self
-      guest_worker.deploy options
+      unless deployable? or options[:force]
+        return false
+      end
+      
+      worker.deploy options
     end
     
     def redeploy(options = {})
@@ -200,8 +203,11 @@ module CloudModel
     end
   
     def redeploy!(options={})
-      guest_worker = CloudModel::GuestWorker.new self
-      guest_worker.redeploy options
+      unless deployable? or options[:force]
+        return false
+      end
+      
+      worker.redeploy options
     end
     
     def self.redeploy(ids, options = {})
