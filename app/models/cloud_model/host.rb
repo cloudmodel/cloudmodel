@@ -21,7 +21,7 @@ module CloudModel
         super value
       end
 
-      def private_network_with_strings=(value)
+      def private_network=(value)
         if value.class == String
           value = CloudModel::Address.from_str(value)
         end
@@ -41,7 +41,7 @@ module CloudModel
     field :tinc_public_key, type: String
     field :initial_root_pw, type: String
     field :cpu_count, type: Integer, default: -1
-    field :arch, default: 'amd64'
+    field :arch, type: String, default: 'amd64'
     field :mac_address_prefix, type: String
 
     enum_field :stage, values: {
@@ -61,18 +61,6 @@ module CloudModel
     }, default: :not_started
 
     field :deploy_last_issue, type: String
-     
-    enum_field :build_state, values: {
-      0x00 => :pending,
-      0x01 => :running,
-      0xe0 => :packaging,
-      0xe8 => :downloading,
-      0xf0 => :finished,
-      0xf1 => :failed,
-      0xff => :not_started
-    }, default: :not_started
-    
-    field :build_last_issue, type: String
     
     has_many :guests, class_name: "CloudModel::Guest", inverse_of: :host
     embeds_many :addresses, class_name: "CloudModel::Address", inverse_of: :host do
@@ -102,14 +90,6 @@ module CloudModel
     before_validation :generate_mac_address_prefix
     
     index _id: 1
-      
-    def default_root_volume_group
-      volume_groups.first
-    end
-    
-    def default_data_volume_group
-      volume_groups.last
-    end
    
     def addresses=(value)
       self.addresses.clear
@@ -118,7 +98,10 @@ module CloudModel
       end
     end
    
-  
+    def to_param
+      name
+    end
+    
     def available_private_address_collection
       all = private_network.list_ips - [private_network.gateway]
       used = guests.map{ |g| g.private_address }
@@ -137,6 +120,10 @@ module CloudModel
     
     def dhcp_external_address
       available_external_address_collection.last
+    end
+    
+    def private_address
+      private_network.list_ips.first
     end
   
     def email_hostname     
@@ -160,10 +147,6 @@ module CloudModel
       self.update_attributes tinc_public_key: key.public_key.to_s
     
       key
-    end
-    
-    def to_param
-      name
     end
     
     def ssh_connection
@@ -190,10 +173,6 @@ module CloudModel
     def sftp
       ssh_connection.sftp
     end
-    
-    def private_address
-       private_network.list_ips.first
-     end
     
     def ssh_address
       initial_root_pw ? primary_address.ip : private_address
@@ -261,7 +240,7 @@ module CloudModel
       
       stdout = stdout_data
       unless success
-        stdout += stderr_data.values * "\n"
+        stdout += "\n\n" + stderr_data.values * "\n"
       end
       
       return [success, stdout]
@@ -276,7 +255,7 @@ module CloudModel
       data
     end
     
-    def mounted_at? mountpoint, root=''      
+    def mounted_at? mountpoint, root='' 
       if exec('mount')[1].match(/on #{root.gsub(/[\/]$/, '')}\/#{mountpoint.gsub(/^[\/]/, '')} type/)
         true
       else
@@ -306,32 +285,6 @@ module CloudModel
       success, data = exec "umount #{root}/boot"  
     
       return success
-    end
-    
-    def list_real_volume_groups
-      begin
-        success, result = exec "vgs --separator ';' --units b --all --nosuffix -o vg_all"
-        volume_groups = {}
-    
-        lines = result.split("\n")
-        head = lines.shift.split(";").map{|c| c.strip.sub('#', '').gsub(' ', '_').underscore.to_sym}
-
-        lines.each do |row|
-          columns = row.split(";")
-          row_hash = {}
-          head.each do |n|
-            row_hash[n] = columns.shift.strip
-          end
-      
-          name = row_hash.delete(:vg).to_sym
-          volume_groups[name] = row_hash
-        end
-
-        return volume_groups
-      rescue Exception => e
-        CloudModel.log_exception e
-        return false
-      end
     end
     
     def system_info
@@ -398,6 +351,10 @@ module CloudModel
     end
     
     def deploy!(options={})
+      unless deployable? or options[:force]
+        return false
+      end
+
       worker.deploy options
     end
     
@@ -417,31 +374,11 @@ module CloudModel
     end
     
     def redeploy!(options={})
-      worker.redeploy options
-    end
-    
-    def buildable?
-      [:finished, :failed, :not_started].include? build_state
-    end
-    
-    def build(options = {})
-      unless buildable? or options[:force]
+      unless deployable? or options[:force]
         return false
       end
-      
-      update_attribute :build_state, :pending
-      
-      begin
-        CloudModel::call_rake 'cloudmodel:host_image:build_image', host_id: id
-      rescue Exception => e
-        update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
-        CloudModel.log_exception e
-      end
-    end  
-    
-    def build!(options={})      
-      host_worker = CloudModel::Images::HostWorker.new self
-      host_worker.build_image options
+
+      worker.redeploy options
     end
     
     def generate_mac_address_prefix

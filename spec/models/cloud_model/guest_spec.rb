@@ -378,6 +378,32 @@ describe CloudModel::Guest do
     end
   end  
   
+  context 'deploy!' do
+    it 'should call worker to deploy Guest' do
+      worker = double CloudModel::GuestWorker, deploy: true
+      expect(subject).to receive(:worker).and_return worker
+      allow(subject).to receive(:deployable?).and_return true
+      
+      expect(subject.deploy!).to eq true
+    end
+    
+    it 'should return false and not run worker if not deployable' do
+      expect(subject).not_to receive(:worker)
+      allow(subject).to receive(:deployable?).and_return false
+      
+      expect(subject.deploy!).to eq false
+      expect(subject.deploy_state).to eq :not_started
+    end
+    
+    it 'should allow to force deploy if not deployable' do
+      worker = double CloudModel::GuestWorker, deploy: true
+      expect(subject).to receive(:worker).and_return worker
+      allow(subject).to receive(:deployable?).and_return false
+      
+      expect(subject.deploy! force:true).to eq true
+    end
+  end
+  
   context 'redeploy' do
     it 'should call rake cloudmodel:host:deploy with host´s and guest´s id' do
       subject.host = host
@@ -398,6 +424,32 @@ describe CloudModel::Guest do
       expect(CloudModel).not_to receive(:call_rake).with('cloudmodel:guest:redeploy', host_id: host.id, guest_id: subject.id)
       allow(subject).to receive(:deployable?).and_return false
       expect(subject.redeploy).to eq false
+    end
+  end
+  
+  context 'redeploy!' do
+    it 'should call worker to deploy Guest' do
+      worker = double CloudModel::GuestWorker, redeploy: true
+      expect(subject).to receive(:worker).and_return worker
+      allow(subject).to receive(:deployable?).and_return true
+      
+      expect(subject.redeploy!).to eq true
+    end
+    
+    it 'should return false and not run worker if not deployable' do
+      expect(subject).not_to receive(:worker)
+      allow(subject).to receive(:deployable?).and_return false
+      
+      expect(subject.redeploy!).to eq false
+      expect(subject.deploy_state).to eq :not_started
+    end
+    
+    it 'should allow to force deploy if not deployable' do
+      worker = double CloudModel::GuestWorker, redeploy: true
+      expect(subject).to receive(:worker).and_return worker
+      allow(subject).to receive(:deployable?).and_return false
+      
+      expect(subject.redeploy! force:true).to eq true
     end
   end
   
