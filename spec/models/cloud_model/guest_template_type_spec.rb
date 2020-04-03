@@ -26,7 +26,17 @@ describe CloudModel::GuestTemplateType do
   end
 
   context 'build_new_template!' do
-    it 'should build new template if non is found' do
+    it 'should build new template' do
+      template = double CloudModel::GuestTemplate
+      expect(subject).to receive(:new_template).with(host).and_return template
+      
+      expect(template).to receive(:build_state=).with :pending
+      expect(template).to receive(:build!).with(host, {})
+      
+      expect(subject.build_new_template! host).to eq template
+    end
+    
+    it 'pass options to build process' do
       template = double CloudModel::GuestTemplate
       options = double
       expect(subject).to receive(:new_template).with(host).and_return template

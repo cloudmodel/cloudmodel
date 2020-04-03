@@ -1,25 +1,13 @@
 module CloudModel
   module Monitoring
     module Services
-      class BaseChecks < ::CloudModel::Monitoring::BaseChecks
-        def initialize host, guest, service, options = {}      
-          @indent = 4
-          @host = host
-          @guest = guest
-          @subject = service
-
-          if options[:cached]
-            @result = @subject.monitoring_last_check_result
-          else
-            print "      * Acqire data ..."
-            @result = @subject.service_status
-            puts "[\e[32mDone\e[39m]"
-      
-            store_check_result
-          end
+      class BaseChecks < ::CloudModel::Monitoring::BaseChecks        
+        def aquire_data
+          @subject.service_status
         end
-      
-        def get_result
+        
+        def indent_size
+          4
         end
     
         def check

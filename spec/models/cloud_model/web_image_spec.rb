@@ -210,6 +210,14 @@ describe CloudModel::WebImage do
       expect(subject.build force:true).to eq true
       expect(subject.build_state).to eq :pending
     end
+    
+    it 'should mark template build as failed if rake is not callable and return false' do
+      allow(CloudModel).to receive(:call_rake).and_raise 'Rake failed to call'
+      
+      expect(subject.build).to eq false
+      expect(subject.build_state).to eq :failed
+      expect(subject.build_last_issue).to eq 'Unable to enqueue job! Try again later.'
+    end
   end
   
   context 'build!' do
@@ -219,6 +227,7 @@ describe CloudModel::WebImage do
       allow(subject).to receive(:buildable?).and_return true
       
       expect(subject.build!).to eq true
+      expect(subject.build_state).to eq :pending
     end
     
     it 'should return false and not run worker if not buildable' do
@@ -273,6 +282,20 @@ describe CloudModel::WebImage do
       expect(subject.redeploy_state).to eq :pending
     end
     
+    it 'should mark services as pending if redeployble' do
+      expect(CloudModel).to receive(:call_rake).with('cloudmodel:web_image:redeploy', web_image_id: subject.id).and_return true
+      allow(subject).to receive(:redeployable?).and_return true
+
+      service1 = double CloudModel::Services::Nginx, redeployable?: false
+      service2 = double CloudModel::Services::Nginx, redeployable?: true
+      allow(subject).to receive(:services).and_return [service1, service2]
+      expect(service1).not_to receive :update_attribute
+      expect(service2).to receive(:update_attribute).with(:redeploy_web_image_state, :pending)
+      
+      expect(subject.redeploy).to eq true
+      expect(subject.redeploy_state).to eq :pending
+    end
+    
     it 'should return false and not run rake if not redeployable' do
       expect(CloudModel).not_to receive(:call_rake)
       allow(subject).to receive(:redeployable?).and_return false
@@ -288,6 +311,14 @@ describe CloudModel::WebImage do
       expect(subject.redeploy force:true).to eq true
       expect(subject.redeploy_state).to eq :pending
     end
+    
+    it 'should mark template build as failed if rake is not callable and return false' do
+      allow(CloudModel).to receive(:call_rake).and_raise 'Rake failed to call'
+      
+      expect(subject.redeploy).to eq false
+      expect(subject.redeploy_state).to eq :failed
+      expect(subject.redeploy_last_issue).to eq 'Unable to enqueue job! Try again later.'
+    end
   end
   
   context 'redeploy!' do
@@ -297,6 +328,22 @@ describe CloudModel::WebImage do
       allow(subject).to receive(:redeployable?).and_return true
       
       expect(subject.redeploy!).to eq true
+      expect(subject.redeploy_state).to eq :pending
+    end
+    
+    it 'should mark services as pending if redeployble' do
+      worker = double CloudModel::Workers::WebImageWorker, redeploy: true
+      service1 = double CloudModel::Services::Nginx, redeployable?: false
+      service2 = double CloudModel::Services::Nginx, redeployable?: true
+      
+      allow(subject).to receive(:worker).and_return worker
+      allow(subject).to receive(:redeployable?).and_return true
+      allow(subject).to receive(:services).and_return [service1, service2]
+      expect(service1).not_to receive :redeploy_web_image_state=
+      expect(service2).to receive(:redeploy_web_image_state=).with( :pending)
+      
+      expect(subject.redeploy!).to eq true
+      expect(subject.redeploy_state).to eq :pending
     end
     
     it 'should return false and not run worker if not redeployable' do

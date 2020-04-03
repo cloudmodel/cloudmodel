@@ -5,7 +5,7 @@ module CloudModel
     module Services
       class RedisChecks < CloudModel::Monitoring::Services::BaseChecks      
         def check
-          do_check_for_errors_on @result, {
+          do_check_for_errors_on data, {
             not_reachable: 'service reachable'
           }
         end

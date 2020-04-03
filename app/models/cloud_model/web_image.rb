@@ -112,6 +112,7 @@ module CloudModel
       rescue Exception => e
         update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
+        return false
       end
     end
         
@@ -119,6 +120,8 @@ module CloudModel
       unless buildable? or options[:force]
         return false
       end
+      
+      self.build_state = :pending
       
       worker.build options
     end
@@ -140,21 +143,30 @@ module CloudModel
       
       services.each do |service|
         if service.redeployable? or options[:force]
-          service.update_attributes redeploy_web_image_state: :pending
+          service.update_attribute :redeploy_web_image_state, :pending
         end
       end
 
       begin
         CloudModel::call_rake 'cloudmodel:web_image:redeploy', web_image_id: id
       rescue Exception => e
-        update_attributes redeploy_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
+        update_attributes redeploy_state: :failed, redeploy_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
+        return false
       end
     end
     
     def redeploy!(options = {})
       unless redeployable? or options[:force]
         return false
+      end
+      
+      self.redeploy_state = :pending
+      
+      services.each do |service|
+        if service.redeployable? or options[:force]
+          service.redeploy_web_image_state = :pending
+        end
       end
 
       worker.redeploy options

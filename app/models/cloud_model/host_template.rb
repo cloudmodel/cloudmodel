@@ -39,9 +39,7 @@ module CloudModel
     end
     
     def self.build!(host, options={})
-      template = new_template_to_build(host)
-      template.build_state = :pending
-      template.build! host, options
+      new_template_to_build(host).build! host, options
     end
     
     def build(host, options = {})
@@ -56,6 +54,7 @@ module CloudModel
       rescue Exception => e
         update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
+        return false
       end
     end
     
@@ -67,6 +66,8 @@ module CloudModel
       unless buildable? or options[:force]
         return false
       end
+
+      self.build_state = :pending
 
       worker(host).build_template self, options
     end  

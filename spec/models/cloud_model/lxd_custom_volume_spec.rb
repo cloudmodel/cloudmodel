@@ -59,6 +59,19 @@ describe CloudModel::LxdCustomVolume do
       
       expect(subject.before_destroy).to eq true
     end
+    
+    it 'should be called on destroy' do
+      expect(subject).to receive(:before_destroy)
+      
+      subject.run_callbacks :destroy
+    end
+    
+    it 'should not be called on destroy if :skip_volume_creation is set' do
+      expect(subject).not_to receive :before_destroy
+      subject.skip_volume_creation = true
+      
+      subject.run_callbacks :destroy
+    end
   end
 
   context 'volume_exists?' do
@@ -99,6 +112,19 @@ describe CloudModel::LxdCustomVolume do
       expect(subject).to receive(:lxc!).with('storage volume create default some_guest-var-data', 'Failed to init LXD volume')
       
       subject.create_volume!
+    end
+    
+    it 'should be called on create' do
+      expect(subject).to receive :create_volume!
+      
+      subject.run_callbacks :create
+    end
+    
+    it 'should not be called on create if :skip_volume_creation is set' do
+      expect(subject).not_to receive :create_volume!
+      subject.skip_volume_creation = true
+      
+      subject.run_callbacks :create
     end
   end
 
@@ -208,6 +234,12 @@ describe CloudModel::LxdCustomVolume do
       
       subject.send :set_volume_name
       expect(subject.name).to eq 'some_guest-var-data'
+    end
+    
+    it 'should be called on validation' do
+      expect(subject).to receive :set_volume_name
+      
+      subject.run_callbacks :validation
     end
   end
 

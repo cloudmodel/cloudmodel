@@ -190,6 +190,14 @@ describe CloudModel::SolrImage do
       expect(subject.build force:true).to eq true
       expect(subject.build_state).to eq :pending
     end
+    
+    it 'should mark template build as failed if rake is not callable and return false' do
+      allow(CloudModel).to receive(:call_rake).and_raise 'Rake failed to call'
+      
+      expect(subject.build).to eq false
+      expect(subject.build_state).to eq :failed
+      expect(subject.build_last_issue).to eq 'Unable to enqueue job! Try again later.'
+    end
   end
   
   context 'build!' do
@@ -199,6 +207,7 @@ describe CloudModel::SolrImage do
       allow(subject).to receive(:buildable?).and_return true
       
       expect(subject.build!).to eq true
+      expect(subject.build_state).to eq :pending
     end
     
     it 'should return false and not run worker if not buildable' do

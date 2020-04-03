@@ -94,14 +94,10 @@ describe CloudModel::ItemIssue do
       subject.set_subject_chain
       expect(subject.subject_chain).to eq [item.host, item]
     end
-
-
+    
     it 'should set subject chain to the subject in an array if item has no item_issue_chain' do
-      class TestModel
-        include Mongoid::Document
-      end
-      
-      item = Factory :host
+      item = Factory :guest
+      allow(item).to receive(:'respond_to?').with(:item_issue_chain, false).and_return false
       subject.subject = item
       
       subject.set_subject_chain
@@ -147,6 +143,17 @@ describe CloudModel::ItemIssue do
     it 'should should not invoke configured notifiers if severity is not met' do
       notifier = double
       allow(CloudModel.config).to receive(:monitoring_notifiers).and_return [{severity: [:info], notifier: notifier}]
+      subject.title = "Issue Test"
+      subject.severity = :task
+      
+      expect(notifier).not_to receive(:send_message)
+      
+      subject.notify
+    end
+    
+    it 'should should not invoke configured notifiers if severity is not set on notifier config' do
+      notifier = double
+      allow(CloudModel.config).to receive(:monitoring_notifiers).and_return [{notifier: notifier}]
       subject.title = "Issue Test"
       subject.severity = :task
       

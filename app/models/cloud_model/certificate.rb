@@ -46,11 +46,6 @@ module CloudModel
       scoped.select{|c| c.valid_now?}
     end
     
-    # Get certificate name as string representation
-    def to_s
-      name
-    end
-    
     # Get certificate as X509 certificate
     def x509
       begin

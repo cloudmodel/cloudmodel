@@ -60,6 +60,27 @@ describe CloudModel::HostTemplate do
     end
   end
   
+  context '#build!' do
+    it 'should create new template and build it' do
+      template = double CloudModel::HostTemplate
+      
+      expect(CloudModel::HostTemplate).to receive(:new_template_to_build).with(host).and_return template
+      expect(template).to receive(:build!).with(host, {})
+      
+      CloudModel::HostTemplate.build! host
+    end
+    
+    it 'should pass options to build process' do
+      options = double
+      template = double CloudModel::HostTemplate
+      
+      expect(CloudModel::HostTemplate).to receive(:new_template_to_build).with(host).and_return template
+      expect(template).to receive(:build!).with(host, options)
+      
+      CloudModel::HostTemplate.build! host, options
+    end
+  end
+  
   context 'build' do
     it 'should call rake to build HostTemplate' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:host_template:build', host_id: host.id, template_id: subject.id).and_return true
@@ -92,6 +113,14 @@ describe CloudModel::HostTemplate do
       expect(subject.build host, force:true).to eq true
       expect(subject.build_state).to eq :pending
     end
+    
+    it 'should mark template build as failed if rake is not callable and return false' do
+      allow(CloudModel).to receive(:call_rake).and_raise 'Rake failed to call'
+      
+      expect(subject.build host).to eq false
+      expect(subject.build_state).to eq :failed
+      expect(subject.build_last_issue).to eq 'Unable to enqueue job! Try again later.'
+    end
   end
   
   context 'worker' do
@@ -109,6 +138,7 @@ describe CloudModel::HostTemplate do
       allow(subject).to receive(:buildable?).and_return true
       
       expect(subject.build! host).to eq true
+      expect(subject.build_state).to eq :pending
     end
     
     it 'should return false and not run worker if not buildable' do
