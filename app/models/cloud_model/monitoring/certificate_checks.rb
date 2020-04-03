@@ -1,12 +1,10 @@
 module CloudModel
   module Monitoring
     class CertificateChecks < CloudModel::Monitoring::BaseChecks
-      def initialize certificate, options = {}
-        puts "[Certificate #{certificate.name}]"
-        @indent = 0
-        @subject = certificate
+      def aquire_data
+        
       end
-    
+          
       def check
         
       end

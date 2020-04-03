@@ -26,8 +26,10 @@ module CloudModel
     accept_size_strings_for :disk_space
 
     before_validation :set_volume_name       
-    after_create :create_volume!
-    before_destroy :before_destroy
+    after_create :create_volume!, unless: :skip_volume_creation
+    before_destroy :before_destroy, unless: :skip_volume_creation
+    
+    attr_accessor :skip_volume_creation
     
     def host
       guest.host

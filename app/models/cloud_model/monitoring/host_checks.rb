@@ -3,26 +3,14 @@ module CloudModel
     class HostChecks < CloudModel::Monitoring::BaseChecks
       include CloudModel::Monitoring::Mixins::SysinfoChecksMixin
     
-      def initialize host, options = {}
-        puts "[Host #{host.name}]"
-        @indent = 0
-        @subject = host
-      
-        if options[:cached]
-          @result = @subject.monitoring_last_check_result
-        else
-          print "  * Acqire data ..."
-          @result = {
-            system: @subject.system_info
-          }
-          puts "[\e[32mDone\e[39m]"
-      
-          store_check_result
-        end
+      def aquire_data
+        {
+          system: @subject.system_info
+        }
       end
     
       def check_md
-        if sys_info = @result[:system] and sys_info['md']
+        if sys_info = data[:system] and sys_info['md']
           failures = []
 
           (['md0', 'md1', 'md2', 'md3', 'md4'] - sys_info['md']['devs'].keys).each do |v|
@@ -40,7 +28,7 @@ module CloudModel
       end
     
       def check_sensors
-        if sys_info = @result[:system] and sys_info['sensors']
+        if sys_info = data[:system] and sys_info['sensors']
           failures = []
         
           sys_info['sensors'].each do |k, sensor|
@@ -57,7 +45,7 @@ module CloudModel
       end
     
       def check_smart
-        if sys_info = @result[:system] and sys_info['smart']
+        if sys_info = data[:system] and sys_info['smart']
           failures = []
         
           (['sda', 'sdb'] - sys_info['smart'].keys).each do |v|
@@ -73,12 +61,12 @@ module CloudModel
       end
     
       def check
-        check_system_info
-        if @result[:system]
+        if check_system_info
           check_md
           check_sensors
           check_smart
         end
+        true
       end
     end
   end

@@ -50,6 +50,17 @@ describe CloudModel::GuestTemplate do
       
       expect(CloudModel::GuestCoreTemplate.latest_created_at).to eq created_at
     end
+    
+    it 'should get creation of latest successfully build template on scope' do
+      collection = double
+      created_at = Time.now - 10.days
+      scoped = CloudModel::GuestCoreTemplate.where(arch: 'mos6502')
+      
+      allow(scoped).to receive(:where).with(build_state_id: 0xf0).and_return collection
+      expect(collection).to receive(:max).with(:created_at).and_return created_at
+      
+      expect(scoped.latest_created_at).to eq created_at
+    end
   end
   
   context 'worker' do
@@ -92,6 +103,14 @@ describe CloudModel::GuestTemplate do
       expect(subject.build host, force:true).to eq true
       expect(subject.build_state).to eq :pending
     end
+    
+    it 'should mark template build as failed if rake is not callable and return false' do
+      allow(CloudModel).to receive(:call_rake).and_raise 'Rake failed to call'
+      
+      expect(subject.build host).to eq false
+      expect(subject.build_state).to eq :failed
+      expect(subject.build_last_issue).to eq 'Unable to enqueue job! Try again later.'
+    end
   end
   
   context 'build!' do
@@ -101,6 +120,7 @@ describe CloudModel::GuestTemplate do
       allow(subject).to receive(:buildable?).and_return true
       
       expect(subject.build! host).to eq true
+      expect(subject.build_state).to eq :pending
     end
     
     it 'should return false and not run worker if not buildable' do

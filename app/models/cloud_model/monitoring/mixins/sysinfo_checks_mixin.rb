@@ -3,7 +3,7 @@ module CloudModel
     module Mixins
       module SysinfoChecksMixin
         def check_cpu_usage
-          if sys_info = @result[:system] and sys_info["cgroup_cpu"]
+          if sys_info = data[:system] and sys_info["cgroup_cpu"]
             if sys_info["cgroup_cpu"]["last_minute_percentage"]
               usage = sys_info["cgroup_cpu"]["last_minute_percentage"].to_f
           
@@ -34,7 +34,7 @@ module CloudModel
         end
       
         def check_mem_usage
-          if sys_info = @result[:system] and sys_info['mem']
+          if sys_info = data[:system] and sys_info['mem']
             total = sys_info['mem']['mem_total'].to_i
             available = sys_info['mem']['mem_available'].to_i
             usage = 100.0 * (total - available) / total
@@ -47,7 +47,7 @@ module CloudModel
         end
       
         def check_disks_usage
-          if sys_info = @result[:system] and sys_info['df']
+          if sys_info = data[:system] and sys_info['df']
             disks_usage = []
             sys_info['df'].each do |k, df|
               size = df['size'].to_i
@@ -74,7 +74,7 @@ module CloudModel
         end
       
         def check_system_info
-          sys_info = @result[:system]
+          sys_info = data[:system]
                 
           if do_check :sys_info_available, 'Check system information', {fatal: not(sys_info["error"].blank?)}, message: sys_info["error"]
             check_cpu_usage

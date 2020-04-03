@@ -41,16 +41,20 @@ describe CloudModel::Address do
   end
   
   context 'to_s' do
-    it "should get IPV4 string" do
+    it "should return IPV4 string" do
       subject.ip = '10.42.23.1'
       subject.subnet = 30
       expect(subject.to_s).to eq '10.42.23.1/30'
     end
     
-    it "should get IPV6 string" do
+    it "should return IPV6 string" do
       subject.ip = 'fec0::'
       subject.subnet = 64
       expect(subject.to_s).to eq 'fec0::/64'
+    end
+    
+    it "should return empty String if no ip is set" do
+      expect(subject.to_s).to eq ''
     end
   end
   
@@ -149,6 +153,12 @@ describe CloudModel::Address do
       subject.subnet = 30
       expect(subject.list_ips).to eq ["10.42.23.2"]
     end
+    
+    it "should return empty array for IPv6 addresses" do
+      subject.ip = 'fe::'
+      subject.subnet = 30
+      expect(subject.list_ips).to eq []
+    end
   end
   
   context 'tinc_subnet' do
@@ -165,12 +175,32 @@ describe CloudModel::Address do
     end
   end
   
-  context "validates data" do
-    it "should not accept invalid IP addresses" do
+  context 'validates data' do
+    it 'should not accept invalid IP addresses' do
       subject.ip = "10.43.0.256"
       subject.subnet = 28
       expect(subject).not_to be_valid
     end
   end
   
+  context 'cidr' do
+    it 'should get NetAddr net for ip and subnet' do
+      net = double
+      subject.ip = "10.42.23.12"
+      subject.subnet = 28
+      
+      expect(NetAddr).to receive(:parse_net).with("10.42.23.12/28").and_return net
+      
+      expect(subject.send :cidr).to eq net
+    end
+    
+    it 'should get NetAddr net for ip and no subnet' do
+      net = double
+      subject.ip = "10.42.23.12"
+      
+      expect(NetAddr).to receive(:parse_net).with("10.42.23.12").and_return net
+      
+      expect(subject.send :cidr).to eq net
+    end
+  end
 end

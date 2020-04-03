@@ -184,6 +184,8 @@ module CloudModel
         return false
       end
       
+      self.deploy_state = :pending
+      
       worker.deploy options
     end
     

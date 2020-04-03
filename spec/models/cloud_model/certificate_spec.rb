@@ -167,6 +167,16 @@ describe CloudModel::Certificate do
       expect(CloudModel::Guest).to receive(:where).with('services.ssl_cert_id' => subject.id).and_return 'LIST OF GUESTS'
       expect(subject.used_in_guests).to eq 'LIST OF GUESTS'
     end
+    
+    it 'should merge guest_certificates and service certificates' do
+      super_query = double
+      guest_ids = [BSON::ObjectId.new, BSON::ObjectId.new]
+      expect(subject.guest_certificates).to receive(:pluck).with(:guest_id).and_return guest_ids
+      
+      expect(CloudModel::Guest).to receive(:where).with('services.ssl_cert_id' => subject.id).and_return super_query
+      expect(CloudModel::Guest).to receive(:or).with(super_query, :id.in => guest_ids).and_return 'LIST OF GUESTS'
+      expect(subject.used_in_guests).to eq 'LIST OF GUESTS'
+    end
   end
 
   context 'used_in_guests_by_hosts' do

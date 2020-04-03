@@ -19,6 +19,7 @@ group :development, :test do
   gem 'miniskirt'
   gem 'faker'
   gem 'yard'
+  gem 'deep-cover', require: false
   if true
     gem 'yard-mongoid', git: 'https://github.com/cloudmodel/yard-mongoid.git'
   else

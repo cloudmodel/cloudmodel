@@ -2,7 +2,7 @@ module CloudModel
   module Components
     class TomcatComponent < BaseComponent
       def requirements
-        [java]
+        [:java]
       end
     end
   end

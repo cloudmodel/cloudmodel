@@ -16,6 +16,20 @@ describe CloudModel::SshPubKey do
     end
   end
   
+  context '#from_file' do
+    it 'should read file and create new key for each line' do
+      allow(File).to receive(:readlines).with('~/my_ssh_keys').and_return [
+        "  ssh key user@host1\n",
+        "ssh key user@host2\n",
+      ]
+      
+      expect(CloudModel::SshPubKey).to receive(:create!).with key: 'ssh key user@host1'
+      expect(CloudModel::SshPubKey).to receive(:create!).with key: 'ssh key user@host2'
+      
+      CloudModel::SshPubKey.from_file '~/my_ssh_keys'
+    end
+  end
+  
   context 'name' do
     it 'should get the last part of ssh key as name' do
       subject.key = 'ssh-rsa my_public_key user@host.domain'
