@@ -5,11 +5,10 @@ describe CloudModel::Workers::BaseWorker do
   subject { CloudModel::Workers::BaseWorker.new host }
   
   context 'render' do
-    it 'should call render on a new instance of ActionView::Base and pass return value' do
-      action_view = double(ActionView::Base)
-      allow(ActionView::Base).to receive(:new).and_return action_view
-      expect(action_view).to receive(:view_paths=).with ActionController::Base.view_paths
-      expect(action_view).to receive(:render).with(template: 'my_template', locals: {a:1, b:2}).and_return 'rendered template'
+    it 'should call render_to_string on a new instance of ActionController::Base and pass return value' do
+      action_controller = double(ActionController::Base)
+      allow(ActionController::Base).to receive(:new).and_return action_controller
+      expect(action_controller).to receive(:render_to_string).with(template: 'my_template', locals: {a:1, b:2}).and_return 'rendered template'
       expect(subject.render 'my_template', a: 1, b: 2).to eq 'rendered template'
     end
   end
