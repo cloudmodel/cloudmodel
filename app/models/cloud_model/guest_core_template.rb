@@ -10,7 +10,7 @@ module CloudModel
     
     has_many :templates, class_name: "CloudModel::GuestTemplate"
         
-    enum_field :build_state, values: {
+    enum_field :build_state, {
       0x00 => :pending,
       0x01 => :running,
       0x05 => :packaging,

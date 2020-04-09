@@ -34,7 +34,7 @@ module CloudModel
     accept_size_strings_for :root_fs_size
     accept_size_strings_for :memory_size
     
-    enum_field :deploy_state, values: {
+    enum_field :deploy_state, {
       0x00 => :pending,
       0x01 => :running,
       0xf0 => :finished,

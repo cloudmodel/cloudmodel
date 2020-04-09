@@ -19,7 +19,7 @@ module CloudModel
       
       belongs_to :deploy_web_image, class_name: 'CloudModel::WebImage', inverse_of: :services, optional: true
       
-      enum_field :redeploy_web_image_state, values: {
+      enum_field :redeploy_web_image_state, {
         0x00 => :pending,
         0x01 => :running,
         0xf0 => :finished,

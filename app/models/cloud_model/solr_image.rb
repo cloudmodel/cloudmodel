@@ -21,7 +21,7 @@ module CloudModel
     field :git_commit, type: String
     field :solr_version, type: String
     
-    enum_field :build_state, values: {
+    enum_field :build_state, {
       0x00 => :pending,
       0x01 => :running,
       0x02 => :checking_out,

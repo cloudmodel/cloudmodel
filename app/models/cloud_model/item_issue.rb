@@ -41,7 +41,7 @@ module CloudModel
     field :message, type: String
     field :key, type: String
     field :value
-    enum_field :severity, values: {
+    enum_field :severity, {
       0x00 => :info,
       0x01 => :task,
       0x10 => :warning,
