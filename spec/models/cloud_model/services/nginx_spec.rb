@@ -41,13 +41,13 @@ describe CloudModel::Services::Nginx do
 
   it { expect(subject).to have_field(:daily_rake_task).of_type(String).with_default_value_of nil }
 
-  context 'kind' do
+  describe 'kind' do
     it 'should return :http' do
       expect(subject.kind).to eq :http
     end
   end
   
-  context 'components_needed' do
+  describe 'components_needed' do
     it 'should require only nginx be default' do
       expect(subject.components_needed).to eq [:nginx]
     end
@@ -58,7 +58,7 @@ describe CloudModel::Services::Nginx do
     end
   end
   
-  context 'used_ports' do
+  describe 'used_ports' do
     it 'should return http port by default' do
       expect(subject.used_ports).to eq [80]
     end
@@ -82,51 +82,51 @@ describe CloudModel::Services::Nginx do
     end
   end
   
-  context 'external_uri' do
+  describe 'external_uri' do
     pending
   end
   
-  context 'internal_uri' do
+  describe 'internal_uri' do
     pending
   end
   
-  context 'status_uri' do
+  describe 'status_uri' do
     pending
   end
   
-  context 'service_status' do
+  describe 'service_status' do
     pending
   end
   
-  context 'www_home' do
+  describe 'www_home' do
     it 'it should return "/var/www" for now' do
       expect(subject.www_home).to eq '/var/www'
     end
   end
   
-  context 'www_root' do
+  describe 'www_root' do
     it 'it should return "/var/www/rails" for now' do
       expect(subject.www_root).to eq '/var/www/rails'
     end
   end
   
-  context '#redeployable_redeploy_web_image_states' do
+  describe '#redeployable_redeploy_web_image_states' do
     pending
   end
   
-  context 'redeployable?' do
+  describe 'redeployable?' do
     pending
   end
   
-  context 'worker' do
+  describe 'worker' do
     pending
   end
   
-  context 'redeploy' do
+  describe 'redeploy' do
     pending
   end
   
-  context 'redeploy!' do
+  describe 'redeploy!' do
     pending
   end
 end

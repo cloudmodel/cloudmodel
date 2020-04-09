@@ -12,14 +12,14 @@ describe CloudModel::WarImage do
   it { expect(subject).to validate_presence_of :file }
   it { expect(subject).to validate_uniqueness_of :name }
 
-  context 'used_in_guests' do
+  describe 'used_in_guests' do
     it 'should get all guests that has Services using this Certificate' do
       expect(CloudModel::Guest).to receive(:where).with('services.deploy_war_image_id' => subject.id).and_return 'LIST OF GUESTS'
       expect(subject.used_in_guests).to eq 'LIST OF GUESTS'
     end
   end
 
-  context 'used_in_guests_by_hosts' do
+  describe 'used_in_guests_by_hosts' do
     it 'should sort the result of used_in_guests by host and return a Hash' do
       guests = [
         double(CloudModel::Guest, host_id: 'host1'),
@@ -35,7 +35,7 @@ describe CloudModel::WarImage do
     end
   end
 
-  context 'file_size' do
+  describe 'file_size' do
     it 'should get length from file object' do
       subject.file = Mongoid::GridFS::Fs::File.new
       subject.file.length = 4711
@@ -48,7 +48,7 @@ describe CloudModel::WarImage do
     end
   end
 
-  context 'file_upload' do
+  describe 'file_upload' do
     it 'should upload and assign new GridFs file' do
       uploaded = double 'Upload', tempfile: double(Tempfile, path: '/test.war_image')
       file = double Mongoid::GridFs, id: '42'

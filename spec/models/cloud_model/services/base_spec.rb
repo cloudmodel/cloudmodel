@@ -11,7 +11,7 @@ describe CloudModel::Services::Base do
   
   it { expect(subject).to be_embedded_in(:guest).of_type CloudModel::Guest }
   
-  context '#service_types' do
+  describe '#service_types' do
     it "should return the default service types" do
       expect(CloudModel::Services::Base.service_types).to eq({
         mongodb: CloudModel::Services::Mongodb,
@@ -26,7 +26,7 @@ describe CloudModel::Services::Base do
     end
   end
   
-  context '#find' do
+  describe '#find' do
     it 'should find service through guest' do
       guest = double CloudModel::Guest, services: []
       expect(CloudModel::Guest).to receive(:find_by).with("services._id" => subject.id).and_return guest
@@ -36,7 +36,7 @@ describe CloudModel::Services::Base do
     end
   end
   
-  context 'host' do
+  describe 'host' do
     it 'should get guest´s host' do
       host = double CloudModel::Host
       guest = double CloudModel::Guest, host: host
@@ -46,7 +46,7 @@ describe CloudModel::Services::Base do
     end
   end
   
-  context 'private_address' do
+  describe 'private_address' do
     it 'should get guest´s private_address' do
       guest = double CloudModel::Guest, private_address: '10.42.23.17'
       allow(subject).to receive(:guest).and_return guest
@@ -55,7 +55,7 @@ describe CloudModel::Services::Base do
     end
   end
   
-  context 'external_address' do
+  describe 'external_address' do
     it 'should get guest´s external_address' do
       guest = double CloudModel::Guest, external_address: '10.42.23.17'
       allow(subject).to receive(:guest).and_return guest
@@ -73,50 +73,48 @@ describe CloudModel::Services::Base do
     end
   end
   
-  context 'item_issue_chain' do
-    context 'item_issue_chain' do
-      it 'should return chained items to service for ItemIssue' do
-        host = double CloudModel::Host
-        guest = double CloudModel::Guest, host: host
-        allow(subject).to receive(:guest).and_return guest
-      
-        expect(subject.item_issue_chain).to eq [host, guest, subject]
-      end
+  describe 'item_issue_chain' do
+    it 'should return chained items to service for ItemIssue' do
+      host = double CloudModel::Host
+      guest = double CloudModel::Guest, host: host
+      allow(subject).to receive(:guest).and_return guest
+    
+      expect(subject.item_issue_chain).to eq [host, guest, subject]
     end
   end
   
-  context 'used_ports' do
+  describe 'used_ports' do
     it 'should return array with result of call to :port of the specific class' do
       allow(subject).to receive(:port).and_return(8080)
       expect(subject.used_ports).to eq [8080]
     end
   end
   
-  context 'kind' do
+  describe 'kind' do
     it 'should always return :unknown in this abstract class' do
       expect(subject.kind).to eq :unknown
     end
   end
   
-  context 'components_needed' do
+  describe 'components_needed' do
     it 'should always return empty array in this abstract class' do
       expect(subject.components_needed).to eq []
     end
   end
   
-  context 'service_status' do
+  describe 'service_status' do
     it 'should always return false in this abstract class' do
       expect(subject.service_status).to eq false
     end
   end
   
-  context 'backupable?' do
+  describe 'backupable?' do
     it 'should always return false in this abstract class' do
       expect(subject.backupable?).to eq false
     end
   end
   
-  context 'has_backups=' do
+  describe 'has_backups=' do
     it 'should always set to false if not backupable' do
       allow(subject).to receive(:backupable?).and_return false
       subject.has_backups = true
@@ -136,7 +134,7 @@ describe CloudModel::Services::Base do
     end
   end
   
-  context 'backup_directory' do
+  describe 'backup_directory' do
     it 'should return path to backups on backup system' do
       host = double CloudModel::Host, id: BSON::ObjectId.new
       guest = double CloudModel::Guest, id: BSON::ObjectId.new, host: host
@@ -149,13 +147,13 @@ describe CloudModel::Services::Base do
     
   end
   
-  context 'backup' do
+  describe 'backup' do
     it 'should raise exception in not backupable class' do
       expect{ subject.backup }.to raise_error(RuntimeError, 'Service has no backups')
     end
   end
   
-  context 'restore' do
+  describe 'restore' do
     it 'should raise exception in not backupable class' do
       expect{ subject.restore }.to raise_error(RuntimeError, 'Service has no restore')
     end

@@ -12,7 +12,7 @@ describe CloudModel::Mixins::SmartToString do
   
   subject { TestSmartToStringModel.new }
   
-  context 'to_s' do
+  describe 'to_s' do
     it 'should return human readable model info' do
       subject.name = 'my model'
       expect(subject.to_s).to eq "Test smart to string model 'my model'"

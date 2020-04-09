@@ -37,7 +37,7 @@ describe CloudModel::Certificate do
     root_ca
   end
 
-  context '#valid' do
+  describe '#valid' do
     it 'should list all valid certificates' do
       valid_certificates = [
         double(CloudModel::Certificate, 'valid_now?': true),
@@ -52,14 +52,14 @@ describe CloudModel::Certificate do
     end
   end
 
-  context 'to_s' do
+  describe 'to_s' do
     it 'should return the name of the Certificate' do
       subject.name = 'TestCertificate'
       expect(subject.to_s).to eq "Certificate 'TestCertificate'"
     end
   end
   
-  context 'x509' do
+  describe 'x509' do
     it 'should get certificate as x509 object' do
       x509 = new_x509
       subject.crt = x509.to_pem
@@ -71,7 +71,7 @@ describe CloudModel::Certificate do
     end
   end
 
-  context 'pkey' do
+  describe 'pkey' do
     it 'should return key as PKey object' do
       subject.key = root_key.to_pem
       expect(subject.pkey.class).to eq OpenSSL::PKey::RSA
@@ -79,7 +79,7 @@ describe CloudModel::Certificate do
     end
   end
   
-  context 'set_valid_dates' do
+  describe 'set_valid_dates' do
     it 'should set valid_from to the crt´s one' do
       timestamp = (Time.now - 14.days).change(usec: 0)
       subject.crt = new_x509(not_before: timestamp).to_pem
@@ -106,7 +106,7 @@ describe CloudModel::Certificate do
     end
   end
 
-  context 'valid_now?' do
+  describe 'valid_now?' do
     it 'should be valid if now is between valid_from and valid_thru' do
       subject.valid_from = Time.now - 14.days
       subject.valid_thru = Time.now + 14.days
@@ -126,7 +126,7 @@ describe CloudModel::Certificate do
     end
   end
   
-  context 'common_name' do
+  describe 'common_name' do
     it 'should get common name from x509' do
       subject.crt = new_x509.to_pem
       expect(subject.common_name).to eq 'Ruby CA'
@@ -137,7 +137,7 @@ describe CloudModel::Certificate do
     end
   end
 
-  context 'issuer' do
+  describe 'issuer' do
     it 'should get common name from x509' do
       subject.crt = new_x509.to_pem
       expect(subject.issuer).to eq 'Ruby CA'
@@ -148,7 +148,7 @@ describe CloudModel::Certificate do
     end
   end
   
-  context 'check_key' do
+  describe 'check_key' do
     it 'should be true if crt and key are the same pair' do
       subject.key = root_key
       subject.crt = new_x509
@@ -162,7 +162,7 @@ describe CloudModel::Certificate do
     end
   end
 
-  context 'used_in_guests' do
+  describe 'used_in_guests' do
     it 'should get all guests that has Services using this Certificate' do
       expect(CloudModel::Guest).to receive(:where).with('services.ssl_cert_id' => subject.id).and_return 'LIST OF GUESTS'
       expect(subject.used_in_guests).to eq 'LIST OF GUESTS'
@@ -179,7 +179,7 @@ describe CloudModel::Certificate do
     end
   end
 
-  context 'used_in_guests_by_hosts' do
+  describe 'used_in_guests_by_hosts' do
     it 'should sort the result of used_in_guests by host and return a Hash' do
       guests = [
         double(CloudModel::Guest, host_id: 'host1'),

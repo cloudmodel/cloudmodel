@@ -2,6 +2,7 @@ require 'mongoid-grid_fs'
 require "cloud_model/config"
 require "cloud_model/engine"
 require "cloud_model/call_rake"
+require "cloud_model/execution_exception"
 
 module CloudModel  
   def self.config
@@ -15,14 +16,5 @@ module CloudModel
   def self.log_exception e
     Rails.logger.error "CloudModel: uncaught #{e.class} exception while handling connection: #{e.message}"
     Rails.logger.error "Stack trace:\n#{e.backtrace.map {|l| "  #{l}\n"}.join}"
-  end
-  
-  class ExecutionException < Exception
-    attr_accessor :command, :error, :output
-    def initialize(command, error, output)
-      @command = command
-      @error = error
-      @output = output
-    end
   end
 end

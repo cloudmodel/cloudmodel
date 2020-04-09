@@ -32,14 +32,14 @@ describe CloudModel::SolrImage do
   it { expect(subject).to validate_presence_of :git_branch }
   it { expect(subject).to validate_uniqueness_of :name }
 
-  context 'used_in_guests' do
+  describe 'used_in_guests' do
     it 'should get all guests that has Services using this Certificate' do
       expect(CloudModel::Guest).to receive(:where).with('services.deploy_solr_image_id' => subject.id).and_return 'LIST OF GUESTS'
       expect(subject.used_in_guests).to eq 'LIST OF GUESTS'
     end
   end
 
-  context 'used_in_guests_by_hosts' do
+  describe 'used_in_guests_by_hosts' do
     it 'should sort the result of used_in_guests by host and return a Hash' do
       guests = [
         double(CloudModel::Guest, host_id: 'host1'),
@@ -55,7 +55,7 @@ describe CloudModel::SolrImage do
     end
   end
   
-  context 'services' do
+  describe 'services' do
     it 'should list all services using SolrImage' do
       guest1 = double CloudModel::Guest
       guest2 = double CloudModel::Guest
@@ -75,7 +75,7 @@ describe CloudModel::SolrImage do
     end
   end
 
-  context 'file_size' do
+  describe 'file_size' do
     it 'should get length from file object' do
       subject.file = Mongoid::GridFS::Fs::File.new
       subject.file.length = 4711
@@ -88,7 +88,7 @@ describe CloudModel::SolrImage do
     end
   end
   
-  context 'solr_mirror' do
+  describe 'solr_mirror' do
     it 'should find SolrMirror for set solr_version' do  
       solr_mirror = double CloudModel::SolrMirror
       subject.solr_version = '8.5.0'
@@ -99,7 +99,7 @@ describe CloudModel::SolrImage do
     end
   end
 
-  context 'build_path' do   
+  describe 'build_path' do   
     it 'should build in CloudModel data_directory' do
       allow(CloudModel.config).to receive(:data_directory).and_return Pathname.new '/my_home/rails_project/data'
       
@@ -107,7 +107,7 @@ describe CloudModel::SolrImage do
     end
   end
   
-  context '#build_state_id_for' do
+  describe '#build_state_id_for' do
     CloudModel::SolrImage.enum_fields[:build_state][:values].each do |k,v|
       it "should map #{v} to id #{k}" do
         expect(CloudModel::SolrImage.build_state_id_for v).to eq k
@@ -115,7 +115,7 @@ describe CloudModel::SolrImage do
     end
   end
   
-  context 'worker' do
+  describe 'worker' do
     it 'should return worker for SolrImage' do
       worker = double CloudModel::Workers::SolrImageWorker, build: true
       expect(CloudModel::Workers::SolrImageWorker).to receive(:new).with(subject).and_return worker
@@ -123,19 +123,19 @@ describe CloudModel::SolrImage do
     end
   end
   
-  context '#buildable_build_states' do
+  describe '#buildable_build_states' do
     it 'should return buildable states' do
       expect(CloudModel::SolrImage.buildable_build_states).to eq [:finished, :failed, :not_started]
     end
   end
   
-  context '#buildable_build_state_ids' do
+  describe '#buildable_build_state_ids' do
     it 'should return buildable states ids' do
       expect(CloudModel::SolrImage.buildable_build_state_ids).to eq [240, 241, 255]
     end
   end
   
-  context 'buildable?' do
+  describe 'buildable?' do
     it 'should be true if current build state is buildable' do
       subject.build_state = :finished
       expect(subject.buildable?).to eq true
@@ -147,7 +147,7 @@ describe CloudModel::SolrImage do
     end
   end
   
-  context '#buildable' do
+  describe '#buildable' do
     it 'should return all buildable SolrImages' do
       scoped = double
       buildable_solr_images = double
@@ -158,7 +158,7 @@ describe CloudModel::SolrImage do
     end
   end
   
-  context 'build' do
+  describe 'build' do
     it 'should call rake to build SolrImage' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:solr_image:build', solr_image_id: subject.id).and_return true
       allow(subject).to receive(:buildable?).and_return true
@@ -200,7 +200,7 @@ describe CloudModel::SolrImage do
     end
   end
   
-  context 'build!' do
+  describe 'build!' do
     it 'should call worker to build SolrImage' do
       worker = double CloudModel::Workers::SolrImageWorker, build: true
       expect(subject).to receive(:worker).and_return worker

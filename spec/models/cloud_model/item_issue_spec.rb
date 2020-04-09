@@ -20,7 +20,7 @@ describe CloudModel::ItemIssue do
   it { expect(subject).to belong_to(:subject).with_polymorphism }
   it { expect(subject).to have_field(:subject_chain_ids).of_type(Array).with_default_value_of [] }
   
-  context '#open' do
+  describe '#open' do
     it 'should filter for open items' do
       scoped = double
       filtered = double
@@ -32,7 +32,7 @@ describe CloudModel::ItemIssue do
     end
   end
 
-  context '#resolved' do
+  describe '#resolved' do
     it 'should filter for resolved items' do
       scoped = double
       filtered = double
@@ -44,14 +44,14 @@ describe CloudModel::ItemIssue do
     end
   end
 
-  context 'name' do
+  describe 'name' do
     it 'should return title' do
       subject.title = "Some Title"
       expect(subject.name).to eq "Some Title"
     end
   end
 
-  context 'resolved?' do
+  describe 'resolved?' do
     it 'should be true if resolved_at is set' do
       subject.resolved_at = Time.now
       expect(subject.resolved?).to eq true
@@ -62,7 +62,7 @@ describe CloudModel::ItemIssue do
     end
   end
 
-  context 'subject_chain=' do
+  describe 'subject_chain=' do
     it 'should set subject_chain_ids' do
       guest = Factory :guest
       
@@ -74,7 +74,7 @@ describe CloudModel::ItemIssue do
     end
   end
 
-  context 'subject_chain' do
+  describe 'subject_chain' do
     it 'should get subject_chains from subject_chain_ids' do
       guest = Factory :guest
       
@@ -86,7 +86,7 @@ describe CloudModel::ItemIssue do
     end
   end
 
-  context 'set_subject_chain' do
+  describe 'set_subject_chain' do
     it 'should set subject chain item item_issue_chain' do
       item = Factory :guest
       subject.subject = item
@@ -116,7 +116,7 @@ describe CloudModel::ItemIssue do
     end
   end
 
-  context 'notify' do
+  describe 'notify' do
     it 'should should invoke configured notifiers' do
       notifier = double
       allow(CloudModel.config).to receive(:monitoring_notifiers).and_return [{severity: [:info], notifier: notifier}]
@@ -169,7 +169,7 @@ describe CloudModel::ItemIssue do
     end
   end
   
-  context 'subject' do
+  describe 'subject' do
     it 'should find services through it´s guest' do
       services = double
       service = double
@@ -225,7 +225,7 @@ describe CloudModel::ItemIssue do
     end
   end
   
-  context 'title' do
+  describe 'title' do
     it 'should return set title if present' do
       subject.title = "Some Title"
       expect(subject.title).to eq "Some Title"

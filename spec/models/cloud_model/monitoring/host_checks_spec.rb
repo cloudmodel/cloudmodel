@@ -8,7 +8,7 @@ describe CloudModel::Monitoring::HostChecks do
 
   it { expect(subject).to be_a CloudModel::Monitoring::BaseChecks }
   
-  context 'aquire_data' do
+  describe 'aquire_data' do
     it 'should aquire system info' do
       expect(host).to receive(:system_info).and_return 'system info'
       
@@ -16,7 +16,7 @@ describe CloudModel::Monitoring::HostChecks do
     end
   end
   
-  context 'check' do
+  describe 'check' do
     it 'should call check_system_info' do
       expect(subject).to receive(:check_system_info).and_return true
       

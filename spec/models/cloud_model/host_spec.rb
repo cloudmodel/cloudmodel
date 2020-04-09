@@ -47,7 +47,7 @@ describe CloudModel::Host do
   it { expect(subject).to validate_presence_of(:mac_address_prefix) }
   it { expect(subject).to validate_uniqueness_of(:mac_address_prefix) }
   
-  context 'addresses=' do
+  describe 'addresses=' do
     it 'should accept strings to be added' do
       subject.addresses << CloudModel::Address.new(ip: '10.42.23.11', subnet: 26)
       subject.addresses << '192.168.42.1/28'
@@ -81,14 +81,14 @@ describe CloudModel::Host do
     end
   end
   
-  context 'to_param' do
+  describe 'to_param' do
     it 'should return name as param' do
       subject.name = 'some_host'
       expect(subject.to_param).to eq 'some_host'
     end
   end
   
-  context 'primary_address=' do
+  describe 'primary_address=' do
     context 'should accept string' do
       before do
         subject.primary_address = '192.168.42.1/28'
@@ -158,7 +158,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'private_network=' do    
+  describe 'private_network=' do    
     context 'should accept string' do
       before do
         subject.private_network = '10.42.23.14/27'
@@ -228,7 +228,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'available_private_address_collection' do
+  describe 'available_private_address_collection' do
     it 'should get the last available address from block' do
       subject.private_network = '10.42.42.0/29'
       subject.private_network.gateway = '10.42.42.1'
@@ -254,7 +254,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'available_external_address_collection' do
+  describe 'available_external_address_collection' do
     it 'should get the last available address from block' do
       subject.addresses << '192.168.42.0/30'
       
@@ -288,7 +288,7 @@ describe CloudModel::Host do
     end
   end
 
-  context 'dhcp_private_address' do
+  describe 'dhcp_private_address' do
     it 'should get the last available address from block' do
       subject.private_network = '10.42.42.0/28'
       subject.private_network.gateway = '10.42.42.1'
@@ -314,7 +314,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'dhcp_external_address' do
+  describe 'dhcp_external_address' do
     it 'should get the last available address from block' do
       subject.addresses << '192.168.42.0/28'
       
@@ -348,7 +348,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'private_address' do
+  describe 'private_address' do
     it 'should return first address of private network' do
       subject.private_network = CloudModel::Address.new ip: '10.42.23.0', subnet: 24
       
@@ -356,11 +356,11 @@ describe CloudModel::Host do
     end
   end
   
-  context 'email_hostname' do
+  describe 'email_hostname' do
     pending
   end
   
-  context 'name_with_stage' do
+  describe 'name_with_stage' do
     it 'should concatinate name with stage' do
       subject.name = 'some_host'
       subject.stage = :production
@@ -369,7 +369,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'tinc_private_key' do
+  describe 'tinc_private_key' do
     it 'should generate new key pair' do
       key = 'PRIVATE_KEY'
       allow(key).to receive(:public_key) { 'PUBLIC_KEY'}
@@ -380,7 +380,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'ssh_connection' do
+  describe 'ssh_connection' do
     it "should open a new SSH connection to the host on first call" do
       allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
       expect(Net::SSH).to receive(:start).with(subject.primary_address.ip, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_return "SSH CONNECTION"
@@ -396,7 +396,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'sftp' do
+  describe 'sftp' do
     it 'should return the sftp of the ssh connection' do
       ssh_connection = double
       sftp_connection = double
@@ -408,7 +408,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'ssh_address' do
+  describe 'ssh_address' do
     it 'should return private address' do
       subject.private_network = '10.42.23.0/24'
       expect(subject.ssh_address).to eq '10.42.23.1'
@@ -421,7 +421,7 @@ describe CloudModel::Host do
     end    
   end
   
-  context 'shell' do
+  describe 'shell' do
     # Goal is an interactive shell, but for now it puts ssh command to copy
     
     it 'should output the command to connect with ssh' do
@@ -432,7 +432,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'sync_inst_images' do
+  describe 'sync_inst_images' do
     it 'should call rsync for cloud directory' do
       allow(subject).to receive(:ssh_address).and_return '10.42.23.1'
       allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
@@ -450,7 +450,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'exec', type: :ssh do
+  describe 'exec', type: :ssh do
     let(:sftp_session) { double('Net::SFTP::Session', close_channel: true) }
     before do
       allow(subject).to receive(:sftp).and_return sftp_session
@@ -491,7 +491,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'exec!' do
+  describe 'exec!' do
     it 'should call exec with same command' do
       expect(subject).to receive(:exec).with('command').and_return [true, 'true']
       expect(subject.exec! 'command', 'message').to eq 'true'
@@ -503,7 +503,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'mounted_at?' do
+  describe 'mounted_at?' do
     it 'should return true if a filesystem is mounted at the given mountpoint' do
       mount = <<~OUT
         sysfs on /sys type sysfs (rw,relatime)
@@ -517,7 +517,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'boot_fs_mounted?' do
+  describe 'boot_fs_mounted?' do
     it 'should return true if /boot is mounted' do
       expect(subject).to receive(:exec).with('mount').and_return [
         true, 
@@ -541,7 +541,7 @@ describe CloudModel::Host do
     
   end
   
-  context 'mount_boot_fs' do
+  describe 'mount_boot_fs' do
     it 'should call mount if not mounted' do
       allow(subject).to receive(:boot_fs_mounted?).and_return false
         
@@ -573,7 +573,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'unmount_boot_fs' do
+  describe 'unmount_boot_fs' do
     it 'should call umount on host and return true on success' do
       expect(subject).to receive(:exec).with('umount /boot').and_return [true, '']
       
@@ -587,19 +587,19 @@ describe CloudModel::Host do
     end
   end
   
-  context 'system_info' do
+  describe 'system_info' do
     pending
   end
   
-  context 'memory_size' do
+  describe 'memory_size' do
     pending
   end
   
-  context 'cpu_usage' do
+  describe 'cpu_usage' do
     pending
   end
   
-  context 'deployable?' do
+  describe 'deployable?' do
     it 'should not be deployable if deploy state is :pending' do
       subject.deploy_state = :pending
       expect(subject).not_to be_deployable
@@ -631,7 +631,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'worker' do
+  describe 'worker' do
     it 'should return worker for host' do
       worker = double CloudModel::Workers::HostWorker
       expect(CloudModel::Workers::HostWorker).to receive(:new).with(subject).and_return worker  
@@ -640,7 +640,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'deploy' do
+  describe 'deploy' do
     it 'should call rake cloudmodel:host:deploy with host´s id' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:host:deploy', host_id: subject.id)
       subject.deploy
@@ -660,7 +660,7 @@ describe CloudModel::Host do
     end
   end  
   
-  context 'deploy!' do
+  describe 'deploy!' do
     it 'should call worker to deploy Host' do
       worker = double CloudModel::Workers::HostWorker, deploy: true
       expect(subject).to receive(:worker).and_return worker
@@ -686,7 +686,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'redeploy' do
+  describe 'redeploy' do
     it 'should call rake cloudmodel:host:deploy with host´s id' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:host:redeploy', host_id: subject.id)
       subject.redeploy
@@ -706,7 +706,7 @@ describe CloudModel::Host do
     end
   end
   
-  context 'redeploy!' do
+  describe 'redeploy!' do
     it 'should call worker to deploy Host' do
       worker = double CloudModel::Workers::HostWorker, redeploy: true
       expect(subject).to receive(:worker).and_return worker

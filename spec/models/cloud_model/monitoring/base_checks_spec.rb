@@ -6,7 +6,7 @@ describe CloudModel::Monitoring::BaseChecks do
   let(:check_subject) { double to_s: 'Check Object' }
   subject { CloudModel::Monitoring::BaseChecks.new check_subject, skip_header: true }
   
-  context 'initialize' do
+  describe 'initialize' do
     it 'should output a header for the subject' do
       expect do
         checks = CloudModel::Monitoring::BaseChecks.new check_subject  
@@ -33,19 +33,19 @@ describe CloudModel::Monitoring::BaseChecks do
     end
   end
   
-  context 'indent_size' do
+  describe 'indent_size' do
     it 'should be 0' do
       expect(subject.indent_size).to eq 0
     end
   end
   
-  context 'aquire_data' do
+  describe 'aquire_data' do
     it 'should be nil' do
       expect(subject.aquire_data).to eq nil
     end
   end
   
-  context 'store_data' do
+  describe 'store_data' do
     it 'should store data on subject' do
       check_subject = Factory :certificate
       subject.instance_variable_set :@subject, check_subject
@@ -59,7 +59,7 @@ describe CloudModel::Monitoring::BaseChecks do
     end
   end
 
-  context 'data' do
+  describe 'data' do
     it 'should aquire data and store it on first run' do
       expect(subject).to receive(:aquire_data).and_return 'data' => 'some data'
       expect(subject).to receive(:store_data)
@@ -107,12 +107,12 @@ describe CloudModel::Monitoring::BaseChecks do
     end
   end
   
-  context 'do_check' do
+  describe 'do_check' do
   end
   
-  context 'do_check_value' do
+  describe 'do_check_value' do
   end
   
-  context 'do_check_errors_on' do
+  describe 'do_check_errors_on' do
   end
 end

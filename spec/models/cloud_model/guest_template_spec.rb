@@ -21,13 +21,13 @@ describe CloudModel::GuestTemplate do
   let(:host) { double CloudModel::Host, id: BSON::ObjectId.new, arch: 'MOS6502'}
   let(:guest_template_type) { double CloudModel::GuestTemplateType, id: BSON::ObjectId.new }
   
-  context '#buildable_build_states' do
+  describe '#buildable_build_states' do
     it 'should return buildable states' do
       expect(CloudModel::GuestTemplate.buildable_build_states).to eq [:finished, :failed, :not_started]
     end
   end
   
-  context 'buildable?' do
+  describe 'buildable?' do
     it 'should be true if current build state is buildable' do
       subject.build_state = :finished
       expect(subject.buildable?).to eq true
@@ -39,7 +39,7 @@ describe CloudModel::GuestTemplate do
     end
   end
   
-  context '#latest_created_at' do
+  describe '#latest_created_at' do
     it 'should get creation of latest successfully build template' do
       scoped = double
       collection = double
@@ -63,7 +63,7 @@ describe CloudModel::GuestTemplate do
     end
   end
   
-  context 'worker' do
+  describe 'worker' do
     it 'should return worker for GuestTemplate' do
       worker = double CloudModel::Workers::GuestTemplateWorker, build_template: true
       expect(CloudModel::Workers::GuestTemplateWorker).to receive(:new).with(host).and_return worker
@@ -71,7 +71,7 @@ describe CloudModel::GuestTemplate do
     end
   end  
   
-  context 'build' do
+  describe 'build' do
     it 'should call rake to build GuestTemplate' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:guest_template:build', host_id: host.id, template_id: subject.id).and_return true
       allow(subject).to receive(:buildable?).and_return true
@@ -113,7 +113,7 @@ describe CloudModel::GuestTemplate do
     end
   end
   
-  context 'build!' do
+  describe 'build!' do
     it 'should call worker to build GuestTemplate' do
       worker = double CloudModel::Workers::GuestTemplateWorker, build_template: true
       expect(subject).to receive(:worker).and_return worker
@@ -152,7 +152,7 @@ describe CloudModel::GuestTemplate do
     end
   end
   
-  context 'lxd_arch' do
+  describe 'lxd_arch' do
     it 'should map amd64 to x86_64' do
       subject.arch = 'amd64'
       expect(subject.lxd_arch).to eq 'x86_64'
@@ -164,7 +164,7 @@ describe CloudModel::GuestTemplate do
     end
   end
   
-  context 'name' do
+  describe 'name' do
     it 'should concatinate template type name and created date' do
       allow(subject.template_type).to receive(:name).and_return "Some Template Type"
       allow(subject).to receive(:created_at).and_return Time.parse('30.03.2020 13:37:42.23')
@@ -180,21 +180,21 @@ describe CloudModel::GuestTemplate do
     end
   end
   
-  context 'lxd_image_metadata_tarball' do
+  describe 'lxd_image_metadata_tarball' do
     it 'should return path to templates tarball' do
       subject.template_type_id = guest_template_type.id
       expect(subject.lxd_image_metadata_tarball).to eq "/cloud/templates/#{guest_template_type.id}/#{subject.id}.lxd.tar.gz"
     end
   end
   
-  context 'lxd_alias' do
+  describe 'lxd_alias' do
     it 'should return lxd alias for template' do
       subject.template_type_id = guest_template_type.id
       expect(subject.lxd_alias).to eq "#{guest_template_type.id}/#{subject.id}"
     end
   end
   
-  context 'tarball' do
+  describe 'tarball' do
     it 'should return path to templates tarball' do
       subject.template_type_id = guest_template_type.id
       expect(subject.tarball).to eq "/cloud/templates/#{guest_template_type.id}/#{subject.id}.tar.gz"
