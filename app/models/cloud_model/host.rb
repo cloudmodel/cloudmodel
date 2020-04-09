@@ -44,14 +44,14 @@ module CloudModel
     field :arch, type: String, default: 'amd64'
     field :mac_address_prefix, type: String
 
-    enum_field :stage, values: {
+    enum_field :stage, {
       0x00 => :pending,
       0x10 => :testing,
       0x30 => :staging,
       0x40 => :production,
     }, default: :pending
     
-    enum_field :deploy_state, values: {
+    enum_field :deploy_state, {
       0x00 => :pending,
       0x01 => :running,
       0x02 => :booting,

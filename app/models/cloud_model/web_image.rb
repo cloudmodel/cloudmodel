@@ -16,7 +16,7 @@ module CloudModel
     field :has_mongodb, type: Mongoid::Boolean, default: false    
     field :has_redis, type: Mongoid::Boolean, default: false    
     
-    enum_field :build_state, values: {
+    enum_field :build_state, {
       0x00 => :pending,
       0x01 => :running,
       0x02 => :checking_out,
@@ -31,7 +31,7 @@ module CloudModel
     
     field :build_last_issue, type: String
     
-    enum_field :redeploy_state, values: {
+    enum_field :redeploy_state, {
       0x00 => :pending,
       0x01 => :running,
       0xf0 => :finished,

@@ -10,7 +10,7 @@ module CloudModel
     belongs_to :template_type, class_name: "CloudModel::GuestTemplateType"
     belongs_to :core_template, class_name: "CloudModel::GuestCoreTemplate"
     
-    enum_field :build_state, values: {
+    enum_field :build_state, {
       0x00 => :pending,
       0x01 => :running,
       0x05 => :packaging,

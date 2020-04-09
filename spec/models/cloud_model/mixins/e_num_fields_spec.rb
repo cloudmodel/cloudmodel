@@ -7,7 +7,7 @@ describe CloudModel::Mixins::ENumFields do
     include Mongoid::Document
     include CloudModel::Mixins::ENumFields
     
-    enum_field :enum, values: {
+    enum_field :enum, {
       0x00 => :pending,
       0x10 => :testing,
       0x30 => :staging,
@@ -49,9 +49,56 @@ describe CloudModel::Mixins::ENumFields do
     })
   end
   
-  it 'should resolve enum in serializable_hash' do
-    subject.enum_id = 0x30
+  describe 'enum_field' do
+    it 'should allow to define new enum' do
+      test_class = Class.new
+      test_class.include Mongoid::Document
+      test_class.include CloudModel::Mixins::ENumFields
+      test_class.enum_field :test_field, {
+        0x00 => :none
+      }
+      
+      expect(test_class.new).to have_field(:test_field_id).of_type(Integer).with_default_value_of(nil) 
+    end
     
-    expect(subject.serializable_hash['enum']).to eq :staging
+    it 'should allow to define new enum with default' do
+      test_class = Class.new
+      test_class.include Mongoid::Document
+      test_class.include CloudModel::Mixins::ENumFields
+      test_class.enum_field :test_field, {
+        0x00 => :none,
+        0x01 => :something
+        }, default: :something
+      
+      expect(test_class.new).to have_field(:test_field_id).of_type(Integer).with_default_value_of(0x01) 
+    end
+    
+    it 'should silently drop default if value is invalid' do
+      test_class = Class.new
+      test_class.include Mongoid::Document
+      test_class.include CloudModel::Mixins::ENumFields
+      test_class.enum_field :test_field, {
+        0x00 => :none,
+        0x01 => :something
+        }, default: :something_else
+      
+      expect(test_class.new).to have_field(:test_field_id).of_type(Integer).with_default_value_of(nil) 
+    end
+  end
+  
+  describe 'seriablizable_hash' do
+    it 'should resolve enum in serializable_hash' do
+      subject.enum_id = 0x30
+    
+      expect(subject.serializable_hash['enum']).to eq :staging
+      expect(subject.serializable_hash['enum_id']).to eq nil
+    end
+    
+    # it 'should allow to call without enum mapper' do
+    #   subject.enum_id = 0x30
+    #
+    #   expect(subject.serializable_hash_without_enum_enum['enum']).to eq nil
+    #   expect(subject.serializable_hash_without_enum_enum['enum_id']).to eq 0x30
+    # end
   end
 end

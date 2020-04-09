@@ -20,6 +20,8 @@ describe CloudModel::Services::Monitoring do
   end
 
   describe 'service_status' do 
-    pending
+    it 'should have no service status' do
+      expect(subject.service_status).to eq false
+    end
   end
 end
