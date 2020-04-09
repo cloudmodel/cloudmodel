@@ -12,7 +12,7 @@ describe CloudModel::Mixins::UsedInGuestsAs do
   
   subject { TestUsedInGuestsAsModel.new }
   
-  context 'used_in_guests' do
+  describe 'used_in_guests' do
     it 'should get guests using the test item' do
       guests = double
       
@@ -22,7 +22,7 @@ describe CloudModel::Mixins::UsedInGuestsAs do
     end
   end
   
-  context 'used_in_guests_by_host' do
+  describe 'used_in_guests_by_host' do
     it 'should get guests ordered by host id using the test item' do
       host_ids = [BSON::ObjectId.new, BSON::ObjectId.new]
       

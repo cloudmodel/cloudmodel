@@ -8,13 +8,13 @@ describe CloudModel::Monitoring::CertificateChecks do
 
   it { expect(subject).to be_a CloudModel::Monitoring::BaseChecks }
   
-  context 'aquire_data' do
+  describe 'aquire_data' do
     it 'should be nil for now' do
       expect(subject.aquire_data).to eq nil
     end
   end
   
-  context 'check' do
+  describe 'check' do
     it 'should be nil for now' do
       expect(subject.check).to eq nil
     end

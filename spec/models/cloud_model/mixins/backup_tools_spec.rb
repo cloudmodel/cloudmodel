@@ -14,7 +14,7 @@ describe CloudModel::Mixins::BackupTools do
   
   subject { TestBackupToolsModel.new }
   
-  context 'list_backups' do
+  describe 'list_backups' do
     it 'should return all items in backup_directory matching a compressed timestamp' do
       expect(Dir).to receive(:entries).with('/var/backups/my_item').and_return [
         '.',
@@ -35,7 +35,7 @@ describe CloudModel::Mixins::BackupTools do
     end
   end
   
-  context 'list_disposable_backups' do
+  describe 'list_disposable_backups' do
     it "should keep last 3 backups" do
       keep_backups = [
         (Time.now-1.days).strftime("%Y%m%d%H%M%S"),
@@ -96,7 +96,7 @@ describe CloudModel::Mixins::BackupTools do
     end
   end
   
-  context 'cleanup_backups' do
+  describe 'cleanup_backups' do
     it 'should delete disposable backups' do
       expect(subject).to receive(:list_disposable_backups).and_return ['20200403133742', '20161224204217']
       

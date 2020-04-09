@@ -4,7 +4,7 @@ describe CloudModel::Workers::BaseWorker do
   let(:host) { Factory :host }
   subject { CloudModel::Workers::BaseWorker.new host }
   
-  context 'render' do
+  describe 'render' do
     it 'should call render_to_string on a new instance of ActionController::Base and pass return value' do
       action_controller = double(ActionController::Base)
       allow(ActionController::Base).to receive(:new).and_return action_controller
@@ -13,7 +13,7 @@ describe CloudModel::Workers::BaseWorker do
     end
   end
   
-  context 'build_tar' do
+  describe 'build_tar' do
     it 'should execute tar on host' do
       expect(host).to receive(:exec!).with("/bin/tar czf /inst/image.tar.bz2 /mnt/root", "Failed to build tar /inst/image.tar.bz2").and_return 'ok'
       subject.build_tar '/mnt/root', '/inst/image.tar.bz2'

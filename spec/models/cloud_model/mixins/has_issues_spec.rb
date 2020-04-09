@@ -14,13 +14,13 @@ describe CloudModel::Mixins::HasIssues do
   it { expect(subject).to have_field(:monitoring_last_check_result).of_type(Hash).with_default_value_of({})}
   it { expect(subject).to have_many(:item_issues).of_type CloudModel::ItemIssue}
   
-  context 'item_issue_chain' do
+  describe 'item_issue_chain' do
     it 'should return model in an Array' do
       expect(subject.item_issue_chain).to eq [subject]
     end
   end
   
-  context 'linked_item_issues' do
+  describe 'linked_item_issues' do
     it 'should get issues related to the subject as Mongoid::Criteria' do
       item1 = Factory :item_issue, subject: subject
       item2 = Factory :item_issue, subject_chain: [TestHasIssuesModel.new, subject]
@@ -32,7 +32,7 @@ describe CloudModel::Mixins::HasIssues do
     end
   end
   
-  context 'state' do
+  describe 'state' do
     it 'should be :undefined without a monitoring_last_check_result' do
       expect(subject.state).to eq :undefined
     end

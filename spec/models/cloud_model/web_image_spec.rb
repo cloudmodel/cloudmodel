@@ -46,14 +46,14 @@ describe CloudModel::WebImage do
   it { expect(subject).to validate_presence_of :git_branch }
   it { expect(subject).to validate_uniqueness_of :name }
 
-  context 'used_in_guests' do
+  describe 'used_in_guests' do
     it 'should get all guests that has Services using this Certificate' do
       expect(CloudModel::Guest).to receive(:where).with('services.deploy_web_image_id' => subject.id).and_return 'LIST OF GUESTS'
       expect(subject.used_in_guests).to eq 'LIST OF GUESTS'
     end
   end
 
-  context 'used_in_guests_by_hosts' do
+  describe 'used_in_guests_by_hosts' do
     it 'should sort the result of used_in_guests by host and return a Hash' do
       guests = [
         double(CloudModel::Guest, host_id: 'host1'),
@@ -69,7 +69,7 @@ describe CloudModel::WebImage do
     end
   end
   
-  context 'services' do
+  describe 'services' do
     it 'should list all services using WebImage' do
       guest1 = double CloudModel::Guest
       guest2 = double CloudModel::Guest
@@ -89,7 +89,7 @@ describe CloudModel::WebImage do
     end
   end
 
-  context 'file_size' do
+  describe 'file_size' do
     it 'should get length from file object' do
       subject.file = Mongoid::GridFS::Fs::File.new
       subject.file.length = 4711
@@ -102,7 +102,7 @@ describe CloudModel::WebImage do
     end
   end
 
-  context 'build_path' do   
+  describe 'build_path' do   
     it 'should build in CloudModel data_directory' do
       allow(CloudModel.config).to receive(:data_directory).and_return Pathname.new '/my_home/rails_project/data'
       
@@ -110,7 +110,7 @@ describe CloudModel::WebImage do
     end
   end
 
-  context 'build_gem_home' do
+  describe 'build_gem_home' do
     it 'should give path to gem_home of deployed WebImage' do
       allow(subject).to receive(:build_path).and_return '/tmp/build/master'
       allow(Bundler).to receive(:ruby_scope).and_return 'ruby/4.2.0'
@@ -120,14 +120,14 @@ describe CloudModel::WebImage do
     
   end
 
-  context 'build_gemfile' do
+  describe 'build_gemfile' do
     it 'should give path to Gemfile of deployed WebImage' do
       allow(subject).to receive(:build_path).and_return '/tmp/build/master'
       expect(subject.build_gemfile).to eq '/tmp/build/master/current/Gemfile'
     end
   end
   
-  context '#build_state_id_for' do
+  describe '#build_state_id_for' do
     CloudModel::WebImage.enum_fields[:build_state][:values].each do |k,v|
       it "should map #{v} to id #{k}" do
         expect(CloudModel::WebImage.build_state_id_for v).to eq k
@@ -135,7 +135,7 @@ describe CloudModel::WebImage do
     end
   end
   
-  context 'worker' do
+  describe 'worker' do
     it 'should return worker for WebImage' do
       worker = double CloudModel::Workers::WebImageWorker, build: true
       expect(CloudModel::Workers::WebImageWorker).to receive(:new).with(subject).and_return worker
@@ -143,19 +143,19 @@ describe CloudModel::WebImage do
     end
   end
   
-  context '#buildable_build_states' do
+  describe '#buildable_build_states' do
     it 'should return buildable states' do
       expect(CloudModel::WebImage.buildable_build_states).to eq [:finished, :failed, :not_started]
     end
   end
   
-  context '#buildable_build_state_ids' do
+  describe '#buildable_build_state_ids' do
     it 'should return buildable states ids' do
       expect(CloudModel::WebImage.buildable_build_state_ids).to eq [240, 241, 255]
     end
   end
   
-  context 'buildable?' do
+  describe 'buildable?' do
     it 'should be true if current build state is buildable' do
       subject.build_state = :finished
       expect(subject.buildable?).to eq true
@@ -167,7 +167,7 @@ describe CloudModel::WebImage do
     end
   end
   
-  context '#buildable' do
+  describe '#buildable' do
     it 'should return all buildable WebImages' do
       scoped = double
       buildable_web_images = double
@@ -178,7 +178,7 @@ describe CloudModel::WebImage do
     end
   end
   
-  context 'build' do
+  describe 'build' do
     it 'should call rake to build WebImage' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:web_image:build', web_image_id: subject.id).and_return true
       allow(subject).to receive(:buildable?).and_return true
@@ -220,7 +220,7 @@ describe CloudModel::WebImage do
     end
   end
   
-  context 'build!' do
+  describe 'build!' do
     it 'should call worker to build WebImage' do
       worker = double CloudModel::Workers::WebImageWorker, build: true
       expect(subject).to receive(:worker).and_return worker
@@ -247,13 +247,13 @@ describe CloudModel::WebImage do
     end
   end
   
-  context '#redeployable_redeploy_states' do
+  describe '#redeployable_redeploy_states' do
     it 'should return redeployable states' do
       expect(CloudModel::WebImage.redeployable_redeploy_states).to eq [:finished, :failed, :not_started]
     end
   end
   
-  context 'redeployable?' do
+  describe 'redeployable?' do
     it 'should be true if current redeploy state is redeployable' do
       subject.redeploy_state = :finished
       expect(subject.redeployable?).to eq true
@@ -265,7 +265,7 @@ describe CloudModel::WebImage do
     end
   end
   
-  context 'redeploy' do
+  describe 'redeploy' do
     it 'should call rake to redeploy WebImage' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:web_image:redeploy', web_image_id: subject.id).and_return true
       allow(subject).to receive(:redeployable?).and_return true
@@ -321,7 +321,7 @@ describe CloudModel::WebImage do
     end
   end
   
-  context 'redeploy!' do
+  describe 'redeploy!' do
     it 'should call worker to redeploy WebImage' do
       worker = double CloudModel::Workers::WebImageWorker, redeploy: true
       expect(subject).to receive(:worker).and_return worker

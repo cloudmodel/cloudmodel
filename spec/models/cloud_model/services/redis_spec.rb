@@ -9,31 +9,31 @@ describe CloudModel::Services::Redis do
   it { expect(subject).to have_field(:redis_sentinel_port).of_type(Integer).with_default_value_of 26379 }
   it { expect(subject).to belong_to(:redis_sentinel_set).of_type(CloudModel::RedisSentinelSet) }
   
-  context 'kind' do
+  describe 'kind' do
     it 'should return :redis' do
       expect(subject.kind).to eq :redis
     end
   end
   
-  context 'components_needed' do
+  describe 'components_needed' do
     it 'should require only redis' do
       expect(subject.components_needed).to eq [:redis]
     end
   end
   
-  context 'service_status' do 
+  describe 'service_status' do 
     pending
   end
   
-  context 'redis_sentinel_master?' do
+  describe 'redis_sentinel_master?' do
     pending
   end
   
-  context 'redis_sentinel_slave?' do
+  describe 'redis_sentinel_slave?' do
     pending
   end
   
-  context 'redis_sentinel_set_version' do
+  describe 'redis_sentinel_set_version' do
     it 'is not available right now' do
       expect(subject.redis_sentinel_set_version).to eq 'N/A'
     end

@@ -8,13 +8,13 @@ describe CloudModel::Monitoring::GuestChecks do
 
   it { expect(subject).to be_a CloudModel::Monitoring::BaseChecks }
   
-  context 'indent_size' do
+  describe 'indent_size' do
     it 'should indent by 2' do
       expect(subject.indent_size).to eq 2
     end
   end
   
-  context 'aquire_data' do
+  describe 'aquire_data' do
     it 'should aquire system and lxc info' do
       expect(guest).to receive(:system_info).and_return 'system info'
       expect(guest).to receive(:lxc_info).and_return 'lxc info'
@@ -23,7 +23,7 @@ describe CloudModel::Monitoring::GuestChecks do
     end
   end
   
-  context 'check' do
+  describe 'check' do
     it 'should call check_system_info' do
       expect(subject).to receive(:check_system_info).and_return true
       expect(subject.check).to eq true

@@ -5,13 +5,13 @@ require 'spec_helper'
 describe CloudModel::Components::NginxComponent do
   it { expect(subject).to be_a CloudModel::Components::BaseComponent }
   
-  context 'name' do
+  describe 'name' do
     it 'should return :nginx' do
       expect(subject.name).to eq :nginx
     end
   end
   
-  context 'requirements' do
+  describe 'requirements' do
     it 'should be an empty Array' do
       expect(subject.requirements).to eq []
     end

@@ -21,13 +21,13 @@ describe CloudModel::HostTemplate do
   
   let(:host) { double CloudModel::Host, id: BSON::ObjectId.new, arch: 'MOS6502'}
   
-  context '#buildable_build_states' do
+  describe '#buildable_build_states' do
     it 'should return buildable states' do
       expect(CloudModel::HostTemplate.buildable_build_states).to eq [:finished, :failed, :not_started]
     end
   end
   
-  context 'buildable?' do
+  describe 'buildable?' do
     it 'should be true if current build state is buildable' do
       subject.build_state = :finished
       expect(subject.buildable?).to eq true
@@ -39,7 +39,7 @@ describe CloudModel::HostTemplate do
     end
   end
   
-  context '#latest_created_at' do
+  describe '#latest_created_at' do
     it 'should get creation of latest successfully build template' do
       scoped = double
       collection = double
@@ -52,7 +52,7 @@ describe CloudModel::HostTemplate do
     end
   end
   
-  context '#new_template_to_build' do
+  describe '#new_template_to_build' do
     it 'should create new HostTemplateWorker' do
       template = double
       expect(CloudModel::HostTemplate).to receive(:create).with(arch: 'MOS6502').and_return template
@@ -60,7 +60,7 @@ describe CloudModel::HostTemplate do
     end
   end
   
-  context '#build!' do
+  describe '#build!' do
     it 'should create new template and build it' do
       template = double CloudModel::HostTemplate
       
@@ -81,7 +81,7 @@ describe CloudModel::HostTemplate do
     end
   end
   
-  context 'build' do
+  describe 'build' do
     it 'should call rake to build HostTemplate' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:host_template:build', host_id: host.id, template_id: subject.id).and_return true
       allow(subject).to receive(:buildable?).and_return true
@@ -123,7 +123,7 @@ describe CloudModel::HostTemplate do
     end
   end
   
-  context 'worker' do
+  describe 'worker' do
     it 'should return worker for HostTemplate' do
       worker = double CloudModel::Workers::HostTemplateWorker
       expect(CloudModel::Workers::HostTemplateWorker).to receive(:new).with(host).and_return worker
@@ -131,7 +131,7 @@ describe CloudModel::HostTemplate do
     end
   end
   
-  context 'build!' do
+  describe 'build!' do
     it 'should call worker to build HostTemplate' do
       worker = double CloudModel::Workers::HostTemplateWorker, build_template: true
       expect(subject).to receive(:worker).and_return worker
@@ -178,7 +178,7 @@ describe CloudModel::HostTemplate do
   #   template
   # end
   
-  context '#last_useable' do
+  describe '#last_useable' do
     it 'should get latest finished template for given host arch' do
       template = double subject.class
       expect(subject.class).to receive(:where).with(arch: 'MOS6502', build_state_id: 0xf0).and_return [template]
@@ -198,7 +198,7 @@ describe CloudModel::HostTemplate do
     end
   end
   
-  context 'tarball' do
+  describe 'tarball' do
     it 'should return path to templates tarball' do
       expect(subject.tarball).to eq "/cloud/templates/host/#{subject.id}.tar.gz"
     end

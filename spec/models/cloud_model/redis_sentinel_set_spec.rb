@@ -8,7 +8,7 @@ describe CloudModel::RedisSentinelSet do
     
   it { expect(subject).to have_field(:name).of_type(String) }
   
-  context 'services' do
+  describe 'services' do
     it 'should get array with all services using set' do
       guest1 = double CloudModel::Guest, services: []
       guest2 = double CloudModel::Guest, services: []
@@ -26,7 +26,7 @@ describe CloudModel::RedisSentinelSet do
     end
   end
   
-  context 'add_service' do
+  describe 'add_service' do
     it 'should add service to set' do
       service = double
       expect(service).to receive(:update_attribute).with(:redis_sentinel_set_id, subject.id)
@@ -35,7 +35,7 @@ describe CloudModel::RedisSentinelSet do
     end
   end
   
-  context 'master_service' do
+  describe 'master_service' do
     it 'should return master service if master_service is set' do
       service = double CloudModel::Services::Redis, id: BSON::ObjectId.new
       subject.master_service_id = service.id
@@ -52,7 +52,7 @@ describe CloudModel::RedisSentinelSet do
     end
   end
   
-  context 'master_node' do
+  describe 'master_node' do
     it 'should return guest of master_service' do
       guest = double CloudModel::Guest
       allow(subject).to receive(:master_service).and_return double(CloudModel::Services::Redis, guest: guest)
@@ -61,7 +61,7 @@ describe CloudModel::RedisSentinelSet do
     end
   end
   
-  context 'master_address' do
+  describe 'master_address' do
     it 'should return address of master_node' do
       guest = double CloudModel::Guest, private_address: '10.42.23.17'
       allow(subject).to receive(:master_node).and_return guest
@@ -70,7 +70,7 @@ describe CloudModel::RedisSentinelSet do
     end
   end
   
-  context 'sentinel_hosts' do
+  describe 'sentinel_hosts' do
     it 'should return array of ip and port mapping of services' do
       allow(subject).to receive(:services).and_return [
         double(CloudModel::Services::Redis, private_address: '10.42.23.17', redis_sentinel_port: 26379),

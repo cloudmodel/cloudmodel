@@ -44,7 +44,7 @@ describe CloudModel::Guest do
   
   let(:host) { Factory.build :host }
   
-  context 'root_fs_size=' do
+  describe 'root_fs_size=' do
     it 'should parse input as size string' do
       expect(subject).to receive(:accept_size_string_parser).with('Size String').and_return(23)
       subject.root_fs_size = 'Size String'
@@ -53,7 +53,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'memory_size=' do
+  describe 'memory_size=' do
     it 'should parse input as size string' do
       expect(subject).to receive(:accept_size_string_parser).with('Size String').and_return(42)
       subject.memory_size = 'Size String'
@@ -62,7 +62,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'current_lxd_container' do
+  describe 'current_lxd_container' do
     it 'should get lxd_container with current_lxd_container_id' do
       container = double CloudModel::LxdContainer
       current_container_id = BSON::ObjectId.new
@@ -73,7 +73,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'available_private_address_collection' do
+  describe 'available_private_address_collection' do
     it 'should return host´s available_private_address_collection and add it´s own private address' do
       subject.host = host
       expect(host).to receive(:available_private_address_collection).and_return(['10.42.42.4', '10.42.42.6'])
@@ -86,7 +86,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'available_external_address_collection' do
+  describe 'available_external_address_collection' do
     it 'should return host´s available_external_address_collection and add it´s own external address' do
       subject.host = host
       expect(host).to receive(:available_external_address_collection).and_return(['192.168.42.4', '192.168.42.6'])
@@ -99,7 +99,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'external_hostname' do
+  describe 'external_hostname' do
     it 'should lookup the hostname for the external ip' do
       allow(Resolv).to receive(:getname).with('127.0.0.1').and_return('localhost')
       subject.external_address = '127.0.0.1'
@@ -113,7 +113,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'external_hostname' do
+  describe 'external_hostname' do
     it 'should return blank string if no external address' do
       expect(subject.external_hostname).to eq ''
     end
@@ -128,7 +128,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'external_alt_names_string' do
+  describe 'external_alt_names_string' do
     it 'should concat alt_names with a comma' do
       allow(subject).to receive(:external_alt_names).and_return ['alt.example.com', 'www.alt.example.com']
       
@@ -136,7 +136,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'external_alt_names_string=' do
+  describe 'external_alt_names_string=' do
     it 'should allow to set alt_names with comma separated string' do
       subject.external_alt_names_string = "alt.example.com,www.alt.example.com"
       
@@ -150,35 +150,35 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'uuid' do
+  describe 'uuid' do
     it 'creates a secure random UUID' do
       expect(SecureRandom).to receive(:uuid).and_return('SECURE_UUID')
       expect(subject.uuid).to eq 'SECURE_UUID'
     end
   end
   
-  context 'random_2_digit_hex' do
+  describe 'random_2_digit_hex' do
     it 'create a byte long hex number' do
       expect(SecureRandom).to receive(:random_number).with(256).and_return 42
       expect(subject.random_2_digit_hex).to eq '2a'
     end
   end
   
-  context 'to_param' do
+  describe 'to_param' do
     it 'should have name as param' do
       subject.name = 'blafasel'
       expect(subject.to_param).to eq 'blafasel'
     end
   end
   
-  context 'item_issue_chain' do
+  describe 'item_issue_chain' do
     it 'should return chained items to guest for ItemIssue' do
       subject.host = host
       expect(subject.item_issue_chain).to eq [host, subject]
     end
   end
   
-  context 'exec' do
+  describe 'exec' do
     it 'should pass to host exec called with lxd exec' do
       subject.host = host
       allow(subject).to receive(:current_lxd_container).and_return double(name: 'some_guest-202004011337342')
@@ -187,7 +187,7 @@ describe CloudModel::Guest do
     end
   end
  
-  context 'exec!' do
+  describe 'exec!' do
     it 'should pass thru to host exec!' do
       subject.host = host
       allow(subject).to receive(:current_lxd_container).and_return double(name: 'some_guest-202004011337342')
@@ -196,7 +196,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'host_root_path' do
+  describe 'host_root_path' do
     it 'should return path to container rootfs on host' do
       allow(subject).to receive(:current_lxd_container).and_return double(name: 'some_guest-202004011337342')
       
@@ -204,7 +204,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'certificates' do
+  describe 'certificates' do
     it 'should get certificates used in guest and services' do
       guest_certificates = [BSON::ObjectId.new, BSON::ObjectId.new]
       service_certificate = BSON::ObjectId.new
@@ -220,7 +220,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'has_certificates?' do
+  describe 'has_certificates?' do
     it 'should be true if guest has certificates' do
       allow(subject).to receive(:certificates).and_return [double]
       
@@ -234,7 +234,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'has_service_type?' do
+  describe 'has_service_type?' do
     before do
       allow(subject).to receive(:services).and_return [
         double(_type: "CloudModel::Services::Mongodb"),
@@ -255,7 +255,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'components_needed' do
+  describe 'components_needed' do
     it 'should collect all needed components from services' do
       allow(subject).to receive(:services).and_return [
         double(components_needed: [:ruby, :nginx]),
@@ -265,7 +265,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'template_type' do
+  describe 'template_type' do
     it 'should find or create GuestTemplateType for needed components' do
       template_type = double CloudModel::GuestTemplateType
       allow(subject).to receive(:components_needed).and_return [:nginx, :ruby]
@@ -274,7 +274,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'template' do
+  describe 'template' do
     it 'should get last usable template for guest' do
       template_type = double CloudModel::GuestTemplateType
       template = double CloudModel::GuestTemplate
@@ -288,7 +288,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'worker' do
+  describe 'worker' do
     it 'should return worker for guest' do
       worker = double CloudModel::Workers::GuestWorker
       expect(CloudModel::Workers::GuestWorker).to receive(:new).with(subject).and_return worker  
@@ -297,7 +297,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context '#deploy_state_id_for' do
+  describe '#deploy_state_id_for' do
     CloudModel::Guest.enum_fields[:deploy_state][:values].each do |k,v|
       it "should map #{v} to id #{k}" do
         expect(CloudModel::Guest.deploy_state_id_for v).to eq k
@@ -305,19 +305,19 @@ describe CloudModel::Guest do
     end
   end
   
-  context '#deployable_deploy_states' do
+  describe '#deployable_deploy_states' do
     it 'should list deployable deploy_states' do
       expect(subject.class.deployable_deploy_states).to eq [:finished, :failed, :not_started]
     end
   end
   
-  context '#deployable_deploy_state_ids' do
+  describe '#deployable_deploy_state_ids' do
     it 'should list deployable deploy_state_ids' do
       expect(subject.class.deployable_deploy_state_ids).to eq [240, 241, 255]
     end
   end
   
-  context 'deployable?' do
+  describe 'deployable?' do
     it 'should be true if state is :finished' do
       subject.deploy_state = :finished
       expect(subject).to be_deployable
@@ -344,7 +344,7 @@ describe CloudModel::Guest do
     end    
   end
   
-  context '#deployable' do
+  describe '#deployable' do
     it 'should return all deployable Guests' do
       scoped = double
       deployable_guests = double
@@ -355,7 +355,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'deploy' do
+  describe 'deploy' do
     it 'should call rake cloudmodel:host:deploy with host´s and guest´s id' do
       subject.host = host
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:guest:deploy', host_id: host.id, guest_id: subject.id)
@@ -378,7 +378,7 @@ describe CloudModel::Guest do
     end
   end  
   
-  context 'deploy!' do
+  describe 'deploy!' do
     it 'should call worker to deploy Guest' do
       worker = double CloudModel::Workers::GuestWorker, deploy: true
       expect(subject).to receive(:worker).and_return worker
@@ -404,7 +404,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'redeploy' do
+  describe 'redeploy' do
     it 'should call rake cloudmodel:host:deploy with host´s and guest´s id' do
       subject.host = host
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:guest:redeploy', host_id: host.id, guest_id: subject.id)
@@ -427,7 +427,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'redeploy!' do
+  describe 'redeploy!' do
     it 'should call worker to deploy Guest' do
       worker = double CloudModel::Workers::GuestWorker, redeploy: true
       expect(subject).to receive(:worker).and_return worker
@@ -453,7 +453,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context '#redeploy' do
+  describe '#redeploy' do
     before do
       allow_any_instance_of(CloudModel::Host).to receive(:exec).and_return [true, '']
     end    
@@ -488,23 +488,23 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'check_mk_agent' do
+  describe 'check_mk_agent' do
     pending
   end
   
-  context 'system_info' do
+  describe 'system_info' do
     pending
   end
   
-  context 'mem_usage' do
+  describe 'mem_usage' do
     pending
   end
   
-  context 'cpu_usage' do
+  describe 'cpu_usage' do
     pending
   end
    
-  context 'live_lxc_info' do
+  describe 'live_lxc_info' do
     it 'should delegate to current container' do
       lxc_info = double
       allow(subject).to receive(:current_lxd_container).and_return double
@@ -518,7 +518,7 @@ describe CloudModel::Guest do
     end
   end
   
-  context 'lxc_info' do
+  describe 'lxc_info' do
     it 'should delegate to current container' do
       lxc_info = double
       allow(subject).to receive(:current_lxd_container).and_return double
@@ -533,39 +533,39 @@ describe CloudModel::Guest do
     
   end
   
-  context 'start' do
+  describe 'start' do
     pending
   end
   
-  context 'stop' do
+  describe 'stop' do
     pending
   end
   
-  context 'stop!' do
+  describe 'stop!' do
     pending
   end
   
-  context 'fix_lxd_custom_volumes' do
+  describe 'fix_lxd_custom_volumes' do
     pending
   end
   
-  context 'backup' do
+  describe 'backup' do
     pending
   end
   
-  context 'restore' do
+  describe 'restore' do
     pending
   end
   
-  context 'generate_mac_address' do
+  describe 'generate_mac_address' do
     pending
   end
   
-  context 'set_dhcp_private_address' do
+  describe 'set_dhcp_private_address' do
     pending
   end
   
-  context 'set_mac_address' do
+  describe 'set_mac_address' do
     pending
   end
 end

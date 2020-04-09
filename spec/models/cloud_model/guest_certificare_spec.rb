@@ -10,7 +10,7 @@ describe CloudModel::GuestCertificate do
   it { expect(subject).to belong_to(:guest).of_type(CloudModel::Guest) }
   it { expect(subject).to belong_to(:certificate).of_type(CloudModel::Certificate) }
   
-  context 'name' do
+  describe 'name' do
     it 'should concatinate guest and certificate names' do
       allow(subject.guest).to receive(:name).and_return 'Some Guest'
       allow(subject.certificate).to receive(:name).and_return 'Some Cert'
@@ -18,7 +18,7 @@ describe CloudModel::GuestCertificate do
     end
   end
   
-  context 'to_s' do
+  describe 'to_s' do
     it 'should concatinate guest and certificate names' do
       allow(subject.guest).to receive(:name).and_return 'Some Guest'
       allow(subject.certificate).to receive(:name).and_return 'Some Cert'

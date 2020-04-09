@@ -28,14 +28,14 @@ describe CloudModel::LxdCustomVolume do
   let(:host) { Factory :host }
   let(:guest) { Factory :guest, name: 'some_guest', host: host }
   
-  context 'host' do
+  describe 'host' do
     it 'should return guest´s host' do
       subject.guest = guest
       expect(subject.host).to eq host
     end
   end
   
-  context 'before_destroy' do
+  describe 'before_destroy' do
     it 'should not allow to destroy used volumes' do
       allow(subject).to receive(:used?).and_return true
       
@@ -74,7 +74,7 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
-  context 'volume_exists?' do
+  describe 'volume_exists?' do
     it 'should return true if lxd volume has valid info' do
       subject.name = 'some_guest-var-data'
       allow(subject).to receive(:lxc).with('storage volume show default some_guest-var-data').and_return [true, '']
@@ -97,7 +97,7 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
-  context 'create_volume' do
+  describe 'create_volume' do
     it 'should call lxd to create volume' do
       subject.name = 'some_guest-var-data'
       expect(subject).to receive(:lxc).with('storage volume create default some_guest-var-data')
@@ -106,7 +106,7 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
-  context 'create_volume!' do
+  describe 'create_volume!' do
     it 'should call lxd to create volume' do
       subject.name = 'some_guest-var-data'
       expect(subject).to receive(:lxc!).with('storage volume create default some_guest-var-data', 'Failed to init LXD volume')
@@ -128,7 +128,7 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
-  context 'destroy_volume' do
+  describe 'destroy_volume' do
     it 'should call lxd to destroy volume' do
       subject.name = 'some_guest-var-data'
       expect(subject).to receive(:lxc).with('storage volume delete default some_guest-var-data')
@@ -137,14 +137,14 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
-  context 'to_param' do
+  describe 'to_param' do
     it 'should return name as param' do
       subject.name = 'some_guest-var-data'
       expect(subject.to_param).to eq 'some_guest-var-data'
     end
   end
 
-  context 'item_issue_chain' do
+  describe 'item_issue_chain' do
     it 'should return chained items to volume for ItemIssue' do
       subject.guest = guest
       
@@ -152,7 +152,7 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
-  context 'lxc_show' do
+  describe 'lxc_show' do
     it 'should call lxd show and parse returned yaml' do
       subject.name = 'some_guest-var-data'
       
@@ -176,7 +176,7 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
-  context 'used?' do
+  describe 'used?' do
     it 'should return true if lxc_show contains used_by' do
       allow(subject).to receive(:lxc_show).and_return 'used_by' => ['a', 'b']
       
@@ -202,14 +202,14 @@ describe CloudModel::LxdCustomVolume do
     end    
   end
 
-  context 'host_path' do
+  describe 'host_path' do
     it 'should return path to volume mount on host' do
       subject.name = 'some_guest-var-data'
       expect(subject.host_path).to eq '/var/lib/lxd/storage-pools/default/custom/some_guest-var-data/'
     end
   end
 
-  context 'backup_directory' do
+  describe 'backup_directory' do
     it 'should return path to backups on backup system' do
       subject.guest = guest
       subject.name = 'some_guest-var-data'
@@ -219,15 +219,15 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
-  context 'backup' do
+  describe 'backup' do
     pending
   end
 
-  context 'restore' do
+  describe 'restore' do
     pending
   end
 
-  context 'set_volume_name' do
+  describe 'set_volume_name' do
     it 'should set name according to guest name and mountpoint' do
       subject.guest = guest
       subject.mount_point = 'var/data'
@@ -243,7 +243,7 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
-  context 'lxc' do
+  describe 'lxc' do
     it 'should call lxc on guest´s host' do
       subject.guest = guest
       expect(host).to receive(:exec).with('lxc lxc_command')
@@ -251,7 +251,7 @@ describe CloudModel::LxdCustomVolume do
     end
   end
   
-  context 'lxc!' do
+  describe 'lxc!' do
     it 'should call lxc on guest´s host' do
       subject.guest = guest
       expect(host).to receive(:exec!).with('lxc lxc_command', 'There was an error')

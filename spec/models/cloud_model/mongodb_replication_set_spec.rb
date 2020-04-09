@@ -7,7 +7,7 @@ describe CloudModel::MongodbReplicationSet do
     
   it { expect(subject).to have_field(:name).of_type(String) }
   
-  context 'services' do
+  describe 'services' do
     it 'should get array with all services using set' do
       guest1 = double CloudModel::Guest, services: []
       guest2 = double CloudModel::Guest, services: []
@@ -25,7 +25,7 @@ describe CloudModel::MongodbReplicationSet do
     end
   end
   
-  context 'add_service' do
+  describe 'add_service' do
     it 'should add service to set' do
       service = double
       expect(service).to receive(:update_attribute).with(:mongodb_replication_set_id, subject.id)
@@ -34,7 +34,7 @@ describe CloudModel::MongodbReplicationSet do
     end
   end
   
-  context 'init_rs_cmd' do
+  describe 'init_rs_cmd' do
     it 'should output mongodb command to init set' do
       subject.name = 'my_mongodb_set'
       

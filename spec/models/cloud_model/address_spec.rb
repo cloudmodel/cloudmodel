@@ -14,7 +14,7 @@ describe CloudModel::Address do
   it { expect(subject).to validate_presence_of(:ip) }
   it { expect(subject).to validate_presence_of(:subnet) }
   
-  context '#from_str' do
+  describe '#from_str' do
     it "should accept IPV4 address without subnet" do
       address = CloudModel::Address.from_str('10.42.23.1')
       expect(address.ip).to eq '10.42.23.1'
@@ -40,7 +40,7 @@ describe CloudModel::Address do
     end
   end
   
-  context 'to_s' do
+  describe 'to_s' do
     it "should return IPV4 string" do
       subject.ip = '10.42.23.1'
       subject.subnet = 30
@@ -58,7 +58,7 @@ describe CloudModel::Address do
     end
   end
   
-  context 'hostname' do
+  describe 'hostname' do
     it 'should return set hostname if given' do
       subject.hostname = 'some.host.name'
       expect(subject.hostname).to eq 'some.host.name'
@@ -71,7 +71,7 @@ describe CloudModel::Address do
     end
   end
   
-  context 'network' do
+  describe 'network' do
     it "should get IPV4 netmask" do
       subject.ip = '10.42.23.130'
       subject.subnet = 30
@@ -85,7 +85,7 @@ describe CloudModel::Address do
     end
   end  
   
-  context 'netmask' do
+  describe 'netmask' do
     it "should get IPV4 netmask" do
       subject.ip = '10.42.23.1'
       subject.subnet = 30
@@ -99,7 +99,7 @@ describe CloudModel::Address do
     end
   end
   
-  context 'broadcast' do
+  describe 'broadcast' do
     it "should get IPV4 broadcast" do
       subject.ip = '10.42.23.1'
       subject.subnet = 30
@@ -113,7 +113,7 @@ describe CloudModel::Address do
     end
   end
   
-  context 'ip_version' do
+  describe 'ip_version' do
     it "should get IPV4 version" do
       subject.ip = '10.42.23.1'
       subject.subnet = 30
@@ -127,7 +127,7 @@ describe CloudModel::Address do
     end
   end
   
-  context 'range?' do
+  describe 'range?' do
     it "should find out that it is an range when given network ip" do
       subject.ip = '127.0.0.0'
       subject.subnet = 24
@@ -141,7 +141,7 @@ describe CloudModel::Address do
     end
   end
   
-  context 'list_ips' do
+  describe 'list_ips' do
     it "should return range if address is range" do
       subject.ip = '10.42.23.0'
       subject.subnet = 30
@@ -161,13 +161,13 @@ describe CloudModel::Address do
     end
   end
   
-  context 'tinc_subnet' do
+  describe 'tinc_subnet' do
     it 'should return 16 (always for now)' do
       expect(subject.tinc_subnet).to eq 16
     end
   end
   
-  context 'tinc_network' do
+  describe 'tinc_network' do
     it 'should get private network from last host and return base address for tinc_subnet' do
       network = CloudModel::Address.new ip: '10.42.23.16', subnet: 24
       allow(CloudModel::Host).to receive(:last).and_return(double :host, private_network: network)
@@ -175,7 +175,7 @@ describe CloudModel::Address do
     end
   end
   
-  context 'validates data' do
+  describe 'validates data' do
     it 'should not accept invalid IP addresses' do
       subject.ip = "10.43.0.256"
       subject.subnet = 28
@@ -183,7 +183,7 @@ describe CloudModel::Address do
     end
   end
   
-  context 'cidr' do
+  describe 'cidr' do
     it 'should get NetAddr net for ip and subnet' do
       net = double
       subject.ip = "10.42.23.12"

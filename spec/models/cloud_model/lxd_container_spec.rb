@@ -17,7 +17,7 @@ describe CloudModel::LxdContainer do
     allow(host).to receive(:exec)
   end
   
-  context 'before_destroy' do
+  describe 'before_destroy' do
     it 'should prevent destroy if container is running' do
       allow(subject).to receive(:running?).and_return true
       expect do
@@ -31,7 +31,7 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'host' do
+  describe 'host' do
     it 'should return host of guest' do
       subject.guest = guest
       
@@ -39,7 +39,7 @@ describe CloudModel::LxdContainer do
     end
   end  
   
-  context 'name' do
+  describe 'name' do
     it 'should give the lxc name of the container' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       
@@ -47,21 +47,21 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'lxc' do
+  describe 'lxc' do
     it 'should call lxc on guest´s host' do
       expect(host).to receive(:exec).with('lxc lxc_command')
       subject.lxc 'lxc_command'
     end
   end
   
-  context 'lxc!' do
+  describe 'lxc!' do
     it 'should call lxc on guest´s host' do
       expect(host).to receive(:exec!).with('lxc lxc_command', 'There was an error')
       subject.lxc! 'lxc_command', 'There was an error'
     end
   end
   
-  context 'ensure_template_is_set' do
+  describe 'ensure_template_is_set' do
     it 'should set guest template from guest' do
       allow(guest).to receive(:template).and_return template
       
@@ -85,7 +85,7 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'import_template' do
+  describe 'import_template' do
     it 'should ensure template and call lxc image import' do
       subject.guest_template = template
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
@@ -97,7 +97,7 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'create_container' do
+  describe 'create_container' do
     it 'should call lxc create' do
       subject.guest_template = template
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
@@ -113,7 +113,7 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'destroy_container' do
+  describe 'destroy_container' do
     it 'should call lxc delete' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       
@@ -128,7 +128,7 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'start' do
+  describe 'start' do
     it 'should call lxc start' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       
@@ -153,7 +153,7 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'stop' do
+  describe 'stop' do
     it 'should call lxc stop' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return true
@@ -181,7 +181,7 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'mount' do
+  describe 'mount' do
     it 'should mount zfs container´s fs' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       expect(host).to receive(:exec).with('zfs mount guests/containers/some_guest-20200331133742')
@@ -190,7 +190,7 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'unmount' do
+  describe 'unmount' do
     it 'should unmount zfs container´s fs' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       expect(host).to receive(:exec).with('zfs unmount guests/containers/some_guest-20200331133742')
@@ -200,14 +200,14 @@ describe CloudModel::LxdContainer do
     
   end
   
-  context 'mountpoint' do
+  describe 'mountpoint' do
     it 'should return the container´s mountpoint in host' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       expect(subject.mountpoint).to eq '/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742'
     end
   end
   
-  context 'lxd_info' do
+  describe 'lxd_info' do
     it 'should call lxc info and parse the returned yaml' do
       data = {'test' => true, 'values' => ['a', 'b']}
       expect(subject).to receive(:lxc).with("info").and_return [true, data.to_yaml]
@@ -224,11 +224,11 @@ describe CloudModel::LxdContainer do
     
   end
   
-  context 'live_lxc_info' do
+  describe 'live_lxc_info' do
     pending
   end
   
-  context 'lxc_info' do
+  describe 'lxc_info' do
     it 'should get lxc info from host´s monitoring_last_check_result' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       
@@ -245,7 +245,7 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'running?' do
+  describe 'running?' do
     it 'should return true if state is running' do
       allow(subject).to receive(:live_lxc_info).and_return({'state' => {'status' => 'Running'}})
       expect(subject.running?).to eq true
@@ -262,7 +262,7 @@ describe CloudModel::LxdContainer do
     end
   end
   
-  context 'set_config' do
+  describe 'set_config' do
     it 'should call lxc config set' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return true
@@ -282,7 +282,7 @@ describe CloudModel::LxdContainer do
     end      
   end
   
-  context 'config_from_guest' do
+  describe 'config_from_guest' do
     it 'should setup container according to guest' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       guest.cpu_count = 1

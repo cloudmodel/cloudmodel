@@ -1,6 +1,15 @@
 require 'spec_helper'
 
 describe CloudModel do
-
-end
+  describe '#config' do
+    pending
+  end
+  
+  describe '#configure' do
+    pending
+  end
+  
+  describe '#log_exception' do
+  end
+end 
 

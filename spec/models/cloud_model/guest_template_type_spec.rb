@@ -11,7 +11,7 @@ describe CloudModel::GuestTemplateType do
   
   let(:host) { double CloudModel::Host, id: BSON::ObjectId.new, arch: 'MOS6502'}
 
-  context 'new_template' do
+  describe 'new_template' do
     it 'should create new template for host arch' do
       core_template = double CloudModel::GuestCoreTemplate, arch: 'MOS6502'
       template = double CloudModel::GuestTemplate
@@ -25,7 +25,7 @@ describe CloudModel::GuestTemplateType do
     end
   end
 
-  context 'build_new_template!' do
+  describe 'build_new_template!' do
     it 'should build new template' do
       template = double CloudModel::GuestTemplate
       expect(subject).to receive(:new_template).with(host).and_return template
@@ -48,7 +48,7 @@ describe CloudModel::GuestTemplateType do
     end
   end
 
-  context '#last_useable' do
+  describe '#last_useable' do
     it 'should get latest finished template for given host arch' do
       template = double CloudModel::GuestTemplate
       expect(subject.templates).to receive(:where).with(arch: 'MOS6502', build_state_id: 0xf0).and_return [template]
@@ -65,7 +65,7 @@ describe CloudModel::GuestTemplateType do
     end
   end
 
-  context 'name' do
+  describe 'name' do
     it 'should handle GuestTemplateType without components' do
       expect(subject.name).to eq 'CloudModel Guest Template without components'
     end

@@ -1,23 +1,23 @@
 require 'spec_helper'
 
 describe CloudModel::Workers::WebImageWorker do
-  context 'checkout_git' do
+  describe 'checkout_git' do
     pending
   end
 
-  context 'bundle_image' do
+  describe 'bundle_image' do
     pending
   end
 
-  context 'build_assets' do
+  describe 'build_assets' do
     pending
   end
 
-  context 'package_build' do
+  describe 'package_build' do
     pending
   end
 
-  context 'build' do
+  describe 'build' do
     pending
   end
 end
