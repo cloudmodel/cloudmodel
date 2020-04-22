@@ -11,6 +11,7 @@ en:
     not_started: Not started
     pending: Scheduled for execution
     running: Deploying
+    booting: Booting
     finished: Finished
     failed: Failed to deploy
     
