@@ -11,6 +11,7 @@ de:
     not_started: Nicht beauftragt
     pending: Geplant
     running: Wird installiert
+    booting: Wird gestartet
     finished: Abgeschlossen
     failed: Fehlgeschlagen
   

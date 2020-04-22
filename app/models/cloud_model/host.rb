@@ -54,7 +54,7 @@ module CloudModel
     enum_field :deploy_state, {
       0x00 => :pending,
       0x01 => :running,
-      0x02 => :booting,
+      0xe0 => :booting,
       0xf0 => :finished,
       0xf1 => :failed,
       0xff => :not_started

@@ -26,6 +26,7 @@ describe CloudModel::Guest do
   it { expect(subject).to have_enum(:deploy_state).with_values(
     0x00 => :pending,
     0x01 => :running,
+    0xe0 => :booting,
     0xf0 => :finished,
     0xf1 => :failed,
     0xff => :not_started

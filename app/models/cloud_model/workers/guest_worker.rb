@@ -87,6 +87,7 @@ module CloudModel
     
       def start_lxd_container
         @lxc.unmount
+        guest.update_attributes deploy_state: :booting
         guest.start @lxc
       end
     
