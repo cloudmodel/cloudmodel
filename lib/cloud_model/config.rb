@@ -33,7 +33,7 @@ module CloudModel
     end
     
     def bundle_command
-      @bundle_command || 'PATH=/bin:/sbin:/usr/bin:/usr/local/bin bundle'
+      @bundle_command || 'PATH=/usr/local/bin:/bin:/sbin:/usr/bin bundle'
     end
     
     # If true do not sync images on deploy

@@ -47,6 +47,10 @@ module CloudModel
     
       def bundle_image
         begin
+          # TODO: Resolve deprecation warnings for bundler 2
+          # [DEPRECATED] The `--deployment` flag is deprecated because it relies on being remembered across bundler invocations, which bundler will no longer do in future versions. Instead please use `bundle config set deployment 'true'`, and stop using this flag
+          # [DEPRECATED] The `--path` flag is deprecated because it relies on being remembered across bundler invocations, which bundler will no longer do in future versions. Instead please use `bundle config set path './bundle'`, and stop using this flag
+          # [DEPRECATED] The `--without` flag is deprecated because it relies on being remembered across bundler invocations, which bundler will no longer do in future versions. Instead please use `bundle config set without 'development test'`, and stop using this flag
           run_with_clean_env "Bundling", "cd #{@web_image.build_path.shellescape} && #{CloudModel.config.bundle_command} install --gemfile #{@web_image.build_path.shellescape}/Gemfile --path ./bundle --deployment --without development test"
         rescue CloudModel::ExecutionException => e
           CloudModel.log_exception e
