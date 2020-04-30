@@ -13,8 +13,9 @@ describe CloudModel::Workers::Components::RubyComponentWorker do
       allow(subject).to receive :chroot!
     end
     
-    it 'should apt-get openjdk' do
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install ruby git bundler zlib1g-dev libxml2-dev ruby-bcrypt nodejs imagemagick libxml2-utils libxslt-dev -y', 'Failed to install packages for deployment of rails app')
+    it 'should apt-get ruby' do
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install ruby git zlib1g-dev libxml2-dev ruby-bcrypt nodejs imagemagick libxml2-utils libxslt-dev -y', 'Failed to install packages for deployment of rails app')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'gem install bundler', 'Failed to install bundler')
       
       subject.build '/tmp/build'
     end
