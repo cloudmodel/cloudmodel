@@ -199,7 +199,8 @@ de:
         severity: Schwere
         subject: Betreffend
         key: Schlüsselwert
-        created_at: Erzeugt Am
+        created_at: Erzeugt am
+        assigned_to: Zugewiesen an
       cloud_model/lxd_container:
         name: Containername
         guest_template: Gästetemplate

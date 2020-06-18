@@ -200,6 +200,7 @@ en:
         subject: Subject
         key: Key Value
         created_at: Created At
+        assigned_to: Assigned To
       cloud_model/lxd_container:
         name: Container Name
         guest_template: Guest Template
