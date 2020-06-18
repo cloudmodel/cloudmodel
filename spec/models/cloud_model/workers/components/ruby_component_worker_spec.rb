@@ -14,8 +14,9 @@ describe CloudModel::Workers::Components::RubyComponentWorker do
     end
     
     it 'should apt-get ruby' do
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install ruby git zlib1g-dev libxml2-dev ruby-bcrypt nodejs imagemagick libxml2-utils libxslt-dev -y', 'Failed to install packages for deployment of rails app')
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'gem install bundler', 'Failed to install bundler')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install ruby ruby-dev git zlib1g-dev libxml2-dev ruby-bcrypt nodejs imagemagick libxml2-utils libxslt-dev -y', 'Failed to install packages for deployment of rails app')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'gem install bundler', 'Failed to install current bundler')
+      expect(subject).to receive(:chroot!).with('/tmp/build', "gem install bundler -v '~>1.0'", 'Failed to install legacy bundler v1')
       
       subject.build '/tmp/build'
     end
