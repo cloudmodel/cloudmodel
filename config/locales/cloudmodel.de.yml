@@ -6,7 +6,7 @@ de:
     critical: Kritisch
     unknown: Unbekannt
     dependent: Abhängigkeit
-    
+
   cloud_model/guest/deploy_state:
     not_started: Nicht beauftragt
     pending: Geplant
@@ -14,7 +14,7 @@ de:
     booting: Wird gestartet
     finished: Abgeschlossen
     failed: Fehlgeschlagen
-  
+
   cloud_model/host/deploy_state:
     not_started: Nicht beauftragt
     pending: Geplant
@@ -22,14 +22,14 @@ de:
     booting: Wird gestartet
     finished: Abgeschlossen
     failed: Fehlgeschlagen
-    
+
   cloud_model/item_issue/severity:
     info: Information
     task: Aufgabe
     warning: Warnung
     critical: Kritisch
-    fatal: Fatal  
-    
+    fatal: Fatal
+
   cloud_model/web_image/build_state:
     not_started: Nicht beauftragt
     pending: Geplant
@@ -41,15 +41,15 @@ de:
     storing: Daten sichern
     finished: Abgeschlossen
     failed: Fehlgeschlagen
-  
-  cloud_model/web_image/redeploy_state:  
+
+  cloud_model/web_image/redeploy_state:
     not_started: Nicht beauftragt
     pending: Geplant
     running: Wird installiert
     finished: Abgeschlossen
     failed: Fehlgeschlagen
-   
-  cloud_model/services/nginx/redeploy_web_image_state:  
+
+  cloud_model/services/nginx/redeploy_web_image_state:
     undefined: Nicht Definiert
     not_started: Nicht beauftragt
     pending: Geplant
@@ -59,8 +59,8 @@ de:
 
   cloud_model/services/nginx:
     deploy_mongodb_replication_set_manual: Eigene MongoDB Konfiguration
-    deploy_redis_sentinel_set_manual: Eigene Redis Konfiguration      
-      
+    deploy_redis_sentinel_set_manual: Eigene Redis Konfiguration
+
   mongoid:
     errors:
       messages:
@@ -69,9 +69,9 @@ de:
         branch_not_pulled: nicht gefunden oder nicht ladbar
         bundle_failed: Packen des Gemfiles fehlgeschlagen
         building_assets_failed: Erstellen fehlgeschlagen
-        
+
     models:
-      cloud_model/host: 
+      cloud_model/host:
         one: Hostrechner
         other: Hostrechner
       cloud_model/guest:
@@ -101,6 +101,9 @@ de:
       cloud_model/redis_sentinel_set:
         one: Redis Replikationset
         other: Redis Replikationsets
+      cloud_model/host_template:
+        one: Hosttemplate
+        other: Hosttemplates
       cloud_model/guest_core_template:
         one: Kerntemplate für Gästetemplates
         other: Kerntemplates für Gästetemplates
@@ -118,7 +121,7 @@ de:
         other: Webpakete
       cloud_model/war_image:
         one: WAR-Paket
-        other: WAR-Pakete     
+        other: WAR-Pakete
       cloud_model/services/base:
         one: Dienst
         other: Dienste
@@ -127,16 +130,16 @@ de:
         other: MongoDB-Dienste
       cloud_model/services/nginx:
         one: Nginx-Dienst
-        other: Nginx-Dienste        
+        other: Nginx-Dienste
       cloud_model/services/redis:
         one: Redis-Dienst
         other: Redis-Dienste
       cloud_model/services/solr:
         one: SOLR-Dienst
-        other: SOLR-Dienste        
+        other: SOLR-Dienste
       cloud_model/services/ssh:
         one: SSH-Dienst
-        other: SSH-Dienste        
+        other: SSH-Dienste
       cloud_model/services/tomcat:
         one: Tomcat-Dienst
         other: Tomcat-Dienste
@@ -271,6 +274,12 @@ de:
       cloud_model/redis_sentinel_set:
         name: Setname
         services: Dienste
+      cloud_model/host_template:
+        id: Bezeichner
+        build_state: Erstellungsstatus
+        os_version: Betriebssystemversion
+        arch: Architektur
+        created_at: Erzeugt am
       cloud_model/guest_core_template:
         id: Bezeichner
         build_state: Erstellungsstatus
@@ -355,24 +364,24 @@ de:
 
         deployment: Projekt deployen
         capistrano_supported: Capistrano unterstützen
-      
+
         deploy_web_image: Web Image installieren
 
         redeploy_web_image_state: Ausrollstatus
         redeploy_web_image_last_issue: Letztes Problem beim Ausrollen
-      
-        deploy_mongodb_replication_set_id: MongoDB Replikationset   
+
+        deploy_mongodb_replication_set_id: MongoDB Replikationset
         deploy_mongodb_host: MongoDB Host
         deploy_mongodb_port: MongoDB Port
         deploy_mongodb_database: MongoDB Datenbank
-      
+
         deploy_redis_sentinel_set_id: Redis Sentinel Set
         deploy_redis_host: Redis Host
         deploy_redis_port: Redis Port
       cloud_model/services/tomcat:
         deployment: Projekt deployen
         deploy_war_image: WAR Image installieren
-        
+
   issues:
     general:
       no_check: '%{value} existiert nicht'
@@ -386,7 +395,7 @@ de:
     cloud_model/host:
       <<: *sysinfo_issues
       mdtools: RAID hat Probleme
-    cloud_model/guest: 
+    cloud_model/guest:
       <<: *sysinfo_issues
     cloud_model/services/redis:
       not_reachable: Dienst nicht erreichbar
