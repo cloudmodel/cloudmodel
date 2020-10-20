@@ -14,7 +14,7 @@ module CloudModel
       end
 
       def ubuntu_kernel_flavour
-        "generic" #"-lts-xenial"
+        CloudModel.config.ubuntu_kernel_flavour
       end
 
       def ubuntu_arch

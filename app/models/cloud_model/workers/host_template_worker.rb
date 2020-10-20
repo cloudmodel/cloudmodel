@@ -91,7 +91,7 @@ module CloudModel
       end
 
       def install_kernel
-        chroot! build_path, "apt-get install linux-image-#{ubuntu_kernel_flavour} -y", "Failed to install linux kernel"
+        chroot! build_path, "apt-get install --install-recommends linux-image-#{ubuntu_kernel_flavour} -y", "Failed to install linux kernel"
       end
 
       def install_grub
@@ -122,6 +122,7 @@ module CloudModel
           ["Download Ubutu Base #{ubuntu_version}", :fetch_ubuntu],
           ["Populate system with image", :populate_root],
           ["Update base system", :update_base],
+          ["Install kernel", :install_kernel],
           ["Install basic utils", :install_utils],
           ["Install network utils", :install_network],
           ["Install SSH server", :install_ssh],
@@ -129,7 +130,6 @@ module CloudModel
           ["Install LXD virtualizer", :install_lxd],
           ["Install mailer (exim) for mail out", :install_exim],
           ["Install check_mk agent for monitoring", :install_check_mk_agent],
-          ["Install kernel", :install_kernel],
           ["Install bootloader grub", :install_grub],
           ["Pack template tarball", :pack_template],
           ["Download template tarball", :download_new_template],

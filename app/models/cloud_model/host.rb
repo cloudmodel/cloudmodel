@@ -143,6 +143,17 @@ module CloudModel
       "[#{stage}] #{name}"
     end
 
+    def self.update_tinc_keys
+      CloudModel::Host.each do |host|
+        begin
+          host.worker.update_tinc_host_files
+          puts "Updated keys on #{host.name}"
+        rescue
+          puts "Failed to update for #{host.name}"
+        end
+      end
+    end
+
     def tinc_private_key
       require 'openssl'
       key = OpenSSL::PKey::RSA.new(2048)
