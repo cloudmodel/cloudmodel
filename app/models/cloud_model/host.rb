@@ -64,6 +64,7 @@ module CloudModel
     }, default: :not_started
 
     field :deploy_last_issue, type: String
+    field :last_deploy_finished_at, type: Time
 
     has_many :guests, class_name: "CloudModel::Guest", inverse_of: :host
     embeds_many :addresses, class_name: "CloudModel::Address", inverse_of: :host do

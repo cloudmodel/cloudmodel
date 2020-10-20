@@ -175,6 +175,7 @@ de:
         cpu_count: CPUs
         deploy_state: Installationsstatus
         deploy_last_issue: Letztes Problem bei der Installation
+        last_deploy_finished_at: Zuletzt erfolgreich installiert
       cloud_model/guest:
         name: Hostname
         host: Hostrechner
@@ -196,6 +197,7 @@ de:
         state: Status
         deploy_state: Installationsstatus
         deploy_last_issue: Letztes Problem bei der Installation
+        last_deploy_finished_at: Zuletzt erfolgreich installiert
       cloud_model/item_issue:
         title: Titel
         message: Nachricht
