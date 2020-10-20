@@ -175,6 +175,7 @@ en:
         cpu_count: CPUs
         deploy_state: Deploy State
         deploy_last_issue: Last Deploy Issue
+        last_deploy_finished_at: Last Deploy At
       cloud_model/guest:
         name: Hostname
         host: Hardware Host
@@ -196,6 +197,7 @@ en:
         state: State
         deploy_state: Deploy State
         deploy_last_issue: Last Deploy Issue
+        last_deploy_finished_at: Last Deploy At
       cloud_model/item_issue:
         title: Title
         message: Message
