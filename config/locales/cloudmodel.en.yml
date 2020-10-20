@@ -6,7 +6,7 @@ en:
     critical: Critical
     unknown: Unknown
     dependent: Dependent
-    
+
   cloud_model/guest/deploy_state:
     not_started: Not started
     pending: Scheduled for execution
@@ -14,7 +14,7 @@ en:
     booting: Booting
     finished: Finished
     failed: Failed to deploy
-    
+
   cloud_model/host/deploy_state:
     not_started: Not started
     pending: Scheduled for execution
@@ -28,8 +28,8 @@ en:
     task: Task
     warning: Warning
     critical: Critical
-    fatal: Fatal  
-    
+    fatal: Fatal
+
   cloud_model/web_image/build_state:
     not_started: Not started
     pending: Scheduled for execution
@@ -37,30 +37,30 @@ en:
     checking_out: Checking out
     bundling: Loading libraries
     building_assets: Building assets
-    packaging: Packaging 
+    packaging: Packaging
     storing: Storing data
     finished: Finished
     failed: Failed to build
-     
-  cloud_model/web_image/redeploy_state:  
+
+  cloud_model/web_image/redeploy_state:
     not_started: Not started
     pending: Scheduled for execution
     running: Deploying
     finished: Finished
     failed: Failed to deploy
-   
-  cloud_model/services/nginx/redeploy_web_image_state:  
+
+  cloud_model/services/nginx/redeploy_web_image_state:
     undefined: undefined
     not_started: Not started
     pending: Scheduled for execution
     running: Deploying
     finished: Finished
     failed: Failed to deploy
-     
+
   cloud_model/services/nginx:
     deploy_mongodb_replication_set_manual: Manual MongoDB Configuration
-    deploy_redis_sentinel_set_manual: Manual Redis Configuration      
-      
+    deploy_redis_sentinel_set_manual: Manual Redis Configuration
+
   mongoid:
     errors:
       messages:
@@ -69,9 +69,9 @@ en:
         branch_not_pulled: not found or pullable
         bundle_failed: Bundling Gemfile failed
         building_assets_failed: Building Assets failed
-              
+
     models:
-      cloud_model/host: 
+      cloud_model/host:
         one: Hardware Host
         other: Hardware Hosts
       cloud_model/guest:
@@ -85,7 +85,7 @@ en:
         other: Issues
       cloud_model/guest_volume:
         one: Guest Volume
-        other: Guest Volumes  
+        other: Guest Volumes
       cloud_model/lxd_container:
         one: LXD Container
         other: LXD Containers
@@ -94,13 +94,16 @@ en:
         other: LXD Custom Volumes
       cloud_model/certificate:
         one: Certificate
-        other: Certificates  
+        other: Certificates
       cloud_model/mongodb_replication_set:
         one: MongoDB Replication Set
         other: MongoDB Replication Sets
       cloud_model/redis_sentinel_set:
         one: Redis Sentinel Set
         other: Redis Sentinel Sets
+      cloud_model/host_template:
+        one: Host Template
+        other: Host Templates
       cloud_model/guest_core_template:
         one: Guest Core Template
         other: Guest Core Templates
@@ -127,16 +130,16 @@ en:
         other: MongoDB Services
       cloud_model/services/nginx:
         one: Nginx Service
-        other: Nginx Services        
+        other: Nginx Services
       cloud_model/services/redis:
         one: Redis Service
         other: Redis Services
       cloud_model/services/solr:
         one: SOLR Service
-        other: SOLR Services        
+        other: SOLR Services
       cloud_model/services/ssh:
         one: SSH Service
-        other: SSH Services        
+        other: SSH Services
       cloud_model/services/tomcat:
         one: Tomcat Service
         other: Tomcat Services
@@ -244,7 +247,7 @@ en:
         mount_point: Mount Point
         disk_space: Disk Space
         writeable: Writeable?
-        has_backups: Backups?        
+        has_backups: Backups?
       cloud_model/certificate:
         name: Name
         ca: Certificate Authority
@@ -270,6 +273,12 @@ en:
       cloud_model/redis_sentinel_set:
         name: Set Name
         services: Services
+      cloud_model/host_template:
+        id: Template Name
+        build_state: Build State
+        os_version: Version of OS
+        arch: Architecture
+        created_at: Created at
       cloud_model/guest_core_template:
         id: Template Name
         build_state: Build State
@@ -346,32 +355,32 @@ en:
         ssl_port: HTTPS Port
         ssl_cert: SSL Certificate
         ssl_certbot: Use Let's Encrypt Certificate?
-        
+
         passenger: Passenger/Rack Server
         passenger_supported: Support Rack Server?
         passenger_env: Rails Environment
         delayed_jobs_supported: "Support Delayed::Job Service?"
-          
+
         deployment: Project Deployment
         capistrano_supported: Support Capistrano?
-        
+
         deploy_web_image: Deploy Web Image
 
         redeploy_web_image_state: Redeploy Web Image State
         redeploy_web_image_last_issue: Last Web Image Redeploy Issue
-        
+
         deploy_mongodb_replication_set_id: Use MongoDB Replication Set
         deploy_mongodb_host: Use MongoDB Host
         deploy_mongodb_port: Use MongoDB Port
         deploy_mongodb_database: Use MongoDB Database
-        
+
         deploy_redis_sentinel_set_id: Use Redis Sentinel Set
         deploy_redis_host: Use Redis Host
         deploy_redis_port: Use Redis Port
       cloud_model/services/tomcat:
         deployment: Project Deployment
         deploy_war_image: Deploy WAR Image
-  
+
   issues:
     general:
       no_check: '%{value} does not exist'
@@ -387,7 +396,7 @@ en:
       mdtools: RAID has issues
       sensors: Sensors reported critial values
       smart: SMART reports issues
-    cloud_model/guest: 
+    cloud_model/guest:
       <<: *sysinfo_issues
     cloud_model/services/redis:
       not_reachable: Service not reachable
@@ -417,4 +426,3 @@ en:
       thread_usage: Thread usage of %{value}
     cloud_model/lxd_custom_volume:
       existence: The defined LXD Volume does not exist on Server
-    

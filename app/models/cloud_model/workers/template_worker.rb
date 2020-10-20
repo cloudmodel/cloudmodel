@@ -1,26 +1,30 @@
 module CloudModel
   module Workers
     class TemplateWorker < BaseWorker
-      def download_path 
+      def download_path
         "/cloud/build/downloads/"
       end
-    
-      def ubuntu_version 
+
+      def error_log_object
+        @template
+      end
+
+      def ubuntu_version
         CloudModel.config.ubuntu_version
       end
-    
+
       def ubuntu_kernel_flavour
         "generic" #"-lts-xenial"
       end
-    
-      def ubuntu_arch 
+
+      def ubuntu_arch
         @template.arch
       end
-    
+
       def ubuntu_image
         "ubuntu-base-#{ubuntu_version}-base-#{ubuntu_arch}.tar.gz"
       end
-     
+
       def ubuntu_url
         if(ubuntu_version =~ /-beta/)
           version = ubuntu_version.split('-')
@@ -29,7 +33,7 @@ module CloudModel
           "http://cdimage.ubuntu.com/ubuntu-base/releases/#{ubuntu_version}/release/#{ubuntu_image}"
         end
       end
-    
+
       def fetch_ubuntu
         begin
           @host.sftp.stat!("#{download_path}#{ubuntu_image}")
@@ -38,7 +42,7 @@ module CloudModel
           @host.exec! "cd #{download_path} && curl #{ubuntu_url.shellescape} -o #{download_path}#{ubuntu_image}", "Failed to download ubuntu image"
         end
       end
-    
+
       def populate_root
         @host.exec! "cd #{build_path} && tar xzpf #{download_path}#{ubuntu_image}", "Failed to unpack system image!"
         # Copy resolv.conf
@@ -52,21 +56,21 @@ module CloudModel
         # Don't install docs
         render_to_remote  "/cloud_model/support/etc/dpkg/dpkg.cfg.d/01_nodoc", "#{build_path}/etc/dpkg/dpkg.cfg.d/01_nodoc"
       end
-    
+
       def update_base
         chroot! build_path, "dpkg --configure -a && apt-get update && apt-get upgrade -y", "Failed to update sources"
         # # Set locale
         # chroot! build_path, "apt-get install console-setup-linux -y",  "Failed to install console setup"
         # chroot! build_path, "localedef -i en_US -c -f UTF-8 en_US.UTF-8", "Failed to define locale"
         # chroot! build_path, "update-locale LANG=en_US.UTF-8 LC_MESSAGES=POSIX", "Failed to update locale"
-      end 
-    
+      end
+
       def install_ssh
         chroot! build_path, "apt-get install ssh -y", "Failed to install SSH"
         # SSH is enabled by default, do no need to enable it by hand
       end
-    
-    
+
+
       def tar_template build_path, template
         mkdir_p File.dirname(template.tarball)
         build_tar '.', template.tarball, one_file_system: true, exclude: [
@@ -80,18 +84,18 @@ module CloudModel
           './etc/ssh/*_key*'
         ], C: build_path
       end
-    
+
       def download_new_template
         @template.update_attribute :build_state, :downloading
         download_template @template
       end
-    
+
       def finalize_template
         @template.update_attribute :build_state, :finished
         cleanup_chroot build_path
         @host.exec "rm -rf #{build_path.shellescape}"
       end
-    
+
     end
   end
 end
