@@ -374,7 +374,7 @@ module CloudModel
 
         run_steps :deploy, steps, options
 
-        @host.update_attributes deploy_state: :finished
+        @host.update_attributes deploy_state: :finished, last_deploy_finished_at: Time.now
 
         puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"
       end
