@@ -4,30 +4,28 @@ module CloudModel
       # @param subject [Object] Subject to run checks against
       # @option options [Boolean] :cached (false) Use cached data instead of aquiring it
       # @option options [Boolean] :skip_header (false) Don't display init message
-      def initialize subject, options = {}      
+      def initialize subject, options = {}
         @subject = subject
         @options = options
-        
+
         puts "#{' ' * (indent_size)}[#{subject}]" unless options[:skip_header]
       end
-      
+
       # Config setting indention in spaces for outputs
       def indent_size
         0
       end
-    
+
       # Abstract/Fallback method to aquire data
       # @return nil
       def aquire_data
         nil
       end
-    
+
       # Store the current data to the subject
       def store_data
         attrs = {monitoring_last_check_at: Time.now, monitoring_last_check_result: data}
-        @subject.assign_attributes attrs
-        res = @subject.collection.update_one({_id: @subject.id}, '$set' => attrs)
-        res.ok?
+        @subject.update_attributes attrs
       end
 
       # Get the data for the subject
@@ -36,16 +34,21 @@ module CloudModel
       # Else it will use aquire data and also store it to the subject
       def data
         return @data unless @data.nil?
-        
-        if @options[:cached]
+
+        if @options and @options[:cached]
           @data = @subject.monitoring_last_check_result || false
         else
           print "#{' ' * (indent_size)}  * Acqire data ..."
           @data = aquire_data
           puts "[\e[32mOK\e[39m]"
-      
+
           if @data
-            store_data
+            print "#{' ' * (indent_size)}  * Store data ..."
+            if store_data
+              puts "[\e[32mOK\e[39m]"
+            else
+              puts "[\e[33mFAILED\e[39m]"
+            end
           end
           @data ||= false
         end
@@ -56,7 +59,7 @@ module CloudModel
       def do_check key, name, checks, options = {}
         issue = @subject.item_issues.find_or_initialize_by key: key, resolved_at: nil
         print "#{' ' * (indent_size)}  * Check #{name}... "
-      
+
         if severity = checks.select{|k,v| v}.keys.first
           issue.severity = severity # unless issue.persisted? - check if severity raised?
           issue.message = options[:message]
@@ -78,7 +81,7 @@ module CloudModel
           true
         end
       end
-    
+
       def do_check_value key, value, thresholds, options = {}
         name = options[:name] || key.to_s.humanize
         human_value = if value.is_a? Float
@@ -86,25 +89,25 @@ module CloudModel
         else
           "#{value}#{options[:unit]}"
         end
-      
+
         message = options[:message] || "#{name} is #{human_value}"
-      
+
         checks = {}
         thresholds.each do |k,v|
           if v
             checks[k] = value > v
           end
         end
-      
+
         do_check key, name, checks, message: message, value: human_value
       end
-    
+
       def do_check_for_errors_on result, error_cases
-      
+
         error_cases.each do |key, name|
           if result[:key] == key
             severity = result[:severity] || :warning
-        
+
             do_check result[:key], name, {severity => true}, message: result[:error]
           else
             do_check key, name, {}
