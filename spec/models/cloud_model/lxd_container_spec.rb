@@ -158,7 +158,7 @@ describe CloudModel::LxdContainer do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return true
 
-      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742 -f -t10")
+      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742 -f --timeout=10")
 
       subject.stop
     end
@@ -167,7 +167,7 @@ describe CloudModel::LxdContainer do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return false
 
-      expect(subject).not_to receive(:lxc).with("stop some_guest-20200331133742 -f -t10")
+      expect(subject).not_to receive(:lxc).with("stop some_guest-20200331133742 -f --timeout=10")
 
       subject.stop
     end
@@ -175,7 +175,7 @@ describe CloudModel::LxdContainer do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return false
 
-      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742 -f -t10")
+      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742 -f --timeout=10")
 
       subject.stop force: true
     end
