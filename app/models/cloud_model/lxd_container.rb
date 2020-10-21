@@ -82,7 +82,7 @@ module CloudModel
 
     def stop options={}
       if options[:force] or running?
-        lxc "stop #{name} -f -t10"
+        lxc "stop #{name} -f --timeout=10"
       end
     end
 
