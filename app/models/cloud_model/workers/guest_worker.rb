@@ -65,11 +65,13 @@ module CloudModel
       end
 
       def ensure_lxd_image
-        guest.lxd_containers.new.import_template
+        @lxc = guest.lxd_containers.new guest_template: guest.template, created_at: Time.now, updated_at: Time.now
+        @lxc.import_template
       end
 
       def create_lxd_container
-        @lxc = guest.lxd_containers.create! guest_template: guest.template, created_at: Time.now, updated_at: Time.now
+        #@lxc = guest.lxd_containers.create! guest_template: guest.template, created_at: Time.now, updated_at: Time.now
+        @lxc.save!
         @lxc.mount
       end
 
