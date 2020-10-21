@@ -43,6 +43,7 @@ module CloudModel
     field :name, type: String
     field :tinc_public_key, type: String
     field :initial_root_pw, type: String
+    field :cpu_name, type: String
     field :cpu_count, type: Integer, default: -1
     field :arch, type: String, default: 'amd64'
     field :mac_address_prefix, type: String
@@ -300,6 +301,25 @@ module CloudModel
       success, data = exec "umount #{root}/boot"
 
       return success
+    end
+
+    def cpu_name
+      if super.blank?
+        unless Net::Ping::External.new.ping(private_network.list_ips.first)
+          'No network connect to host private address'
+        end
+
+        success, result = exec('cat /proc/cpuinfo')
+        if success
+          name = result.lines.select{|l| l =~ /model name/}.first.split(':')[1].strip
+          update_attribute :cpu_name, name
+          name
+        else
+          "Unknown"
+        end
+      else
+        super
+      end
     end
 
     def system_info
