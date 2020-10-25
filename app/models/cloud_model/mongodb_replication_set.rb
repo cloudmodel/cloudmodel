@@ -51,7 +51,7 @@ module CloudModel
     def client
       if operational_service_uris.first
         begin
-          Mongo::Client.new(service_uris, connect_timeout: 2, timeout: 2)
+          Mongo::Client.new(operational_service_uris, connect_timeout: 2, timeout: 2)
         rescue
           false
         end
