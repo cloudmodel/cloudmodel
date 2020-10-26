@@ -94,7 +94,7 @@ module CloudModel
 
         checks = {}
         thresholds.each do |k,v|
-          if v
+          if value and v
             checks[k] = value > v
           end
         end
