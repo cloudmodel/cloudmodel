@@ -110,6 +110,8 @@ module CloudModel
       if success
         result = YAML.load(result).first
 
+        result ||= {}
+
         if result['container']
           container = result.delete('container')
           result = result.merge(container)
@@ -117,15 +119,17 @@ module CloudModel
 
         %w(config expanded_config).each do |field|
           config = {}
-          result[field].each do |k,v|
-            keys = k.split('.')
-            prev = config
-            keys.each_with_index do |sk,i|
-              prev[sk] ||= {}
-              if i + 1 == keys.size
-                prev[sk] = v
-              else
-                prev = prev[sk]
+          if result[field]
+            result[field].each do |k,v|
+              keys = k.split('.')
+              prev = config
+              keys.each_with_index do |sk,i|
+                prev[sk] ||= {}
+                if i + 1 == keys.size
+                  prev[sk] = v
+                else
+                  prev = prev[sk]
+                end
               end
             end
           end
@@ -152,7 +156,7 @@ module CloudModel
 
 
     def running?
-      if state = live_lxc_info['state']
+      if info = live_lxc_info and state = info['state']
         state['status'] == "Running"
       else
         nil
