@@ -3,8 +3,6 @@ module CloudModel
     module Components
       class RubyComponentWorker < BaseComponentWorker
         def build build_path
-          # Ruby deps needed for most rails projects
-          # TODO: Consider separating them to more Components
           packages = %w(ruby ruby-dev git)
           packages += %w(zlib1g-dev)
           packages << 'ruby-bcrypt' # bcrypt
