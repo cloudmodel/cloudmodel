@@ -263,7 +263,14 @@ describe CloudModel::Guest do
         double(components_needed: [:ruby, :nginx]),
         double(components_needed: [:ruby, :mongodb]),
       ]
-      expect(subject.components_needed).to eq [:mongodb, :nginx, :ruby]
+      expect(subject.components_needed).to eq [:ruby, :nginx, :mongodb]
+    end
+
+    it 'should resolve component dependencies' do
+      allow(subject).to receive(:services).and_return [
+        double(components_needed: [:solr]),
+      ]
+      expect(subject.components_needed).to eq [:java, :solr]
     end
   end
 

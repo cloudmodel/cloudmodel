@@ -327,6 +327,7 @@ en:
         git_repo: GIT Repository
         git_branch: GIT Branch
         git_commit: GIT Commit
+        additional_components: Add Components
         updated_at: Last Updated
         has_assets: Compile Assets?
         file_size: Package Size
