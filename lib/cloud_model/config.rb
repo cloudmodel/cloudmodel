@@ -73,6 +73,10 @@ module CloudModel
       @ubuntu_name || "Bionic Beaver"
     end
 
+    def ubuntu_short_name
+      ubuntu_name.split.first.downcase
+    end
+
     def ubuntu_kernel_flavour
       @ubuntu_kernel_flavour || "generic-hwe-18.04"
     end
