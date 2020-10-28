@@ -131,7 +131,17 @@ module CloudModel
         components += service.components_needed
       end
 
-      components.uniq.sort{|a,b| a<=>b}
+      components.uniq.sort!{|a,b| a<=>b}
+
+      needed_components=[]
+      components.each do |component|
+        component_class = "CloudModel::Components::#{component.to_s.camelcase}Component".constantize
+
+        needed_components += component_class.new.requirements
+        needed_components << component
+      end
+
+      needed_components.uniq
     end
 
     def template_type

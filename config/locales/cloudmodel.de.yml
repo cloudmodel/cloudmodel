@@ -328,6 +328,7 @@ de:
         git_repo: GIT Repository
         git_branch: GIT Branch
         git_commit: GIT Commit
+        additional_components: Zusätzliche Komponenten
         updated_at: Letztes Update
         has_assets: Assets erzeugen?
         file_size: Packetgröße
