@@ -80,6 +80,8 @@ module CloudModel
       end
     end
     accepts_nested_attributes_for :addresses, allow_destroy: true
+    embeds_many :firewall_rules, class_name: "CloudModel::FirewallRule", inverse_of: :host
+    accepts_nested_attributes_for :firewall_rules, allow_destroy: true
 
     embeds_one :primary_address, class_name: "CloudModel::Address", autobuild: true, inverse_of: :host
     accepts_nested_attributes_for :primary_address
@@ -107,14 +109,22 @@ module CloudModel
       name
     end
 
+    def private_address_collection
+      private_network.list_ips - [private_network.gateway]
+    end
+
     def available_private_address_collection
-      all = private_network.list_ips - [private_network.gateway]
+      all = private_address_collection
       used = guests.map{ |g| g.private_address }
       all - used
     end
 
+    def external_address_collection
+      addresses.map{ |a| a.list_ips if a.ip_version == 4 }.flatten
+    end
+
     def available_external_address_collection
-      all = addresses.map{ |a| a.list_ips if a.ip_version == 4 }.flatten
+      all = external_address_collection
       used = guests.map{ |g| g.external_address }
       all - used - [nil]
     end

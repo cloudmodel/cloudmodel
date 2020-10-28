@@ -80,6 +80,9 @@ en:
       cloud_model/address:
         one: Address/Subnet
         other: Addresses/Subnets
+      cloud_model/firewall_rule:
+        one: Firewall Rule
+        other: Firewall Rules
       cloud_model/item_issue:
         one: Issue
         other: Issues
@@ -163,6 +166,13 @@ en:
         network: Network Address
         netmask: Subnet Mask
         broadcast: Broadcast Address
+      cloud_model/firewall_rule:
+        protocol: Protocol
+        service_kind: Service
+        source_ip: Source IP
+        source_port: Source Port
+        target_ip: Target IP
+        target_port: Target Port
       cloud_model/host:
         name: Host Name
         tinc_public_key: VPN Public Key
