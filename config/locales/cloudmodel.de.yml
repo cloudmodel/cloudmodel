@@ -186,6 +186,7 @@ de:
         deploy_state: Installationsstatus
         deploy_last_issue: Letztes Problem bei der Installation
         last_deploy_finished_at: Zuletzt erfolgreich installiert
+        monitoring_last_check_at: Zuletzt überwacht
       cloud_model/guest:
         name: Hostname
         host: Hostrechner
@@ -208,6 +209,7 @@ de:
         deploy_state: Installationsstatus
         deploy_last_issue: Letztes Problem bei der Installation
         last_deploy_finished_at: Zuletzt erfolgreich installiert
+        monitoring_last_check_at: Zuletzt überwacht
       cloud_model/item_issue:
         title: Titel
         message: Nachricht
@@ -260,6 +262,8 @@ de:
         disk_space: Laufwerksgröße
         writeable: Schreibbar?
         has_backups: Backups?
+        state: Status
+        monitoring_last_check_at: Zuletzt überwacht
       cloud_model/certificate:
         name: Name
         name: Name
@@ -349,7 +353,8 @@ de:
         guest: Gastsystem
         public_service: Öffentlicher Dienst?
         has_backups: Dienstdaten sichern?
-        state: Status
+        state: Dienststatus
+        monitoring_last_check_at: Zuletzt überwacht
         _type: Dienstart
       cloud_model/services/mongodb:
         mongodb_replication_set: Replikationset
