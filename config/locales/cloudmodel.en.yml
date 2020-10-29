@@ -185,7 +185,8 @@ en:
         cpu_count: CPUs
         deploy_state: Deploy State
         deploy_last_issue: Last Deploy Issue
-        last_deploy_finished_at: Last Deploy At
+        last_deploy_finished_at: Last Deployed
+        monitoring_last_check_at: Last Monitored
       cloud_model/guest:
         name: Hostname
         host: Hardware Host
@@ -208,6 +209,7 @@ en:
         deploy_state: Deploy State
         deploy_last_issue: Last Deploy Issue
         last_deploy_finished_at: Last Deploy At
+        monitoring_last_check_at: Last Monitored
       cloud_model/item_issue:
         title: Title
         message: Message
@@ -260,6 +262,8 @@ en:
         disk_space: Disk Space
         writeable: Writeable?
         has_backups: Backups?
+        state: State
+        monitoring_last_check_at: Last Monitored
       cloud_model/certificate:
         name: Name
         ca: Certificate Authority
@@ -348,7 +352,8 @@ en:
         guest: Guest Host
         public_service: Public Service?
         has_backups: Backup Service Data?
-        state: State
+        state: Service State
+        monitoring_last_check_at: Last Monitored
         _type: Service Type
       cloud_model/services/mongodb:
         mongodb_replication_set: Replication Set
