@@ -4,11 +4,11 @@ module CloudModel
       def kind
         :headless
       end
-      
+
       def components_needed
-        [:ruby]
+        ([:ruby] + super).uniq
       end
-      
+
       def service_status
         false
       end

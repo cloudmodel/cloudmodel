@@ -306,6 +306,7 @@ de:
       cloud_model/guest_template_type:
         name: Templateart
         components: Komponenten beinhaltet
+        used_in_guests: In Gästen genutzt
         last_created_at: Zuletzt erzeugt am
       cloud_model/guest_template:
         id: Bezeichner
@@ -353,6 +354,7 @@ de:
         guest: Gastsystem
         public_service: Öffentlicher Dienst?
         has_backups: Dienstdaten sichern?
+        additional_components: Zusätzliche Komponenten
         state: Dienststatus
         monitoring_last_check_at: Zuletzt überwacht
         _type: Dienstart

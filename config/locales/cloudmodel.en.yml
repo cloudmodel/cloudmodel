@@ -305,6 +305,7 @@ en:
       cloud_model/guest_template_type:
         name: Template Type
         components: Provides Components
+        used_in_guests: Used in Guests
         last_created_at: Last Created at
       cloud_model/guest_template:
         id: Template Name
@@ -352,6 +353,7 @@ en:
         guest: Guest Host
         public_service: Public Service?
         has_backups: Backup Service Data?
+        additional_components: Add Components
         state: Service State
         monitoring_last_check_at: Last Monitored
         _type: Service Type

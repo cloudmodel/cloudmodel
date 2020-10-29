@@ -53,9 +53,9 @@ module CloudModel
           if deploy_web_image
             components += deploy_web_image.additional_components.map &:to_sym
           end
-          components.uniq
+          (components + super).uniq
         else
-          [:nginx]
+          ([:nginx] + super).uniq
         end
       end
 
