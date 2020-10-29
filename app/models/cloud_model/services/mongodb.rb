@@ -9,7 +9,7 @@ module CloudModel
       end
 
       def components_needed
-        [:mongodb]
+        ([:mongodb] + super).uniq
       end
 
       def sanitize_service_data data

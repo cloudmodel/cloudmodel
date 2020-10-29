@@ -10,7 +10,7 @@ module CloudModel
       end
 
       def components_needed
-        [:solr]
+        ([:solr] + super).uniq
       end
 
       def read_solr_json uri
