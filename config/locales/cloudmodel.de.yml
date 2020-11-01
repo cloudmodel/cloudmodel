@@ -359,9 +359,16 @@ de:
         monitoring_last_check_at: Zuletzt überwacht
         _type: Dienstart
       cloud_model/services/mongodb:
+        replication: Replikation
         mongodb_replication_set: Replikationset
+        mongodb_replication_set_id: Replikationset
+        mongodb_replication_priority: Replikationspriorität
+        mongodb_replication_arbiter_only: Nur Schiedsrichter?
         mongodb_replication_set_master?: Primärknoten
         mongodb_replication_set_version: Replikationsversion
+        server_uri: Serveradresse
+        health: Gesundheit
+        uptime: Betriebszeit
       cloud_model/services/redis:
         redis_sentinel_set: Replikationset
         redis_sentinel_port: Replikationsport
