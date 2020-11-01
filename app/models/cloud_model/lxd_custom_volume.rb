@@ -95,7 +95,11 @@ module CloudModel
     end
 
     def usage_percentage
-      (100.0 * usage_bytes / disk_space)
+      if usage_bytes and disk_space
+        (100.0 * usage_bytes / disk_space)
+      else
+        nil
+      end
     end
 
     def host_path

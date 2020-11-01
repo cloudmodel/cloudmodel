@@ -27,7 +27,7 @@ module CloudModel
             "   members: [\n"
 
       services.each_with_index do |service,i|
-        cmd += "      { _id: #{i}, host: \"#{service.private_address}:#{service.port}\" },\n"
+        cmd += "      { _id: #{i}, host: \"#{service.private_address}:#{service.port}\", arbiterOnly: #{service.mongodb_replication_arbiter_only}, priority: #{service.mongodb_replication_priority} },\n"
       end
 
       cmd += "   ]\n" +
@@ -78,6 +78,11 @@ module CloudModel
       end
     end
 
+    def initiate
+      # eval init_rs_cmd
+      guests.first.exec "mongo --eval '#{init_rs_cmd}'"
+    end
+
     def status
       # Issue an administrative command
       #data = db_command(replSetGetStatus: 1).as_json.first
@@ -106,10 +111,48 @@ module CloudModel
       data
     end
 
-    def initiate
-      guests.first.exec "mongo --eval '#{init_rs_cmd}'"
-      #eval init_rs_cmd
+    def read_config
+      eval 'rs.config()'
     end
+
+    def reconfig
+      config = read_config
+
+      new_members = []
+      max_member_id = config['members'].map{|m| m['_id']}.max
+      has_changed_arbiter_setting_on_member = false
+
+      services.each do |service|
+        member = config['members'].find{|m| m['host'] == service.server_uri} || {
+          '_id' => (max_member_id += 1),
+          'host' => service.server_uri,
+          'arbiterOnly' => service.mongodb_replication_arbiter_only
+        }
+
+        member['priority'] = service.mongodb_replication_priority
+
+        # Increase id if arbiterOnly did change from previous config
+        if not member['arbiterOnly'].nil? and member['arbiterOnly'] != service.mongodb_replication_arbiter_only
+          puts "#{service} on #{service.guest} changed arbiter to #{member['arbiterOnly']}"
+          has_changed_arbiter_setting_on_member = true
+        else
+          new_members << member
+        end
+      end
+
+      config['version'] += 1
+      config['members'] = new_members
+
+      res = db_command replSetReconfig: config
+
+      if has_changed_arbiter_setting_on_member and res.first['ok']
+        puts 'Reconfig again to change arbiter setting...'
+        return reconfig
+      end
+
+      res
+    end
+
 
     def add host
       eval "rs.add('#{host}')"

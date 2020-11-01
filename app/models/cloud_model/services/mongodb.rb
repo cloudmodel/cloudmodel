@@ -2,7 +2,12 @@ module CloudModel
   module Services
     class Mongodb < Base
       field :port, type: Integer, default: 27017
+
+      field :mongodb_replication_priority, type: Integer, default: 50
+      field :mongodb_replication_arbiter_only, type: Boolean, default: false
       belongs_to :mongodb_replication_set, class_name: "CloudModel::MongodbReplicationSet", optional: true
+
+      validates :mongodb_replication_priority, inclusion: {in: 0..100}
 
       def kind
         :mongodb
@@ -53,6 +58,15 @@ module CloudModel
 
       def server_uri
         "#{private_address}:#{port}"
+      end
+
+      def mongodb_replication_priority
+        # Make sure it sets priority to 0 if it is arbiter only
+        if mongodb_replication_arbiter_only
+          0
+        else
+          super
+        end
       end
 
       def mongodb_replication_set_master?

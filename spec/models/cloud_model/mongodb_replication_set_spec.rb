@@ -7,6 +7,10 @@ describe CloudModel::MongodbReplicationSet do
 
   it { expect(subject).to have_field(:name).of_type(String) }
 
+  describe 'guests' do
+    pending
+  end
+
   describe 'services' do
     it 'should get array with all services using set' do
       guest1 = double CloudModel::Guest, services: []
@@ -38,20 +42,74 @@ describe CloudModel::MongodbReplicationSet do
     it 'should return mongodb command to init set' do
       subject.name = 'my_mongodb_set'
 
-      service1 = double CloudModel::Services::Mongodb, port: 27017, private_address: '10.23.42.17'
-      service2 = double CloudModel::Services::Mongodb, port: 1337, private_address: '10.23.42.240'
+      service1 = double(CloudModel::Services::Mongodb,
+        port: 27017,
+        private_address: '10.23.42.17',
+        mongodb_replication_arbiter_only: false,
+        mongodb_replication_priority: 50
+      )
+      service2 = double(CloudModel::Services::Mongodb,
+        port: 1337,
+        private_address: '10.23.42.240',
+        mongodb_replication_arbiter_only: true,
+        mongodb_replication_priority: 0
+      )
       allow(subject).to receive(:services).and_return [service1, service2]
 
       expect(subject.init_rs_cmd).to eq(<<~OUT
         rs.initiate( {
            _id : "my_mongodb_set",
            members: [
-              { _id: 0, host: "10.23.42.17:27017" },
-              { _id: 1, host: "10.23.42.240:1337" },
+              { _id: 0, host: "10.23.42.17:27017", arbiterOnly: false, priority: 50 },
+              { _id: 1, host: "10.23.42.240:1337", arbiterOnly: true, priority: 0 },
            ]
         })
       OUT
       )
     end
+  end
+
+  describe 'service_uris' do
+    pending
+  end
+
+  describe 'operational_service_uris' do
+    pending
+  end
+
+  describe 'client' do
+    pending
+  end
+
+  describe 'db_command' do
+    pending
+  end
+
+  describe 'eval' do
+    pending
+  end
+
+  describe 'initiate' do
+    pending
+  end
+
+  describe 'status' do
+    pending
+  end
+
+  describe 'read_config' do
+    pending
+  end
+
+  describe 'reconfig' do
+    pending
+  end
+
+  describe 'add' do
+    pending
+  end
+
+  describe 'remove' do
+    pending
   end
 end

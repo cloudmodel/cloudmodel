@@ -358,9 +358,16 @@ en:
         monitoring_last_check_at: Last Monitored
         _type: Service Type
       cloud_model/services/mongodb:
+        replication: Replication
         mongodb_replication_set: Replication Set
+        mongodb_replication_set_id: Replication Set
+        mongodb_replication_priority: Replication Priority
+        mongodb_replication_arbiter_only: Arbiter only?
         mongodb_replication_set_master?: Primary Node
         mongodb_replication_set_version: Replication Version
+        server_uri: Server Address
+        health: Health
+        uptime: Uptime
       cloud_model/services/redis:
         redis_sentinel_set: Sentinel Set
         redis_sentinel_port: Sentinel Port
