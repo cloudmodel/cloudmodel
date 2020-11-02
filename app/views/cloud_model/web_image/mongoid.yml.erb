@@ -1,28 +1,32 @@
 <%= model.passenger_env %>:
   sessions:
     default:
-      hosts: 
+      hosts:
       <% if model.deploy_mongodb_replication_set -%>
         <% model.deploy_mongodb_replication_set.services.each do |service| -%>
         - <%= service.private_address %>:<%= service.port %>
         <% end -%>
       options:
-        read: :nearest  
+        read: :primary
+        write:
+          w: majority
       <% else -%>
-        - <%= model.deploy_mongodb_host %>:<%= model.deploy_mongodb_port %>  
+        - <%= model.deploy_mongodb_host %>:<%= model.deploy_mongodb_port %>
       <% end -%>
       database: <%= model.deploy_mongodb_database %>
   clients:
     default:
-      hosts: 
+      hosts:
       <% if model.deploy_mongodb_replication_set -%>
         <% model.deploy_mongodb_replication_set.services.each do |service| -%>
         - <%= service.private_address %>:<%= service.port %>
         <% end -%>
       options:
         read:
-          mode: :nearest   
+          mode: :primary
+        write:
+          w: majority
       <% else -%>
-        - <%= model.deploy_mongodb_host %>:<%= model.deploy_mongodb_port %>  
+        - <%= model.deploy_mongodb_host %>:<%= model.deploy_mongodb_port %>
       <% end -%>
       database: <%= model.deploy_mongodb_database %>
