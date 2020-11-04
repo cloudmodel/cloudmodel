@@ -28,6 +28,9 @@ module CloudModel
     field :mac_address, type: String
     field :external_alt_names, type: Array, default: []
 
+    field :lxd_autostart_priority, type: Integer, default: 50
+    field :lxd_autostart_delay, type: Integer, default: 0
+
     field :root_fs_size, type: Integer, default: 10737418240
     field :memory_size, type: Integer, default: 2147483648
     field :cpu_count, type: Integer, default: 2
@@ -50,10 +53,14 @@ module CloudModel
     validates :name, presence: true, uniqueness: { scope: :host }, format: {with: /\A[a-z0-9\-_]+\z/}
     validates :host, presence: true
     validates :private_address, presence: true
+    validates :lxd_autostart_priority, presence: true, numericality: {only_integer: true, greater_than_or_equal_to: 0}
+    validates :lxd_autostart_delay, presence: true, numericality: {only_integer: true, greater_than_or_equal_to: 0}
 
     before_validation :set_dhcp_private_address, :on => :create
     before_validation :set_mac_address, :on => :create
     before_destroy    :stop
+
+    after_save :configure_current_lxd_container
 
     def current_lxd_container
       lxd_containers.where(id: current_lxd_container_id).first
@@ -298,6 +305,46 @@ module CloudModel
     def cpu_usage
       if check_result = monitoring_last_check_result and sys_info = check_result['system'] and cpu_info = sys_info['cgroup_cpu']
         cpu_info['last_5_minutes_percentage']
+      end
+    end
+
+    def apply_memory_size container=nil
+      if container ||= current_lxd_container
+        container.set_config 'limits.memory', memory_size
+      else
+        nil
+      end
+    end
+
+    def apply_cpu_count container=nil
+      if container ||= current_lxd_container
+        container.set_config 'limits.cpu', cpu_count
+      else
+        nil
+      end
+    end
+
+    def apply_lxd_autostart container=nil
+      if container ||= current_lxd_container
+        container.set_config 'boot.autostart.priority', lxd_autostart_priority
+        container.set_config 'boot.autostart.delay', lxd_autostart_delay
+      else
+        nil
+      end
+    end
+
+    def configure_lxd_container container
+      apply_memory_size container
+      apply_cpu_count container
+      apply_lxd_autostart container
+      true
+    end
+
+    def configure_current_lxd_container
+      if current_lxd_container
+        configure_lxd_container current_lxd_container
+      else
+        true # Always be true to not interfere with callbacks
       end
     end
 

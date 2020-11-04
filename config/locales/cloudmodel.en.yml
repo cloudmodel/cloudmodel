@@ -203,8 +203,10 @@ en:
         root_volume: Root Volume
         guest_volumes: Other Volumes
         certificates: Certificates
-        lxd_containers: LXD Containers
-        lxd_custom_volumes: LXD Custom Volumes
+        lxd_containers: Containers
+        lxd_custom_volumes: Custom Volumes
+        lxd_autostart_priority: Boot Priority
+        lxd_autostart_delay: Boot Delay
         state: State
         deploy_state: Deploy State
         deploy_last_issue: Last Deploy Issue

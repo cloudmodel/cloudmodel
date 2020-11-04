@@ -23,6 +23,9 @@ describe CloudModel::Guest do
   it { expect(subject).to have_field(:memory_size).of_type(Integer).with_default_value_of 2*1024*1024*1024 }
   it { expect(subject).to have_field(:cpu_count).of_type(Integer).with_default_value_of 2 }
 
+  it { expect(subject).to have_field(:lxd_autostart_priority).of_type(Integer).with_default_value_of 50 }
+  it { expect(subject).to have_field(:lxd_autostart_delay).of_type(Integer).with_default_value_of 0 }
+
   it { expect(subject).to have_enum(:deploy_state).with_values(
     0x00 => :pending,
     0x01 => :running,
@@ -43,6 +46,11 @@ describe CloudModel::Guest do
 
   it { expect(subject).to validate_presence_of(:host) }
   it { expect(subject).to validate_presence_of(:private_address) }
+
+  it { expect(subject).to validate_presence_of(:lxd_autostart_priority) }
+  it { expect(subject).to validate_numericality_of(:lxd_autostart_priority).greater_than_or_equal_to 0 }
+  it { expect(subject).to validate_presence_of(:lxd_autostart_delay) }
+  it { expect(subject).to validate_numericality_of(:lxd_autostart_delay).greater_than_or_equal_to 0 }
 
   let(:host) { Factory.build :host }
 
@@ -511,6 +519,111 @@ describe CloudModel::Guest do
 
   describe 'cpu_usage' do
     pending
+  end
+
+  describe 'apply_memory_size' do
+    let(:container) { double CloudModel::LxdContainer }
+
+    it 'should set memory limit on given container' do
+      expect(subject).not_to receive(:current_lxd_container)
+      subject.memory_size = '128K'
+      expect(container).to receive(:set_config).with("limits.memory", 131072).and_return [true, '']
+
+      expect(subject.apply_memory_size container).to eq [true, '']
+    end
+
+    it 'should set memory limit on current container by default' do
+      allow(subject).to receive(:current_lxd_container).and_return container
+      subject.memory_size = '64K'
+      expect(container).to receive(:set_config).with("limits.memory", 65536).and_return [true, '']
+
+      expect(subject.apply_memory_size).to eq [true, '']
+    end
+
+    it 'should return nil if no current container found' do
+      allow(subject).to receive(:current_lxd_container).and_return nil
+      expect(subject.apply_memory_size).to eq nil
+    end
+  end
+
+  describe 'apply_cpu_count' do
+    let(:container) { double CloudModel::LxdContainer }
+
+    it 'should set memory limit on given container' do
+      expect(subject).not_to receive(:current_lxd_container)
+      subject.cpu_count = 4
+      expect(container).to receive(:set_config).with("limits.cpu", 4).and_return [true, '']
+
+      expect(subject.apply_cpu_count container).to eq [true, '']
+    end
+
+    it 'should set memory limit on current container by default' do
+      allow(subject).to receive(:current_lxd_container).and_return container
+      subject.cpu_count = 1
+      expect(container).to receive(:set_config).with("limits.cpu", 1).and_return [true, '']
+
+      expect(subject.apply_cpu_count).to eq [true, '']
+    end
+
+    it 'should return nil if no current container found' do
+      allow(subject).to receive(:current_lxd_container).and_return nil
+      expect(subject.apply_cpu_count).to eq nil
+    end
+  end
+
+  describe 'apply_lxd_autostart' do
+    let(:container) { double CloudModel::LxdContainer }
+
+    it 'should set memory limit on given container' do
+      expect(subject).not_to receive(:current_lxd_container)
+      subject.lxd_autostart_priority = 42
+      subject.lxd_autostart_delay = 0
+      expect(container).to receive(:set_config).with("boot.autostart.priority", 42).and_return [true, '']
+      expect(container).to receive(:set_config).with("boot.autostart.delay", 0).and_return [true, '']
+
+      expect(subject.apply_lxd_autostart container).to eq [true, '']
+    end
+
+    it 'should set memory limit on current container by default' do
+      allow(subject).to receive(:current_lxd_container).and_return container
+      subject.lxd_autostart_priority = 23
+      subject.lxd_autostart_delay = 13
+      expect(container).to receive(:set_config).with("boot.autostart.priority", 23).and_return [true, '']
+      expect(container).to receive(:set_config).with("boot.autostart.delay", 13).and_return [true, '']
+
+      expect(subject.apply_lxd_autostart).to eq [true, '']
+    end
+
+    it 'should return nil if no current container found' do
+      allow(subject).to receive(:current_lxd_container).and_return nil
+      expect(subject.apply_lxd_autostart).to eq nil
+    end
+  end
+
+  describe 'configure_lxd_container' do
+    let(:container) { double CloudModel::LxdContainer }
+
+    it 'should call apply cpu count, memory limit, and lxd autostart' do
+      expect(subject).to receive(:apply_cpu_count).with(container)
+      expect(subject).to receive(:apply_memory_size).with(container)
+      expect(subject).to receive(:apply_lxd_autostart).with(container)
+      expect(subject.configure_lxd_container container).to eq true
+    end
+  end
+
+  describe 'configure_current_lxd_container' do
+    let(:container) { double CloudModel::LxdContainer }
+
+    it 'should call apply cpu count and memory limit' do
+      allow(subject).to receive(:current_lxd_container).and_return container
+      expect(subject).to receive(:configure_lxd_container).with(container).and_return true
+      expect(subject.configure_current_lxd_container).to eq true
+    end
+
+    it 'should call it on saving the guest' do
+      expect(subject).to receive(:configure_current_lxd_container)
+      subject.run_callbacks(:save)
+    end
   end
 
   describe 'live_lxc_info' do
