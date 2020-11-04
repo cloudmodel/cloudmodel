@@ -203,8 +203,10 @@ de:
         root_volume: Systemlaufwerk
         guest_volumes: Andere Laufwerke
         certificates: Zertifikate
-        lxd_containers: LXD Container
-        lxd_custom_volumes: LXD Gastlaufwerke
+        lxd_containers: Container
+        lxd_custom_volumes: Gastlaufwerke
+        lxd_autostart_priority: Startpriorität
+        lxd_autostart_delay: Startverzögerung
         state: Status
         deploy_state: Installationsstatus
         deploy_last_issue: Letztes Problem bei der Installation

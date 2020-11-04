@@ -262,6 +262,29 @@ describe CloudModel::LxdContainer do
     end
   end
 
+  describe 'get_config' do
+    it 'should get config and return it' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(subject).to receive(:lxc).with('config get some_guest-20200331133742 some_key').and_return [true, "Some Return Value\n"]
+
+      expect(subject.get_config 'some_key').to eq 'Some Return Value'
+    end
+
+    it 'should cast integer values' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(subject).to receive(:lxc).with('config get some_guest-20200331133742 some_key').and_return [true, "42\n"]
+
+      expect(subject.get_config 'some_key').to eq 42
+    end
+
+    it 'should return nil if get failed' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(subject).to receive(:lxc).with('config get some_guest-20200331133742 some_key').and_return [false, "Container no found\n"]
+
+      expect(subject.get_config 'some_key').to eq nil
+    end
+  end
+
   describe 'set_config' do
     it 'should call lxc config set' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
@@ -285,13 +308,10 @@ describe CloudModel::LxdContainer do
   describe 'config_from_guest' do
     it 'should setup container according to guest' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
-      guest.cpu_count = 1
-      guest.memory_size = 64 * 1024
       guest.root_fs_size = 170 * 1024
 
       expect(subject).to receive(:set_config).with('raw.lxc', "'lxc.mount.auto = cgroup'")
-      expect(subject).to receive(:set_config).with('limits.cpu',1)
-      expect(subject).to receive(:set_config).with('limits.memory', 65536)
+      expect(guest).to receive(:configure_lxd_container).with(subject)
       expect(subject).to receive(:lxc).with("config device set some_guest-20200331133742 root size 174080")
       expect(subject).to receive(:lxc).with("network attach lxdbr0 some_guest-20200331133742 eth0")
 

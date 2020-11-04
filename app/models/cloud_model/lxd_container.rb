@@ -163,14 +163,27 @@ module CloudModel
       end
     end
 
+    def get_config key
+      res, ret = lxc "config get #{name} #{key.to_s.shellescape}"
+      if res
+        ret = ret.strip
+        if ret =~ /^[0-9]+$/
+          ret.to_i
+        else
+          ret
+        end
+      else
+        nil
+      end
+    end
+
     def set_config key, value
       lxc "config set #{name} #{key.to_s.shellescape} #{value.to_s.shellescape}"
     end
 
     def config_from_guest
       set_config 'raw.lxc', "'lxc.mount.auto = cgroup'"
-      set_config 'limits.cpu', guest.cpu_count
-      set_config 'limits.memory', guest.memory_size
+      guest.configure_lxd_container self
 
       lxc "config device set #{name} root size #{guest.root_fs_size}" # todo: fix disk quota
 
