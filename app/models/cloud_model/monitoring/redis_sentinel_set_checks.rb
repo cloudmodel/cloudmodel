@@ -1,12 +1,12 @@
 module CloudModel
   module Monitoring
     class RedisSentinelSetChecks < CloudModel::Monitoring::BaseChecks
-      def aquire_data
-      
+      def acquire_data
+
       end
-      
+
       def check
-        
+
       end
     end
   end

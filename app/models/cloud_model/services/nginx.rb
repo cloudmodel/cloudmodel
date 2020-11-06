@@ -87,15 +87,14 @@ module CloudModel
         data = {}
         uri = URI(status_uri)
 
-        http = Net::HTTP.new(uri.host, uri.port)
-        if ssl_supported
-          http.use_ssl = true
-          http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-        end
-        request = Net::HTTP::Get.new(uri.request_uri)
-
         begin
-          res = http.request(request)
+          Net::HTTP.start(uri.host, uri.port,
+            :use_ssl => ssl_supported,
+            :verify_mode => OpenSSL::SSL::VERIFY_NONE) do |http|
+
+            req = Net::HTTP::Get.new uri.request_uri
+            res = http.request req
+          end
         rescue Exception => e
           return {key: :not_reachable, error: "#{e.class}\n\n#{e.to_s}", severity: :critical}
         end

@@ -74,14 +74,20 @@ module CloudModel
     def start
       # Shutdown previous running container of guest
       guest.lxd_containers.each do |c|
-        c.stop
+        c.stop up_state: :booting, reason: 'Reboot'
       end
 
-      lxc "start #{name}"
+      success, result = lxc "start #{name}"
+      if success
+        guest.update_attributes up_state: :started
+      else
+        guest.update_attributes up_state: :start_failed, last_downtime_at: Time.now, last_downtime_reason: "LXC start issue: #{result}"
+      end
     end
 
     def stop options={}
       if options[:force] or running?
+        guest.update_attributes up_state: options[:up_state] || :stopped, last_downtime_at: Time.now, last_downtime_reason: options[:reason] || "Stopped"
         lxc "stop #{name} -f --timeout=10"
       end
     end

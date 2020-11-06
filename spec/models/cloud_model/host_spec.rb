@@ -593,6 +593,10 @@ describe CloudModel::Host do
     pending
   end
 
+  describe 'live_lxc_info' do
+    pending
+  end
+
   describe 'memory_size' do
     pending
   end

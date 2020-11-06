@@ -41,6 +41,8 @@ module CloudModel
           return {key: :not_reachable, error: "#{e.class}\n\n#{e.to_s}", severity: :critical}
         rescue Exception => e
           return {key: :not_reachable, error: "#{e.class}\n\n#{e.to_s}", severity: :warning}
+        ensure
+          mongo_client.close
         end
 
         # Remove keys containing config details and doubled values

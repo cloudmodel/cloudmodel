@@ -39,9 +39,9 @@ describe CloudModel::Monitoring::BaseChecks do
     end
   end
 
-  describe 'aquire_data' do
+  describe 'acquire_data' do
     it 'should be nil' do
-      expect(subject.aquire_data).to eq nil
+      expect(subject.acquire_data).to eq nil
     end
   end
 
@@ -60,22 +60,22 @@ describe CloudModel::Monitoring::BaseChecks do
   end
 
   describe 'data' do
-    it 'should aquire data and store it on first run' do
-      expect(subject).to receive(:aquire_data).and_return 'data' => 'some data'
+    it 'should acquire data and store it on first run' do
+      expect(subject).to receive(:acquire_data).and_return 'data' => 'some data'
       expect(subject).to receive(:store_data).and_return true
 
       expect do
         expect(subject.data).to eq 'data' => 'some data'
-      end.to output("  * Acqire data ...[\e[32mOK\e[39m]\n  * Store data ...[\e[32mOK\e[39m]\n").to_stdout
+      end.to output("  * Acqire data ...\n    -> \e[32mOK\e[39m\n  * Store data ...\n    -> \e[32mOK\e[39m\n").to_stdout
     end
 
-    it 'should aquire data as false and not store that on first run if aquire_data is nil' do
-      expect(subject).to receive(:aquire_data).and_return nil
+    it 'should acquire data as false and not store that on first run if acquire_data is nil' do
+      expect(subject).to receive(:acquire_data).and_return nil
       expect(subject).not_to receive(:store_data)
 
       expect do
         expect(subject.data).to eq false
-      end.to output("  * Acqire data ...[\e[32mOK\e[39m]\n").to_stdout
+      end.to output("  * Acqire data ...\n    -> \e[32mOK\e[39m\n").to_stdout
     end
 
 
@@ -98,7 +98,7 @@ describe CloudModel::Monitoring::BaseChecks do
       end.to output('').to_stdout
     end
 
-    it 'should not pull/aquire data once it was loaded' do
+    it 'should not pull/acquire data once it was loaded' do
       subject.instance_variable_set :@data, 'data' => 'some data'
 
       expect do
@@ -107,12 +107,24 @@ describe CloudModel::Monitoring::BaseChecks do
     end
   end
 
+  describe 'line_prefix' do
+    it 'should be the indention' do
+      allow(subject).to receive(:indent_size).and_return 2
+      expect(subject.line_prefix).to eq '  '
+      allow(subject).to receive(:indent_size).and_return 6
+      expect(subject.line_prefix).to eq '      '
+    end
+  end
+
   describe 'do_check' do
+    pending
   end
 
   describe 'do_check_value' do
+    pending
   end
 
   describe 'do_check_errors_on' do
+    pending
   end
 end

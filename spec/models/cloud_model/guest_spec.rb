@@ -35,9 +35,19 @@ describe CloudModel::Guest do
     0xff => :not_started
   ).with_default_value_of(:not_started) }
 
-  it{ expect(subject).to have_field(:deploy_last_issue).of_type String }
+  it { expect(subject).to have_field(:deploy_last_issue).of_type String }
   it { expect(subject).to have_field(:last_deploy_finished_at).of_type Time }
-  it{ expect(subject).to have_field(:deploy_path).of_type String }
+  it { expect(subject).to have_field(:deploy_path).of_type String }
+
+  it { expect(subject).to have_enum(:up_state).with_values(
+    0x00 => :started,
+    0x01 => :stopped,
+    0x40 => :booting,
+    0x41 => :start_failed,
+    0xff => :not_deployed_yet
+  ).with_default_value_of(:not_deployed_yet) }
+  it { expect(subject).to have_field(:last_downtime_at).of_type Time }
+  it { expect(subject).to have_field(:last_downtime_reason).of_type String }
 
   it { expect(subject).to validate_presence_of(:name) }
   it { expect(subject).to validate_uniqueness_of(:name).scoped_to(:host) }
@@ -652,19 +662,81 @@ describe CloudModel::Guest do
       allow(subject).to receive(:current_lxd_container).and_return nil
       expect(subject.lxc_info).to eq nil
     end
-
   end
 
   describe 'start' do
-    pending
+    it 'should call start on current containers of guest by default' do
+      container = double CloudModel::LxdContainer
+      allow(subject).to receive(:current_lxd_container).and_return container
+      expect(container).to receive(:start).and_return [true, '']
+
+      expect(subject.start).to eq [true, '']
+    end
+
+    it 'should call start on given container and set it to current container' do
+      container1 = double CloudModel::LxdContainer, running?: true
+      container2 = double CloudModel::LxdContainer, running?: false, id: '42', is_a?: CloudModel::LxdContainer
+      allow(subject).to receive(:lxd_containers).and_return [container1, container2]
+      allow(subject).to receive(:current_lxd_container).and_return container1
+
+      expect(container1).not_to receive(:start)
+      expect(container2).to receive(:start).and_return [true, '']
+      expect(subject).to receive(:update_attributes).with(current_lxd_container_id: '42') do
+        allow(subject).to receive(:current_lxd_container).and_return container2
+      end
+
+      expect(subject.start container2).to eq [true, '']
+    end
+
+    it 'should call start on given container and set it to current container' do
+      container1 = double CloudModel::LxdContainer, running?: true
+      container2 = double CloudModel::LxdContainer, running?: false
+      allow(subject).to receive(:lxd_containers).and_return [container1, container2]
+      allow(subject).to receive(:current_lxd_container).and_return container1
+
+      expect(container1).not_to receive(:start)
+      expect(container2).to receive(:start).and_return [true, '']
+      expect(subject).to receive(:update_attributes).with(current_lxd_container_id: '42') do
+        allow(subject).to receive(:current_lxd_container).and_return container2
+      end
+
+      expect(subject.start "42").to eq [true, '']
+    end
+
+    it 'should return false if starting container fails fatally' do
+      container = double CloudModel::LxdContainer, running?: true
+      allow(subject).to receive(:current_lxd_container).and_return container
+      expect(container).to receive(:start).and_raise('ooops')
+
+      expect(subject.start).to eq [false, 'ooops']
+    end
   end
 
   describe 'stop' do
-    pending
-  end
+    it 'should call stop on all running containers of guest with given options' do
+      options = double
+      container1 = double CloudModel::LxdContainer, running?: true
+      container2 = double CloudModel::LxdContainer, running?: false
+      container3 = double CloudModel::LxdContainer, running?: true # Even if that should not happen, let's assume we have to containers running by some mistake
+      allow(subject).to receive(:lxd_containers).and_return [container1, container2, container3]
 
-  describe 'stop!' do
-    pending
+      expect(container1).to receive(:stop).with(options).and_return [true, '']
+      expect(container2).not_to receive(:stop)
+      expect(container3).to receive(:stop).with(options).and_return [false, 'Container not even running for real']
+
+
+      expect(subject.stop options).to eq true
+    end
+
+    it 'should return false if stopping container fails fatally' do
+      options = double
+      container = double CloudModel::LxdContainer, running?: true
+      allow(subject).to receive(:lxd_containers).and_return [container]
+
+      expect(container).to receive(:stop).with(options).and_raise('ooops')
+
+      expect(subject.stop options).to eq false
+    end
   end
 
   describe 'fix_lxd_custom_volumes' do

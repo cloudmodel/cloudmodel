@@ -7,6 +7,13 @@ de:
     unknown: Unbekannt
     dependent: Abhängigkeit
 
+  cloud_model/guest/up_state:
+    not_deployed_yet: Noch nicht ausgerollt
+    started: Sollte laufen
+    stopped: Angehalten
+    booting: Wird gestartet
+    start_failed: Start fehlgeschlagen
+
   cloud_model/guest/deploy_state:
     not_started: Nicht beauftragt
     pending: Geplant
@@ -212,6 +219,9 @@ de:
         deploy_last_issue: Letztes Problem bei der Installation
         last_deploy_finished_at: Zuletzt erfolgreich installiert
         monitoring_last_check_at: Zuletzt überwacht
+        up_state: Startstatus
+        last_downtime_at: Zuletzt gestoppt
+        last_downtime_reason: Grund des letzten Stop
       cloud_model/item_issue:
         title: Titel
         message: Nachricht
@@ -414,6 +424,7 @@ de:
   issues:
     general:
       no_check: '%{value} existiert nicht'
+      check_crashed: 'Absturz bei Prüfung - %{value}'
     sysinfo: &sysinfo_issues
       sys_info_available: Kann die Systeminformationen nicht zugreifen
       cpu_minute_usage: Prozessorauslastung in der letzten Minute von %{value}
@@ -426,6 +437,7 @@ de:
       mdtools: RAID hat Probleme
     cloud_model/guest:
       <<: *sysinfo_issues
+      sys_boot_failed: Neustart benötigt %{value} und ist noch nicht beendet
     cloud_model/services/redis:
       not_reachable: Dienst nicht erreichbar
     cloud_model/services/mongodb:

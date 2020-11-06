@@ -2,13 +2,17 @@ module CloudModel
   module Monitoring
     class HostChecks < CloudModel::Monitoring::BaseChecks
       include CloudModel::Monitoring::Mixins::SysinfoChecksMixin
-    
-      def aquire_data
+
+      def line_prefix
+        "[#{@subject.name}] #{super}"
+      end
+
+      def acquire_data
         {
           system: @subject.system_info
         }
       end
-    
+
       def check_md
         if sys_info = data[:system] and sys_info['md']
           failures = []
@@ -26,11 +30,11 @@ module CloudModel
           do_check :mdtools, 'RAID', {critical: not(failures.blank?)}, message: failures * "\n"
         end
       end
-    
+
       def check_sensors
         if sys_info = data[:system] and sys_info['sensors']
           failures = []
-        
+
           sys_info['sensors'].each do |k, sensor|
             if sensor['input'] and sensor['max'] and sensor['max'] != 0.0 and sensor['input']>sensor['max']
               failures << "#{k} to high: #{sensor['input']} > #{sensor['max']}"
@@ -43,11 +47,11 @@ module CloudModel
           do_check :sensors, 'Sensors', {warning: not(failures.blank?)}, message: failures * "\n"
         end
       end
-    
+
       def check_smart
         if sys_info = data[:system] and sys_info['smart']
           failures = []
-        
+
           (['sda', 'sdb'] - sys_info['smart'].keys).each do |v|
             failures << "#{v} not found"
           end
@@ -55,18 +59,21 @@ module CloudModel
           sys_info['smart'].each do |k,v|
             failures << "Test on #{k} not passed (#{v['smart_status']})" unless v['smart_status'].to_s == 'PASSED'
           end
-        
+
           do_check :smart, 'SMART', {critical: not(failures.blank?)}, message: failures * "\n"
         end
       end
-    
+
       def check
         if check_system_info
           check_md
           check_sensors
           check_smart
+          true
+        else
+          false
         end
-        true
+
       end
     end
   end
