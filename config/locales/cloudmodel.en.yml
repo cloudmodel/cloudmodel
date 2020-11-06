@@ -7,6 +7,13 @@ en:
     unknown: Unknown
     dependent: Dependent
 
+  cloud_model/guest/up_state:
+    not_deployed_yet: Not deployed yet
+    started: Should be running
+    stopped: Stopped
+    booting: Booting
+    start_failed: Failed to start
+
   cloud_model/guest/deploy_state:
     not_started: Not started
     pending: Scheduled for execution
@@ -212,6 +219,9 @@ en:
         deploy_last_issue: Last Deploy Issue
         last_deploy_finished_at: Last Deploy At
         monitoring_last_check_at: Last Monitored
+        up_state: Up State
+        last_downtime_at: Last Down at
+        last_downtime_reason: Last Downtime Reason
       cloud_model/item_issue:
         title: Title
         message: Message
@@ -413,6 +423,7 @@ en:
   issues:
     general:
       no_check: '%{value} does not exist'
+      check_crashed: 'Check crashed - %{value}'
     sysinfo: &sysinfo_issues
       sys_info_available: Unable to access system information
       cpu_minute_usage: CPU usage in the last minute of %{value}
@@ -427,6 +438,7 @@ en:
       smart: SMART reports issues
     cloud_model/guest:
       <<: *sysinfo_issues
+      sys_boot_failed: Booting for %{value} and still not up
     cloud_model/services/redis:
       not_reachable: Service not reachable
     cloud_model/services/mongodb:

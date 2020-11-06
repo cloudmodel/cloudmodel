@@ -352,6 +352,24 @@ module CloudModel
       end
     end
 
+    def live_lxc_info
+      success, result = exec('lxc list --format yaml')
+      if success
+        result = YAML.load(result)
+
+        result ||= []
+        info = {}
+
+        result.each do |c|
+          info[c.delete('name')] = c
+        end
+
+        info
+      else
+        {}
+      end
+    end
+
     def memory_size
       if check_result = monitoring_last_check_result and sys_info = check_result['system'] and mem_info = sys_info['mem']
         mem_info['mem_total'].to_i * 1024

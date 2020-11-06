@@ -50,6 +50,16 @@ module CloudModel
     field :last_deploy_finished_at, type: Time
     field :deploy_path, type: String
 
+    enum_field :up_state, {
+      0x00 => :started,
+      0x01 => :stopped,
+      0x40 => :booting,
+      0x41 => :start_failed,
+      0xff => :not_deployed_yet
+    }, default: :not_deployed_yet
+    field :last_downtime_reason, type: String
+    field :last_downtime_at, type: Time
+
     validates :name, presence: true, uniqueness: { scope: :host }, format: {with: /\A[a-z0-9\-_]+\z/}
     validates :host, presence: true
     validates :private_address, presence: true
@@ -255,9 +265,10 @@ module CloudModel
           while line = s.gets
             result << line
           end
-          s.close
         rescue Errno::ECONNREFUSED
           return [false, "Connection refused"]
+        ensure
+          s.close
         end
         [true, result]
       else
@@ -363,34 +374,25 @@ module CloudModel
         else
           lxd_container
         end
-        collection.update_one({_id:  id}, '$set' => { 'current_lxd_container_id': lxd_container_id })
-        self.current_lxd_container_id = lxd_container_id
+        self.update_attributes current_lxd_container_id: lxd_container_id
       end
 
       begin
         return current_lxd_container.start
-      rescue
-        return false
+      rescue Exception => e
+        return [false, e.to_s]
       end
     end
 
-    def stop
+    def stop options={}
       begin
         lxd_containers.each do |c|
-          c.stop if c.running?
+          c.stop options if c.running?
         end
       rescue
         return false
       end
-    end
-
-    def stop! options = {}
-      stop
-      timeout = options[:timeout] || 600
-      while vm_state != -1 and timeout > 0 do
-        sleep 0.1
-        timeout -= 1
-      end
+      true
     end
 
     def fix_lxd_custom_volumes

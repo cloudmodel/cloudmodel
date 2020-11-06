@@ -129,11 +129,41 @@ describe CloudModel::LxdContainer do
   end
 
   describe 'start' do
+    before do
+      allow(guest).to receive(:update_attributes)
+    end
+
     it 'should call lxc start' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
 
       expect(guest).to receive(:lxd_containers).and_return []
-      expect(subject).to receive(:lxc).with("start some_guest-20200331133742")
+      expect(subject).to receive(:lxc).with("start some_guest-20200331133742").and_return [true, '']
+
+      subject.start
+    end
+
+    it 'should set guest´s upstate to :started on successful start' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+
+      expect(guest).to receive(:lxd_containers).and_return []
+      expect(subject).to receive(:lxc).with("start some_guest-20200331133742").and_return [true, '']
+      expect(guest).to receive(:update_attributes).with(up_state: :started)
+
+      subject.start
+    end
+
+    it 'should set guest´s upstate to :started on successful start' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      time_now = Time.now
+
+      allow(Time).to receive(:now).and_return time_now
+      expect(guest).to receive(:lxd_containers).and_return []
+      expect(subject).to receive(:lxc).with("start some_guest-20200331133742").and_return [false, 'Ooops, I can´t do it again!']
+      expect(guest).to receive(:update_attributes).with(
+        last_downtime_at: time_now,
+        last_downtime_reason: "LXC start issue: Ooops, I can´t do it again!",
+        up_state: :start_failed
+      )
 
       subject.start
     end
@@ -143,30 +173,57 @@ describe CloudModel::LxdContainer do
 
       container1 = double
       container2 = double
-      expect(container1).to receive(:stop)
-      expect(container2).to receive(:stop)
+      expect(container1).to receive(:stop).with(up_state: :booting, reason: 'Reboot')
+      expect(container2).to receive(:stop).with(up_state: :booting, reason: 'Reboot')
 
       expect(guest).to receive(:lxd_containers).and_return [container1, container2]
-      expect(subject).to receive(:lxc).with("start some_guest-20200331133742")
+      expect(subject).to receive(:lxc).with("start some_guest-20200331133742").and_return [true, '']
 
       subject.start
     end
   end
 
   describe 'stop' do
+    before do
+      allow(guest).to receive(:update_attributes)
+    end
+
     it 'should call lxc stop' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
-      allow(subject).to receive(:running?).and_return true
+      time_now = Time.now
+      allow(Time).to receive(:now).and_return time_now
 
-      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742 -f --timeout=10")
+      allow(subject).to receive(:running?).and_return true
+      expect(guest).to receive(:update_attributes).with(
+        last_downtime_at: time_now,
+        last_downtime_reason: "Stopped",
+        up_state: :stopped
+      )
+      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742 -f --timeout=10").and_return [true, '']
 
       subject.stop
+    end
+
+    it 'should call lxc stop with given reason' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      time_now = Time.now
+      allow(Time).to receive(:now).and_return time_now
+
+      allow(subject).to receive(:running?).and_return true
+      expect(guest).to receive(:update_attributes).with(
+        last_downtime_at: time_now,
+        last_downtime_reason: "This was intentional",
+        up_state: :not_deployed_yet
+      )
+      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742 -f --timeout=10").and_return [true, '']
+
+      subject.stop reason: 'This was intentional', up_state: :not_deployed_yet
     end
 
     it 'should not call lxc stop if container not running' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return false
-
+      expect(guest).not_to receive(:update_attributes)
       expect(subject).not_to receive(:lxc).with("stop some_guest-20200331133742 -f --timeout=10")
 
       subject.stop
@@ -175,7 +232,7 @@ describe CloudModel::LxdContainer do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       allow(subject).to receive(:running?).and_return false
 
-      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742 -f --timeout=10")
+      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742 -f --timeout=10").and_return [true, '']
 
       subject.stop force: true
     end

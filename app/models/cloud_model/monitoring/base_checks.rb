@@ -8,7 +8,7 @@ module CloudModel
         @subject = subject
         @options = options
 
-        puts "#{' ' * (indent_size)}[#{subject}]" unless options[:skip_header]
+        puts "#{line_prefix}[#{subject}]" unless options[:skip_header]
       end
 
       # Config setting indention in spaces for outputs
@@ -16,9 +16,9 @@ module CloudModel
         0
       end
 
-      # Abstract/Fallback method to aquire data
+      # Abstract/Fallback method to acquire data
       # @return nil
-      def aquire_data
+      def acquire_data
         nil
       end
 
@@ -31,34 +31,36 @@ module CloudModel
       # Get the data for the subject
       #
       # If the checks have the option :cached set, it uses cached data from the subject
-      # Else it will use aquire data and also store it to the subject
+      # Else it will use acquire data and also store it to the subject
       def data
         return @data unless @data.nil?
 
         if @options and @options[:cached]
           @data = @subject.monitoring_last_check_result || false
         else
-          print "#{' ' * (indent_size)}  * Acqire data ..."
-          @data = aquire_data
-          puts "[\e[32mOK\e[39m]"
+          puts "#{line_prefix}  * Acqire data ..."
+          @data = acquire_data
+          puts "#{line_prefix}    -> \e[32mOK\e[39m"
 
           if @data
-            print "#{' ' * (indent_size)}  * Store data ..."
+            puts "#{line_prefix}  * Store data ..."
             if store_data
-              puts "[\e[32mOK\e[39m]"
+              puts "#{line_prefix}    -> \e[32mOK\e[39m"
             else
-              puts "[\e[33mFAILED\e[39m]"
+              puts "#{line_prefix}    -> \e[33mFAILED\e[39m"
             end
           end
           @data ||= false
         end
       end
 
-
+      def line_prefix
+        "#{' ' * (indent_size)}"
+      end
 
       def do_check key, name, checks, options = {}
         issue = @subject.item_issues.find_or_initialize_by key: key, resolved_at: nil
-        print "#{' ' * (indent_size)}  * Check #{name}... "
+        puts "#{line_prefix}  * Check #{name}... "
 
         if severity = checks.select{|k,v| v}.keys.first
           issue.severity = severity # unless issue.persisted? - check if severity raised?
@@ -72,12 +74,12 @@ module CloudModel
             critical: 31,
             fatal: 35
           }
-          puts "[\e[#{severity_colors[severity]}m#{severity.to_s.upcase}\e[39m]"
+          puts "#{line_prefix}    -> \e[#{severity_colors[severity]}m#{severity.to_s.upcase}\e[39m"
           false
         else
           issue.resolved_at = Time.now
           issue.save if issue.persisted?
-          puts "[\e[32mOK\e[39m]"
+          puts "#{line_prefix}    -> \e[32mOK\e[39m"
           true
         end
       end
