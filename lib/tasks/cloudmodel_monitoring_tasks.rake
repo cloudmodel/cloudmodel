@@ -1,3 +1,10 @@
+require_relative "../../app/models/cloud_model/monitoring/base_checks"
+require_relative "../../app/models/cloud_model/monitoring/mixins/sysinfo_checks_mixin"
+require_relative "../../app/models/cloud_model/monitoring/host_checks"
+require_relative "../../app/models/cloud_model/monitoring/guest_checks"
+require_relative "../../app/models/cloud_model/monitoring/service_checks"
+require_relative "../../app/models/cloud_model/monitoring/lxd_custom_volume_checks"
+
 def handle_cloudmodel_monitoring_exception subject, host, indent
   begin
     issue = subject.item_issues.find_or_initialize_by key: :check_crashed, resolved_at: nil
