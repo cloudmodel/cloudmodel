@@ -70,7 +70,7 @@ module CloudModel
     before_validation :set_mac_address, :on => :create
     before_destroy    :stop
 
-    after_save :configure_current_lxd_container
+    around_save :apply_current_lxd_container_config
 
     def current_lxd_container
       lxd_containers.where(id: current_lxd_container_id).first
@@ -357,6 +357,31 @@ module CloudModel
       else
         true # Always be true to not interfere with callbacks
       end
+    end
+
+    def apply_current_lxd_container_config
+      memory_changed = memory_size_changed?
+      cpu_changed    = cpu_count_changed?
+      autostart_prio_changed    = lxd_autostart_priority_changed?
+      autostart_delay_changed    = lxd_autostart_delay_changed?
+
+      res = yield
+
+      if res and current_lxd_container
+        if memory_changed
+          current_lxd_container.set_config 'limits.memory', memory_size
+        end
+        if cpu_changed
+          current_lxd_container.set_config 'limits.cpu', cpu_count
+        end
+        if autostart_prio_changed
+          current_lxd_container.set_config 'boot.autostart.priority', lxd_autostart_priority
+        end
+        if autostart_delay_changed
+          current_lxd_container.set_config 'boot.autostart.delay', lxd_autostart_delay
+        end
+      end
+      res
     end
 
     def live_lxc_info

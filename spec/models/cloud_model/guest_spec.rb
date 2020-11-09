@@ -629,9 +629,112 @@ describe CloudModel::Guest do
       expect(subject).to receive(:configure_lxd_container).with(container).and_return true
       expect(subject.configure_current_lxd_container).to eq true
     end
+  end
+
+  describe 'apply_current_lxd_container_config' do
+    # def apply_current_lxd_container_config
+    #   memory_changed = memory_size_changed?
+    #   cpu_changed    = cpu_count_changed?
+    #   autostart_prio_changed    = lxd_autostart_priority_changed?
+    #   autostart_delay_changed    = lxd_autostart_delay_changed?
+    #
+    #   res = yield
+    #
+    #   if res and current_lxd_container
+    #     if memory_changed
+    #       current_lxd_container.set_config 'limits.memory', memory_size
+    #     end
+    #     if cpu_changed
+    #       current_lxd_container.set_config 'limits.cpu', cpu_count
+    #     end
+    #     if autostart_prio_changed
+    #       current_lxd_container.set_config 'boot.autostart.priority', lxd_autostart_priority
+    #     end
+    #     if autostart_delay_changed
+    #       current_lxd_container.set_config 'boot.autostart.delay', lxd_autostart_delay
+    #     end
+    #   end
+    #   res
+    # end
+
+    let(:container) { double CloudModel::LxdContainer }
+
+    before do
+      subject.move_changes # Mark model to have no changes/persisted
+    end
+
+    it 'should not call any container set config if nothing changed' do
+      allow(subject).to receive(:current_lxd_container).and_return container
+      expect(container).not_to receive(:set_config)
+
+      expect(subject.apply_current_lxd_container_config{true}).to eq true
+    end
+
+    it 'should call container set config if memory size changed' do
+      subject.memory_size = '64K'
+      allow(subject).to receive(:current_lxd_container).and_return container
+      expect(container).to receive(:set_config).with("limits.memory", 65536)
+      expect(container).not_to receive(:set_config)
+
+      expect(subject.apply_current_lxd_container_config{true}).to eq true
+    end
+
+    it 'should call container set config if cpu count changed' do
+      subject.cpu_count = 8
+      allow(subject).to receive(:current_lxd_container).and_return container
+      expect(container).to receive(:set_config).with("limits.cpu", 8)
+      expect(container).not_to receive(:set_config)
+
+      expect(subject.apply_current_lxd_container_config{true}).to eq true
+    end
+
+    it 'should call container set config if autostart priority changed' do
+      subject.lxd_autostart_priority = 42
+      allow(subject).to receive(:current_lxd_container).and_return container
+      expect(container).to receive(:set_config).with("boot.autostart.priority", 42)
+      expect(container).not_to receive(:set_config)
+
+      expect(subject.apply_current_lxd_container_config{true}).to eq true
+    end
+
+    it 'should call container set config if autostart delay changed' do
+      subject.lxd_autostart_delay = 3
+      allow(subject).to receive(:current_lxd_container).and_return container
+      expect(container).to receive(:set_config).with("boot.autostart.delay", 3)
+      expect(container).not_to receive(:set_config)
+
+      expect(subject.apply_current_lxd_container_config{true}).to eq true
+    end
+
+    it 'should call multiple container set config multiple things changed' do
+      subject.memory_size = '64K'
+      subject.cpu_count = 8
+      subject.lxd_autostart_priority = 42
+      subject.lxd_autostart_delay = 3
+
+      allow(subject).to receive(:current_lxd_container).and_return container
+      expect(container).to receive(:set_config).with("limits.memory", 65536)
+      expect(container).to receive(:set_config).with("limits.cpu", 8)
+      expect(container).to receive(:set_config).with("boot.autostart.priority", 42)
+      expect(container).to receive(:set_config).with("boot.autostart.delay", 3)
+
+      expect(subject.apply_current_lxd_container_config{true}).to eq true
+    end
+
+    it 'should not call any container set config if save failed' do
+      subject.memory_size = '64K'
+      subject.cpu_count = 8
+      subject.lxd_autostart_priority = 42
+      subject.lxd_autostart_delay = 3
+
+      allow(subject).to receive(:current_lxd_container).and_return container
+      expect(container).not_to receive(:set_config)
+
+      expect(subject.apply_current_lxd_container_config{false}).to eq false
+    end
 
     it 'should call it on saving the guest' do
-      expect(subject).to receive(:configure_current_lxd_container)
+      expect(subject).to receive(:apply_current_lxd_container_config)
       subject.run_callbacks(:save)
     end
   end
