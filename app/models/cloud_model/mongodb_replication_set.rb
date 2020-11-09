@@ -85,7 +85,7 @@ module CloudModel
       guests.first.exec "mongo --eval '#{init_rs_cmd}'"
     end
 
-    def status
+    def status options={}
       # Issue an administrative command
       #data = db_command(replSetGetStatus: 1).as_json.first
       data = eval 'rs.status()'
@@ -107,6 +107,19 @@ module CloudModel
             'state' => -1,
             'stateStr' => 'N/C'
           }
+        end
+      end
+
+      data['clusterTime'] = data.delete('$clusterTime')
+
+      if options[:service_id_only]
+        data['members'] = data['members'].map do |member|
+          if member['service']
+            member['host_id'] = member['service'].guest.host_id
+            member['guest_id'] = member['service'].guest.id
+            member['service_id'] = member.delete('service').id
+            member
+          end
         end
       end
 

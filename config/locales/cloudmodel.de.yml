@@ -466,3 +466,6 @@ de:
       thread_usage: Threadverbrauch von %{value}
     cloud_model/lxd_custom_volume:
       existence: Das definierte LXD Laufwerk existiert nicht auf dem Server
+    cloud_model/mongodb_replication_set:
+      set_health: MongoDB Replikationset ist nicht gesund
+      member_health: Mitglied des MongoDB Replikationsets ist nicht gesund

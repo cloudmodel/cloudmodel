@@ -467,3 +467,6 @@ en:
       thread_usage: Thread usage of %{value}
     cloud_model/lxd_custom_volume:
       existence: The defined LXD Volume does not exist on Server
+    cloud_model/mongodb_replication_set:
+      set_health: MongoDB Replication Set is not healthy
+      member_health: Member of MongoDB Replication Set not healthy

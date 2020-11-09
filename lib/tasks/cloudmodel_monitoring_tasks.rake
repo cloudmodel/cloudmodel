@@ -11,7 +11,15 @@ def handle_cloudmodel_monitoring_exception subject, host, indent
 
     yield
   rescue Exception => e
-    puts "[#{host.name}] #{(' ' * indent)}\e[33m! Check for #{subject} crashed\e[39m"
+    prefix = ''
+    if host
+      if host.is_a? String
+        prefix = "[#{host}] "
+      else
+        prefix = "[#{host.name}] "
+      end
+    end
+    puts "#{prefix}#{(' ' * indent)}\e[33m! Check for #{subject} crashed\e[39m"
     issue.severity = :warning
     issue.message = "#{e.message}\n\n#{e.backtrace * "\n"}"
     issue.value = e.message
@@ -60,6 +68,13 @@ namespace :cloudmodel do
         end
       end
       threads.each(&:join)
+
+      CloudModel::MongodbReplicationSet.scoped.each do |replication_set|
+        handle_cloudmodel_monitoring_exception replication_set, '_Mongo Repl_', 2 do
+          CloudModel::Monitoring::MongodbReplicationSetChecks.new(replication_set).check
+        end
+      end
+
       puts "[_Monitoring_] Done."
     end
   end
