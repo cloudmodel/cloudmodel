@@ -203,4 +203,11 @@ describe CloudModel::Config do
       expect(subject.monitoring_notifiers).to eq []
     end
   end
+
+  describe 'issue_url' do
+    it 'should allow to set issue url for notifications' do
+      subject.issue_url = 'https://cloud.cloud-model.org/issues/%id%'
+      expect(subject.issue_url).to eq 'https://cloud.cloud-model.org/issues/%id%'
+    end
+  end
 end
