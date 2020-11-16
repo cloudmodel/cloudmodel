@@ -12,7 +12,8 @@ module CloudModel
 
     attr_writer :host_mac_address_prefix_init
 
-    attr_accessor :monitoring_notifiers
+    attr_writer :monitoring_notifiers
+    attr_accessor :issue_url
 
     def initialize(&block)
       configure(&block) if block_given?
