@@ -19,6 +19,7 @@ describe CloudModel::Services::Base do
         nginx: CloudModel::Services::Nginx,
         redis: CloudModel::Services::Redis,
         solr: CloudModel::Services::Solr,
+        fuseki: CloudModel::Services::Fuseki,
         ssh: CloudModel::Services::Ssh,
         tomcat: CloudModel::Services::Tomcat,
         backup: CloudModel::Services::Backup,

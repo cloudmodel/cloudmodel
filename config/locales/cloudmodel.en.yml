@@ -135,6 +135,9 @@ en:
       cloud_model/services/base:
         one: Service
         other: Services
+      cloud_model/services/fuseki:
+        one: Apache Jena Fuseki Service
+        other: Apache Jena Fuseki Services
       cloud_model/services/mongodb:
         one: MongoDB Service
         other: MongoDB Services
@@ -145,8 +148,8 @@ en:
         one: Redis Service
         other: Redis Services
       cloud_model/services/solr:
-        one: SOLR Service
-        other: SOLR Services
+        one: Apache SOLR Service
+        other: Apache SOLR Services
       cloud_model/services/ssh:
         one: SSH Service
         other: SSH Services
@@ -455,6 +458,12 @@ en:
       parse_result: Service status not parsable
       solr_status_forbidden: Access to service status forbidden
       no_solr_status: Service status not found
+      mem_usage: Memory usage of %{value}
+    cloud_model/services/fuseki:
+      not_reachable: Service not reachable
+      parse_result: Service status not parsable
+      fuseki_status_forbidden: Access to service status forbidden
+      no_fuseki_status: Service status not found
       mem_usage: Memory usage of %{value}
     cloud_model/services/ssh:
       not_reachable: Service not reachable

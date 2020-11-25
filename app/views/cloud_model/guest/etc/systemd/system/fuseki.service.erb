@@ -1,0 +1,25 @@
+[Unit]
+Description=Apache Jena Fuseki Server
+#Wants=network.target
+#After=network.target
+
+[Service]
+Environment=FUSEKI_HOME="/opt/fuseki"
+Environment=FUSEKI_BASE="/var/lib/fuseki"
+Environment=FUSEKI_LOGS="/var/log/fuseki"
+Environment=FUSEKI_RUN="/var/run"
+#Environment=JVM_ARGS=-Xmx4G
+Environment=JVM_ARGS=-Xmx<%= model.heap_size %>
+
+PermissionsStartOnly=true
+User=fuseki
+Group=fuseki
+SuccessExitStatus=143
+ExecStartPre=/bin/mkdir -p /var/lib/fuseki /var/log/fuseki
+ExecStartPre=/bin/cp /etc/fuseki/shiro.ini /var/lib/fuseki/shiro.ini
+ExecStartPre=/bin/chown -R fuseki:fuseki /var/lib/fuseki /var/log/fuseki
+ExecStart=/opt/fuseki/fuseki-server --update --port <%= model.port %>
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
