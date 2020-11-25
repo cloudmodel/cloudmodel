@@ -46,7 +46,7 @@ module CloudModel
 
       def service_status
         #base_url = "http#{ssl_supported ? 's' : ''}://#{guest.private_address}:8080/solr/admin"
-        base_url = "http://#{guest.private_address}:8080/solr/admin"
+        base_url = "http://#{guest.private_address}:#{port}/solr/admin"
 
         data = {}
         status_uri = URI("#{base_url}/info/system?wt=json")
