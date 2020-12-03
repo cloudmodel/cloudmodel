@@ -116,6 +116,38 @@ module CloudModel
           end
         end
       end
+
+      def self.handle_cloudmodel_monitoring_exception subject, host, indent
+        begin
+          key = :check_crashed
+          if subject.is_a? Symbol
+            key = "#{key}_#{subject}".to_sym
+            subject = nil
+          end
+
+          issue = ItemIssue.find_or_initialize_by key: key, resolved_at: nil, subject: subject
+
+          yield
+        rescue Exception => e
+          prefix = ''
+          if host
+            if host.is_a? String
+              prefix = "[#{host}] "
+            else
+              prefix = "[#{host.name}] "
+            end
+          end
+          puts "#{prefix}#{(' ' * indent)}\e[33m! Check for #{subject} crashed\e[39m"
+          issue.severity = :warning
+          issue.message = "#{e.message}\n\n#{e.backtrace * "\n"}"
+          issue.value = e.message
+          issue.save
+          return false
+        end
+        issue.resolved_at = Time.now
+        issue.save if issue.persisted?
+        return true
+      end
     end
   end
 end
