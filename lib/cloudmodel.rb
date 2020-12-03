@@ -4,11 +4,11 @@ require "cloud_model/engine"
 require "cloud_model/call_rake"
 require "cloud_model/execution_exception"
 
-module CloudModel  
+module CloudModel
   def self.config
     @config ||= CloudModel::Config.new
   end
-  
+
   def self.configure(&block)
     config.configure(&block)
   end

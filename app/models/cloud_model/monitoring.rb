@@ -8,15 +8,11 @@ require_relative "monitoring/mongodb_replication_set_checks"
 
 module CloudModel
   module Monitoring
-
-
     def self.check
       @checks ||= []
       @checks.each do |check|
         check.check
       end
-      #CloudModel::Monitoring::HostChecks.check
-      #CloudModel::Monitoring::MongodbReplicationSetChecks.check
     end
 
     def self.register_check check
