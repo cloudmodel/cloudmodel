@@ -1,3 +1,5 @@
+require "cloud_model/config_modules/api"
+
 module CloudModel
   class Config
     attr_writer :data_directory, :backup_directory, :bundle_command
@@ -23,6 +25,10 @@ module CloudModel
     # the block. For possible options see above.
     def configure(&block)
       yield(self)
+    end
+
+    def api
+      @api_module ||= CloudModel::ConfigModules::Api.new
     end
 
     def data_directory

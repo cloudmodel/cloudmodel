@@ -1,6 +1,14 @@
 module CloudModel
   module Monitoring
     class MongodbReplicationSetChecks < CloudModel::Monitoring::BaseChecks
+      def self.check options = {}
+        CloudModel::MongodbReplicationSet.scoped.each do |replication_set|
+          handle_cloudmodel_monitoring_exception replication_set, '_Mongo Repl_', 2 do
+            CloudModel::Monitoring::MongodbReplicationSetChecks.new(replication_set).check
+          end
+        end
+      end
+
       def line_prefix
         "[_Mongo Repl_] #{super}"
       end
