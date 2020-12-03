@@ -1,6 +1,10 @@
 require 'net/ssh'
 require 'net/sftp'
 
+require_relative('mixins/e_num_fields')
+require_relative('mixins/has_issues')
+require_relative('mixins/smart_to_string')
+
 module CloudModel
   class Host
 
