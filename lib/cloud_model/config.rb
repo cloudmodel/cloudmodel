@@ -11,6 +11,7 @@ module CloudModel
     attr_writer :ubuntu_mirror, :ubuntu_deb_src, :ubuntu_version, :ubuntu_name, :ubuntu_kernel_flavour
 
     attr_accessor :admin_email, :email_domain
+    attr_writer :dns_domains
 
     attr_writer :host_mac_address_prefix_init
 
@@ -86,6 +87,10 @@ module CloudModel
 
     def ubuntu_kernel_flavour
       @ubuntu_kernel_flavour || "generic-hwe-18.04"
+    end
+
+    def dns_domains
+      @dns_domains ||= []
     end
 
     def host_mac_address_prefix_init
