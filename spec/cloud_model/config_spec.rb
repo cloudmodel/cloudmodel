@@ -20,6 +20,16 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'api' do
+    it 'should init and return Config::Api instance' do
+      api_config = double CloudModel::ConfigModules::Api
+      expect(CloudModel::ConfigModules::Api).to receive(:new).once.and_return api_config
+      expect(subject.api).to eq api_config
+      expect(subject.instance_variable_get :@api_module).to eq api_config
+      expect(subject.api).to eq api_config
+    end
+  end
+
   describe 'data_directory' do
     it 'should allow to set data directory' do
       subject.data_directory = '/my/data/dir'
@@ -168,6 +178,18 @@ describe CloudModel::Config do
     it 'should allow to set email domain for outgoing mails' do
       subject.email_domain = 'mail.example.com'
       expect(subject.email_domain).to eq 'mail.example.com'
+    end
+  end
+
+  describe 'dns_domains' do
+    it 'should allow to set dns_domains under control by CloudModel via an API provider' do
+      subject.dns_domains = ['example.com']
+      expect(subject.dns_domains).to eq ['example.com']
+    end
+
+    it 'should default to empty array and init instance variable' do
+      expect(subject.dns_domains).to eq []
+      expect(subject.instance_variable_get :@dns_domains).to eq []
     end
   end
 
