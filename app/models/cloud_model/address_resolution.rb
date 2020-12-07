@@ -9,6 +9,7 @@ module CloudModel
 
     field :ip, type: String
     field :name, type: String
+    field :alt_name, type: Array
     field :active, type: Boolean, default: false
     field :ptr_active, type: Boolean, default: true
 
@@ -20,7 +21,7 @@ module CloudModel
       subnet = CloudModel::Address.from_str subnet
       if subnet.ip_version == 4
         resolutions = []
-        subnet.list_ips.each do |ip|
+        subnet.list_ips(include_network:true, include_gateway:true).each do |ip|
           resolutions << find_or_initialize_by(ip:ip)
         end
         resolutions

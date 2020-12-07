@@ -81,12 +81,18 @@ module CloudModel
     end
 
     # Get array of all IPv4 addresses in address block
-    def list_ips
+    def list_ips options={}
       return [] if ip_version==6 # Don't list ips for IPV6
       if range?
         ips = []
+        if options[:include_network]
+          ips << cidr.nth(0).to_s
+        end
         (cidr.len - 2).times do |i|
           ips << cidr.nth(i + 1).to_s
+        end
+        if options[:include_gateway]
+          ips << cidr.nth(cidr.len - 1).to_s
         end
         ips
         #cidr.to_a#.enumerate[1..-2]
