@@ -71,6 +71,7 @@ module CloudModel
     before_destroy    :stop
 
     around_save :apply_current_lxd_container_config
+    around_save :apply_address_resolution
 
     def current_lxd_container
       lxd_containers.where(id: current_lxd_container_id).first
@@ -89,9 +90,18 @@ module CloudModel
     end
 
     def external_hostname= hostname
-      if external_address
-        CloudModel::AddressResolution.find_or_initialize_by(ip: external_address).update_attribute :name, hostname
+      unless @external_hostname == hostname
+        @external_hostname = hostname
+        @external_hostname_changed = true
       end
+    end
+
+    def apply_address_resolution
+      if result = yield and external_address and @external_hostname_changed
+        CloudModel::AddressResolution.find_or_initialize_by(ip: external_address).update_attribute :name, @external_hostname
+        @external_hostname_changed = false
+      end
+      result
     end
 
     def external_alt_names_string
