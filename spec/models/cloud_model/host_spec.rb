@@ -290,7 +290,26 @@ describe CloudModel::Host do
     end
   end
 
-  describe 'dhcp_private_address' do
+  describe '#external_address_resolutions' do
+    pending
+  end
+
+  describe '#external_address_resolution_hash' do
+    it 'should transform external_address_resolutions to hash of ip to name' do
+      expect(subject).to receive(:external_address_resolutions).and_return [
+        double(CloudModel::AddressResolution, ip: '10.42.23.13', name: 'my.host.name'),
+        double(CloudModel::AddressResolution, ip: 'fe::2', name: 'my-other.host.name'),
+        double(CloudModel::AddressResolution, ip: '192.168.42.1', name: 'foo.bar.baz'),
+      ]
+      expect(subject.external_address_resolution_hash).to eq(
+        "10.42.23.13" => "my.host.name",
+        "192.168.42.1" => "foo.bar.baz",
+        "fe::2" => "my-other.host.name"
+      )
+    end
+  end
+
+  describe '#dhcp_private_address' do
     it 'should get the last available address from block' do
       subject.private_network = '10.42.42.0/28'
       subject.private_network.gateway = '10.42.42.1'
@@ -316,7 +335,7 @@ describe CloudModel::Host do
     end
   end
 
-  describe 'dhcp_external_address' do
+  describe '#dhcp_external_address' do
     it 'should get the last available address from block' do
       subject.addresses << '192.168.42.0/28'
 

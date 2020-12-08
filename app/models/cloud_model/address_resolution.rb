@@ -18,7 +18,7 @@ module CloudModel
     validates :name, format: {with: /\A([\w-]+\.)*[\w\-]+\.\w{2,10}\z/}
 
     def self.for_subnet(subnet)
-      subnet = CloudModel::Address.from_str subnet
+      subnet = CloudModel::Address.from_str subnet if subnet.is_a? String
       if subnet.ip_version == 4
         resolutions = []
         subnet.list_ips(include_network:true, include_gateway:true).each do |ip|

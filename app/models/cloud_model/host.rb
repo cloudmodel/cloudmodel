@@ -133,6 +133,31 @@ module CloudModel
       all - used - [nil]
     end
 
+    def external_address_resolutions
+      resolutions_v4 = []
+      resolutions_v6 = []
+
+      addresses.each do |address|
+        if address.ip_version == 6
+          resolutions_v6 += CloudModel::AddressResolution.for_subnet(address).to_a
+        else
+          resolutions_v4 += CloudModel::AddressResolution.for_subnet(address).to_a
+        end
+      end
+
+      resolutions_v6 = resolutions_v6.flatten.sort{|a,b| a.cidr.cmp b.cidr}
+      resolutions_v4 = resolutions_v4.flatten.sort{|a,b| a.cidr.cmp b.cidr}
+      resolutions_v4 + resolutions_v6
+    end
+
+    def external_address_resolution_hash
+      result = {}
+      external_address_resolutions.each do |resolution|
+        result[resolution.ip] = resolution.name
+      end
+      result
+    end
+
     def dhcp_private_address
       available_private_address_collection.last
     end
