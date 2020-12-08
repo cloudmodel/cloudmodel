@@ -133,7 +133,7 @@ describe CloudModel::Guest do
     end
   end
 
-  describe 'external_hostname' do
+  describe '#external_hostname' do
     it 'should return blank string if no external address' do
       expect(subject.external_hostname).to eq ''
     end
@@ -146,9 +146,94 @@ describe CloudModel::Guest do
       subject.external_address = '198.51.100.42'
       expect(subject.external_hostname).to eq 'myhost.example.com'
     end
+
+    it 'should set instance variable' do
+      address = double CloudModel::Address
+      allow(CloudModel::Address).to receive(:from_str).with('198.51.100.42').and_return address
+      allow(address).to receive(:hostname).and_return 'myhost.example.com'
+
+      subject.external_address = '198.51.100.42'
+      subject.external_hostname
+      expect(subject.instance_variable_get :@external_hostname).to eq 'myhost.example.com'
+    end
+
+    it 'should get instance variable if set' do
+      subject.instance_variable_set :@external_hostname, 'test.example.com'
+      expect(subject.external_hostname).to eq 'test.example.com'
+    end
   end
 
-  describe 'external_alt_names_string' do
+  describe '#external_host_name=' do
+    it 'should set instance variable' do
+      subject.external_hostname = 'test.example.com'
+      expect(subject.instance_variable_get :@external_hostname).to eq 'test.example.com'
+    end
+
+    it 'should set changed instance variable if hostname changed' do
+      expect(subject.instance_variable_get :@external_hostname_changed).not_to eq true
+      subject.external_hostname = 'test.example.com'
+      expect(subject.instance_variable_get :@external_hostname_changed).to eq true
+    end
+
+    it 'should not set changed instance variable if hostname did not changed' do
+      subject.instance_variable_set :@external_hostname, 'test.example.com'
+      subject.instance_variable_set :@external_hostname_changed, false
+      subject.external_hostname = 'test.example.com'
+      expect(subject.instance_variable_get :@external_hostname_changed).to eq false
+    end
+  end
+
+  # def apply_address_resolution
+  #   if result = yield and external_address and @external_hostname_changed
+  #     CloudModel::AddressResolution.find_or_initialize_by(ip: external_address).update_attribute :name, @external_hostname
+  #     @external_hostname_changed = false
+  #   end
+  #   result
+  # end
+
+  describe '#apply_address_resolution' do
+    it 'should set AddressResolution if yield was successful, guest has external address and external hostname changed' do
+      resolution = double
+      subject.external_address = '198.51.100.42'
+      subject.external_hostname = 'test42.example.com'
+      expect(CloudModel::AddressResolution).to receive(:find_or_initialize_by).with(ip: '198.51.100.42').and_return resolution
+      expect(resolution).to receive(:update_attribute).with(:name, 'test42.example.com')
+      subject.apply_address_resolution{true}
+    end
+
+    it 'should set external hostname changed to false' do
+      subject.external_address = '198.51.100.42'
+      allow(CloudModel::AddressResolution).to receive(:find_or_initialize_by).with(ip: '198.51.100.42').and_return double update_attribute: true
+      subject.instance_variable_set :@external_hostname_changed, true
+      subject.apply_address_resolution{true}
+      expect(subject.instance_variable_get :@external_hostname_changed).to eq false
+    end
+
+    it 'should do nothing if yield failed' do
+      subject.external_address = '198.51.100.42'
+      expect(CloudModel::AddressResolution).not_to receive(:find_or_initialize_by)
+      subject.instance_variable_set :@external_hostname_changed, true
+      subject.apply_address_resolution{false}
+      expect(subject.instance_variable_get :@external_hostname_changed).to eq true
+    end
+
+    it 'should do nothing if external hostname did not change failed' do
+      subject.external_address = '198.51.100.42'
+      expect(CloudModel::AddressResolution).not_to receive(:find_or_initialize_by)
+      subject.instance_variable_set :@external_hostname_changed, false
+      subject.apply_address_resolution{true}
+    end
+
+    it 'should do nothing if external address is not set' do
+      subject.external_address = nil
+      expect(CloudModel::AddressResolution).not_to receive(:find_or_initialize_by)
+      subject.instance_variable_set :@external_hostname_changed, true
+      subject.apply_address_resolution{true}
+      expect(subject.instance_variable_get :@external_hostname_changed).to eq true
+    end
+  end
+
+  describe '#external_alt_names_string' do
     it 'should concat alt_names with a comma' do
       allow(subject).to receive(:external_alt_names).and_return ['alt.example.com', 'www.alt.example.com']
 
@@ -156,7 +241,7 @@ describe CloudModel::Guest do
     end
   end
 
-  describe 'external_alt_names_string=' do
+  describe '#external_alt_names_string=' do
     it 'should allow to set alt_names with comma separated string' do
       subject.external_alt_names_string = "alt.example.com,www.alt.example.com"
 
