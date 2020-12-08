@@ -10,8 +10,8 @@ describe CloudModel::AddressResolution do
   it { expect(subject).to have_field(:active).of_type(Mongoid::Boolean).with_default_value_of false }
   it { expect(subject).to have_field(:ptr_active).of_type(Mongoid::Boolean).with_default_value_of true }
 
-  describe '.for' do
-
+  describe '.for_subnet' do
+    pending
   end
 
   describe '#address' do

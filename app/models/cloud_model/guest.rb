@@ -88,6 +88,12 @@ module CloudModel
       @external_hostname ||= external_address.blank? ? '' : CloudModel::Address.from_str(external_address).hostname
     end
 
+    def external_hostname= hostname
+      if external_address
+        CloudModel::AddressResolution.find_or_initialize_by(ip: external_address).update_attribute :name, hostname
+      end
+    end
+
     def external_alt_names_string
       external_alt_names * ','
     end

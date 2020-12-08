@@ -87,6 +87,9 @@ de:
       cloud_model/address:
         one: Adresse/Subnetz
         other: Adressen/Subnetze
+      cloud_model/address_resolution:
+        one: DNS Eintrag
+        other: DNS Einträge
       cloud_model/firewall_rule:
         one: Firewallregel
         other: Firewallregeln
@@ -176,6 +179,11 @@ de:
         network: Netzwerk Adresse
         netmask: Subnetz Maske
         broadcast: Broadcast Adresse
+      cloud_model/address_resolution:
+        ip: IP Addresse
+        name: Name
+        active: Name auflösen?
+        ptr_active: Addresse auflösen?
       cloud_model/firewall_rule:
         protocol: Protokoll
         service_kind: Dienst
@@ -188,7 +196,7 @@ de:
         tinc_public_key: Öffentlicher VPN Schlüssel
         primary_address: Primäre Adresse
         private_network: VPN Netzwerk
-        addresses: Adressen/Subnetze
+        addresses: Subnetzwerke
         guests: Gastsysteme
         state: Status
         memory_size: RAM

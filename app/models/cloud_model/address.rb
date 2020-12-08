@@ -13,8 +13,6 @@ module CloudModel
     field :subnet, type: Integer # @return [Integer] Subnet as bitmask
     # Gateway for the address block
     field :gateway, type: String
-    # Hostname of the address
-    field :hostname, type: String
 
     validates :ip, presence: true
     validates :subnet, presence: true
@@ -44,10 +42,14 @@ module CloudModel
     # Get resolved hostname for Address
     # @return [String]
     def hostname
-      self[:hostname] ||= begin
-        Resolv.getname(ip)
-      rescue
-        ip
+      if resolution = CloudModel::AddressResolution.where(ip: ip).first
+        resolution.name
+      else
+        begin
+          Resolv.getname(ip)
+        rescue
+          ip
+        end
       end
     end
 
@@ -80,24 +82,47 @@ module CloudModel
       ip == network
     end
 
+    def private?
+      if ip_version == 6
+        ip =~ /^f[cd][0-9a-f]{2}:/ or ip =~ /^::1/ or ip =~ /^fe[c-f][0-9a-f]:/
+      else
+        ip_parts = ip.split('.').map &:to_i
+
+        ip_parts[0] == 10 or
+        (ip_parts[0] == 192 and ip_parts[1] == 168) or
+        (ip_parts[0] == 169 and ip_parts[1] == 254) or
+        ip == '127.0.0.1' or
+        (ip_parts[0] == 172 and ip_parts[1] >= 16 and ip_parts[1] <= 31) or
+        (ip_parts[0] == 100 and ip_parts[1] >= 64 and ip_parts[1] <= 127)
+      end ? true : false
+    end
+
+    def public?
+      not private?
+    end
+
     # Get array of all IPv4 addresses in address block
     def list_ips options={}
-      return [] if ip_version==6 # Don't list ips for IPV6
-      if range?
-        ips = []
-        if options[:include_network]
-          ips << cidr.nth(0).to_s
-        end
-        (cidr.len - 2).times do |i|
-          ips << cidr.nth(i + 1).to_s
-        end
-        if options[:include_gateway]
-          ips << cidr.nth(cidr.len - 1).to_s
-        end
-        ips
-        #cidr.to_a#.enumerate[1..-2]
+      if ip_version==6
+        # Only list ips that have a resolutions
+        AddressResolution.for_subnet(self).map &:ip
       else
-        [ip]
+        if range?
+          ips = []
+          if options[:include_network]
+            ips << cidr.nth(0).to_s
+          end
+          (cidr.len - 2).times do |i|
+            ips << cidr.nth(i + 1).to_s
+          end
+          if options[:include_gateway]
+            ips << cidr.nth(cidr.len - 1).to_s
+          end
+          ips
+          #cidr.to_a#.enumerate[1..-2]
+        else
+          [ip]
+        end
       end
     end
 
