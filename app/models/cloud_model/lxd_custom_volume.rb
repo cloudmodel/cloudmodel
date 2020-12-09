@@ -58,7 +58,9 @@ module CloudModel
     end
 
     def create_volume!
-      lxc! "storage volume create default #{name.shellescape}", "Failed to init LXD volume"
+      unless guest.deploy_state == :not_started
+        lxc! "storage volume create default #{name.shellescape}", "Failed to init LXD volume"
+      end
     end
 
     def destroy_volume
