@@ -38,6 +38,14 @@ module CloudModel
       address.cidr
     end
 
+    def alt_addresses
+      CloudModel::AddressResolution.where(name: name, :ip.ne => ip)
+    end
+
+    def alt_ips
+      alt_addresses.map(&:ip)
+    end
+
     private
     def check_ip_format
       if ip =~ /^[0-9a-f\.\:]+$/
