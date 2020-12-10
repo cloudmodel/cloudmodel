@@ -180,10 +180,13 @@ de:
         netmask: Subnetz Maske
         broadcast: Broadcast Adresse
       cloud_model/address_resolution:
-        ip: IP Addresse
+        ip: IP Adresse
         name: Name
         active: Name auflösen?
-        ptr_active: Addresse auflösen?
+        ptr_active: Adresse auflösen?
+        alt_names: Alternative Namen
+        alt_addresses: Alternative Adressen
+        alt_ips: Alternative IP Adressen
       cloud_model/firewall_rule:
         protocol: Protokoll
         service_kind: Dienst

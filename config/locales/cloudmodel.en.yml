@@ -184,6 +184,9 @@ en:
         name: Name
         active: Resolve Name?
         ptr_active: Resolve Address?
+        alt_names: Alternative Names
+        alt_addresses: Alternative Addresses
+        alt_ips: Alternative IP Addresses
       cloud_model/firewall_rule:
         protocol: Protocol
         service_kind: Service

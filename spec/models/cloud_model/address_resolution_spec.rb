@@ -33,6 +33,14 @@ describe CloudModel::AddressResolution do
     end
   end
 
+  describe '#alt_addresses' do
+    pending
+  end
+
+  describe '#alt_ips' do
+    pending
+  end
+
   describe 'ip validator' do
     before do
       subject.name = 'host.example.com'
