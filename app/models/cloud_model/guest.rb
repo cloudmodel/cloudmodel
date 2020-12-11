@@ -20,6 +20,7 @@ module CloudModel
     has_many :guest_certificates, class_name: "CloudModel::GuestCertificate"
 
     accepts_nested_attributes_for :lxd_custom_volumes, allow_destroy: true
+    accepts_nested_attributes_for :services, allow_destroy: true
 
     field :name, type: String
 
