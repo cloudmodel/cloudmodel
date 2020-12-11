@@ -158,7 +158,9 @@ module CloudModel
       end
 
       def activate_address_resolution
-        guest.external_address_resolution.update_attributes! name: guest.external_hostname, active: true
+        if resolution = guest.external_address_resolution
+          resolution.update_attributes! name: guest.external_hostname, active: true
+        end
       end
 
       def deploy options={}
