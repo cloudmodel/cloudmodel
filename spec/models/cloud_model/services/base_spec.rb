@@ -28,6 +28,16 @@ describe CloudModel::Services::Base do
     end
   end
 
+  describe 'service_type' do
+    it 'should get key for _type' do
+      expect(CloudModel::Services::Mongodb.new.service_type).to eq :mongodb
+    end
+
+    it 'should get nil for unknown type' do
+      expect(CloudModel::Services::Base.new.service_type).to eq nil
+    end
+  end
+
   describe '#find' do
     it 'should find service through guest' do
       guest = double CloudModel::Guest, services: []
