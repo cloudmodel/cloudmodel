@@ -157,6 +157,10 @@ module CloudModel
         host.exec! "/etc/cloud_model/firewall_stop && /etc/cloud_model/firewall_start", "Failed to restart Firewall!"
       end
 
+      def activate_address_resolution
+        guest.external_address_resolution.update_attributes! name: guest.external_hostname, active: true
+      end
+
       def deploy options={}
         return false unless guest.deploy_state == :pending or options[:force]
 
@@ -174,6 +178,7 @@ module CloudModel
           ['Config guest certificates', :config_guest_certificates],
           ['Config network', :config_network],
           ['Config firewall', :config_firewall],
+          ['Activate Address Resolution', :activate_address_resolution],
           ['Launch LXD container', :start_lxd_container]
 
           # ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],

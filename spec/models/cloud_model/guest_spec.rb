@@ -183,27 +183,34 @@ describe CloudModel::Guest do
     end
   end
 
-  # def apply_address_resolution
-  #   if result = yield and external_address and @external_hostname_changed
-  #     CloudModel::AddressResolution.find_or_initialize_by(ip: external_address).update_attribute :name, @external_hostname
-  #     @external_hostname_changed = false
-  #   end
-  #   result
-  # end
+  describe '#external_address_resolution' do
+    it 'should find or init AddressResolution with external address given' do
+      resolution = double
+      subject.external_address = '198.51.100.42'
+      expect(CloudModel::AddressResolution).to receive(:find_or_initialize_by).with(ip: '198.51.100.42').and_return resolution
+      expect(subject.external_address_resolution).to eq resolution
+    end
+
+    it 'should return nil with no external address given' do
+      subject.external_address = nil
+      expect(CloudModel::AddressResolution).not_to receive(:find_or_initialize_by)
+      expect(subject.external_address_resolution).to eq nil
+    end
+  end
 
   describe '#apply_address_resolution' do
     it 'should set AddressResolution if yield was successful, guest has external address and external hostname changed' do
       resolution = double
       subject.external_address = '198.51.100.42'
       subject.external_hostname = 'test42.example.com'
-      expect(CloudModel::AddressResolution).to receive(:find_or_initialize_by).with(ip: '198.51.100.42').and_return resolution
+      expect(subject).to receive(:external_address_resolution).and_return resolution
       expect(resolution).to receive(:update_attribute).with(:name, 'test42.example.com')
       subject.apply_address_resolution{true}
     end
 
     it 'should set external hostname changed to false' do
       subject.external_address = '198.51.100.42'
-      allow(CloudModel::AddressResolution).to receive(:find_or_initialize_by).with(ip: '198.51.100.42').and_return double update_attribute: true
+      allow(subject).to receive(:external_address_resolution).and_return double update_attribute: true
       subject.instance_variable_set :@external_hostname_changed, true
       subject.apply_address_resolution{true}
       expect(subject.instance_variable_get :@external_hostname_changed).to eq false
@@ -211,7 +218,7 @@ describe CloudModel::Guest do
 
     it 'should do nothing if yield failed' do
       subject.external_address = '198.51.100.42'
-      expect(CloudModel::AddressResolution).not_to receive(:find_or_initialize_by)
+      expect(subject).not_to receive(:external_address_resolution)
       subject.instance_variable_set :@external_hostname_changed, true
       subject.apply_address_resolution{false}
       expect(subject.instance_variable_get :@external_hostname_changed).to eq true
@@ -219,17 +226,36 @@ describe CloudModel::Guest do
 
     it 'should do nothing if external hostname did not change failed' do
       subject.external_address = '198.51.100.42'
-      expect(CloudModel::AddressResolution).not_to receive(:find_or_initialize_by)
+      expect(subject).not_to receive(:external_address_resolution)
       subject.instance_variable_set :@external_hostname_changed, false
       subject.apply_address_resolution{true}
     end
 
     it 'should do nothing if external address is not set' do
       subject.external_address = nil
-      expect(CloudModel::AddressResolution).not_to receive(:find_or_initialize_by)
+      expect(subject).to receive(:external_address_resolution).and_return nil
       subject.instance_variable_set :@external_hostname_changed, true
       subject.apply_address_resolution{true}
       expect(subject.instance_variable_get :@external_hostname_changed).to eq true
+    end
+  end
+
+  describe '#remove_external_address_resolution' do
+    it 'should destroy external_address_resolution' do
+      resolution = double
+      expect(subject).to receive(:external_address_resolution).and_return resolution
+      expect(resolution).to receive(:destroy)
+      subject.remove_external_address_resolution
+    end
+
+    it 'should do nothing if no external address resolution' do
+      expect(subject).to receive(:external_address_resolution).and_return nil
+      subject.remove_external_address_resolution
+    end
+
+    it 'should be called after destroy' do
+      expect(subject).to receive(:remove_external_address_resolution)
+      subject.run_callbacks :destroy
     end
   end
 
@@ -252,6 +278,112 @@ describe CloudModel::Guest do
       subject.external_alt_names_string = "alt.example.com, www.alt.example.com"
 
       expect(subject.external_alt_names).to eq ['alt.example.com', 'www.alt.example.com']
+    end
+  end
+
+  describe '#copy_to_host' do
+    let(:target_host) {Factory.build :host}
+
+    it 'should return unpersisted copy of current guest on target host' do
+      new_guest = subject.copy_to_host target_host
+
+      expect(target_host.guests.first).to eq new_guest
+      expect(new_guest).to_not be_persisted
+    end
+
+    it 'should copy over guest external_alt_names' do
+      subject.external_alt_names = [double]
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.external_alt_names).to eq subject.external_alt_names
+    end
+
+    it 'should copy over guest lxd_autostart_priority' do
+      subject.lxd_autostart_priority = rand(0..50)
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.lxd_autostart_priority).to eq subject.lxd_autostart_priority
+    end
+
+    it 'should copy over guest lxd_autostart_delay' do
+      subject.lxd_autostart_delay = rand(0..300)
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.lxd_autostart_delay).to eq subject.lxd_autostart_delay
+    end
+
+    it 'should copy over guest root_fs_size' do
+      subject.root_fs_size = rand(65536...1048576) * 1024
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.root_fs_size).to eq subject.root_fs_size
+    end
+
+    it 'should copy over guest memory_size' do
+      subject.memory_size = rand(2..16) * 1024 * 1024
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.memory_size).to eq subject.memory_size
+    end
+
+    it 'should copy over guest cpu_count' do
+      subject.cpu_count = rand(1..8)
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.cpu_count).to eq subject.cpu_count
+    end
+
+    it 'should copy over guest name' do
+      subject.name = Faker::Internet.domain_word
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.name).to eq subject.name
+    end
+
+    it 'should allow to set new name' do
+      subject.name = Faker::Internet.domain_word
+      new_name = Faker::Internet.domain_word
+      new_guest = subject.copy_to_host target_host, name: new_name
+      expect(new_guest.name).to eq new_name
+    end
+
+    it 'should assign new private address' do
+      subject.private_address = Faker::Internet.private_ip_v4_address
+      new_address = Faker::Internet.private_ip_v4_address
+      expect(target_host).to receive(:dhcp_private_address).and_return new_address
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.private_address).to eq new_address
+    end
+
+    it 'should assign new external address if given on subject' do
+      subject.external_address = Faker::Internet.ip_v4_address
+      new_address = Faker::Internet.ip_v4_address
+      expect(target_host).to receive(:dhcp_external_address).and_return new_address
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.external_address).to eq new_address
+    end
+
+    it 'should assign no external address if not given on subject' do
+      subject.external_address = nil
+      expect(target_host).not_to receive(:dhcp_external_address)
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.external_address).to eq subject.external_address
+    end
+
+    it 'should copy over guest external_hostname' do
+      subject.external_alt_names = [double]
+      new_guest = subject.copy_to_host target_host
+      expect(new_guest.external_hostname).to eq subject.external_hostname
+    end
+
+    context 'lxd_custom_volumes' do
+      it 'should copy values of lxd custom volume' do
+        subject.lxd_custom_volumes = [Factory.build(:lxd_custom_volume)]
+        new_guest = subject.copy_to_host target_host
+
+        old_volume_data = subject.lxd_custom_volumes.first.as_document
+        new_volume_data = new_guest.lxd_custom_volumes.first.as_document
+
+        expect(new_volume_data.delete('_id')).not_to equal old_volume_data.delete('_id')
+        expect(new_volume_data).to eq old_volume_data
+      end
+    end
+
+    context 'services' do
+      pending
     end
   end
 
