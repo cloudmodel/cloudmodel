@@ -27,6 +27,15 @@ module CloudModel
         }
       end
 
+      def service_type
+        self.class.service_types.each do |type, model_class|
+          if self.class == model_class
+            return type
+          end
+        end
+        nil
+      end
+
       def self.find(id)
         CloudModel::Guest.find_by("services._id" => id).services.find(id)
       end
