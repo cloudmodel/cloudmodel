@@ -69,6 +69,7 @@ module CloudModel
     before_validation :set_dhcp_private_address, :on => :create
     before_validation :set_mac_address, :on => :create
     before_destroy    :stop
+    after_destroy     :remove_external_address_resolution
 
     around_save :apply_current_lxd_container_config
     around_save :apply_address_resolution
@@ -96,12 +97,24 @@ module CloudModel
       end
     end
 
+    def external_address_resolution
+      unless external_address.blank?
+        CloudModel::AddressResolution.find_or_initialize_by(ip: external_address)
+      end
+    end
+
     def apply_address_resolution
-      if result = yield and external_address and @external_hostname_changed
-        CloudModel::AddressResolution.find_or_initialize_by(ip: external_address).update_attribute :name, @external_hostname
+      if result = yield and @external_hostname_changed and resolution = external_address_resolution
+        resolution.update_attribute :name, @external_hostname
         @external_hostname_changed = false
       end
       result
+    end
+
+    def remove_external_address_resolution
+      if resolution = external_address_resolution
+        resolution.destroy
+      end
     end
 
     def external_alt_names_string
@@ -110,6 +123,45 @@ module CloudModel
 
     def external_alt_names_string=(string)
       self.external_alt_names = string.split(',').map &:strip
+    end
+
+    def copy_to_host host, options={}
+      new_name = options[:name] || name
+
+      new_guest = host.guests.new(
+        external_alt_names: external_alt_names,
+        lxd_autostart_priority: lxd_autostart_priority,
+        lxd_autostart_delay: lxd_autostart_delay,
+        root_fs_size: root_fs_size,
+        memory_size: memory_size,
+        cpu_count: cpu_count,
+        name: new_name,
+        private_address: host.dhcp_private_address,
+        external_address: external_address.blank? ? nil : host.dhcp_external_address,
+        external_hostname: external_address.blank? ? nil : external_hostname
+      )
+
+      lxd_custom_volumes.each do |volume|
+        new_guest.lxd_custom_volumes.new(
+          disk_space: volume.disk_space,
+          writeable: volume.writeable,
+          mount_point: volume.mount_point,
+          has_backups: volume.has_backups
+        )
+      end
+
+      services.each do |service|
+        new_service_document = service.as_document
+        new_service_document.delete('_id')
+        new_service_document.delete('monitoring_last_check_result')
+        new_service_document.delete('updated_at')
+        new_service_document.delete('created_at')
+        new_service_document.delete('monitoring_last_check_at')
+
+        new_guest.services.new new_service_document
+      end
+
+      new_guest
     end
 
     def uuid
