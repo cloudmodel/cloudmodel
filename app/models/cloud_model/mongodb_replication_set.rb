@@ -6,6 +6,7 @@ module CloudModel
     prepend CloudModel::Mixins::SmartToString
 
     field :name, type: String # Name of the replication set
+    field :initiated, type: Boolean, default: false
 
     def guests
       CloudModel::Guest.where("services.mongodb_replication_set_id" => id)
@@ -49,7 +50,7 @@ module CloudModel
     end
 
     def client
-      if operational_service_uris.first
+      if initiated? and operational_service_uris.first
         begin
           Mongo::Client.new(operational_service_uris, connect_timeout: 2, timeout: 2)
         rescue
@@ -81,8 +82,16 @@ module CloudModel
     end
 
     def initiate
-      # eval init_rs_cmd
-      guests.first.exec "mongo --eval '#{init_rs_cmd}'"
+      if guests.blank?
+        return false, 'No guests found'
+      end
+      ret, msg = guests.first.exec "mongo --eval #{init_rs_cmd.shellescape}"
+      if ret
+        ret = false if msg =~ /"ok"\s\:\s0/
+        update_attribute :initiated, true if ret
+        CloudModel::Monitoring::MongodbReplicationSetChecks.new(self).check
+      end
+      return ret, msg
     end
 
     def status options={}
