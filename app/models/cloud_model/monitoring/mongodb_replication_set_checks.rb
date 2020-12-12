@@ -4,7 +4,9 @@ module CloudModel
       def self.check options = {}
         CloudModel::MongodbReplicationSet.scoped.each do |replication_set|
           handle_cloudmodel_monitoring_exception replication_set, '_Mongo Repl_', 2 do
-            CloudModel::Monitoring::MongodbReplicationSetChecks.new(replication_set).check
+            if replication_set.initiated?
+              CloudModel::Monitoring::MongodbReplicationSetChecks.new(replication_set).check
+            end
           end
         end
       end
