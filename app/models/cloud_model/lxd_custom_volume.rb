@@ -50,7 +50,7 @@ module CloudModel
 
     def volume_exists?
       success, output = lxc "storage volume show default #{name.shellescape}"
-      not(success == false and output == "Error: not found\n")
+      not(success == false and output.strip == "Error: not found")
     end
 
     def create_volume

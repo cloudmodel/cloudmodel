@@ -91,7 +91,7 @@ describe CloudModel::LxdCustomVolume do
 
     it 'should return true if lxd volume has not found error (assuming it exists otherwise)' do
       subject.name = 'some_guest-var-data'
-      allow(subject).to receive(:lxc).with('storage volume show default some_guest-var-data').and_return [false, "Error: Something else\n"]
+      allow(subject).to receive(:lxc).with('storage volume show default some_guest-var-data').and_return [false, "\n\nError: Something else\n"]
 
       expect(subject.volume_exists?).to eq true
     end
