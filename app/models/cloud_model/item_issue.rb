@@ -89,7 +89,11 @@ module CloudModel
 
     def subject_chain
       subject_chain_ids.map do |link|
-        link[:type].constantize.find link[:id]
+        begin
+          link[:type].constantize.find link[:id]
+        rescue
+          ItemIssue.new(subject_type: link[:type], subject_id: link[:id]).subject
+        end
       end
     end
 
