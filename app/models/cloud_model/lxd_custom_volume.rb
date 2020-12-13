@@ -78,10 +78,10 @@ module CloudModel
     # Get infos about the volume
     def lxc_show
       success, result = lxc "storage volume show default #{name.shellescape}"
-      if success
+      begin
         YAML.load(result).deep_transform_keys { |key| key.to_s.underscore }
-      else
-        nil
+      rescue
+        {'error' => "No valid YAML: #{result}"}
       end
     end
 

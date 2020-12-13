@@ -181,9 +181,9 @@ describe CloudModel::LxdCustomVolume do
     it 'should return nil if lxc show fails' do
       subject.name = 'some_guest-var-data'
 
-      expect(subject).to receive(:lxc).with('storage volume show default some_guest-var-data').and_return [false, '']
+      expect(subject).to receive(:lxc).with('storage volume show default some_guest-var-data').and_return [false, 'FATAL ERROR!']
 
-      expect(subject.lxc_show).to eq nil
+      expect(subject.lxc_show).to eq "error"=>"No valid YAML: FATAL ERROR!"
     end
   end
 
