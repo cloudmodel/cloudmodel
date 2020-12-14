@@ -79,7 +79,8 @@ module CloudModel
       end
 
       def has_backups=(state)
-        self[:has_backups] = state && backupable?
+        state = false unless backupable?
+        self[:has_backups] = state
       end
 
       def backup_directory
