@@ -150,6 +150,18 @@ describe CloudModel::Services::Base do
       subject.has_backups = false
       expect(subject.has_backups).to eq false
     end
+
+    it 'should allow to set to true by string "1" if backupable' do
+      allow(subject).to receive(:backupable?).and_return true
+      subject.has_backups = '1'
+      expect(subject.has_backups).to eq true
+    end
+
+    it 'should allow to set to false by string "0" if backupable' do
+      allow(subject).to receive(:backupable?).and_return true
+      subject.has_backups = '0'
+      expect(subject.has_backups).to eq false
+    end
   end
 
   describe 'backup_directory' do
