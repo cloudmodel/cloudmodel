@@ -12,8 +12,8 @@ describe CloudModel::Components::MariadbComponent do
   end
 
   describe 'requirements' do
-    it 'should be an empty Array' do
-      expect(subject.requirements).to eq []
+    it 'should require mariadb_client' do
+      expect(subject.requirements).to eq [:mariadb_client]
     end
   end
 end

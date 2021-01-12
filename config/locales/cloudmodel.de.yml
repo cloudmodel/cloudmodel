@@ -401,6 +401,9 @@ de:
         server_uri: Serveradresse
         health: Gesundheit
         uptime: Betriebszeit
+      cloud_model/services/mariadb:
+        php_options: PHP Optionen
+        php_components: PHP Module
       cloud_model/services/redis:
         redis_sentinel_set: Replikationset
         redis_sentinel_port: Replikationsport
@@ -420,6 +423,12 @@ de:
         passenger_supported: Rack unterstützen
         passenger_env: Rails-Umgebung
         delayed_jobs_supported: "Delayed::Job Service unterstützen"
+
+        fastcgi: FastCGI/PHP-FPM
+        fastcgi_supported: FastCGI/PHP-FPM unterstützen
+        fastcgi_location: FastCGI Regel
+        fastcgi_pass: FastCGI Pass
+        fastcgi_index: FastCGI Index
 
         deployment: Projekt deployen
         capistrano_supported: Capistrano unterstützen

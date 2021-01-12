@@ -1,8 +1,8 @@
 module CloudModel
   module Components
-    class MariadbComponent < BaseComponent
+    class PhpMysqlComponent < BaseComponent
       def requirements
-        [:mariadb_client]
+        [:mariadb_client, :php]
       end
     end
   end

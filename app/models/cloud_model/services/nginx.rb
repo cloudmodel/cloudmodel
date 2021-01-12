@@ -15,6 +15,11 @@ module CloudModel
       field :passenger_env, type: String, default: 'production'
       field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
 
+      field :fastcgi_supported, type: Mongoid::Boolean, default: false
+      field :fastcgi_location, type: String, default: ".php$"
+      field :fastcgi_pass, type: String, default: "127.0.0.1:9000"
+      field :fastcgi_index, type: String, default: "index.php"
+
       field :capistrano_supported, type: Mongoid::Boolean, default: false
 
       belongs_to :deploy_web_image, class_name: 'CloudModel::WebImage', inverse_of: :services, optional: true
