@@ -50,7 +50,11 @@ http {
 
   ignore_invalid_headers          on;
 
+<%- if model.fastcgi_supported? and not model.fastcgi_index.blank? -%>
+  index                           <%= model.fastcgi_index %> index.html;
+<%- else -%>
   index                           index.html;
+<%- end -%>
 <%- if model.passenger_supported? %>
 #  include                         passenger.conf;
 #  passenger_root /usr/lib/ruby/vendor_ruby/phusion_passenger/locations.ini;
