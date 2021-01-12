@@ -23,7 +23,7 @@ http {
     '"$request" $status $bytes_sent '
     '"$http_referer" "$http_user_agent" '
     '"$gzip_ratio"';
-                       
+
   client_header_timeout           10m;
   client_body_timeout             10m;
   send_timeout                    10m;
@@ -61,7 +61,7 @@ http {
 #  include /etc/nginx/sites-enabled/*;
 <%-
   protocols = []
-  protocols << :http unless model.ssl_supported? and model.ssl_only? 
+  protocols << :http unless model.ssl_supported? and model.ssl_only?
   protocols << :https if model.ssl_supported?
 -%>
 <%- protocols.each do |protocol| -%>
@@ -106,7 +106,7 @@ http {
     gzip_proxied                  any;
     # Some version of IE 6 don't handle compression well on some mime-types, so just disable them
     gzip_disable                  "MSIE [1-6].(?!.*SV1)";
-    
+
     location ~ ^/assets/ {
       expires                     max;
       add_header                  Cache-Control public;
@@ -118,13 +118,21 @@ http {
       try_files                   $uri $uri/ /index.html;
     }
 <%- end -%>
+<%- if model.fastcgi_supported? -%>
+
+    location ~ <%= model.fastcgi_location %> {
+      fastcgi_pass <%= model.fastcgi_pass %>;
+      fastcgi_index <%= model.fastcgi_index %>;
+      include fastcgi_params;
+    }
+<%- end -%>
     location /nginx_status {
       stub_status                 on;
       access_log                  off;
       allow                       <%= model.host.private_network.ip %>/16;
       deny all;
     }
-    
+
     include /etc/nginx/server.d/*;
 
 <%- if protocol == :https -%>
@@ -148,15 +156,15 @@ http {
     ssl_stapling_verify           on;
     resolver                      8.8.4.4 8.8.8.8 valid=300s;
     resolver_timeout              10s;
-    
+
     ssl_session_cache             shared:SSL:10m;
-    
+
     # #
     # # cd /etc/ssl/certs
     # # openssl dhparam -out dhparam.pem 4096
     # #
     # ssl_dhparam /etc/ssl/certs/dhparam.pem;
-        
+
     passenger_env_var             HTTP_X_FORWARDED_PROTO https;
 <%- end -%>
 <%- end -%>

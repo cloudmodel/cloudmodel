@@ -17,6 +17,11 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:passenger_env).of_type(String).with_default_value_of('production') }
   it { expect(subject).to have_field(:delayed_jobs_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
 
+  it { expect(subject).to have_field(:fastcgi_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
+  it { expect(subject).to have_field(:fastcgi_location).of_type(String).with_default_value_of('.php$') }
+  it { expect(subject).to have_field(:fastcgi_pass).of_type(String).with_default_value_of('127.0.0.1:9000') }
+  it { expect(subject).to have_field(:fastcgi_index).of_type(String).with_default_value_of('index.php') }
+
   it { expect(subject).to have_field(:capistrano_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
 
   it { expect(subject).to belong_to(:deploy_web_image).of_type(CloudModel::WebImage).as_inverse_of :services }

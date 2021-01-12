@@ -400,6 +400,9 @@ en:
         server_uri: Server Address
         health: Health
         uptime: Uptime
+      cloud_model/services/mariadb:
+        php_options: PHP Options
+        php_components: PHP Modules
       cloud_model/services/redis:
         redis_sentinel_set: Sentinel Set
         redis_sentinel_port: Sentinel Port
@@ -419,6 +422,12 @@ en:
         passenger_supported: Support Rack Server?
         passenger_env: Rails Environment
         delayed_jobs_supported: "Support Delayed::Job Service?"
+
+        fastcgi: FastCGI/PHP-FPM
+        fastcgi_supported: Support FastCGI/PHP-FPM?
+        fastcgi_location: FastCGI Location Rule
+        fastcgi_pass: FastCGI Pass
+        fastcgi_index: FastCGI Index
 
         deployment: Project Deployment
         capistrano_supported: Support Capistrano?
