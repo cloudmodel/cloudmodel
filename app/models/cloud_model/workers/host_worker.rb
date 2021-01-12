@@ -316,6 +316,13 @@ module CloudModel
         chroot root, "/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=#{host.private_address}/#{host.private_network.subnet} ipv4.nat=true"
       end
 
+      def update_tinc
+        begin
+          CloudModel::Host.update_tinc_keys
+        rescue
+        end
+      end
+
       # def copy_lxd
       #   @host.exec! "cp -a /var/lib/lxd #{root}/var/lib/ && rm -f #{root}/var/lib/lxd/unix.socket", "Failed to copy lxd files"
       # end
@@ -369,6 +376,7 @@ module CloudModel
           ['Config new system', :config_deploy_root],
           # TODO: apply existing guests and restore backups
           ['Config LXD', :config_lxd],
+          ['Update TINC config', :update_tinc]
           ['Write boot config and reboot', :boot_deploy_root],
         ]
 
