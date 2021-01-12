@@ -1,18 +1,18 @@
 require 'spec_helper'
 
-describe CloudModel::Workers::Services::SshWorker do
+describe CloudModel::Workers::Services::MariadbWorker do
   let(:host) {double CloudModel::Host}
   let(:guest) {double CloudModel::Guest, host: host}
-  let(:model) {CloudModel::Services::Ssh.new}
-  subject {CloudModel::Workers::Services::SshWorker.new guest, model}
+  let(:model) {CloudModel::Services::Mariadb.new}
+  subject {CloudModel::Workers::Services::MariadbWorker.new guest, model}
 
   describe 'write_config' do
     pending
   end
 
   describe 'service_name' do
-    it 'should return sshd' do
-      expect(subject.service_name).to eq 'sshd'
+    it 'should return mongodb' do
+      expect(subject.service_name).to eq 'mariadb'
     end
   end
 

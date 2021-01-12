@@ -376,7 +376,7 @@ module CloudModel
           ['Config new system', :config_deploy_root],
           # TODO: apply existing guests and restore backups
           ['Config LXD', :config_lxd],
-          ['Update TINC config', :update_tinc]
+          ['Update TINC config', :update_tinc],
           ['Write boot config and reboot', :boot_deploy_root],
         ]
 

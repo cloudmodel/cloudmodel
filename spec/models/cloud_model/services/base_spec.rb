@@ -21,6 +21,8 @@ describe CloudModel::Services::Base do
         solr: CloudModel::Services::Solr,
         fuseki: CloudModel::Services::Fuseki,
         ssh: CloudModel::Services::Ssh,
+        phpfpm: CloudModel::Services::Phpfpm,
+        mariadb: CloudModel::Services::Mariadb,
         tomcat: CloudModel::Services::Tomcat,
         backup: CloudModel::Services::Backup,
         monitoring: CloudModel::Services::Monitoring
