@@ -14,9 +14,36 @@ describe CloudModel::Services::Phpfpm do
     end
   end
 
+  describe 'php_components=' do
+    it 'should set php_components' do
+      subject.php_components = ['php_mysql']
+      expect(subject.php_components).to eq [:php_mysql]
+    end
+
+    it 'should ignore unavailable components' do
+      subject.php_components = ['php_virus', 'php_mysql']
+      expect(subject.php_components).to eq [:php_mysql]
+    end
+
+    it 'should ignore empty components' do
+      subject.php_components = ['', 'php_mysql']
+      expect(subject.php_components).to eq [:php_mysql]
+    end
+
+    it 'should allow to set no components' do
+      subject.php_components = ['']
+      expect(subject.php_components).to eq []
+    end
+  end
+
   describe 'components_needed' do
-    it 'should require php component' do
+    it 'should require php component by default' do
       expect(subject.components_needed).to eq [:php]
+    end
+
+    it 'should require php components' do
+      subject.php_components = ['php_mysql']
+      expect(subject.components_needed).to eq [:php, :php_mysql]
     end
   end
 

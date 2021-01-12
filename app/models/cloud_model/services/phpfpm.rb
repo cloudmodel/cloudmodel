@@ -8,8 +8,12 @@ module CloudModel
         :phpfpm
       end
 
+      def php_components= components
+        self[:php_components] = components.map(&:to_sym) & available_php_components
+      end
+
       def components_needed
-        [:php]
+        [:php] + php_components.map(&:to_sym)
       end
 
       def available_php_components
