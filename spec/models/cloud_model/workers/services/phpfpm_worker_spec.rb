@@ -1,18 +1,18 @@
 require 'spec_helper'
 
-describe CloudModel::Workers::Services::SshWorker do
+describe CloudModel::Workers::Services::PhpfpmWorker do
   let(:host) {double CloudModel::Host}
   let(:guest) {double CloudModel::Guest, host: host}
-  let(:model) {CloudModel::Services::Ssh.new}
-  subject {CloudModel::Workers::Services::SshWorker.new guest, model}
+  let(:model) {double CloudModel::Services::Phpfpm}
+  subject {CloudModel::Workers::Services::PhpfpmWorker.new guest, model}
 
   describe 'write_config' do
     pending
   end
 
   describe 'service_name' do
-    it 'should return sshd' do
-      expect(subject.service_name).to eq 'sshd'
+    it 'should return php-fpm' do
+      expect(subject.service_name).to eq 'php-fpm'
     end
   end
 

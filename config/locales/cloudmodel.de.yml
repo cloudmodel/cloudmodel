@@ -156,6 +156,12 @@ de:
       cloud_model/services/ssh:
         one: SSH-Dienst
         other: SSH-Dienste
+      cloud_model/services/phpfpm:
+        one: PHP FPM-Dienst
+        other: PHP FPM-Dienste
+      cloud_model/services/mariadb:
+        one: MariaDB-Dienst
+        other: MariaDB-Dienste
       cloud_model/services/tomcat:
         one: Tomcat-Dienst
         other: Tomcat-Dienste
