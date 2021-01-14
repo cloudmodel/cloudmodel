@@ -91,7 +91,7 @@ module CloudModel
     end
 
     def ruby_version
-      @ruby_version || "2.6"
+      @ruby_version || "2.5"
     end
 
     def ubuntu_kernel_flavour
