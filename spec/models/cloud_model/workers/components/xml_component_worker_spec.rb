@@ -14,7 +14,7 @@ describe CloudModel::Workers::Components::XmlComponentWorker do
     end
 
     it 'should apt-get libxml' do
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install libxml2-dev libxml2-utils libxslt-dev -y', 'Failed to install packages for libxml')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install libxml2-dev libxml2-utils libxslt-dev xsltproc -y', 'Failed to install packages for libxml')
 
       subject.build '/tmp/build'
     end
