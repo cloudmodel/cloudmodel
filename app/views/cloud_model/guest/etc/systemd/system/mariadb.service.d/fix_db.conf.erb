@@ -1,0 +1,4 @@
+[Service]
+PermissionsStartOnly=true
+ExecStartPre=/bin/chown -R mysql:root /var/lib/mysql
+ExecStartPre=/bin/sh -c "/bin/ls /var/lib/mysql || /usr/bin/mysql_install_db"

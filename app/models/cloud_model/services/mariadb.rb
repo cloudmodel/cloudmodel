@@ -20,10 +20,11 @@ module CloudModel
       end
 
       def backup
-
+        # ToDo: mysql dump data
       end
 
       def restore timestamp='latest'
+        # ToDo: mysql import data
       end
     end
   end
