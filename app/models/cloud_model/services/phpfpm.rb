@@ -17,7 +17,7 @@ module CloudModel
       end
 
       def available_php_components
-        [:php_mysql]
+        [:php_mysql, :php_imagemagick, :php_imap]
       end
 
       def service_status

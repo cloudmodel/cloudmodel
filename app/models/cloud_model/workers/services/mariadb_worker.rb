@@ -17,7 +17,7 @@ module CloudModel
 
         def auto_start
           mkdir_p overlay_path
-          #render_to_remote "/cloud_model/guest/etc/systemd/system/mariadb.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"
+          render_to_remote "/cloud_model/guest/etc/systemd/system/mariadb.service.d/fix_db.conf", "#{overlay_path}/fix_db.conf"
           super
         end
       end

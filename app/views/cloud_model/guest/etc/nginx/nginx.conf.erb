@@ -93,6 +93,18 @@ http {
 <%- else -%>
     root                          <%= model.www_root %>/current/public;
 <%- end -%>
+
+    add_header Referrer-Policy "no-referrer" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Download-Options "noopen" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Permitted-Cross-Domain-Policies "none" always;
+    # add_header X-Robots-Tag "none" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Remove X-Powered-By, which is an information leak
+    fastcgi_hide_header X-Powered-By;
+
     client_max_body_size          600M;
     client_body_buffer_size       128k;
     client_header_timeout         30m;
@@ -119,7 +131,11 @@ http {
 <%- unless model.passenger_supported? -%>
 
     location / {
+      <%- if model.fastcgi_supported? and not model.fastcgi_index.blank? -%>
+      try_files                   $uri $uri/ /<%= model.fastcgi_index %>;
+      <%- else -%>
       try_files                   $uri $uri/ /index.html;
+      <%- end -%>
     }
 <%- end -%>
 <%- if model.fastcgi_supported? -%>
@@ -130,6 +146,12 @@ http {
       include fastcgi.conf;
     }
 <%- end -%>
+
+    location = /robots.txt {
+      allow all;
+      log_not_found off;
+      access_log off;
+    }
 
     location /nginx_status {
       stub_status                 on;
