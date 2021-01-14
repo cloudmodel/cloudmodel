@@ -17,7 +17,7 @@ describe CloudModel::Workers::Components::RubyComponentWorker do
       expect(subject).to receive(:chroot!).with('/tmp/build', 'add-apt-repository ppa:brightbox/ruby-ng -y', 'Failed to add ruby-ng ppa').ordered
       expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get update', 'Failed to update apt').ordered
 
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install ruby2.6 ruby2.6-dev ruby-switch git zlib1g-dev ruby-bcrypt nodejs -y', 'Failed to install packages for deployment of rails app')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install ruby2.5 ruby2.5-dev ruby-switch git zlib1g-dev ruby-bcrypt nodejs -y', 'Failed to install packages for deployment of rails app')
       expect(subject).to receive(:chroot!).with('/tmp/build', 'gem install bundler', 'Failed to install current bundler')
       expect(subject).to receive(:chroot!).with('/tmp/build', "gem install bundler -v '~>1.0'", 'Failed to install legacy bundler v1')
 
