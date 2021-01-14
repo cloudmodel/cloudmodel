@@ -9,7 +9,7 @@ module CloudModel
     attr_writer :dns_servers
 
     attr_writer :ubuntu_mirror, :ubuntu_deb_src, :ubuntu_version, :ubuntu_name, :ubuntu_kernel_flavour
-    attr_writer :php_version
+    attr_writer :php_version, :ruby_version
 
     attr_accessor :admin_email, :email_domain
     attr_writer :dns_domains
@@ -88,6 +88,10 @@ module CloudModel
 
     def php_version
       @php_version || "7.4"
+    end
+
+    def ruby_version
+      @ruby_version || "2.6"
     end
 
     def ubuntu_kernel_flavour
