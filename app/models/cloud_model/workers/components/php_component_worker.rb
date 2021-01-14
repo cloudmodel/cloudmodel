@@ -7,7 +7,6 @@ module CloudModel
         end
 
         def build build_path
-          chroot! build_path, "apt-get install software-properties-common -y", "Failed to install software-properties-common for php ppa"
           chroot! build_path, "add-apt-repository ppa:ondrej/php -y", "Failed to add php ppa"
           chroot! build_path, "apt-get update", "Failed to update apt"
 

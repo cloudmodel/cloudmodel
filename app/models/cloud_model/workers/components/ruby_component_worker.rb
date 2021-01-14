@@ -3,8 +3,11 @@ module CloudModel
     module Components
       class RubyComponentWorker < BaseComponentWorker
         def build build_path
-          packages = %w(ruby ruby-dev git)
-          packages += %w(zlib1g-dev)
+          chroot! build_path, "add-apt-repository ppa:brightbox/ruby-ng -y", "Failed to add ruby-ng ppa"
+          chroot! build_path, "apt-get update", "Failed to update apt"
+
+          packages = ["ruby-#{CloudModel.config.ruby_version}", "ruby-dev-#{CloudModel.config.ruby_version}"]
+          packages += %w(ruby-switch git zlib1g-dev)
           packages << 'ruby-bcrypt' # bcrypt
           packages << 'nodejs' # JS interpreter
           chroot! build_path, "apt-get install #{packages * ' '} -y", "Failed to install packages for deployment of rails app"

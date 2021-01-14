@@ -18,6 +18,9 @@ module CloudModel
         comment_sub_step 'Install gnupg'
         chroot! build_path, "apt-get install sudo gnupg -y", "Failed to install gnupg"
 
+        comment_sub_step 'Install ppa support'
+        chroot! build_path, "apt-get install apt-transport-https ca-certificates software-properties-common -y", "Failed to install ppa support"
+
         comment_sub_step 'Install rsync'
         chroot! build_path, "apt-get install sudo rsync -y", "Failed to install rsync"
 
