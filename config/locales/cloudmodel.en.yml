@@ -392,6 +392,11 @@ en:
         state: Service State
         monitoring_last_check_at: Last Monitored
         _type: Service Type
+      cloud_model/services/mariadb:
+        replication: Replication
+        mariadb_galera_cluster: Galera Cluster
+        mariadb_galera_cluster_id: Galera Cluster
+        mariadb_galera_port: Replication Port
       cloud_model/services/mongodb:
         replication: Replication
         mongodb_replication_set: Replication Set
@@ -403,12 +408,12 @@ en:
         server_uri: Server Address
         health: Health
         uptime: Uptime
-      cloud_model/services/mariadb:
+      cloud_model/services/phpfpm:
         php_options: PHP Options
         php_components: PHP Modules
       cloud_model/services/redis:
         redis_sentinel_set: Sentinel Set
-        redis_sentinel_port: Sentinel Port
+        redis_sentinel_port: Replication Port
         redis_sentinel_master?: Primary Node
         redis_sentinel_set_version: Replication Version
       cloud_model/services/nginx:
