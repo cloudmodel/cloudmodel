@@ -108,6 +108,9 @@ de:
       cloud_model/certificate:
         one: Zertifikat
         other: Zertifikate
+      cloud_model/mariadb_galera_cluster:
+        one: MariaDB Galera Gruppe
+        other: MariaDB Galera Gruppen
       cloud_model/mongodb_replication_set:
         one: MongoDB Replikationset
         other: MongoDB Replikationsets

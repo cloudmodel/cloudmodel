@@ -3,15 +3,15 @@
 require 'spec_helper'
 
 describe CloudModel::SolrImage do
-  it { expect(subject).to have_timestamps }  
-    
+  it { expect(subject).to have_timestamps }
+
   it { expect(subject).to have_field(:name).of_type String }
   it { expect(subject).to have_field(:git_server).of_type String }
   it { expect(subject).to have_field(:git_repo).of_type String }
   it { expect(subject).to have_field(:git_branch).of_type(String).with_default_value_of 'master' }
   it { expect(subject).to have_field(:git_commit).of_type String }
   it { expect(subject).to have_field(:solr_version).of_type String }
-  
+
   it { expect(subject).to have_enum(:build_state).with_values(
     0x00 => :pending,
     0x01 => :running,
@@ -24,7 +24,7 @@ describe CloudModel::SolrImage do
   ).with_default_value_of(:not_started) }
   it { expect(subject).to have_field(:build_last_issue).of_type(String) }
 
-  it { expect(subject).to belong_to(:file).of_type Mongoid::GridFS::Fs::File }
+  it { expect(subject).to belong_to(:file).of_type(Mongoid::GridFS::Fs::File).with_optional }
 
   it { expect(subject).to validate_presence_of :name }
   it { expect(subject).to validate_presence_of :git_server }
@@ -44,33 +44,33 @@ describe CloudModel::SolrImage do
       guests = [
         double(CloudModel::Guest, host_id: 'host1'),
         double(CloudModel::Guest, host_id: 'host2'),
-        double(CloudModel::Guest, host_id: 'host1')        
-      ]    
+        double(CloudModel::Guest, host_id: 'host1')
+      ]
       allow(subject).to receive(:used_in_guests) { guests }
-      
+
       expect(subject.used_in_guests_by_hosts).to eq({
         'host1' => [guests[0], guests[2]],
         'host2' => [guests[1]],
       })
     end
   end
-  
+
   describe 'services' do
     it 'should list all services using SolrImage' do
       guest1 = double CloudModel::Guest
       guest2 = double CloudModel::Guest
       allow(subject).to receive(:used_in_guests).and_return [guest1, guest2]
-      
+
       service1 = double CloudModel::Services::Solr
       service2 = double CloudModel::Services::Solr
-      
+
       services1 = double
       services2 = double
       allow(guest1).to receive(:services).and_return(services1)
       allow(guest2).to receive(:services).and_return(services2)
       allow(services1).to receive(:where).with(deploy_solr_image_id: subject.id).and_return [service1]
       allow(services2).to receive(:where).with(deploy_solr_image_id: subject.id).and_return [service2]
-      
+
       expect(subject.services).to eq [service1, service2]
     end
   end
@@ -81,32 +81,32 @@ describe CloudModel::SolrImage do
       subject.file.length = 4711
       expect(subject.file_size).to eq 4711
     end
-    
+
     it 'should be nil if no file was attached' do
       subject.file = nil
       expect(subject.file_size).to be_nil
     end
   end
-  
+
   describe 'solr_mirror' do
-    it 'should find SolrMirror for set solr_version' do  
+    it 'should find SolrMirror for set solr_version' do
       solr_mirror = double CloudModel::SolrMirror
       subject.solr_version = '8.5.0'
-      
+
       expect(CloudModel::SolrMirror).to receive(:find_by).with(version: '8.5.0').and_return solr_mirror
-      
+
       expect(subject.solr_mirror).to eq solr_mirror
     end
   end
 
-  describe 'build_path' do   
+  describe 'build_path' do
     it 'should build in CloudModel data_directory' do
       allow(CloudModel.config).to receive(:data_directory).and_return Pathname.new '/my_home/rails_project/data'
-      
+
       expect(subject.build_path).to eq "/my_home/rails_project/data/build/solr_images/#{subject.id}"
     end
   end
-  
+
   describe '#build_state_id_for' do
     CloudModel::SolrImage.enum_fields[:build_state][:values].each do |k,v|
       it "should map #{v} to id #{k}" do
@@ -114,7 +114,7 @@ describe CloudModel::SolrImage do
       end
     end
   end
-  
+
   describe 'worker' do
     it 'should return worker for SolrImage' do
       worker = double CloudModel::Workers::SolrImageWorker, build: true
@@ -122,31 +122,31 @@ describe CloudModel::SolrImage do
       expect(subject.worker).to eq worker
     end
   end
-  
+
   describe '#buildable_build_states' do
     it 'should return buildable states' do
       expect(CloudModel::SolrImage.buildable_build_states).to eq [:finished, :failed, :not_started]
     end
   end
-  
+
   describe '#buildable_build_state_ids' do
     it 'should return buildable states ids' do
       expect(CloudModel::SolrImage.buildable_build_state_ids).to eq [240, 241, 255]
     end
   end
-  
+
   describe 'buildable?' do
     it 'should be true if current build state is buildable' do
       subject.build_state = :finished
       expect(subject.buildable?).to eq true
     end
-    
+
     it 'should be false if current build state is not buildable' do
       subject.build_state = :pending
       expect(subject.buildable?).to eq false
     end
   end
-  
+
   describe '#buildable' do
     it 'should return all buildable SolrImages' do
       scoped = double
@@ -157,72 +157,72 @@ describe CloudModel::SolrImage do
       expect(CloudModel::SolrImage.buildable).to eq buildable_solr_images
     end
   end
-  
+
   describe 'build' do
     it 'should call rake to build SolrImage' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:solr_image:build', solr_image_id: subject.id).and_return true
       allow(subject).to receive(:buildable?).and_return true
-      
+
       expect(subject.build).to eq true
     end
-    
+
     it 'should set build_state to :pending' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:solr_image:build', solr_image_id: subject.id).and_return true
       allow(subject).to receive(:buildable?).and_return true
-      
+
       expect(subject.build).to eq true
-      
+
       expect(subject.build_state).to eq :pending
     end
-    
+
     it 'should return false and not run rake if not buildable' do
       expect(CloudModel).not_to receive(:call_rake)
       allow(subject).to receive(:buildable?).and_return false
-      
+
       expect(subject.build).to eq false
       expect(subject.build_state).to eq :not_started
     end
-    
+
     it 'should allow to force build if not buildable' do
       expect(CloudModel).to receive(:call_rake).with('cloudmodel:solr_image:build', solr_image_id: subject.id).and_return true
       allow(subject).to receive(:buildable?).and_return false
-      
+
       expect(subject.build force:true).to eq true
       expect(subject.build_state).to eq :pending
     end
-    
+
     it 'should mark template build as failed if rake is not callable and return false' do
       allow(CloudModel).to receive(:call_rake).and_raise 'Rake failed to call'
-      
+
       expect(subject.build).to eq false
       expect(subject.build_state).to eq :failed
       expect(subject.build_last_issue).to eq 'Unable to enqueue job! Try again later.'
     end
   end
-  
+
   describe 'build!' do
     it 'should call worker to build SolrImage' do
       worker = double CloudModel::Workers::SolrImageWorker, build: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return true
-      
+
       expect(subject.build!).to eq true
       expect(subject.build_state).to eq :pending
     end
-    
+
     it 'should return false and not run worker if not buildable' do
       expect(subject).not_to receive(:worker)
       allow(subject).to receive(:buildable?).and_return false
-      
+
       expect(subject.build!).to eq false
       expect(subject.build_state).to eq :not_started
     end
-    
+
     it 'should allow to force build if not buildable' do
       worker = double CloudModel::Workers::SolrImageWorker, build: true
       expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return false
-      
+
       expect(subject.build! force:true).to eq true
     end
   end

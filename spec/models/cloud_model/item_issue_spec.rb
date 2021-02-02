@@ -17,7 +17,7 @@ describe CloudModel::ItemIssue do
     0xff => :fatal
   ).with_default_value_of(:info) }
   it { expect(subject).to have_field(:resolved_at).of_type Time }
-  it { expect(subject).to belong_to(:subject).with_polymorphism }
+  it { expect(subject).to belong_to(:subject).with_polymorphism.with_optional }
   it { expect(subject).to have_field(:subject_chain_ids).of_type(Array).with_default_value_of [] }
 
   describe '#open' do

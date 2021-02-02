@@ -11,7 +11,7 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:ssl_enforce).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:ssl_port).of_type(Integer).with_default_value_of(443) }
   it { expect(subject).to have_field(:ssl_certbot).of_type(Mongoid::Boolean).with_default_value_of(false) }
-  it { expect(subject).to belong_to(:ssl_cert).of_type(CloudModel::Certificate).as_inverse_of :services }
+  it { expect(subject).to belong_to(:ssl_cert).of_type(CloudModel::Certificate).with_optional.as_inverse_of :services }
 
   it { expect(subject).to have_field(:passenger_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:passenger_env).of_type(String).with_default_value_of('production') }
@@ -24,7 +24,7 @@ describe CloudModel::Services::Nginx do
 
   it { expect(subject).to have_field(:capistrano_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
 
-  it { expect(subject).to belong_to(:deploy_web_image).of_type(CloudModel::WebImage).as_inverse_of :services }
+  it { expect(subject).to belong_to(:deploy_web_image).of_type(CloudModel::WebImage).with_optional.as_inverse_of :services }
 
   it { expect(subject).to have_enum(:redeploy_web_image_state).with_values(
     0x00 => :pending,
@@ -38,11 +38,11 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:deploy_mongodb_host).of_type(String) }
   it { expect(subject).to have_field(:deploy_mongodb_port).of_type(Integer).with_default_value_of(27017) }
   it { expect(subject).to have_field(:deploy_mongodb_database).of_type(String) }
-  it { expect(subject).to belong_to(:deploy_mongodb_replication_set).of_type(CloudModel::MongodbReplicationSet) }
+  it { expect(subject).to belong_to(:deploy_mongodb_replication_set).with_optional.of_type(CloudModel::MongodbReplicationSet) }
 
   it { expect(subject).to have_field(:deploy_redis_host).of_type(String) }
   it { expect(subject).to have_field(:deploy_redis_port).of_type(Integer).with_default_value_of(6379) }
-  it { expect(subject).to belong_to(:deploy_redis_sentinel_set).of_type(CloudModel::RedisSentinelSet) }
+  it { expect(subject).to belong_to(:deploy_redis_sentinel_set).with_optional.of_type(CloudModel::RedisSentinelSet) }
 
   it { expect(subject).to have_field(:daily_rake_task).of_type(String).with_default_value_of nil }
 

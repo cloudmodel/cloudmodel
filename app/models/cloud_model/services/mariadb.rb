@@ -2,6 +2,8 @@ module CloudModel
   module Services
     class Mariadb < Base
       field :port, type: Integer, default: 3306
+      field :mariadb_galera_port, type: Integer, default: 4567
+      belongs_to :mariadb_galera_cluster, optional: true
 
       def kind
         :mariadb

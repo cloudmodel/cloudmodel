@@ -39,7 +39,7 @@ describe CloudModel::WebImage do
   it { expect(subject).to have_field(:redeploy_last_issue).of_type(String) }
 
 
-  it { expect(subject).to belong_to(:file).of_type Mongoid::GridFS::Fs::File }
+  it { expect(subject).to belong_to(:file).of_type(Mongoid::GridFS::Fs::File).with_optional }
 
   it { expect(subject).to validate_presence_of :name }
   it { expect(subject).to validate_presence_of :git_server }

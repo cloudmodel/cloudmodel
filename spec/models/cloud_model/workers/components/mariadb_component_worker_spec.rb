@@ -14,7 +14,7 @@ describe CloudModel::Workers::Components::MariadbComponentWorker do
     end
 
     it 'should apt-get mariadb' do
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install mariadb-server galera -y', 'Failed to install mariadb')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install mariadb-server galera-arbitrator-4 -y', 'Failed to install mariadb')
 
       subject.build '/tmp/build'
     end
