@@ -393,6 +393,11 @@ de:
         state: Dienststatus
         monitoring_last_check_at: Zuletzt überwacht
         _type: Dienstart
+      cloud_model/services/mariadb:
+        replication: Replication
+        mariadb_galera_cluster: Galera-Gruppe
+        mariadb_galera_cluster_id: Galera-Gruppe
+        mariadb_galera_port: Replikationsport
       cloud_model/services/mongodb:
         replication: Replikation
         mongodb_replication_set: Replikationset
@@ -404,7 +409,7 @@ de:
         server_uri: Serveradresse
         health: Gesundheit
         uptime: Betriebszeit
-      cloud_model/services/mariadb:
+      cloud_model/services/phpfpm:
         php_options: PHP Optionen
         php_components: PHP Module
       cloud_model/services/redis:
