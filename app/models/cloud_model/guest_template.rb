@@ -9,7 +9,7 @@ module CloudModel
 
     belongs_to :template_type, class_name: "CloudModel::GuestTemplateType"
     belongs_to :core_template, class_name: "CloudModel::GuestCoreTemplate"
-    
+
     enum_field :build_state, {
       0x00 => :pending,
       0x01 => :running,
@@ -21,23 +21,23 @@ module CloudModel
     }, default: :not_started
 
     field :build_last_issue, type: String
-    
+
     def self.buildable_build_states
       [:finished, :failed, :not_started]
     end
-        
+
     def buildable?
       self.class.buildable_build_states.include? build_state
     end
-    
+
     def self.latest_created_at
       scoped.where(build_state_id: 0xf0).max(:created_at)
     end
-    
+
     def worker host
       CloudModel::Workers::GuestTemplateWorker.new host
     end
-    
+
     def build(host, options = {})
       unless buildable? or options[:force]
         return false
@@ -53,7 +53,7 @@ module CloudModel
         return false
       end
     end
-  
+
     def build!(host, options={})
       unless buildable? or options[:force]
         return false
@@ -63,7 +63,7 @@ module CloudModel
 
       worker(host).build_template self, options
     end
-    
+
     def lxd_arch
       case arch
       when 'amd64'
@@ -72,7 +72,7 @@ module CloudModel
         arch
       end
     end
-    
+
     def name
       if created_at
         "#{template_type.name} (#{created_at.strftime("%Y-%m-%d %H:%M:%S")})"
@@ -80,15 +80,15 @@ module CloudModel
         "#{template_type.name} (not saved)"
       end
     end
-    
+
     def lxd_image_metadata_tarball
       "/cloud/templates/#{template_type_id}/#{id}.lxd.tar.gz"
     end
-    
+
     def lxd_alias
       "#{template_type_id}/#{id}"
     end
-    
+
     def tarball
       "/cloud/templates/#{template_type_id}/#{id}.tar.gz"
     end
