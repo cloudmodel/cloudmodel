@@ -1,3 +1,5 @@
+require 'mysql2'
+
 module CloudModel
   module Services
     class Mariadb < Base
@@ -14,7 +16,18 @@ module CloudModel
       end
 
       def service_status
-
+        begin
+          client = Mysql2::Client.new(host: guest.private_address, username: 'monitoring');
+          result = client.query("SHOW STATUS");
+          values = {}
+          result.each do |e|
+            values[e['Variable_name']] = e['Value']
+          end
+          client.close
+          values
+        rescue Exception => e
+          return {key: :not_reachable, error: "Failed to get db status\n#{e.class}\n\n#{e.to_s}", severity: :critical}
+        end
       end
 
       def backupable?

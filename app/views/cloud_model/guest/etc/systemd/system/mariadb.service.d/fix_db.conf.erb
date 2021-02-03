@@ -2,3 +2,4 @@
 PermissionsStartOnly=true
 ExecStartPre=/bin/chown -R mysql:root /var/lib/mysql
 ExecStartPre=/bin/sh -c "/bin/ls /var/lib/mysql || /usr/bin/mysql_install_db"
+ExecStartPost=-/usr/bin/mysql -e "CREATE USER 'monitoring'@'<%= CloudModel::Host.first.private_network.tinc_network.gsub('.0', '.%') %>' IDENTIFIED BY '';"

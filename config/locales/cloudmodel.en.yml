@@ -478,6 +478,8 @@ en:
       sys_boot_failed: Booting for %{value} and still not up
     cloud_model/services/redis:
       not_reachable: Service not reachable
+    cloud_model/services/mariadb:
+      not_reachable: Service not reachable
     cloud_model/services/mongodb:
       not_reachable: Service not reachable
     cloud_model/services/nginx:
@@ -487,6 +489,9 @@ en:
       no_nginx_status: Nginx status not found
       parse_passenger_result: Passenger status not parsable
       no_passenger_status: Passenger status not found
+    cloud_model/services/phpfpm:
+      not_reachable: Service not reachable
+      parse_phpfpm_result: PHP FPM status not parsable
     cloud_model/services/solr:
       not_reachable: Service not reachable
       parse_result: Service status not parsable
