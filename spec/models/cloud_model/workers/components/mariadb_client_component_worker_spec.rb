@@ -21,7 +21,7 @@ describe CloudModel::Workers::Components::MariadbClientComponentWorker do
     end
 
     it 'should apt-get mariadb client' do
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install mariadb-client -y', 'Failed to install mariadb client')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install mariadb-client libmariadb-dev -y', 'Failed to install mariadb client')
 
       subject.build '/tmp/build'
     end
