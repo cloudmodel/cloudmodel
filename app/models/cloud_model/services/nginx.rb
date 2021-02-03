@@ -91,6 +91,7 @@ module CloudModel
       def service_status
         data = {}
         uri = URI(status_uri)
+        res = nil
 
         begin
           Net::HTTP.start(uri.host, uri.port,

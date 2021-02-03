@@ -12,6 +12,7 @@ PATH
       bcrypt-ruby (~> 3.0, >= 3.0.0)
       mongoid (~> 7.0, >= 7.1.2)
       mongoid-grid_fs (~> 2.3)
+      mysql2
       net-ping (~> 2.0)
       net-sftp (~> 2.1, >= 2.1.0)
       netaddr (~> 2.0, >= 2.0.4)
@@ -148,6 +149,7 @@ GEM
       rspec-core (~> 3.3)
       rspec-expectations (~> 3.3)
       rspec-mocks (~> 3.3)
+    mysql2 (0.5.3)
     net-ping (2.0.8)
     net-sftp (2.1.2)
       net-ssh (>= 2.6.5)

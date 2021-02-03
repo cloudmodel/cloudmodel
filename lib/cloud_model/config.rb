@@ -4,7 +4,7 @@ module CloudModel
   class Config
     attr_writer :data_directory, :backup_directory, :bundle_command
     attr_writer :skip_sync_images
-    # Use external IP, useful for testing without setting up a VPN for your development box or if you have troubles woith tinc
+    # Use external IP, useful for testing without setting up a VPN for your development box or if you have troubles with tinc
     attr_writer :use_external_ip
     attr_writer :dns_servers
 

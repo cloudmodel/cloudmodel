@@ -54,6 +54,36 @@ describe CloudModel::Services::Phpfpm do
   end
 
   describe 'service_status' do
-    pending
+    before do
+      allow(subject).to receive(:guest).and_return double private_address: '10.42.23.1'
+    end
+
+    it 'should call cgi-fcgi to get status' do
+      expect(subject).to receive("`").with('SCRIPT_NAME=/fpm_status SCRIPT_FILENAME=/fpm_status QUERY_STRING=full\\&json REQUEST_METHOD=GET cgi-fcgi -bind -connect 10.42.23.1:9000')
+      subject.service_status
+    end
+
+    it 'should JSON parse the last line of the execute result' do
+      allow(subject).to receive("`").and_return "Output header\n\n{\"result\":\"success\"}"
+      expect(subject.service_status).to eq 'result' => 'success'
+    end
+
+    it 'should return error json if command fails' do
+      allow(subject).to receive(:guest).and_raise 'Invalid guest'
+      expect(subject.service_status).to eq(
+        error: "Failed to get fcgi status\nRuntimeError\n\nInvalid guest",
+        key: :not_reachable,
+        severity: :critical
+      )
+    end
+
+    it 'should return error if json is not parseable' do
+      allow(subject).to receive("`").and_return "Output header\nSomething went wrong"
+      expect(subject.service_status).to eq(
+        error: "NilClass\n\n\n--\nOutput header\nSomething went wrong",
+        key: :parse_phpfpm_result,
+        severity: :warning
+      )
+    end
   end
 end

@@ -477,6 +477,8 @@ de:
       sys_boot_failed: Neustart benötigt %{value} und ist noch nicht beendet
     cloud_model/services/redis:
       not_reachable: Dienst nicht erreichbar
+    cloud_model/services/mariadb:
+      not_reachable: Dienst nicht erreichbar
     cloud_model/services/mongodb:
       not_reachable: Dienst nicht erreichbar
     cloud_model/services/nginx:
@@ -486,6 +488,9 @@ de:
       no_nginx_status: Dienststatus für Nginx nicht gefunden
       parse_passenger_result: Dienststatus für Passenger nicht interpretierbar
       no_passenger_status: Dienststatus für Passenger nicht gefunden
+    cloud_model/services/phpfpm:
+      not_reachable: Dienst nicht erreichbar
+      parse_phpfpm_result: Dienststatus für PHP FPM nicht interpretierbar
     cloud_model/services/solr:
       not_reachable: Dienst nicht erreichbar
       parse_result: Dienststatus nicht interpretierbar

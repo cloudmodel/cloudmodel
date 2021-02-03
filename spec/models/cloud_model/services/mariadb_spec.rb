@@ -23,7 +23,44 @@ describe CloudModel::Services::Mariadb do
   end
 
   describe 'service_status' do
-    pending
+    let(:client) {double close:true, query:[]}
+
+    before do
+      allow(subject).to receive(:guest).and_return double private_address: '10.42.23.1'
+      allow(Mysql2::Client).to receive(:new).with(host: '10.42.23.1', username: 'monitoring').and_return client
+    end
+
+    it 'should get mysql status' do
+      expect(Mysql2::Client).to receive(:new).with(host: '10.42.23.1', username: 'monitoring').and_return client
+      expect(client).to receive(:query).with("SHOW STATUS")
+
+      subject.service_status
+    end
+
+    it 'should transform mysql result as hash' do
+      expect(client).to receive(:query).with("SHOW STATUS").and_return [
+        {'Variable_name' => 'some_item', 'Value' => 'some value'},
+        {'Variable_name' => 'some_other_item', 'Value' => 'some other value'},
+      ]
+      expect(subject.service_status).to eq(
+        'some_item' => 'some value',
+        'some_other_item' => 'some other value',
+      )
+    end
+
+    it 'should close the mysql client connection' do
+      expect(client).to receive(:close)
+      subject.service_status
+    end
+
+    it 'should return error with exception' do
+      allow(Mysql2::Client).to receive(:new).and_raise 'DB not connectable'
+      expect(subject.service_status).to eq(
+        error: "Failed to get db status\nRuntimeError\n\nDB not connectable",
+        key: :not_reachable,
+        severity: :critical
+      )
+    end
   end
 
   describe 'backupable?' do

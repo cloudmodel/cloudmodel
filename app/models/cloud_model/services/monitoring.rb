@@ -8,7 +8,7 @@ module CloudModel
       end
 
       def components_needed
-        ([:ruby] + super).uniq
+        ([:ruby, :lib_fcgi, :mariadb_client] + super).uniq
       end
 
       def service_status
