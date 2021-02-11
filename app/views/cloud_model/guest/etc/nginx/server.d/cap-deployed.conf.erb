@@ -1,0 +1,5 @@
+location / {
+  root /var/www/rails/current/public;
+  try_files $uri $uri/ /index.html;
+  index index.html index.htm;
+}

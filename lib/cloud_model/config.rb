@@ -16,7 +16,7 @@ module CloudModel
 
     attr_writer :host_mac_address_prefix_init
 
-    attr_writer :monitoring_notifiers
+    attr_writer :backup_hosts, :monitoring_notifiers
     attr_accessor :issue_url
 
     def initialize(&block)
@@ -104,6 +104,10 @@ module CloudModel
 
     def host_mac_address_prefix_init
       @host_mac_address_prefix_init || '00:00'
+    end
+
+    def backup_hosts
+      @backup_hosts ||= []
     end
 
     def monitoring_notifiers

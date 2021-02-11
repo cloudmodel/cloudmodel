@@ -1,0 +1,51 @@
+location <%= model.location_with_leading_slash %> {
+  alias /opt/web-app/wordpress/;
+  try_files $uri $uri/ /index.php$args =404;
+  index index.php;
+
+  location ~ \.php$ {
+    try_files $uri $uri/ =404;
+    error_page 404 /index.php;
+
+    set $skip_cache 0;
+
+    if ($query_string != "") {
+        set $skip_cache 1;
+    }
+
+    # Don't cache uris containing the following segments
+    if ($request_uri ~* "/wp-admin/|/xmlrpc.php|wp-.*.php|/feed/|index.php|sitemap(_index)?.xml") {
+        set $skip_cache 1;
+    }
+
+    # Don't use the cache if cookies includes the following
+    if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in") {
+        set $skip_cache 1;
+    }
+
+    include fastcgi.conf;
+    fastcgi_cache_valid 30s;
+    fastcgi_cache_bypass $skip_cache;
+    fastcgi_no_cache $skip_cache;
+    fastcgi_param SCRIPT_FILENAME $request_filename;
+    fastcgi_pass 127.0.0.1:9000;
+    fastcgi_index index.php;
+  }
+}
+
+location <%= model.location_with_slashes %>wp-content/ {
+  alias /var/www/wp-content/;
+}
+
+location ~ <%= model.location_with_slashes %>wp-content/.+\.php$ {
+  root /var/www/wp-content/;
+
+  fastcgi_pass 127.0.0.1:9000;
+  fastcgi_index index.php;
+  include fastcgi.conf;
+}
+
+# Prevent PHP scripts from execution in uploads
+location ~* <%= model.location_with_slashes %>wp-content/uploads/.+\.php$ {
+    deny all;
+}

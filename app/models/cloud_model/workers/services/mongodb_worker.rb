@@ -4,17 +4,17 @@ module CloudModel
       class MongodbWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           target = '/var/lib/mongodb'
-      
-          puts "        Write mongodb config"
+
+          comment_sub_step "Write mongodb config"
           @host.sftp.file.open("#{@guest.deploy_path.shellescape}/etc/mongodb.conf", 'w') do |f|
             f.write render("/cloud_model/guest/etc/mongodb.conf", guest: @guest, model: @model)
           end
         end
-      
+
         def auto_restart
           true
         end
-      
+
         def auto_start
           mkdir_p overlay_path
           render_to_remote "/cloud_model/guest/etc/systemd/system/mongodb.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"

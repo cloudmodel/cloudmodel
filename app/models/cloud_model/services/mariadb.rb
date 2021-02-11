@@ -35,7 +35,24 @@ module CloudModel
       end
 
       def backup
-        # ToDo: mysql dump data
+        return false unless has_backups
+        timestamp = Time.now.strftime "%Y%m%d%H%M%S"
+        FileUtils.mkdir_p "#{backup_directory}/#{timestamp}"
+        command = "LC_ALL=C mysqldump -h #{guest.private_address} -P #{port} -u backup --all-databases --all-tablespaces > #{backup_directory}/#{timestamp}/dump.sql"
+
+        Rails.logger.debug command
+        Rails.logger.debug `#{command}`
+
+        if $?.success? and File.exists? "#{backup_directory}/#{timestamp}/dump.sql"
+          FileUtils.rm_f "#{backup_directory}/latest"
+          FileUtils.ln_s "#{backup_directory}/#{timestamp}", "#{backup_directory}/latest"
+          cleanup_backups
+
+          return true
+        else
+          FileUtils.rm_rf "#{backup_directory}/#{timestamp}"
+          return false
+        end
       end
 
       def restore timestamp='latest'

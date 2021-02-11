@@ -15,7 +15,7 @@ describe CloudModel::Services::Monitoring do
 
   describe 'components_needed' do
     it 'should require ruby components' do
-      expect(subject.components_needed).to eq [:ruby, :lib_fcgi, :mariadb_client]
+      expect(subject.components_needed).to eq [:ruby, :libfcgi, :mariadb_client]
     end
   end
 

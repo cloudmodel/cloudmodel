@@ -50,19 +50,9 @@ http {
 
   ignore_invalid_headers          on;
 
-<%- if model.fastcgi_supported? and not model.fastcgi_index.blank? -%>
-  index                           <%= model.fastcgi_index %> index.html;
-<%- else -%>
   index                           index.html;
-<%- end -%>
-<%- if model.passenger_supported? %>
-#  include                         passenger.conf;
-#  passenger_root /usr/lib/ruby/vendor_ruby/phusion_passenger/locations.ini;
-#  passenger_ruby /usr/bin/passenger_free_ruby;
-<% end -%>
 
   include /etc/nginx/conf.d/*.conf;
-#  include /etc/nginx/sites-enabled/*;
 <%-
   protocols = []
   protocols << :http unless model.ssl_supported? and model.ssl_only?
@@ -85,14 +75,7 @@ http {
       return                      444;
     }
 <%- else -%>
-<%- if model.passenger_supported? -%>
-    root                          <%= model.www_root %>/current/public;
-    rails_env                     <%= model.passenger_env %>;
-    passenger_enabled             on;
-    passenger_min_instances       3;
-<%- else -%>
-    root                          <%= model.www_root %>/current/public;
-<%- end -%>
+    root                          <%= model.www_root %>/current/public/;
 
     add_header Referrer-Policy "no-referrer" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -123,45 +106,6 @@ http {
     # Some version of IE 6 don't handle compression well on some mime-types, so just disable them
     gzip_disable                  "MSIE [1-6].(?!.*SV1)";
 
-    location ~ ^/assets/ {
-      expires                     max;
-      add_header                  Cache-Control public;
-      access_log                  off;
-    }
-<%- unless model.passenger_supported? -%>
-
-    location / {
-      <%- if model.fastcgi_supported? and not model.fastcgi_index.blank? -%>
-      try_files                   $uri $uri/ /<%= model.fastcgi_index %>;
-      <%- else -%>
-      try_files                   $uri $uri/ /index.html;
-      <%- end -%>
-    }
-<%- end -%>
-<%- if model.fastcgi_supported? -%>
-
-    location ~ <%= model.fastcgi_location %> {
-      fastcgi_pass <%= model.fastcgi_pass %>;
-      fastcgi_index <%= model.fastcgi_index %>;
-      include fastcgi.conf;
-    }
-<%- end -%>
-
-    location = /robots.txt {
-      allow all;
-      log_not_found off;
-      access_log off;
-    }
-
-    location /nginx_status {
-      stub_status                 on;
-      access_log                  off;
-      allow                       <%= model.host.private_network.ip %>/16;
-      deny all;
-    }
-
-    include /etc/nginx/server.d/*;
-
 <%- if protocol == :https -%>
     <%- if model.ssl_enforce? or model.ssl_only? -%>
     add_header                    Strict-Transport-Security max-age=63072000;
@@ -183,11 +127,22 @@ http {
     resolver                      8.8.4.4 8.8.8.8 valid=300s;
     resolver_timeout              10s;
     ssl_session_cache             shared:SSL:10m;
-<%- if model.passenger_supported? -%>
 
-    passenger_env_var             HTTP_X_FORWARDED_PROTO https;
 <%- end -%>
-<%- end -%>
+    location = /robots.txt {
+      allow all;
+      log_not_found off;
+      access_log off;
+    }
+
+    location /nginx_status {
+      stub_status                 on;
+      access_log                  off;
+      allow                       <%= model.host.private_network.ip %>/16;
+      deny all;
+    }
+
+    include /etc/nginx/server.d/*;
 <%- end -%>
   }
 <%- end -%>

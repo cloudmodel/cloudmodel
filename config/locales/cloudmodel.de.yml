@@ -132,9 +132,33 @@ de:
       cloud_model/solr_image:
         one: SOLR-Paket
         other: SOLR-Pakete
+      cloud_model/web_app:
+        one: Webanwendung
+        other: Webanwendungen
       cloud_model/web_image:
         one: Webpaket
         other: Webpakete
+      cloud_model/web_location:
+        one: Web Anwendungsverzeichnis
+        other: Web Anwendungsverzeichnise
+      cloud_model/web_app:
+        one: Webanwendung
+        other: Webanwendungen
+      cloud_model/web_apps/static_web_app:
+        one: Statische Seiten
+        other: Statische Seiten
+      cloud_model/web_apps/php_web_app:
+        one: PHP Anwendung
+        other: PHP Anwendungen
+      cloud_model/web_apps/nextcloud_web_app:
+        one: Nextcloud Anwendung
+        other: Nextcloud Anwendungen
+      cloud_model/web_apps/roundcubemail_web_app:
+        one: RoundCube Webmail Anwendung
+        other: RoundCube Webmail Anwendungen
+      cloud_model/web_apps/wordpress_web_app:
+        one: WordPress Anwendung
+        other: WordPress Anwendungen
       cloud_model/war_image:
         one: WAR-Paket
         other: WAR-Pakete
@@ -378,6 +402,43 @@ de:
         build_last_issue: Letztes Problem bei der Erstellung
         redeploy_state: Ausrollstatus
         redeploy_last_issue: Letztes Problem beim Ausrollen
+      cloud_model/web_location:
+        location: Webpfad
+        web_app: Webanwendung
+        web_app_id: Webanwendung
+      cloud_model/web_app:
+        name: Webanwendungsname
+        needed_components: Benötigte Komponenten
+        _type: Webanwendungsart
+      cloud_model/web_apps/nextcloud_web_app:
+        mysql_host: Datenbankhost
+        mysql_port: Datenbankport
+        mysql_user: Datenbanknutzer
+        mysql_passwd: Datenbankkennwort
+        mysql_database: Datenbankname
+        nextcloud_instanceid: Nextcloud-Instanz-ID
+      cloud_model/web_apps/roundcubemail_web_app:
+        rcm_product_name: Produktname
+        rcm_support_url: Support-URL
+        rcm_plugins: RoundCube-Plugins
+        rcm_skin: RoundCube-Oberfläche
+        mysql_host: Datenbankhost
+        mysql_port: Datenbankport
+        mysql_user: Datenbanknutzer
+        mysql_passwd: Datenbankkennwort
+        mysql_database: Datenbankname
+        imap_host: IMAP-Host
+        imap_port: IMAP-Port
+        smtp_host: SMTP-Host
+        smtp_port: SMTP-Port
+        smtp_user: SMTP-Benutzer
+        smtp_passwd: SMTP-Kennwort
+      cloud_model/web_apps/wordpress_web_app:
+        mysql_host: Datenbankhost
+        mysql_port: Datenbankport
+        mysql_user: Datenbanknutzer
+        mysql_passwd: Datenbankkennwort
+        mysql_database: Datenbankname
       cloud_model/war_image:
         name: Name
         file: WAR Image Datei
@@ -427,16 +488,12 @@ de:
         ssl_cert: SSL Zertifikat
         ssl_certbot: Let's Encrypt Zertifikat nutzen
 
+        web_locations: Anwendungsverzeichnisse
+
         passenger: Passenger/Rack Dienst
         passenger_supported: Rack unterstützen
         passenger_env: Rails-Umgebung
         delayed_jobs_supported: "Delayed::Job Service unterstützen"
-
-        fastcgi: FastCGI/PHP-FPM
-        fastcgi_supported: FastCGI/PHP-FPM unterstützen
-        fastcgi_location: FastCGI Regel
-        fastcgi_pass: FastCGI Pass
-        fastcgi_index: FastCGI Index
 
         deployment: Projekt deployen
         capistrano_supported: Capistrano unterstützen
