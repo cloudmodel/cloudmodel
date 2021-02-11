@@ -1,0 +1,5 @@
+location <%= model.location_with_leading_slash %> {
+  alias /var/www/static/current/;
+  try_files $uri $uri/ /404.html =404;
+  index index.html index.htm;
+}

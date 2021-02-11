@@ -88,6 +88,7 @@ module CloudModel
       end
 
       def start_lxd_container
+        cleanup_chroot guest.deploy_path
         @lxc.unmount
         guest.update_attributes deploy_state: :booting
         guest.stop
@@ -99,10 +100,12 @@ module CloudModel
         guest.deploy_path = "#{@lxc.mountpoint}/rootfs"
 
         guest.services.each do |service|
+          comment_sub_step "#{service.class.model_name.element.camelcase} '#{service.name}'"
+          increase_indent
           begin
-            puts "      #{service.class.model_name.element.camelcase} '#{service.name}'"
             service_worker_class = "CloudModel::Workers::Services::#{service.class.model_name.element.camelcase}Worker".constantize
             service_worker = service_worker_class.new guest, service
+            service_worker.set_indent current_indent
 
             service_worker.write_config
             service_worker.auto_start
@@ -110,6 +113,7 @@ module CloudModel
             CloudModel.log_exception e
             raise "Failed to configure service #{service.class.model_name.element.camelcase} '#{service.name}'"
           end
+          decrease_indent
         end
         mkdir_p "#{guest.deploy_path}/usr/share/cloud_model/"
         render_to_remote "/cloud_model/guest/usr/share/cloud_model/fix_permissions.sh", "#{guest.deploy_path}/usr/share/cloud_model/fix_permissions.sh", 0755, guest: guest
@@ -151,9 +155,9 @@ module CloudModel
       end
 
       def config_firewall
-        puts "    Configure Firewall"
+        comment_sub_step "Configure Firewall"
         CloudModel::Workers::FirewallWorker.new(host).write_scripts
-        puts "      Restart Firewall"
+        comment_sub_step "Restart Firewall"
         host.exec! "/etc/cloud_model/firewall_stop && /etc/cloud_model/firewall_start", "Failed to restart Firewall!"
       end
 
@@ -191,7 +195,13 @@ module CloudModel
          #  ['Write boot config and reboot', :boot_deploy_root],
         ]
 
-        run_steps :deploy, steps, options
+        begin
+          run_steps :deploy, steps, options
+        rescue Exception => e
+          cleanup_chroot guest.deploy_path
+          @lxc.unmount unless @lxc.blank?
+          raise e
+        end
 
         #guest.update_attributes deploy_state: :finished
         guest.collection.update_one({_id:  guest.id}, '$set' => { 'deploy_state_id': 0xf0, 'last_deploy_finished_at': Time.now })

@@ -129,9 +129,33 @@ en:
       cloud_model/guest_template_type:
         one: Guest Template Type
         other: Guest Template Types
+      cloud_model/web_app:
+        one: Web Application
+        other: Web Applications
       cloud_model/web_image:
         one: Web Image
         other: Web Images
+      cloud_model/web_location:
+        one: Web Application Location
+        other: Web Application Locations
+      cloud_model/web_app:
+        one: Web Application
+        other: Web Applications
+      cloud_model/web_apps/static_web_app:
+        one: Static Pages
+        other: Static Pages
+      cloud_model/web_apps/php_web_app:
+        one: PHP Application
+        other: PHP Applications
+      cloud_model/web_apps/nextcloud_web_app:
+        one: Nextcloud Application
+        other: Nextcloud Applications
+      cloud_model/web_apps/roundcubemail_web_app:
+        one: RoundCube Webmail Application
+        other: RoundCube Webmail Applications
+      cloud_model/web_apps/wordpress_web_app:
+        one: WordPress Application
+        other: WordPress Applications
       cloud_model/solr_image:
         one: SOLR Image
         other: SOLR Images
@@ -377,6 +401,43 @@ en:
         build_last_issue: Last Build Issue
         redeploy_state: Redeploy State
         redeploy_last_issue: Last Redeploy Issue
+      cloud_model/web_location:
+        location: Web Path
+        web_app: Web Application
+        web_app_id: Web Application
+      cloud_model/web_app:
+        name: Web App Name
+        needed_components: Needed Components
+        _type: Web App Type
+      cloud_model/web_apps/nextcloud_web_app:
+        mysql_host: Database Host
+        mysql_port: Database Port
+        mysql_user: Database User
+        mysql_passwd: Database Password
+        mysql_database: Database Name
+        nextcloud_instanceid: Nextcloud Instance ID
+      cloud_model/web_apps/roundcubemail_web_app:
+        rcm_product_name: Product Name
+        rcm_support_url: Support URL
+        rcm_plugins: RoundCube Plugins
+        rcm_skin: RoundCube Skin
+        mysql_host: Database Host
+        mysql_port: Database Port
+        mysql_user: Database User
+        mysql_passwd: Database Password
+        mysql_database: Database Name
+        imap_host: IMAP Host
+        imap_port: IMAP Port
+        smtp_host: SMTP Host
+        smtp_port: SMTP Port
+        smtp_user: SMTP User
+        smtp_passwd: SMTP Password
+      cloud_model/web_apps/wordpress_web_app:
+        mysql_host: Database Host
+        mysql_port: Database Port
+        mysql_user: Database User
+        mysql_passwd: Database Password
+        mysql_database: Database Name
       cloud_model/war_image:
         name: Name
         file: WAR Image File
@@ -426,16 +487,12 @@ en:
         ssl_cert: SSL Certificate
         ssl_certbot: Use Let's Encrypt Certificate?
 
+        web_locations: Application Locations
+
         passenger: Passenger/Rack Server
         passenger_supported: Support Rack Server?
         passenger_env: Rails Environment
         delayed_jobs_supported: "Support Delayed::Job Service?"
-
-        fastcgi: FastCGI/PHP-FPM
-        fastcgi_supported: Support FastCGI/PHP-FPM?
-        fastcgi_location: FastCGI Location Rule
-        fastcgi_pass: FastCGI Pass
-        fastcgi_index: FastCGI Index
 
         deployment: Project Deployment
         capistrano_supported: Support Capistrano?

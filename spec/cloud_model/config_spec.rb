@@ -204,6 +204,20 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'backup_hosts' do
+    it 'should allow to set backup hosts' do
+      subject.backup_hosts = %w(10.42.23.1 10.42.23.129)
+      expect(subject.backup_hosts).to eq [
+        '10.42.23.1',
+        '10.42.23.129'
+      ]
+    end
+
+    it 'should default to empty array' do
+      expect(subject.backup_hosts).to eq []
+    end
+  end
+
   describe 'monitoring_notifiers' do
     it 'should allow to set notifiers to be called on new issues' do
       notifier = CloudModel::Notifiers::SlackNotifier.new(push_url: 'https://hooks.slack.com/services/ABC/DEF/1233cc2')

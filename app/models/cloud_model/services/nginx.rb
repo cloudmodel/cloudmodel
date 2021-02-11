@@ -15,12 +15,15 @@ module CloudModel
       field :passenger_env, type: String, default: 'production'
       field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
 
-      field :fastcgi_supported, type: Mongoid::Boolean, default: false
-      field :fastcgi_location, type: String, default: ".php$"
-      field :fastcgi_pass, type: String, default: "127.0.0.1:9000"
-      field :fastcgi_index, type: String, default: "index.php"
+      # field :fastcgi_supported, type: Mongoid::Boolean, default: false
+      # field :fastcgi_location, type: String, default: ".php$"
+      # field :fastcgi_pass, type: String, default: "127.0.0.1:9000"
+      # field :fastcgi_index, type: String, default: "index.php"
 
       field :capistrano_supported, type: Mongoid::Boolean, default: false
+
+      embeds_many :web_locations, class_name: 'CloudModel::WebLocation', inverse_of: :service
+      accepts_nested_attributes_for :web_locations
 
       belongs_to :deploy_web_image, class_name: 'CloudModel::WebImage', inverse_of: :services, optional: true
 
@@ -53,14 +56,20 @@ module CloudModel
       end
 
       def components_needed
+        components = [:nginx]
+
+        web_locations.each do |loc|
+          components = loc.web_app.needed_components + components
+        end
+
         if passenger_supported or capistrano_supported
-          components = [:ruby, :nginx]
+          components = [:ruby] + components
           if deploy_web_image
             components += deploy_web_image.additional_components.map &:to_sym
           end
           (components + super).uniq
         else
-          ([:nginx] + super).uniq
+          (components + super).uniq
         end
       end
 

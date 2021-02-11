@@ -1,0 +1,299 @@
+<?php
+$CONFIG = array (
+  'instanceid' => 'oc8c0fd71e03',
+  'passwordsalt' => '515a13302a6b3950a9d0fdb970191a',
+  'trusted_domains' =>
+  array (
+    0 => 'localhost',
+    1 => 'studio',
+    2 => '192.168.10.155'
+  ),
+  'datadirectory' => '/var/www/nextcloud/data',
+  'dbtype' => 'mysql',
+  'version' => '7.0.2.1',
+  'dbname' => '<%= model.mysql_database %>',
+  'dbhost' => '<%= model.mysql_host %>',
+  'dbtableprefix' => 'oc_',
+  'dbuser' => '<%= model.mysql_user %>',
+  'dbpassword' => '<%= model.mysql_passwd %>',
+  'installed' => true,
+
+  'default_language' => 'en',
+  'defaultapp' => 'files',
+  'knowledgebaseenabled' => true,
+  'enable_avatars' => true,
+  'allow_user_to_change_display_name' => true,
+  'session_lifetime' => 60 * 60 * 24, // 15 days
+  'session_keepalive' => true,
+  'token_auth_enforced' => false,
+  'auth.bruteforce.protection.enabled' => true,
+  'skeletondirectory' => '/path/to/nextcloud/core/skeleton', // empty for no skeleton
+
+  // 'user_backends' => array(
+  //         array(
+  //                 'class' => 'OC_User_IMAP',
+  //                 'arguments' => array('{imap.gmail.com:993/imap/ssl}INBOX')
+  //         )
+  // ),
+  //'lost_password_link' => 'https://example.org/link/to/password/reset',
+
+  // Mail Configurations
+
+  'mail_domain' => 'example.com',
+  'mail_from_address' => 'nextcloud',
+  'mail_smtpdebug' => false,
+  'mail_smtpmode' => 'php',
+  'mail_smtphost' => '127.0.0.1',
+  'mail_smtpport' => 25,
+  'mail_smtptimeout' => 10,
+  'mail_smtpsecure' => '',
+  'mail_smtpauth' => false,
+  'mail_smtpauthtype' => 'LOGIN',
+  'mail_smtpname' => '',
+  'mail_smtppassword' => '',
+
+  // Proxy Configurations
+  // 'overwritehost' => '',
+  // 'overwriteprotocol' => '',
+  // 'overwritewebroot' => '',
+  // 'overwritecondaddr' => '',
+  // 'overwrite.cli.url' => '',
+  // 'htaccess.RewriteBase' => '/',
+  // 'htaccess.IgnoreFrontController' => false,
+  // 'proxy' => '',
+  // 'proxyuserpwd' => '',
+
+  'trashbin_retention_obligation' => 'auto',
+  'versions_retention_obligation' => 'auto',
+
+  // Nextcloud Verifications
+
+  'appcodechecker' => true,
+  'updatechecker' => true,
+  'updater.server.url' => 'https://updates.nextcloud.com/updater_server/',
+  'updater.release.channel' => 'stable',
+  'has_internet_connection' => true,
+  'check_for_working_webdav' => true,
+  'check_for_working_wellknown_setup' => true,
+  'check_for_working_htaccess' => true,
+  'config_is_read_only' => false,
+
+  // Logging
+
+  // 'log_type' => 'file',
+  // 'logfile' => '/var/log/nextcloud.log',
+  // 'loglevel' => 2,
+  // 'syslog_tag' => 'Nextcloud',
+  // 'log.condition' => [
+  //         'shared_secret' => '57b58edb6637fe3059b3595cf9c41b9',
+  //         'users' => ['sample-user'],
+  //         'apps' => ['files'],
+  // ],
+  // 'logdateformat' => 'F d, Y H:i:s',
+  // 'logtimezone' => 'Europe/Berlin',
+  // 'log_query' => false,
+  // 'cron_log' => true,
+  // 'log_rotate_size' => false,
+
+  // Alternate Code Locations
+
+  // 'customclient_desktop' =>
+  //         'https://nextcloud.com/install/#install-clients',
+  // 'customclient_android' =>
+  //         'https://play.google.com/store/apps/details?id=com.nextcloud.client',
+  // 'customclient_ios' =>
+  //         'https://itunes.apple.com/us/app/nextcloud/id1125420102?mt=8',
+
+  // Apps
+
+  'appstoreenabled' => true,
+  // 'apps_paths' => array(
+  //         array(
+  //                 'path'=> '/var/www/nextcloud/apps',
+  //                 'url' => '/apps',
+  //                 'writable' => true,
+  //         ),
+  // ),
+  'appcodechecker' => true,
+
+  // Previews
+
+  'enable_previews' => true,
+  'preview_max_x' => 2048,
+  'preview_max_y' => 2048,
+  'preview_max_scale_factor' => 10,
+  'preview_max_filesize_image' => 50,
+  'preview_libreoffice_path' => '/usr/bin/libreoffice',
+
+  'preview_office_cl_parameters' =>
+          ' --headless --nologo --nofirststartwizard --invisible --norestore '.
+          '--convert-to pdf --outdir ',
+
+  'enabledPreviewProviders' => array(
+          'OC\Preview\PNG',
+          'OC\Preview\JPEG',
+          'OC\Preview\GIF',
+          'OC\Preview\BMP',
+          'OC\Preview\XBitmap',
+          'OC\Preview\MP3',
+          'OC\Preview\TXT',
+          'OC\Preview\MarkDown'
+  ),
+  /*
+  The following providers are enabled by default:
+
+  OC\Preview\PNG
+  OC\Preview\JPEG
+  OC\Preview\GIF
+  OC\Preview\BMP
+  OC\Preview\XBitmap
+  OC\Preview\MarkDown
+  OC\Preview\MP3
+  OC\Preview\TXT
+  The following providers are disabled by default due to performance or privacy concerns:
+
+  OC\Preview\Illustrator
+  OC\Preview\Movie
+  OC\Preview\MSOffice2003
+  OC\Preview\MSOffice2007
+  OC\Preview\MSOfficeDoc
+  OC\Preview\OpenDocument
+  OC\Preview\PDF
+  OC\Preview\Photoshop
+  OC\Preview\Postscript
+  OC\Preview\StarOffice
+  OC\Preview\SVG
+  OC\Preview\TIFF
+  OC\Preview\Font
+  */
+
+
+  //LDAP
+
+  // 'ldapUserCleanupInterval' => 51,
+
+  // Comments
+
+  // 'comments.managerFactory' => '\OC\Comments\ManagerFactory',
+  // 'systemtags.managerFactory' => '\OC\SystemTag\ManagerFactory',
+
+  // Maintenance
+
+  // 'maintenance' => false,
+  // 'singleuser' => false,
+
+  // SSL
+
+  // 'openssl' => array(
+  //         'config' => '/absolute/location/of/openssl.cnf',
+  // ),
+
+  // Memory caching backend configuration
+
+  /*
+  Available cache backends:
+
+  \OC\Memcache\APC Alternative PHP Cache backend
+  \OC\Memcache\APCu APC user backend
+  \OC\Memcache\ArrayCache In-memory array-based backend (not recommended)
+  \OC\Memcache\Memcached Memcached backend
+  \OC\Memcache\Redis Redis backend
+  \OC\Memcache\XCache XCache backend
+  */
+  'memcache.local' => '\OC\Memcache\APCu',
+  // 'memcache.distributed' => '\OC\Memcache\Memcached',
+  // 'redis' => array(
+  //         'host' => 'localhost', // can also be a unix domain socket: '/tmp/redis.sock'
+  //         'port' => 6379,
+  //         'timeout' => 0.0,
+  //         'password' => '', // Optional, if not defined no password will be used.
+  //         'dbindex' => 0, // Optional, if undefined SELECT will not run and will use Redis Server's default DB Index.
+  // ),
+  // 'memcached_servers' => array(
+  //         // hostname, port and optional weight. Also see:
+  //         // http://www.php.net/manual/en/memcached.addservers.php
+  //         // http://www.php.net/manual/en/memcached.addserver.php
+  //         array('localhost', 11211),
+  //         //array('other.host.local', 11211),
+  // ),
+  // 'memcached_options' => array(
+  //         // Set timeouts to 50ms
+  //         \Memcached::OPT_CONNECT_TIMEOUT => 50,
+  //         \Memcached::OPT_RETRY_TIMEOUT =>   50,
+  //         \Memcached::OPT_SEND_TIMEOUT =>    50,
+  //         \Memcached::OPT_RECV_TIMEOUT =>    50,
+  //         \Memcached::OPT_POLL_TIMEOUT =>    50,
+  //
+  //         // Enable compression
+  //         \Memcached::OPT_COMPRESSION =>          true,
+  //
+  //         // Turn on consistent hashing
+  //         \Memcached::OPT_LIBKETAMA_COMPATIBLE => true,
+  //
+  //         // Enable Binary Protocol
+  //         \Memcached::OPT_BINARY_PROTOCOL =>      true,
+  //
+  //         // Binary serializer vill be enabled if the igbinary PECL module is available
+  //         //\Memcached::OPT_SERIALIZER => \Memcached::SERIALIZER_IGBINARY,
+  // ),
+  //
+  // 'cache_path' => '',
+  // 'cache_chunk_gc_ttl' => 86400, // 60*60*24 = 1 day
+
+  // Using Object Store
+
+  // 'objectstore' => [
+  //         'class' => 'OC\\Files\\ObjectStore\\Swift',
+  //         'arguments' => [
+  //                 // trystack will user your facebook id as the user name
+  //                 'username' => 'facebook100000123456789',
+  //                 // in the trystack dashboard go to user -> settings -> API Password to
+  //                 // generate a password
+  //                 'password' => 'Secr3tPaSSWoRdt7',
+  //                 // must already exist in the objectstore, name can be different
+  //                 'container' => 'nextcloud',
+  //                 // prefix to prepend to the fileid, default is 'oid:urn:'
+  //                 'objectPrefix' => 'oid:urn:',
+  //                 // create the container if it does not exist. default is false
+  //                 'autocreate' => true,
+  //                 // required, dev-/trystack defaults to 'RegionOne'
+  //                 'region' => 'RegionOne',
+  //                 // The Identity / Keystone endpoint
+  //                 'url' => 'http://8.21.28.222:5000/v2.0',
+  //                 // required on dev-/trystack
+  //                 'tenantName' => 'facebook100000123456789',
+  //                 // dev-/trystack uses swift by default, the lib defaults to 'cloudFiles'
+  //                 // if omitted
+  //                 'serviceName' => 'swift',
+  //                 // The Interface / url Type, optional
+  //                 'urlType' => 'internal'
+  //         ],
+  // ],
+
+  // Sharing
+
+  // 'sharing.managerFactory' => '\OC\Share20\ProviderFactory',
+  // 'sharing.maxAutocompleteResults' => 0,
+  // 'sharing.minSearchStringLength' => 0,
+
+  // Other
+
+  // 'dbdriveroptions' => array(
+  //         PDO::MYSQL_ATTR_SSL_CA => '/file/path/to/ca_cert.pem',
+  //         PDO::MYSQL_ATTR_INIT_COMMAND => 'SET wait_timeout = 28800'
+  // ),
+  // 'sqlite.journal_mode' => 'DELETE',
+  // 'mysql.utf8mb4' => false,
+  // 'supportedDatabases' => array(
+  //         'sqlite',
+  //         'mysql',
+  //         'pgsql',
+  //         'oci',
+  // ),
+  // 'tempdirectory' => '/tmp/nextcloudtemp',
+  // 'hashingCost' => 10,
+  // 'blacklisted_files' => array('.htaccess'),
+üüü
+
+);
+?>

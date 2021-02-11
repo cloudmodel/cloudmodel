@@ -1,0 +1,4 @@
+CREATE DATABASE roundcubemail CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE USER '<%= model.mysql_user %>'@'localhost' IDENTIFIED BY '<%= model.mysql_passwd %>';
+GRANT ALL PRIVILEGES ON <%= model.mysql_database %>.* TO '<%= model.mysql_user %>'@'localhost';
+FLUSH PRIVILEGES;

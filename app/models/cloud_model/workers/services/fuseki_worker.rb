@@ -3,6 +3,7 @@ module CloudModel
     module Services
       class FusekiWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
+          comment_sub_step "Write Fuseki config"
           install_path = "#{@guest.deploy_path}/opt"
           config_path = "#{@guest.deploy_path}/etc/fuseki"
 

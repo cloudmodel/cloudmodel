@@ -1,0 +1,19 @@
+<%- location = '/' %>
+#passenger_enabled           on;
+
+location <%= location %> {
+  root                        <%= model.www_root %>/current/public;
+  passenger_base_uri          <%= location %>;
+  passenger_app_root          <%= model.www_root %>/current;
+  passenger_document_root     <%= model.www_root %>/current/public;
+  passenger_enabled           on;
+  passenger_min_instances     3;
+  passenger_env_var           HTTP_X_FORWARDED_PROTO $scheme;
+  passenger_app_env           <%= model.passenger_env %>;
+
+  location ~ ^/assets/ {
+    expires                   max;
+    add_header                Cache-Control public;
+    access_log                off;
+  }
+}
