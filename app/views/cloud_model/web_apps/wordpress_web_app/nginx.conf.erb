@@ -6,7 +6,7 @@ location <%= model.location_with_leading_slash %> {
 
   if (!-e $request_filename)
   {
-    rewrite ^(.+)$ <%= model.location_with_leading_slash %>/index.php?q=$1 last;
+    rewrite ^(.+)$ <%= model.location_with_slashes %>index.php?q=$1 last;
   }
 
   index index.php;
@@ -14,7 +14,7 @@ location <%= model.location_with_leading_slash %> {
   location ~ \.php$ {
     if (!-e $request_filename)
     {
-      rewrite ^(.+)$ <%= model.location_with_leading_slash %>/index.php?q=$1 last;
+      rewrite ^(.+)$ <%= model.location_with_slashes %>index.php?q=$1 last;
     }
 
     set $skip_cache 0;
