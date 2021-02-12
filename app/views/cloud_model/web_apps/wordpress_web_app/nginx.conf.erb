@@ -1,11 +1,21 @@
 location <%= model.location_with_leading_slash %> {
   alias /opt/web-app/wordpress/;
-  try_files $uri $uri/ /index.php$args =404;
+  if (!-f $request_filename) {
+    rewrite [^/]$ $uri/ permanent;
+  }
+
+  if (!-e $request_filename)
+  {
+    rewrite ^(.+)$ <%= model.location_with_leading_slash %>/index.php?q=$1 last;
+  }
+
   index index.php;
 
   location ~ \.php$ {
-    try_files $uri $uri/ =404;
-    error_page 404 /index.php;
+    if (!-e $request_filename)
+    {
+      rewrite ^(.+)$ <%= model.location_with_leading_slash %>/index.php?q=$1 last;
+    }
 
     set $skip_cache 0;
 
@@ -49,3 +59,4 @@ location ~ <%= model.location_with_slashes %>wp-content/.+\.php$ {
 location ~* <%= model.location_with_slashes %>wp-content/uploads/.+\.php$ {
     deny all;
 }
+
