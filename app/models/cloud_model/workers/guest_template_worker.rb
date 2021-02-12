@@ -27,7 +27,10 @@ module CloudModel
         comment_sub_step 'Install nano editor'
         chroot! build_path, "apt-get install sudo nano -y", "Failed to install nano"
 
-        comment_sub_step 'Configre autologin'
+        comment_sub_step 'Install msmtp mailer'
+        chroot! build_path, "apt-get install sudo msmtp msmtp-mta mailutils -y", "Failed to install msmtp"
+
+        comment_sub_step 'Configure autologin'
         # Autologin
         mkdir_p "#{build_path}/etc/systemd/system/console-getty.service.d"
         render_to_remote "/cloud_model/guest/etc/systemd/system/console-getty.service.d/autologin.conf", "#{build_path}/etc/systemd/system/console-getty.service.d/autologin.conf"

@@ -1,0 +1,1 @@
+sendmail_path = msmtp --host <%= guest.host.private_address %> --domain <%= CloudModel.config.email_domain %> --from <%= CloudModel.config.admin_email %> -t -i

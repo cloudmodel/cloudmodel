@@ -111,6 +111,10 @@ module CloudModel
             service_worker.auto_start
           rescue Exception => e
             CloudModel.log_exception e
+
+            puts e
+            puts e.backtrace
+
             raise "Failed to configure service #{service.class.model_name.element.camelcase} '#{service.name}'"
           end
           decrease_indent
@@ -152,6 +156,8 @@ module CloudModel
         chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.socket /etc/systemd/system/sockets.target.wants/systemd-networkd.socket"
         mkdir_p "#{guest.deploy_path}/etc/systemd/system/network-online.target.wants"
         chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd-wait-online.service /etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service"
+        # config mail out
+        render_to_remote "/cloud_model/guest/etc/msmtprc", "#{guest.deploy_path}/etc/msmtprc", guest: guest
       end
 
       def config_firewall
