@@ -3,6 +3,7 @@ module CloudModel
     class Phpfpm < Base
       field :port, type: Integer, default: 9000
       field :php_components, type: Array, default: []
+      field :php_upload_max_filesize, type: Integer, default: 2 # Size in M
 
       def kind
         :phpfpm

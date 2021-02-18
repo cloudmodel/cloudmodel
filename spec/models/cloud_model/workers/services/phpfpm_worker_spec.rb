@@ -6,6 +6,10 @@ describe CloudModel::Workers::Services::PhpfpmWorker do
   let(:model) {double CloudModel::Services::Phpfpm}
   subject {CloudModel::Workers::Services::PhpfpmWorker.new guest, model}
 
+  describe 'patch_php_ini' do
+    pending
+  end
+
   describe 'write_config' do
     pending
   end
