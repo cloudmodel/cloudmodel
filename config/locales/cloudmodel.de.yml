@@ -473,6 +473,7 @@ de:
       cloud_model/services/phpfpm:
         php_options: PHP Optionen
         php_components: PHP Module
+        php_upload_max_filesize: Max. Dateigröße für Uploads in MB
       cloud_model/services/redis:
         redis_sentinel_set: Replikationset
         redis_sentinel_port: Replikationsport

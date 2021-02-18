@@ -7,6 +7,7 @@ describe CloudModel::Services::Phpfpm do
 
   it { expect(subject).to have_field(:port).of_type(Integer).with_default_value_of 9000 }
   it { expect(subject).to have_field(:php_components).of_type(Array).with_default_value_of [] }
+  it { expect(subject).to have_field(:php_upload_max_filesize).of_type(Integer).with_default_value_of 2 }
 
   describe 'kind' do
     it 'should return :phpfpm' do
