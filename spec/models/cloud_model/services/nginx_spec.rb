@@ -24,6 +24,8 @@ describe CloudModel::Services::Nginx do
 
   it { expect(subject).to have_field(:capistrano_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
 
+  it { expect(subject).to have_field(:google_analytics_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
+
   it { expect(subject).to embed_many(:web_locations).of_type(CloudModel::WebLocation).as_inverse_of(:service) }
   it { expect(subject).to accept_nested_attributes_for(:web_locations) }
 
@@ -137,6 +139,17 @@ describe CloudModel::Services::Nginx do
 
   describe 'worker' do
     pending
+  end
+
+  describe 'content_security_policy' do
+    it 'should restrict scripts source to self' do
+      expect(subject.content_security_policy).to eq "script-src 'self';"
+    end
+
+    it 'should restrict scripts source to self and google analytics, if google analytics is supported' do
+      subject.google_analytics_supported = true
+      expect(subject.content_security_policy).to eq "script-src 'self https://www.google-analytics.com https://ssl.google-analytics.com';"
+    end
   end
 
   describe 'redeploy' do

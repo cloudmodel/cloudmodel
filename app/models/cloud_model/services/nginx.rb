@@ -22,6 +22,8 @@ module CloudModel
 
       field :capistrano_supported, type: Mongoid::Boolean, default: false
 
+      field :google_analytics_supported, type: Mongoid::Boolean, default: false
+
       embeds_many :web_locations, class_name: 'CloudModel::WebLocation', inverse_of: :service
       accepts_nested_attributes_for :web_locations
 
@@ -185,6 +187,14 @@ module CloudModel
 
       def worker
         CloudModel::Workers::Services::NginxWorker.new self.guest, self
+      end
+
+      def content_security_policy
+        if google_analytics_supported?
+          "script-src 'self https://www.google-analytics.com https://ssl.google-analytics.com';"
+        else
+          "script-src 'self';"
+        end
       end
 
       def redeploy(options = {})
