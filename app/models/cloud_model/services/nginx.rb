@@ -191,9 +191,9 @@ module CloudModel
 
       def content_security_policy
         if google_analytics_supported?
-          "script-src 'self https://www.google-analytics.com https://ssl.google-analytics.com';"
+          "script-src 'self' https://www.google-analytics.com https://ssl.google-analytics.com 'unsafe-inline';"
         else
-          "script-src 'self';"
+          "script-src 'self' 'unsafe-inline';"
         end
       end
 
