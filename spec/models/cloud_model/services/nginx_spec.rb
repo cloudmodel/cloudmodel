@@ -143,12 +143,12 @@ describe CloudModel::Services::Nginx do
 
   describe 'content_security_policy' do
     it 'should restrict scripts source to self' do
-      expect(subject.content_security_policy).to eq "script-src 'self';"
+      expect(subject.content_security_policy).to eq "script-src 'self' 'unsafe-inline';"
     end
 
     it 'should restrict scripts source to self and google analytics, if google analytics is supported' do
       subject.google_analytics_supported = true
-      expect(subject.content_security_policy).to eq "script-src 'self https://www.google-analytics.com https://ssl.google-analytics.com';"
+      expect(subject.content_security_policy).to eq "script-src 'self' https://www.google-analytics.com https://ssl.google-analytics.com 'unsafe-inline';"
     end
   end
 
