@@ -488,6 +488,8 @@ en:
         ssl_cert: SSL Certificate
         ssl_certbot: Use Let's Encrypt Certificate?
 
+        google_analytics_supported: Support Google Analytics?
+
         web_locations: Application Locations
 
         passenger: Passenger/Rack Server

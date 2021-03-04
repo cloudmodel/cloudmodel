@@ -489,6 +489,8 @@ de:
         ssl_cert: SSL Zertifikat
         ssl_certbot: Let's Encrypt Zertifikat nutzen
 
+        google_analytics_supported: Google Analytics unterstützen
+
         web_locations: Anwendungsverzeichnisse
 
         passenger: Passenger/Rack Dienst
