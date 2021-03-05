@@ -200,7 +200,7 @@ module CloudModel
         end
 
         if hubspot_forms_supported?
-          policies['script-src'] << "https://js.hsforms.net"
+          policies['script-src'] += %w(https://js.hsforms.net https://forms.hsforms.com https://www.google.com https://www.gstatic.com)
         end
 
         if pingdom_supported?
@@ -211,7 +211,7 @@ module CloudModel
           policies['script-src'] << "'unsafe-inline'"
         end
 
-        "#{policies.map{|k,v| "#{k} #{v * ' '}"} * ';'};"
+        "#{policies.map{|k,v| "#{k} #{v.uniq * ' '}"} * ';'};"
       end
 
       def redeploy(options = {})
