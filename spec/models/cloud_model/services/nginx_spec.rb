@@ -24,7 +24,10 @@ describe CloudModel::Services::Nginx do
 
   it { expect(subject).to have_field(:capistrano_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
 
+  it { expect(subject).to have_field(:unsafe_inline_script_allowed).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:google_analytics_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
+  it { expect(subject).to have_field(:hubspot_forms_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
+  it { expect(subject).to have_field(:pingdom_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
 
   it { expect(subject).to embed_many(:web_locations).of_type(CloudModel::WebLocation).as_inverse_of(:service) }
   it { expect(subject).to accept_nested_attributes_for(:web_locations) }
@@ -143,10 +146,26 @@ describe CloudModel::Services::Nginx do
 
   describe 'content_security_policy' do
     it 'should restrict scripts source to self' do
-      expect(subject.content_security_policy).to eq "script-src 'self' 'unsafe-inline';"
+      expect(subject.content_security_policy).to eq "script-src 'self';"
     end
 
-    it 'should restrict scripts source to self and google analytics, if google analytics is supported' do
+    it 'should restrict scripts source to self and Google Analytics, if Google Analytics is supported' do
+      subject.google_analytics_supported = true
+      expect(subject.content_security_policy).to eq "script-src 'self' https://www.google-analytics.com https://ssl.google-analytics.com;"
+    end
+
+    it 'should restrict scripts source to self and Pingdom, if Pingdom is supported' do
+      subject.pingdom_supported = true
+      expect(subject.content_security_policy).to eq "script-src 'self' https://rum-static.pingdom.net;"
+    end
+
+    it 'should restrict scripts source to self and HubSpot forms, if HubSpot is supported' do
+      subject.hubspot_forms_supported = true
+      expect(subject.content_security_policy).to eq "script-src 'self' https://js.hsforms.net;"
+    end
+
+    it 'should restrict scripts source to self, google analytics and unsafe inline, if google analytics is supported and inline allowed' do
+      subject.unsafe_inline_script_allowed = true
       subject.google_analytics_supported = true
       expect(subject.content_security_policy).to eq "script-src 'self' https://www.google-analytics.com https://ssl.google-analytics.com 'unsafe-inline';"
     end
