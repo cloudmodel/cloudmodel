@@ -161,7 +161,7 @@ describe CloudModel::Services::Nginx do
 
     it 'should restrict scripts source to self and HubSpot forms, if HubSpot is supported' do
       subject.hubspot_forms_supported = true
-      expect(subject.content_security_policy).to eq "script-src 'self' https://js.hsforms.net;"
+      expect(subject.content_security_policy).to eq "script-src 'self' https://js.hsforms.net https://forms.hsforms.com https://www.google.com https://www.gstatic.com;"
     end
 
     it 'should restrict scripts source to self, google analytics and unsafe inline, if google analytics is supported and inline allowed' do
