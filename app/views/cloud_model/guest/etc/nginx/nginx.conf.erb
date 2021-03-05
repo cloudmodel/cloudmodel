@@ -87,7 +87,7 @@ http {
     add_header X-XSS-Protection "1; mode=block;" always;
     more_clear_headers 'Server' 'X-Powered-By' 'X-Runtime';
     add_header Content-Security-Policy "<%=raw model.content_security_policy %>" always;
-    add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()";
+    add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" always;
 
     # Remove X-Powered-By, which is an information leak
     fastcgi_hide_header X-Powered-By;
