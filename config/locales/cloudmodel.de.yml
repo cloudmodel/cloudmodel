@@ -489,7 +489,11 @@ de:
         ssl_cert: SSL Zertifikat
         ssl_certbot: Let's Encrypt Zertifikat nutzen
 
+        secure_headers: Sichere Header
+        unsafe_inline_script_allowed: Unsichere Inline-Skripte erlauben
         google_analytics_supported: Google Analytics unterstützen
+        hubspot_forms_supported: HubSpot Forms unterstützen
+        pingdom_supported: Pingdom unterstützen
 
         web_locations: Anwendungsverzeichnisse
 

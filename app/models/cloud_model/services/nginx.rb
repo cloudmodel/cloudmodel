@@ -22,7 +22,10 @@ module CloudModel
 
       field :capistrano_supported, type: Mongoid::Boolean, default: false
 
+      field :unsafe_inline_script_allowed, type: Mongoid::Boolean, default: false
       field :google_analytics_supported, type: Mongoid::Boolean, default: false
+      field :hubspot_forms_supported, type: Mongoid::Boolean, default: false
+      field :pingdom_supported, type: Mongoid::Boolean, default: false
 
       embeds_many :web_locations, class_name: 'CloudModel::WebLocation', inverse_of: :service
       accepts_nested_attributes_for :web_locations
@@ -190,11 +193,25 @@ module CloudModel
       end
 
       def content_security_policy
+        policies = {'script-src' => ["'self'"]}
+
         if google_analytics_supported?
-          "script-src 'self' https://www.google-analytics.com https://ssl.google-analytics.com 'unsafe-inline';"
-        else
-          "script-src 'self' 'unsafe-inline';"
+          policies['script-src'] += %w(https://www.google-analytics.com https://ssl.google-analytics.com)
         end
+
+        if hubspot_forms_supported?
+          policies['script-src'] << "https://js.hsforms.net"
+        end
+
+        if pingdom_supported?
+          policies['script-src'] << "https://rum-static.pingdom.net"
+        end
+
+        if unsafe_inline_script_allowed?
+          policies['script-src'] << "'unsafe-inline'"
+        end
+
+        "#{policies.map{|k,v| "#{k} #{v * ' '}"} * ';'};"
       end
 
       def redeploy(options = {})
