@@ -25,6 +25,7 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:capistrano_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
 
   it { expect(subject).to have_field(:unsafe_inline_script_allowed).of_type(Mongoid::Boolean).with_default_value_of(false) }
+  it { expect(subject).to have_field(:unsafe_eval_script_allowed).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:google_analytics_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:hubspot_forms_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:pingdom_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
@@ -162,6 +163,16 @@ describe CloudModel::Services::Nginx do
     it 'should restrict scripts source to self and HubSpot forms, if HubSpot is supported' do
       subject.hubspot_forms_supported = true
       expect(subject.content_security_policy).to eq "script-src 'self' https://js.hsforms.net https://forms.hsforms.com https://www.google.com https://www.gstatic.com;"
+    end
+
+    it 'should allow inline scripts, if configured' do
+      subject.unsafe_inline_script_allowed = true
+      expect(subject.content_security_policy).to eq "script-src 'self' 'unsafe-inline';"
+    end
+
+    it 'should allow eval scripts, if configured' do
+      subject.unsafe_eval_script_allowed = true
+      expect(subject.content_security_policy).to eq "script-src 'self' 'unsafe-eval';"
     end
 
     it 'should restrict scripts source to self, google analytics and unsafe inline, if google analytics is supported and inline allowed' do

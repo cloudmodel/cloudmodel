@@ -23,6 +23,7 @@ module CloudModel
       field :capistrano_supported, type: Mongoid::Boolean, default: false
 
       field :unsafe_inline_script_allowed, type: Mongoid::Boolean, default: false
+      field :unsafe_eval_script_allowed, type: Mongoid::Boolean, default: false
       field :google_analytics_supported, type: Mongoid::Boolean, default: false
       field :hubspot_forms_supported, type: Mongoid::Boolean, default: false
       field :pingdom_supported, type: Mongoid::Boolean, default: false
@@ -209,6 +210,10 @@ module CloudModel
 
         if unsafe_inline_script_allowed?
           policies['script-src'] << "'unsafe-inline'"
+        end
+
+        if unsafe_eval_script_allowed?
+          policies['script-src'] << "'unsafe-eval'"
         end
 
         "#{policies.map{|k,v| "#{k} #{v.uniq * ' '}"} * ';'};"
