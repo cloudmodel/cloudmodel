@@ -490,6 +490,7 @@ en:
 
         secure_headers: Secure Headers
         unsafe_inline_script_allowed: Allow unsafe inline scripts?
+        unsafe_eval_script_allowed: Allow unsafe evaluation of scripts?
         google_analytics_supported: Support Google Analytics?
         hubspot_forms_supported: Support HubSpot Forms?
         pingdom_supported: Support Pingdom?

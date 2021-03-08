@@ -491,6 +491,7 @@ de:
 
         secure_headers: Sichere Header
         unsafe_inline_script_allowed: Unsichere Inline-Skripte erlauben
+        unsafe_eval_script_allowed: Unsichere Ausführung von Skripten erlauben
         google_analytics_supported: Google Analytics unterstützen
         hubspot_forms_supported: HubSpot Forms unterstützen
         pingdom_supported: Pingdom unterstützen
