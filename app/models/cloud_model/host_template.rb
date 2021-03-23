@@ -1,4 +1,4 @@
-module CloudModel  
+module CloudModel
   class HostTemplate
     include Mongoid::Document
     include Mongoid::Timestamps
@@ -7,9 +7,9 @@ module CloudModel
 
     field :os_version, type: String
     field :arch, type: String
-    
+
     has_many :templates, class_name: "CloudModel::GuestTemplate"
-        
+
     enum_field :build_state, {
       0x00 => :pending,
       0x01 => :running,
@@ -21,27 +21,27 @@ module CloudModel
     }, default: :not_started
 
     field :build_last_issue, type: String
-  
+
     def self.buildable_build_states
       [:finished, :failed, :not_started]
     end
-    
+
     def buildable?
       self.class.buildable_build_states.include? build_state
     end
-    
+
     def self.latest_created_at
       scoped.where(build_state_id: 0xf0).max(:created_at)
     end
-    
+
     def self.new_template_to_build host
       CloudModel::HostTemplate.create arch: host.arch
     end
-    
+
     def self.build!(host, options={})
       new_template_to_build(host).build! host, options
     end
-    
+
     def build(host, options = {})
       unless buildable? or options[:force]
         return false
@@ -57,11 +57,11 @@ module CloudModel
         return false
       end
     end
-    
+
     def worker host
       CloudModel::Workers::HostTemplateWorker.new host
     end
-  
+
     def build!(host, options={})
       unless buildable? or options[:force]
         return false
@@ -70,8 +70,8 @@ module CloudModel
       self.build_state = :pending
 
       worker(host).build_template self, options
-    end  
-    
+    end
+
     def self.last_useable(host, options={})
       template = self.where(arch: host.arch, build_state_id: 0xf0).last
       unless template
@@ -81,7 +81,7 @@ module CloudModel
       end
       template
     end
-    
+
     def tarball
       "/cloud/templates/host/#{id}.tar.gz"
     end

@@ -14,7 +14,7 @@ module RSpec
         @default = default
         self
       end
-    
+
       def which_is_read_protected
         @read_protected = true
         self
@@ -43,9 +43,9 @@ module RSpec
                 error << " with default value of :#{@klass.enum_fields[attr][:default]}"
               end
             end
-            
+
             @errors.push("enum #{attr.inspect}" << error) unless error.blank?
-          
+
           else
             @errors.push "no enum named #{attr.inspect}"
           end

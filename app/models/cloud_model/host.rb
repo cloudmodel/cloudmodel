@@ -1,9 +1,11 @@
 require 'net/ssh'
 require 'net/sftp'
 
-require_relative('mixins/e_num_fields')
-require_relative('mixins/has_issues')
-require_relative('mixins/smart_to_string')
+unless defined?(Zeitwerk)
+  require_relative('mixins/e_num_fields')
+  require_relative('mixins/has_issues')
+  require_relative('mixins/smart_to_string')
+end
 
 module CloudModel
   class Host
