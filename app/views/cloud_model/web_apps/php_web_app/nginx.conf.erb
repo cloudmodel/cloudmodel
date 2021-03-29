@@ -1,12 +1,9 @@
 location <%= model.location_with_leading_slash %> {
-  alias /var/www/php/current;
-  try_files $uri $uri/ /index.php$args =404;
+  root /var/www/php/current;
+  try_files $uri $uri/ <%= model.location_with_slashes %>index.php?$args;
   index index.php index.html index.htm;
 
   location ~ \.php$ {
-    try_files $uri =404;
-    error_page 404 /index.php;
-
     include fastcgi.conf;
     fastcgi_param SCRIPT_FILENAME $request_filename;
     fastcgi_pass 127.0.0.1:9000;
