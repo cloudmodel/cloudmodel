@@ -1,4 +1,5 @@
 primary_hostname = <%= host.email_hostname %>
+disable_ipv6 = true
 
 domainlist local_domains = @
 domainlist relay_to_domains =
@@ -57,7 +58,7 @@ acl_check_rcpt:
 
 acl_check_data:
   accept
-  
+
 begin routers
 
 nslookup:
