@@ -27,7 +27,7 @@ module CloudModel
     end
 
     def name
-      "#{guest.name.shellescape}-#{created_at.try :strftime, "%Y%m%d%H%M%S"}"
+      "#{guest.name.shellescape}-#{created_at.try(:utc).try :strftime, "%Y%m%d%H%M%S"}"
     end
 
     # Command definitions

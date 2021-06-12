@@ -45,6 +45,16 @@ describe CloudModel::LxdContainer do
 
       expect(subject.name).to eq 'some_guest-20200331133742'
     end
+
+    it 'should use utc time for making name' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      begin
+        Time.zone = "Berlin"
+        expect(subject.name).to eq 'some_guest-20200331133742'
+      ensure
+        Time.zone = "UTC"
+      end
+    end
   end
 
   describe 'lxc' do
