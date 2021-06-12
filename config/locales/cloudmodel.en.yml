@@ -554,6 +554,8 @@ en:
       no_nginx_status: Nginx status not found
       parse_passenger_result: Passenger status not parsable
       no_passenger_status: Passenger status not found
+      cert_valid_before: SSL Certificate not valid before
+      cert_valid_after: SSL Certificate not valid after
     cloud_model/services/phpfpm:
       not_reachable: Service not reachable
       parse_phpfpm_result: PHP FPM status not parsable

@@ -104,6 +104,26 @@ module CloudModel
         do_check key, name, checks, message: message, value: human_value
       end
 
+      def do_check_above_value key, value, thresholds, options = {}
+        name = options[:name] || key.to_s.humanize
+        human_value = if value.is_a? Float
+          "#{"%0.2f" % (value)}#{options[:unit]}"
+        else
+          "#{value}#{options[:unit]}"
+        end
+
+        message = options[:message] || "#{name} is #{human_value}"
+
+        checks = {}
+        thresholds.each do |k,v|
+          if value and v
+            checks[k] = value < v
+          end
+        end
+
+        do_check key, name, checks, message: message, value: human_value
+      end
+
       def do_check_for_errors_on result, error_cases
 
         error_cases.each do |key, name|
