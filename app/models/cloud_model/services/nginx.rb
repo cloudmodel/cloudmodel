@@ -107,11 +107,16 @@ module CloudModel
         data = {}
         uri = URI(status_uri)
         res = nil
+        cert = nil
 
         begin
           Net::HTTP.start(uri.host, uri.port,
             :use_ssl => ssl_supported,
             :verify_mode => OpenSSL::SSL::VERIFY_NONE) do |http|
+
+            if ssl_supported
+              cert = http.peer_cert
+            end
 
             req = Net::HTTP::Get.new uri.request_uri
             res = http.request req
@@ -131,6 +136,19 @@ module CloudModel
           end
         rescue Exception => e
            return {key: :parse_nginx_result, error: "#{e.class}\n\n#{e.to_s}", severity: :warning}
+        end
+
+        begin
+          if ssl_supported
+            data['ssl_cert'] = {
+              'not_before' => cert.not_before,
+              'not_after' => cert.not_after,
+              'issuer' => cert.issuer.to_a.map{|v| [v[0],v[1]]}.to_h,
+              'subject' => cert.subject.to_a.map{|v| [v[0],v[1]]}.to_h
+            }
+          end
+        rescue
+          return {key: :parse_ssl_cert, error: "#{e.class}\n\n#{e.to_s}", severity: :warning}
         end
 
         if res.code == '404'
