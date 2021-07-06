@@ -8,7 +8,7 @@ module CloudModel
 
     field :location, type: String, default: '/'
 
-    belongs_to :web_app, class_name: CloudModel::WebApp
+    belongs_to :web_app, class_name: CloudModel::WebApp, polymorphic: true
     embedded_in :service, class_name: CloudModel::Services::Nginx
 
     #embedded_in :service, class: CloudModel::Services::Nginx
@@ -39,6 +39,10 @@ module CloudModel
       end
 
       l
+    end
+
+    def base_uri
+      "http#{service.ssl_supported? ? 's' : ''}://#{service.guest.external_hostname}#{location_with_slashes}"
     end
   end
 end

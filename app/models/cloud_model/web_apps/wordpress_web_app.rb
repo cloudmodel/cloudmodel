@@ -16,6 +16,9 @@ module CloudModel
       field :wp_logged_in_salt, type: String, default: nil
       field :wp_nonce_salt, type: String, default: nil
 
+      field :wp_passwd, type: String, default: nil
+      field :wp_allow_xmlrpc, type: Boolean, default: false
+
       before_create :set_mysql_passwd
       before_create :set_salt_keys
 
@@ -44,12 +47,16 @@ module CloudModel
         ]
       end
 
+      def wp_public_login?
+        wp_passwd.blank?
+      end
+
       def generate_salt_key
         SecureRandom.alphanumeric 64
       end
 
       def additional_allowed_params
-        [:mysql_host, :mysql_port, :mysql_user, :mysql_database]
+        [:mysql_host, :mysql_port, :mysql_user, :mysql_database, :wp_passwd, :wp_allow_xmlrpc]
       end
 
       def self.fetch_app_command
@@ -64,9 +71,10 @@ module CloudModel
         ] * ' && '
       end
 
-      def self.config_files_to_render
+      def config_files_to_render
         {
-          'cloud_model/web_apps/wordpress_web_app/wp-config.php' => ["#{app_folder}/wp-config.php", 0644],
+          'cloud_model/web_apps/wordpress_web_app/wp-config.php' => ["#{self.class.app_folder}/wp-config.php", 0644],
+          'cloud_model/web_apps/wordpress_web_app/htpasswd' => ["/etc/nginx/.htpasswd-#{id}-wordpress",0600],
           'cloud_model/web_apps/wordpress_web_app/init_mysql.sql' => ["/root/init_wordpress_user.sql", 0600] # TODO: Find better way to init mysql
         }
       end

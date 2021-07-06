@@ -63,9 +63,9 @@ module CloudModel
         ] * ' && '
       end
 
-      def self.config_files_to_render
+      def config_files_to_render
         {
-          'cloud_model/web_apps/roundcubemail_web_app/config.inc.php' => ["#{app_folder}/config/config.inc.php", 0644],
+          'cloud_model/web_apps/roundcubemail_web_app/config.inc.php' => ["#{self.class.app_folder}/config/config.inc.php", 0644],
           'cloud_model/web_apps/roundcubemail_web_app/init_mysql.sql' => ["/root/init_roundcube_user.sql", 0600] # TODO: call init_db
         }
       end

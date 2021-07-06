@@ -38,9 +38,9 @@ module CloudModel
         ] * ' && '
       end
 
-      def self.config_files_to_render
+      def config_files_to_render
         {
-          'cloud_model/web_apps/nextcloud_web_app/config.php' => ["#{app_folder}/config/config.php", 0644],
+          'cloud_model/web_apps/nextcloud_web_app/config.php' => ["#{self.class.app_folder}/config/config.php", 0644],
           'cloud_model/web_apps/nextcloud_web_app/init_mysql.sql' => ["/root/init_nextcloud_user.sql", 0600] # TODO: Find better way to init mysql
         }
       end

@@ -18,6 +18,10 @@
  * @package WordPress
  */
 
+// Set Home and SiteUrl to fix possible tinkering
+define( 'WP_HOME', '<%= model.web_locations.first.base_uri %>' );
+define( 'WP_SITEURL', '<%= model.web_locations.first.base_uri %>' );
+
 // ** MySQL settings - You can get this info from your web host ** //
 /** The name of the database for WordPress */
 define( 'DB_NAME', '<%= model.mysql_database %>' );

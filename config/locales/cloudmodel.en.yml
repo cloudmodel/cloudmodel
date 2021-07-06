@@ -408,6 +408,7 @@ en:
       cloud_model/web_app:
         name: Web App Name
         needed_components: Needed Components
+        used_in_guests: Used In Guests
         _type: Web App Type
       cloud_model/web_apps/nextcloud_web_app:
         mysql_host: Database Host
@@ -438,6 +439,9 @@ en:
         mysql_user: Database User
         mysql_passwd: Database Password
         mysql_database: Database Name
+        wp_passwd: Passwd File Content
+        wp_public_login: Public Login
+        wp_allow_xmlrpc: Allow XML RPC
       cloud_model/war_image:
         name: Name
         file: WAR Image File
