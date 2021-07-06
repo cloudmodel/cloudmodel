@@ -44,6 +44,17 @@ location <%= model.location_with_leading_slash %> {
     fastcgi_pass 127.0.0.1:9000;
     fastcgi_pass_header Authorization;
     fastcgi_index index.php;
+    <%- unless model.web_app.wp_passwd.blank? -%>
+
+    location ~ <%= model.location_with_slashes %>(wp-admin|wp-login.php) {
+      auth_basic "Restricted";
+      auth_basic_user_file /etc/nginx/.htpasswd-<%= model.web_app_id %>-wordpress;
+      include fastcgi.conf;
+      fastcgi_pass 127.0.0.1:9000;
+      fastcgi_pass_header Authorization;
+      fastcgi_index index.php;
+    }
+    <%- end -%>
   }
 }
 
@@ -64,4 +75,11 @@ location ~ <%= model.location_with_slashes %>wp-content/.+\.php$ {
 location ~* <%= model.location_with_slashes %>wp-content/uploads/.+\.php$ {
     deny all;
 }
+<%- unless model.web_app.wp_allow_xmlrpc -%>
+
+# Disable xmlrpc
+location <%= model.location_with_slashes %>xmlrpc.php {
+  deny all;
+}
+<%- end -%>
 

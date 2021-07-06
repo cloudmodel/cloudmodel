@@ -47,9 +47,9 @@ describe CloudModel::WebApp do
     end
   end
 
-  describe '#config_files_to_render' do
+  describe '.config_files_to_render' do
     it 'should not have any files to render' do
-      expect(subject.class.config_files_to_render).to eq({})
+      expect(subject.config_files_to_render).to eq({})
     end
   end
 end

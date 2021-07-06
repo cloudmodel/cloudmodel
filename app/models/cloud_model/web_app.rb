@@ -25,6 +25,22 @@ module CloudModel
       []
     end
 
+    def used_in_guests
+      CloudModel::Guest.where("services.web_locations.web_app_id" => id)
+    end
+
+    def services
+      used_in_guests.map do |guest|
+        guest.services.where("web_locations.web_app_id" => id).to_a
+      end.flatten
+    end
+
+    def web_locations
+      services.map do |service|
+        service.web_locations.where("web_app_id" => id).to_a
+      end.flatten
+    end
+
     def self.app_name
       name.demodulize.gsub(/WebApp$/, '').underscore
     end
@@ -37,7 +53,7 @@ module CloudModel
       false
     end
 
-    def self.config_files_to_render
+    def config_files_to_render
       {}
     end
   end

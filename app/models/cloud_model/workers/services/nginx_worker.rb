@@ -112,7 +112,7 @@ module CloudModel
             end
 
             # Render config files
-            web_app_class.config_files_to_render.each do |src, dst|
+            web_app.config_files_to_render.each do |src, dst|
               comment_sub_step "Render config #{src}"
               render_to_remote src, "#{@guest.deploy_path}#{dst[0]}", dst[1], guest: @guest, service: @model, web_location: web_location, model: web_app
             end
