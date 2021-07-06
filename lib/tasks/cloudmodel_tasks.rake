@@ -1,7 +1,7 @@
 namespace :cloudmodel do
   desc "Backup marked services and volumes"
   task :backup => [:environment] do
-    CloudModel::Guest.all.each do |guest|
+    CloudModel::Guest.all.to_a.each do |guest|
       begin
         guest.backup
       rescue
@@ -117,7 +117,7 @@ namespace :cloudmodel do
     # bash -c 'cd /var/www/rails/current && RAILS_ENV=production /usr/local/bin/bundle exec rake cloudmodel:guest:backup_all'
     desc "Backup all guest"
     task :backup_all => [:environment] do
-      CloudModel::Guest.all.each do |guest|
+      CloudModel::Guest.all.to_a.each do |guest|
         begin
           guest.backup
         rescue
