@@ -16,9 +16,9 @@ module CloudModel
             }
 
             do_check_above_value :cert_valid_after, data['ssl_cert']['not_after'].to_time, {
-              warning: Time.now + 1.month,
+              fatal: Time.now,
               critical: Time.now + 1.week,
-              fatal: Time.now
+              warning: Time.now + 1.month
             }
           end
         end
