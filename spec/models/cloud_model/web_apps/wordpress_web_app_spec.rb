@@ -96,7 +96,7 @@ describe CloudModel::WebApps::WordpressWebApp do
     end
 
     it 'should render passwd template' do
-      expect(subject.config_files_to_render['cloud_model/web_apps/wordpress_web_app/htpasswd']).to eq ["/etc/nginx/.htpasswd-#{subject.id}-wordpress", 0600]
+      expect(subject.config_files_to_render['cloud_model/web_apps/wordpress_web_app/htpasswd']).to eq ["/etc/nginx/.htpasswd-#{subject.id}-wordpress", 0640, gid: '101001']
     end
 
     it 'should render init_mysql template' do

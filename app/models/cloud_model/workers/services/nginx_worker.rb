@@ -114,7 +114,13 @@ module CloudModel
             # Render config files
             web_app.config_files_to_render.each do |src, dst|
               comment_sub_step "Render config #{src}"
-              render_to_remote src, "#{@guest.deploy_path}#{dst[0]}", dst[1], guest: @guest, service: @model, web_location: web_location, model: web_app
+              remote_file = "#{@guest.deploy_path}#{dst[0]}"
+              render_to_remote src, remote_file, dst[1], guest: @guest, service: @model, web_location: web_location, model: web_app
+              if dst[2]
+                uid = dst[2][:uid] || 100000
+                gid = dst[2][:gid] || 100000
+                host.exec! "chown -R #{uid}:#{gid} #{remote_file}", "failed to set owner for #{remote_file}"
+              end
             end
 
             decrease_indent

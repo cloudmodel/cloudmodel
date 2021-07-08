@@ -74,7 +74,7 @@ module CloudModel
       def config_files_to_render
         {
           'cloud_model/web_apps/wordpress_web_app/wp-config.php' => ["#{self.class.app_folder}/wp-config.php", 0644],
-          'cloud_model/web_apps/wordpress_web_app/htpasswd' => ["/etc/nginx/.htpasswd-#{id}-wordpress",0600],
+          'cloud_model/web_apps/wordpress_web_app/htpasswd' => ["/etc/nginx/.htpasswd-#{id}-wordpress",0640, gid: '101001'],
           'cloud_model/web_apps/wordpress_web_app/init_mysql.sql' => ["/root/init_wordpress_user.sql", 0600] # TODO: Find better way to init mysql
         }
       end
