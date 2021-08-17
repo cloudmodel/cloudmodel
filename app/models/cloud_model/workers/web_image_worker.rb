@@ -142,7 +142,10 @@ module CloudModel
       end
 
       def redeploy options={}
-        return false unless @web_image.redeploy_state == :pending or options[:force]
+        unless @web_image.redeploy_state == :pending or options[:force]
+          puts "Redeploy WebImage #{@web_image.name} failed, as it is not pending for redeploy: #{@web_image.redeploy_state}"
+          return false
+        end
         @web_image.update_attributes redeploy_state: :running, redeploy_last_issue: nil
         puts "Redeploy WebImage #{@web_image.name}"
         begin

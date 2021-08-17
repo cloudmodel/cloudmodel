@@ -253,7 +253,7 @@ module CloudModel
       end
 
       def redeploy!(options = {})
-        unless redeployable? or options[:force]
+        unless redeployable? or redeploy_web_image_state == :pending or options[:force]
           return false
         end
 
