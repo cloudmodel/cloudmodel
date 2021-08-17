@@ -111,22 +111,22 @@ pm = dynamic
 ; forget to tweak pm.* to fit your needs.
 ; Note: Used when pm is set to 'static', 'dynamic' or 'ondemand'
 ; Note: This value is mandatory.
-pm.max_children = 5
+pm.max_children = 120
 
 ; The number of child processes created on startup.
 ; Note: Used only when pm is set to 'dynamic'
 ; Default Value: min_spare_servers + (max_spare_servers - min_spare_servers) / 2
-pm.start_servers = 2
+pm.start_servers = 12
 
 ; The desired minimum number of idle server processes.
 ; Note: Used only when pm is set to 'dynamic'
 ; Note: Mandatory when pm is set to 'dynamic'
-pm.min_spare_servers = 1
+pm.min_spare_servers = 6
 
 ; The desired maximum number of idle server processes.
 ; Note: Used only when pm is set to 'dynamic'
 ; Note: Mandatory when pm is set to 'dynamic'
-pm.max_spare_servers = 3
+pm.max_spare_servers = 18
 
 ; The number of seconds after which an idle process will be killed.
 ; Note: Used only when pm is set to 'ondemand'
@@ -393,7 +393,7 @@ ping.path = /fpm_ping
 ; the current environment.
 ; Default Value: clean env
 ;env[HOSTNAME] = $HOSTNAME
-;env[PATH] = /usr/local/bin:/usr/bin:/bin
+env[PATH] = /usr/local/bin:/usr/bin:/bin
 ;env[TMP] = /tmp
 ;env[TMPDIR] = /tmp
 ;env[TEMP] = /tmp
@@ -421,4 +421,4 @@ ping.path = /fpm_ping
 ;php_flag[display_errors] = off
 ;php_admin_value[error_log] = /var/log/fpm-php.www.log
 ;php_admin_flag[log_errors] = on
-;php_admin_value[memory_limit] = 32M
+php_admin_value[memory_limit] = 512M

@@ -129,6 +129,8 @@ collation-server      = utf8mb4_general_ci
 # If you use the same .cnf file for MySQL and MariaDB,
 # you can put MariaDB-only options here
 [mariadb]
+# Needed for compress InnoDB tables as used in NextCloud
+innodb_read_only_compressed=0
 
 # This group is only read by MariaDB-10.5 servers.
 # If you use the same .cnf file for MariaDB of different versions,

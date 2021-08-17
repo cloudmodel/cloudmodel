@@ -1,4 +1,9 @@
-CREATE DATABASE roundcubemail CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE DATABASE IF NOT EXISTS <%= model.mysql_database %> CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 CREATE USER '<%= model.mysql_user %>'@'localhost' IDENTIFIED BY '<%= model.mysql_passwd %>';
 GRANT ALL PRIVILEGES ON <%= model.mysql_database %>.* TO '<%= model.mysql_user %>'@'localhost';
 FLUSH PRIVILEGES;
+
+# cd /opt/web-app/nextcloud
+# php occ maintenance:install --database "mysql" --database-name "<%= model.mysql_database %>"  --database-user "<%= model.mysql_user %>" --database-pass "<%= model.mysql_passwd %>" --admin-user "admin" --admin-pass "password"
+# mkdir -p /var/www/nextcloud/data
+# chown -R www:www /var/www/nextcloud

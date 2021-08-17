@@ -6,7 +6,7 @@ location = /.well-known/caldav {
 }
 
 location ^~ <%= model.location_with_leading_slash %> {
-  alias /opt/web-app/nextcloud/;
+  root /opt/www/nextcloud/;
 
   # set max upload size
   client_max_body_size 512M;
