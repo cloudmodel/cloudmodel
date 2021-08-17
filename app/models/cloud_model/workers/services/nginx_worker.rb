@@ -11,7 +11,7 @@ module CloudModel
 
           mkdir_p deploy_path
 
-          comment_sub_step "Deploy WebImage #{@model.deploy_web_image.name} to #{deploy_path}"
+          comment_sub_step "Unroll WebImage #{@model.deploy_web_image.name} to #{deploy_path}"
           temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
           io = StringIO.new(@model.deploy_web_image.file.data)
           @host.sftp.upload!(io, temp_file_name)
@@ -60,15 +60,20 @@ module CloudModel
           begin
             deploy_id = make_deploy_web_image_id
             unroll_path = "/tmp/webimage_unroll_#{@model.id}"
-            deploy_path = "#{unroll_path}/var/www/rails/#{deploy_id}"
+            deploy_path = "#{unroll_path}#{@model.www_root}/#{deploy_id}"
 
             @host.exec! "rm -rf #{unroll_path}", "Failed to clean unroll path"
             mkdir_p deploy_path
             unroll_web_image deploy_path
 
-            @host.exec! "cd #{unroll_path} && tar c . | virsh lxc-enter-namespace #{@model.guest.name.shellescape} --noseclabel -- /bin/tar x", "Failed to transfer files"
+            comment_sub_step "Copy unrolled data to guest"
+            @host.exec! "cd #{unroll_path} && tar c . | lxc exec #{@model.guest.current_lxd_container.name.shellescape} -- /bin/tar x -C / --no-same-owner", "Failed to transfer files"
+
+            comment_sub_step "Remove unrolled data from hosts /tmp"
             @host.exec "rm -rf #{unroll_path}"
-            @model.guest.exec! "/bin/chown -R 101001:101001 #{@model.www_root}/#{deploy_id}", "Failed to set user to www "
+
+            comment_sub_step "Align owner of guest data"
+            @model.guest.exec! "/bin/chown -R www:www #{@model.www_root}/#{deploy_id}", "Failed to set user to www "
 
             @model.guest.exec! "/bin/rm -f #{@model.www_root}/current", "Failed to remove old current"
             @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"
