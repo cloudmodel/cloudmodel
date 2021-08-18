@@ -52,6 +52,18 @@ module CloudModel
       def install_lxd
         comment_sub_step 'Install apparmor'
         chroot! build_path, "apt-get install apparmor-utils -y", "Failed to install apparmor"
+        comment_sub_step 'Install snapd'
+        chroot! build_path, "apt-get install snapd -y", "Failed to install snapd"
+
+        #
+        # Snap is recommended to install LXD, but does not work in chroot environment
+        # A possibility would be to install LXD snap on boot. It fails with return code of 0
+        # if the snap is already installed:
+        #
+        # > snap install lxd
+        #
+        # For now we use apt-get version for compatibility
+
         comment_sub_step 'Install LXD'
         chroot! build_path, "apt-get install lxd -y", "Failed to install LXD"
 
