@@ -59,14 +59,14 @@ describe CloudModel::LxdContainer do
 
   describe 'lxc' do
     it 'should call lxc on guest´s host' do
-      expect(host).to receive(:exec).with('lxc lxc_command')
+      expect(host).to receive(:exec).with('echo "lxc lxc_command" | bash')
       subject.lxc 'lxc_command'
     end
   end
 
   describe 'lxc!' do
     it 'should call lxc on guest´s host' do
-      expect(host).to receive(:exec!).with('lxc lxc_command', 'There was an error')
+      expect(host).to receive(:exec!).with('echo "lxc lxc_command" | bash', 'There was an error')
       subject.lxc! 'lxc_command', 'There was an error'
     end
   end
@@ -270,6 +270,13 @@ describe CloudModel::LxdContainer do
   describe 'mountpoint' do
     it 'should return the container´s mountpoint in host' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+
+      expect(host).to receive(:exec).with("zfs list | grep guests/containers/some_guest-20200331133742").and_return [
+        true,
+        "guests/containers/some_guest-2020033113374    530M   725G   530M  /var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742\n"
+      ]
+
+      subject.mountpoint
       expect(subject.mountpoint).to eq '/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742'
     end
   end
