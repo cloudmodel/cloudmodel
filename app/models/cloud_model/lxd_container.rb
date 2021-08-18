@@ -33,11 +33,11 @@ module CloudModel
     # Command definitions
 
     def lxc command
-      host.exec "lxc #{command}"
+      host.exec "echo \"lxc #{command}\" | bash"
     end
 
     def lxc! command, error
-      host.exec! "lxc #{command}", error
+      host.exec! "echo \"lxc #{command}\" | bash", error
     end
 
     def ensure_template_is_set
@@ -101,7 +101,21 @@ module CloudModel
     end
 
     def mountpoint
-      "/var/lib/lxd/storage-pools/default/containers/#{name}"
+      return @mountpoint if @mountpoint
+
+      res, out = host.exec("zfs list | grep guests/containers/#{name}")
+      if res
+        @mountpoint = out.split(' ').last
+      else
+        "/tmp/#{name}"
+      end
+      # if false
+      #   # apt-get version of lxd
+      #   "/var/lib/lxd/storage-pools/default/containers/#{name}"
+      # else
+      #   # snap version of lxd
+      #   "/var/snap/lxd/common/lxd/storage-pools/default/containers/#{name}"
+      # end
     end
 
     # Get generic infos about the LXD

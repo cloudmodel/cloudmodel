@@ -90,6 +90,7 @@ module CloudModel
       def start_lxd_container
         cleanup_chroot guest.deploy_path
         @lxc.unmount
+        host.exec! "rm -f #{@lxc.mountpoint}/*", "Failed to clear mountpoint for container"
         guest.update_attributes deploy_state: :booting
         guest.stop
         guest.start @lxc
