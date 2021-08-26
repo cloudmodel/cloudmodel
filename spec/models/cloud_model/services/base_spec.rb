@@ -15,17 +15,19 @@ describe CloudModel::Services::Base do
   describe '#service_types' do
     it "should return the default service types" do
       expect(CloudModel::Services::Base.service_types).to eq({
-        mongodb: CloudModel::Services::Mongodb,
-        nginx: CloudModel::Services::Nginx,
-        redis: CloudModel::Services::Redis,
-        solr: CloudModel::Services::Solr,
-        fuseki: CloudModel::Services::Fuseki,
         ssh: CloudModel::Services::Ssh,
+        nginx: CloudModel::Services::Nginx,
         phpfpm: CloudModel::Services::Phpfpm,
+        mongodb: CloudModel::Services::Mongodb,
+        redis: CloudModel::Services::Redis,
         mariadb: CloudModel::Services::Mariadb,
+        neo4j: CloudModel::Services::Neo4j,
+        fuseki: CloudModel::Services::Fuseki,
+        solr: CloudModel::Services::Solr,
         tomcat: CloudModel::Services::Tomcat,
+        collabora: CloudModel::Services::Collabora,
         backup: CloudModel::Services::Backup,
-        monitoring: CloudModel::Services::Monitoring
+        monitoring: CloudModel::Services::Monitoring,
       })
     end
   end

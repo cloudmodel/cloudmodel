@@ -192,6 +192,12 @@ en:
       cloud_model/services/tomcat:
         one: Tomcat Service
         other: Tomcat Services
+      cloud_model/services/neo4j:
+        one: Neo4j Service
+        other: Neo4j Services
+      cloud_model/services/collabora:
+        one: Collabora Office Service
+        other: Collabore Office Services
       cloud_model/services/monitoring:
         one: Monitoring Service
         other: Monitoring Services
@@ -522,9 +528,14 @@ en:
         deploy_redis_sentinel_set_id: Use Redis Sentinel Set
         deploy_redis_host: Use Redis Host
         deploy_redis_port: Use Redis Port
+      cloud_model/services/solr:
+        deploy_solr_image: Deploy SOLR Image
+        deploy_solr_image_id: Deploy SOLR Image
       cloud_model/services/tomcat:
         deployment: Project Deployment
         deploy_war_image: Deploy WAR Image
+      cloud_model/services/collabora:
+        wopi_host: Web Application Open Platform Host
 
   issues:
     general:

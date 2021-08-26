@@ -56,5 +56,9 @@ module CloudModel
     def config_files_to_render
       {}
     end
+
+    def configure
+      return
+    end
   end
 end

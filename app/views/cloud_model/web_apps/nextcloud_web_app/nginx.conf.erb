@@ -5,8 +5,21 @@ location = /.well-known/caldav {
   return 301 $scheme://$host:$server_port<%= model.location_with_slashes %>remote.php/dav;
 }
 
+rewrite ^/.well-known/webfinger <%= model.location_with_slashes %>index.php$uri redirect;
+rewrite ^/.well-known/nodeinfo <%= model.location_with_slashes %>index.php$uri redirect;
+
+
 location ^~ <%= model.location_with_leading_slash %> {
   root /opt/www/nextcloud/;
+
+  add_header Strict-Transport-Security "max-age=15768000; includeSubDomains; preload;" always;
+  add_header Referrer-Policy "no-referrer" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Download-Options "noopen" always;
+  add_header X-Frame-Options "SAMEORIGIN" always;
+  add_header X-Permitted-Cross-Domain-Policies "none" always;
+  add_header X-Robots-Tag "none" always;
+  add_header X-XSS-Protection "1; mode=block" always;
 
   # set max upload size
   client_max_body_size 512M;
@@ -34,6 +47,53 @@ location ^~ <%= model.location_with_leading_slash %> {
   location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>(?:\.|autotest|occ|issue|indie|db_|console) {
     deny all;
   }
+
+
+  ### Collabora CODE
+
+  # static files
+  location ^~ /loleaflet {
+      proxy_pass http://localhost:9980;
+      proxy_set_header Host $http_host;
+  }
+
+  # WOPI discovery URL
+  location ^~ /hosting/discovery {
+      proxy_pass http://localhost:9980;
+      proxy_set_header Host $http_host;
+  }
+
+  # Capabilities
+  location ^~ /hosting/capabilities {
+      proxy_pass http://localhost:9980;
+      proxy_set_header Host $http_host;
+  }
+
+  # main websocket
+  location ~ ^/lool/(.*)/ws$ {
+      proxy_pass http://localhost:9980;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "Upgrade";
+      proxy_set_header Host $http_host;
+      proxy_read_timeout 36000s;
+  }
+
+  # download, presentation and image upload
+  location ~ ^/lool {
+      proxy_pass http://localhost:9980;
+      proxy_set_header Host $http_host;
+  }
+
+  # Admin Console websocket
+  location ^~ /lool/adminws {
+      proxy_pass http://localhost:9980;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "Upgrade";
+      proxy_set_header Host $http_host;
+      proxy_read_timeout 36000s;
+  }
+
+  ### Collabora CODE END
 
   location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>(?:index|remote|public|cron|core\/ajax\/update|status|ocs\/v[12]|updater\/.+|oc[ms]-provider\/.+|.+\/richdocumentscode\/proxy)\.php(?:$|\/) {
     fastcgi_split_path_info ^(.+?\.php)(\/.*|)$;
