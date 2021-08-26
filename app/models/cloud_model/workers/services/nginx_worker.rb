@@ -128,6 +128,8 @@ module CloudModel
               end
             end
 
+            web_app.configure
+
             decrease_indent
           end
         end

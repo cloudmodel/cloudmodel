@@ -41,8 +41,14 @@ module CloudModel
       def config_files_to_render
         {
           'cloud_model/web_apps/nextcloud_web_app/config.php' => ["#{self.class.app_folder}/config/config.php", 0644],
-          'cloud_model/web_apps/nextcloud_web_app/init_mysql.sql' => ["/root/init_nextcloud_user.sql", 0600] # TODO: Find better way to init mysql
+          'cloud_model/web_apps/nextcloud_web_app/init_mysql.sql' => ["/root/init_nextcloud_user.sql", 0600], # TODO: Find better way to init mysql
+          'cloud_model/web_apps/nextcloud_web_app/nextcloudcron.service' => ["/etc/systemd/system/nextcloudcron.service", 0755],
+          'cloud_model/web_apps/nextcloud_web_app/nextcloudcron.timer' => ["/etc/systemd/system/nextcloudcron.timer", 0755],
         }
+      end
+
+      def configure
+        chroot! @guest.deploy_path, "ln -s /etc/systemd/system/nextcloudcron.timer /etc/systemd/system/timers.target.wants/nextcloudcron.timer", "Failed to enable nextcloudcron timer"
       end
     end
   end
