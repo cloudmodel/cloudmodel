@@ -93,7 +93,9 @@ module CloudModel
     end
 
     def mount
-      host.exec "zfs mount guests/containers/#{name}"
+      mountpoint # to init mountpoint
+      host.exec! "zfs mount guests/containers/#{name}", "Failed to mount containers fs"
+      return [true, mountpoint]
     end
 
     def unmount
@@ -106,6 +108,13 @@ module CloudModel
       res, out = host.exec("zfs list | grep guests/containers/#{name}")
       if res
         @mountpoint = out.split(' ').last
+
+        if @mountpoint == 'none'
+          @mountpoint = "/var/snap/lxd/common/lxd/storage-pools/default/containers/#{name}"
+          host.exec "zfs set mountpoint=#{@mountpoint} canmount=noauto guests/containers/#{name}"
+        end
+
+        @mountpoint
       else
         "/tmp/#{name}"
       end

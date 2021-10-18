@@ -251,7 +251,7 @@ describe CloudModel::LxdContainer do
   describe 'mount' do
     it 'should mount zfs container´s fs' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
-      expect(host).to receive(:exec).with('zfs mount guests/containers/some_guest-20200331133742')
+      expect(host).to receive(:exec!).with('zfs mount guests/containers/some_guest-20200331133742', "Failed to mount containers fs")
 
       subject.mount
     end
