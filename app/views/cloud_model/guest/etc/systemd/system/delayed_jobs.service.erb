@@ -1,21 +1,25 @@
 [Unit]
+<%- path = "/var/www/rails/current" %>
 Description=Delayed Job Worker
 After=syslog.target network.target
-AssertPathExists=/var/www/rails/current
+AssertPathExists=<%= path %>
 
 [Service]
-Type=simple
-WorkingDirectory=/var/www/rails/current
+Type=forking
+RemainAfterExit=no
+WorkingDirectory=<%= path %>
+PIDFile=/tmp/delayed_job.pid
 
-ExecStart=/bin/bash -lc 'RAILS_ENV=<%= model.passenger_env %> bundle exec rake jobs:work'
-KillSignal=SIGINT
+Environment = RAILS_ENV=<%= model.passenger_env %>
+ExecStart=<%= path %>/bin/delayed_job --pid_dir=/tmp/ start
+ExecStop=<%= path %>/bin/delayed_job --pid_dir=/tmp/ stop
 User=www
 Group=www
 UMask=0002
 
-# Restart after 1 minute delay
-Restart=on-failure
-RestartSec=60
+# Restart after 5 seconds delay
+Restart=always
+RestartSec=5
 
 StandardOutput=syslog
 StandardError=syslog

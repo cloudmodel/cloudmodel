@@ -78,6 +78,16 @@ module CloudModel
             @model.guest.exec! "/bin/rm -f #{@model.www_root}/current", "Failed to remove old current"
             @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"
             @model.guest.exec! "/bin/touch #{@model.www_root}/current/tmp/restart.txt", "Failed to restart service"
+            if @model.delayed_jobs_supported
+              # Stop delayed job if used
+              comment_sub_step "Stop deloyed job daemon to restart it"
+              command = "/usr/bin/sudo -u www RAILS_ENV=#{@model.passenger_env} #{@model.www_root}/current/bin/delayed_job stop --pid-dir=/tmp/"
+              #puts command
+              success, data = @model.guest.exec command
+              unless success
+                puts "Error stopping dj: #{data}"
+              end
+            end
           rescue Exception => e
             CloudModel.log_exception e
             @model.update_attributes redeploy_web_image_state: :failed, redeploy_web_image_last_issue: "#{e}"
