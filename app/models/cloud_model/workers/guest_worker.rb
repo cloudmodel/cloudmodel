@@ -75,6 +75,11 @@ module CloudModel
         @lxc.mount
       end
 
+      def mount_lxd_container
+        @lxc = guest.lxd_containers.last
+        @lxc.mount
+      end
+
       def ensure_lxd_custom_volumes
         guest.lxd_custom_volumes.each do |volume|
           unless volume.volume_exists?
@@ -183,9 +188,9 @@ module CloudModel
 
         steps = [
           ['Sync template', :ensure_template, no_skip: true],
-          ['Ensure LXD image', :ensure_lxd_image, no_skip: true],
-          ['Create LXD container', :create_lxd_container],
-          ['Ensure LXD custom volumes', :ensure_lxd_custom_volumes],
+          ['Ensure LXD image', :ensure_lxd_image],
+          ['Create LXD container', :create_lxd_container, on_skip: :mount_lxd_container],
+          ['Ensure LXD custom volumes', :ensure_lxd_custom_volumes, no_skip: true],
           ['Config LXD container', :config_lxd_container],
           ['Config guest services', :config_services],
           ['Config guest certificates', :config_guest_certificates],
