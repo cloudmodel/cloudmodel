@@ -8,10 +8,10 @@ module CloudModel
 
         def write_config
           comment_sub_step "Write PHP FPM config"
-          render_to_remote "/cloud_model/guest/etc/php/fpm/pool.d/www.conf", "#{@guest.deploy_path}/etc/php/#{CloudModel.config.php_version}/fpm/pool.d/www.conf", guest: @guest, model: @model
-          render_to_remote "/cloud_model/guest/etc/php/fpm/conf.d/30-msmtp.ini", "#{@guest.deploy_path}/etc/php/#{CloudModel.config.php_version}/fpm/conf.d/30-msmtp.ini", guest: @guest, model: @model
-          render_to_remote "/cloud_model/guest/etc/php/fpm/conf.d/20-apcu.ini", "#{@guest.deploy_path}/etc/php/#{CloudModel.config.php_version}/fpm/conf.d/20-apcu.ini", guest: @guest, model: @model
-          render_to_remote "/cloud_model/guest/etc/php/fpm/conf.d/20-apcu.ini", "#{@guest.deploy_path}/etc/php/#{CloudModel.config.php_version}/cli/conf.d/20-apcu.ini", guest: @guest, model: @model
+          render_to_remote "/cloud_model/guest/etc/php/fpm/pool.d/www.conf", "#{@guest.deploy_path}/etc/php/#{CloudModel.config.php_version}/fpm/pool.d/www.conf", 644, guest: @guest, model: @model
+          render_to_remote "/cloud_model/guest/etc/php/fpm/conf.d/30-msmtp.ini", "#{@guest.deploy_path}/etc/php/#{CloudModel.config.php_version}/fpm/conf.d/30-msmtp.ini", 644, guest: @guest, model: @model
+          host.exec "rm #{@guest.deploy_path}/etc/php/#{CloudModel.config.php_version}/mods-available/apcu.ini"
+          render_to_remote "/cloud_model/guest/etc/php/fpm/conf.d/20-apcu.ini", "#{@guest.deploy_path}/etc/php/#{CloudModel.config.php_version}/mods-available/apcu.ini", 644, guest: @guest, model: @model
 
           # Patch php.ini
           patch_php_ini :upload_max_filesize, "#{@model.php_upload_max_filesize}M"

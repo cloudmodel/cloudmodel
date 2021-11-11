@@ -10,7 +10,7 @@ rewrite ^/.well-known/nodeinfo <%= model.location_with_slashes %>index.php$uri r
 
 
 location ^~ <%= model.location_with_leading_slash %> {
-  root /opt/www/nextcloud/;
+  root /var/www/nextcloud/;
 
   add_header Strict-Transport-Security "max-age=15768000; includeSubDomains; preload;" always;
   add_header Referrer-Policy "no-referrer" always;

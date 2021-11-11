@@ -47,7 +47,7 @@ module CloudModel
           @host.exec "ln -sf /lib/systemd/system/#{service_name}.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
           if auto_restart
             mkdir_p overlay_path
-            render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{overlay_path}/restart.conf"
+            render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{overlay_path}/restart.conf", 644
           end
           @host.exec  "chown -R 100000:100000 #{overlay_path}"
         end

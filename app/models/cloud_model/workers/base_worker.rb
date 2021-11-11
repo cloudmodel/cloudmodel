@@ -205,6 +205,7 @@ module CloudModel
         skip_to_string, skip_to = parse_step_skip_to options[:skip_to]
 
         ts = Time.now
+
         begin
           if step[2] and step[2][:each]
             puts ':'
@@ -218,7 +219,7 @@ module CloudModel
               print "#{' ' * indent}(#{counter_prefix}#{counter}) For #{object.name}"
 
               if skip_to > counter
-                puts "[Skipped]"
+                puts "[Skipped*]"
               else
                 if options[:pretend]
                   puts "[Done (pretended)]"
@@ -328,7 +329,7 @@ module CloudModel
           print "#{' ' * current_indent}(#{counter_prefix}#{counter}) #{step[0]} "
           Rails.logger.debug "STEP START: (#{counter_prefix}#{counter}) #{step[0]}"
 
-          if skip_to > counter
+          if skip_to > counter and not (step[2] and step[2][:no_skip])
             if step[2] and step[2][:on_skip]
               print "(Run skip action #{step[2][:on_skip]})"
               run_step_command stage, step[2][:on_skip], step, step_options
