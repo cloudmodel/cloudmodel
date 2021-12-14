@@ -2,9 +2,9 @@
 
 require 'spec_helper'
 
-describe CloudModel::Workers::Components::JavaComponentWorker do
+describe CloudModel::Workers::Components::Java8ComponentWorker do
   let(:host) {double CloudModel::Host}
-  subject {CloudModel::Workers::Components::JavaComponentWorker.new host}
+  subject {CloudModel::Workers::Components::Java8ComponentWorker.new host}
 
   it { expect(subject).to be_a CloudModel::Workers::Components::BaseComponentWorker }
 
@@ -21,7 +21,7 @@ describe CloudModel::Workers::Components::JavaComponentWorker do
     end
 
     it 'should apt-get openjdk' do
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install default-jre-headless -y', 'Failed to install Java')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install openjdk-8-jre-headless -y', 'Failed to install Java 8')
 
       subject.build '/tmp/build'
     end
