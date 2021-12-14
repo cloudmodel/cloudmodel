@@ -121,14 +121,14 @@ de:
         one: Hosttemplate
         other: Hosttemplates
       cloud_model/guest_core_template:
-        one: Kerntemplate für Gästetemplates
-        other: Kerntemplates für Gästetemplates
+        one: Kerntemplate für Gasttemplates
+        other: Kerntemplates für Gasttemplates
       cloud_model/guest_template:
-        one: Gästetemplate
-        other: Gästetemplates
+        one: Gasttemplate
+        other: Gasttemplates
       cloud_model/guest_template_type:
-        one: Gästtemplateart
-        other: Gästtemplatearten
+        one: Gasttemplateart
+        other: Gasttemplatearten
       cloud_model/solr_image:
         one: SOLR-Paket
         other: SOLR-Pakete
@@ -285,7 +285,7 @@ de:
         assigned_to: Zugewiesen an
       cloud_model/lxd_container:
         name: Containername
-        guest_template: Gästetemplate
+        guest_template: Gasttemplate
         current_lxd_container: Aktueller Container?
         status: Containerstatus
         pid: Prozess-ID
