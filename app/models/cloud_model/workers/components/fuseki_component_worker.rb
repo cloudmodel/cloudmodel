@@ -5,11 +5,11 @@ module CloudModel
     module Components
       class FusekiComponentWorker < BaseComponentWorker
         def build build_path
-          ftp_host = 'ftp.halifax.rwth-aachen.de'
+          ftp_host = 'ftp-stud.hs-esslingen.de'
 
           ftp = Net::FTP.new(ftp_host)
           ftp.login
-          files = ftp.chdir('apache/jena/binaries/')
+          ftp.chdir('Mirrors/ftp.apache.org/dist/jena/binaries/')
           files = ftp.list('apache-jena-fuseki-*.tar.gz')
           latest_fuseki = files.map{|l| l.split(' ').last}.sort{|a,b| b<=>a}.first
           fuseki_url = "ftp://#{ftp_host}#{ftp.pwd}/#{latest_fuseki}"
