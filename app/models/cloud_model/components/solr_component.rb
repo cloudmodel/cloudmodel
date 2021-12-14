@@ -2,7 +2,7 @@ module CloudModel
   module Components
     class SolrComponent < BaseComponent
       def requirements
-        [:java]
+        [:java8]
       end
     end
   end
