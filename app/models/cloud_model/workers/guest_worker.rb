@@ -167,10 +167,11 @@ module CloudModel
       end
 
       def config_firewall
-        comment_sub_step "Configure Firewall"
-        CloudModel::Workers::FirewallWorker.new(host).write_scripts
+        #comment_sub_step "Configure Firewall"
+        #CloudModel::Workers::FirewallWorker.new(host).write_scripts
         comment_sub_step "Restart Firewall"
-        host.exec! "/etc/cloud_model/firewall_stop && /etc/cloud_model/firewall_start", "Failed to restart Firewall!"
+        #host.exec! "/etc/cloud_model/firewall_stop && /etc/cloud_model/firewall_start", "Failed to restart Firewall!"
+        host.restart_firewall
       end
 
       def activate_address_resolution
