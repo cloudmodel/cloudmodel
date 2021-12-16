@@ -475,6 +475,11 @@ module CloudModel
       worker.redeploy options
     end
 
+    def restart_firewall
+      CloudModel::Workers::FirewallWorker.new(self).write_scripts
+      exec! "/etc/cloud_model/firewall_stop && /etc/cloud_model/firewall_start", "Failed to restart Firewall!"
+    end
+
     def generate_mac_address_prefix
       def format_mac_address_prefix(i)
         i.to_s(16).rjust(4,'0').upcase.scan(/.{1,2}/) * ':'
