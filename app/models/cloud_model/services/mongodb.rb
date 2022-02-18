@@ -3,6 +3,7 @@ module CloudModel
     class Mongodb < Base
       field :port, type: Integer, default: 27017
 
+      field :mongodb_version, type: String, default: '4.0'
       field :mongodb_replication_priority, type: Integer, default: 50
       field :mongodb_replication_arbiter_only, type: Boolean, default: false
       belongs_to :mongodb_replication_set, class_name: "CloudModel::MongodbReplicationSet", optional: true
@@ -14,7 +15,7 @@ module CloudModel
       end
 
       def components_needed
-        ([:mongodb] + super).uniq
+        (["mongodb@#{mongodb_version}".to_sym] + super).uniq
       end
 
       def sanitize_service_data data

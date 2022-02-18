@@ -5,7 +5,7 @@ module CloudModel
         def _prepare_collabora_repository build_path
           chroot! build_path, "apt-get install dirmngr gnupg -y", "Failed to install key management"
           chroot! build_path, "echo 'deb https://debian.neo4j.com stable 4.1' | sudo tee /etc/apt/sources.list.d/neo4j.list", "Failed to add neo4j to list if repos"
-          chroot! build_path, "wget -q -O "-" https://debian.neo4j.com/neotechnology.gpg.key | sudo apt-key add - ", "Failed to add neo4j key"
+          chroot! build_path, "wget -q -O - https://debian.neo4j.com/neotechnology.gpg.key | sudo apt-key add - ", "Failed to add neo4j key"
         end
 
 

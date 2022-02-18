@@ -221,10 +221,9 @@ module CloudModel
 
       needed_components=[]
       components.each do |component|
-        component_class = "CloudModel::Components::#{component.to_s.camelcase}Component".constantize
-
-        needed_components += component_class.new.requirements
-        needed_components << component
+        c = CloudModel::Components::BaseComponent.from_sym component
+        needed_components += c.requirements
+        needed_components << c.name
       end
 
       needed_components.uniq

@@ -12,7 +12,7 @@ describe CloudModel::Workers::Services::MongodbWorker do
 
   describe 'service_name' do
     it 'should return mongodb' do
-      expect(subject.service_name).to eq 'mongodb'
+      expect(subject.service_name).to eq 'mongod'
     end
   end
 

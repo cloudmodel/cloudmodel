@@ -470,6 +470,7 @@ en:
         mariadb_galera_port: Replication Port
       cloud_model/services/mongodb:
         replication: Replication
+        mongodb_version: MongoDB Version
         mongodb_replication_set: Replication Set
         mongodb_replication_set_id: Replication Set
         mongodb_replication_priority: Replication Priority

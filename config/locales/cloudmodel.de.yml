@@ -471,6 +471,7 @@ de:
         mariadb_galera_port: Replikationsport
       cloud_model/services/mongodb:
         replication: Replikation
+        mongodb_version: MongoDB Version
         mongodb_replication_set: Replikationset
         mongodb_replication_set_id: Replikationset
         mongodb_replication_priority: Replikationspriorität

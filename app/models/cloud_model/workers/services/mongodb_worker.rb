@@ -2,11 +2,15 @@ module CloudModel
   module Workers
     module Services
       class MongodbWorker < CloudModel::Workers::Services::BaseWorker
+        def service_name
+          "mongod"
+        end
+
         def write_config
           target = '/var/lib/mongodb'
 
           comment_sub_step "Write mongodb config"
-          @host.sftp.file.open("#{@guest.deploy_path.shellescape}/etc/mongodb.conf", 'w') do |f|
+          @host.sftp.file.open("#{@guest.deploy_path.shellescape}/etc/mongod.conf", 'w') do |f|
             f.write render("/cloud_model/guest/etc/mongodb.conf", guest: @guest, model: @model)
           end
         end
