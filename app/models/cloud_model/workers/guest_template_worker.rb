@@ -174,9 +174,9 @@ module CloudModel
       def install_components
         @template.template_type.components.each do |component_type|
           begin
-            comment_sub_step "Install #{component_type}"
-            component_const = "CloudModel::Workers::Components::#{component_type.to_s.gsub(/[^a-z0-9_]*/, '').camelcase}ComponentWorker".constantize
-            component = component_const.new @host
+            c = CloudModel::Components::BaseComponent.from_sym(component_type)
+            comment_sub_step "Install #{c.human_name}"
+            component = c.worker @host
           rescue Exception => e
             CloudModel.log_exception e
             raise "Component :#{component_type} has no worker"

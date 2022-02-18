@@ -6,6 +6,7 @@ describe CloudModel::Services::Mongodb do
   it { expect(subject).to be_a CloudModel::Services::Base }
 
   it { expect(subject).to have_field(:port).of_type(Integer).with_default_value_of 27017 }
+  it { expect(subject).to have_field(:mongodb_version).of_type(String).with_default_value_of "4.0" }
   it { expect(subject).to have_field(:mongodb_replication_priority).of_type(Integer).with_default_value_of 50 }
   it { expect(subject).to have_field(:mongodb_replication_arbiter_only).of_type(Mongoid::Boolean).with_default_value_of false }
 
@@ -21,7 +22,12 @@ describe CloudModel::Services::Mongodb do
 
   describe 'components_needed' do
     it 'should require only mongodb' do
-      expect(subject.components_needed).to eq [:mongodb]
+      expect(subject.components_needed).to eq [:'mongodb@4.0']
+    end
+
+    it 'should require only mongodb with custom version' do
+      subject.mongodb_version = '7.2'
+      expect(subject.components_needed).to eq [:'mongodb@7.2']
     end
   end
 
