@@ -38,6 +38,7 @@ module CloudModel
         begin
           mongo_client = Mongo::Client.new(["#{server_uri}"], connect_timeout: 1, server_selection_timeout: 1, connect: :direct)
           data = mongo_client.database.command('serverStatus' => true).first
+          data['featureCompatibilityVersion'] = mongo_client.database.command(getParameter: 1, featureCompatibilityVersion: 1).first['featureCompatibilityVersion']['version']
         rescue Mongo::Error::NoServerAvailable => e
           return {key: :not_reachable, error: "#{e.class}\n\n#{e.to_s}", severity: :critical}
         rescue Exception => e

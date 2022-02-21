@@ -52,7 +52,7 @@ module CloudModel
     def client
       if initiated? and operational_service_uris.first
         begin
-          Mongo::Client.new(operational_service_uris, connect_timeout: 2, timeout: 2)
+          Mongo::Client.new(operational_service_uris, connect_timeout: 1, server_selection_timeout: 1)
         rescue
           false
         end
@@ -73,13 +73,13 @@ module CloudModel
       end
     end
 
-    def eval js
-      if res = db_command(eval: js)
-        res.first['retval']
-      else
-        false
-      end
-    end
+    # def eval js
+    #   if res = db_command(eval: js)
+    #     res.first['retval']
+    #   else
+    #     false
+    #   end
+    # end
 
     def initiate
       if guests.blank?
@@ -95,9 +95,7 @@ module CloudModel
     end
 
     def status options={}
-      # Issue an administrative command
-      #data = db_command(replSetGetStatus: 1).as_json.first
-      data = eval 'rs.status()'
+      data = db_command(replSetGetStatus: true).first
       data ||= {}
       data['members'] ||= []
 
@@ -136,7 +134,7 @@ module CloudModel
     end
 
     def read_config
-      eval 'rs.config()'
+      db_command(replSetGetConfig: true).first['config']
     end
 
     def reconfig
@@ -178,13 +176,13 @@ module CloudModel
     end
 
 
-    def add host
-      eval "rs.add('#{host}')"
-    end
-
-    def remove host
-      eval "rs.remove('#{host}')"
-    end
+    # def add host
+    #   eval "rs.add('#{host}')"
+    # end
+    #
+    # def remove host
+    #   eval "rs.remove('#{host}')"
+    # end
 
   end
 end
