@@ -36,7 +36,7 @@ module CloudModel
 
       def service_status
         begin
-          mongo_client = Mongo::Client.new(["#{server_uri}"], connect_timeout: 1, server_selection_timeout: 1)
+          mongo_client = Mongo::Client.new(["#{server_uri}"], connect_timeout: 1, server_selection_timeout: 1, connect: :direct)
           data = mongo_client.database.command('serverStatus' => true).first
         rescue Mongo::Error::NoServerAvailable => e
           return {key: :not_reachable, error: "#{e.class}\n\n#{e.to_s}", severity: :critical}
