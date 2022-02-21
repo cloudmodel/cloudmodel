@@ -95,7 +95,7 @@ module CloudModel
     end
 
     def status options={}
-      data = db_command(replSetGetStatus: true).first
+      data = db_command(replSetGetStatus: true).try :first
       data ||= {}
       data['members'] ||= []
 
