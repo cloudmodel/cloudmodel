@@ -82,6 +82,7 @@ module CloudModel
             check_cpu_usage
             check_mem_usage
             check_disks_usage
+            true
           end
         end
       end
