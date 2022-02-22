@@ -23,6 +23,7 @@ describe CloudModel::Services::Nginx do
   # it { expect(subject).to have_field(:fastcgi_index).of_type(String).with_default_value_of('index.php') }
 
   it { expect(subject).to have_field(:capistrano_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
+  it { expect(subject).to have_and_belong_to_many(:capistrano_ssh_groups).as_inverse_of(:services).of_type CloudModel::SshGroup }
 
   it { expect(subject).to have_field(:unsafe_inline_script_allowed).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:unsafe_eval_script_allowed).of_type(Mongoid::Boolean).with_default_value_of(false) }

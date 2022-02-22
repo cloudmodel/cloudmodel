@@ -207,6 +207,9 @@ en:
       cloud_model/ssh_pub_key:
         one: SSH Public Key
         other: SSH Public Keys
+      cloud_model/ssh_group:
+        one: SSH Group
+        other: SSH Groups
       cloud_model/vpn_client:
         one: VPN Client
         other: VPN Clients
@@ -342,6 +345,13 @@ en:
       cloud_model/ssh_pub_key:
         name: Key Name
         key: Public Key
+        created_at: Created At
+        groups: Groups
+        group_ids: Groups
+      cloud_model/ssh_group:
+        name: Group Name
+        description: Group Description
+        pub_keys: Public Keys
         created_at: Created At
       cloud_model/vpn_client:
         name: Client Name
@@ -515,6 +525,8 @@ en:
 
         deployment: Project Deployment
         capistrano_supported: Support Capistrano?
+        capistrano_ssh_groups: Capistrano SSH Groups
+        capistrano_ssh_group_ids: Capistrano SSH Groups
 
         deploy_web_image: Deploy Web Image
 
