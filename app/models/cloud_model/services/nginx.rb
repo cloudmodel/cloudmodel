@@ -21,6 +21,7 @@ module CloudModel
       # field :fastcgi_index, type: String, default: "index.php"
 
       field :capistrano_supported, type: Mongoid::Boolean, default: false
+      has_and_belongs_to_many :capistrano_ssh_groups, class_name: CloudModel::SshGroup, inverse_of: :services
 
       field :unsafe_inline_script_allowed, type: Mongoid::Boolean, default: false
       field :unsafe_eval_script_allowed, type: Mongoid::Boolean, default: false

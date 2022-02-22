@@ -207,6 +207,9 @@ de:
       cloud_model/ssh_pub_key:
         one: Öffentlicher SSH Schlüssel
         other: Öffentliche SSH Schlüssel
+      cloud_model/ssh_group:
+        one: SSH Gruppe
+        other: SSH Gruppen
       cloud_model/vpn_client:
         one: VPN Client
         other: VPN Clients
@@ -344,6 +347,13 @@ de:
         name: Schlüsselname
         key: Öffentlicher Schlüssel
         created_at: Erzeugt am
+        groups: Gruppen
+        group_ids: Gruppen
+      cloud_model/ssh_group:
+        name: Gruppenname
+        description: Gruppenbeschreibung
+        pub_keys: Öffentliche Schlüssel
+        created_at: Angelegt am
       cloud_model/vpn_client:
         name: Clientname
         tinc_public_key: Öffentlicher Schlüssel
@@ -516,6 +526,8 @@ de:
 
         deployment: Projekt deployen
         capistrano_supported: Capistrano unterstützen
+        capistrano_ssh_groups: Capistrano SSH Gruppen
+        capistrano_ssh_group_ids: Capistrano SSH Gruppen
 
         deploy_web_image: Web Image installieren
 

@@ -30,7 +30,7 @@ module CloudModel
 
           # Copy over client ssh files
           ssh_target = File.expand_path("var/www/.ssh", @guest.deploy_path)
-          @host.exec "rm -rf #{ssh_target.shellescape}"
+          #@host.exec "rm -rf #{ssh_target.shellescape}"
           #@host.exec! "cp -ra /inst/ssh/client_keys #{ssh_target}", "Failed to copy www client keys"
           mkdir_p ssh_www_key_source
           mkdir_p ssh_target
@@ -41,11 +41,6 @@ module CloudModel
               @host.exec! "cp -ra #{ssh_www_key_source.shellescape}/id_* #{ssh_target.shellescape}", "Failed to copy client keys"
             end
           rescue Net::SFTP::StatusException => e
-          end
-
-          # Write authorized keys from database entries
-          @host.sftp.file.open("#{ssh_target}/authorized_keys", 'w') do |f|
-            f.write CloudModel::SshPubKey.all.map(&:key) * "\n"
           end
 
           # TODO: Reenable after config for nginx done

@@ -216,7 +216,27 @@ module CloudModel
             @host.exec! "cp -ra #{key_file.shellescape} #{ssl_base_dir.shellescape}", "Failed to copy dhparam keys"
           end
 
+          if not @model.capistrano_ssh_groups.blank? #and @guest.has_service_type? CloudModel::Services::Ssh
+            # Write authorized keys from database entries
+            comment_sub_step "Write SSH authorized keys"
+            ssh_dir = File.expand_path("var/www/.ssh", @guest.deploy_path)
+            ssh_target = File.expand_path("authorized_keys", ssh_dir)
+            mkdir_p "#{ssh_dir}"
+            @host.exec "chown -R 101001:101001 #{ssh_dir}"
+            @host.exec "rm -f #{ssh_target.shellescape}"
 
+            puts ssh_target
+
+            ssh_keys = []
+
+            @model.capistrano_ssh_groups.each do |ssh_group|
+              ssh_keys += ssh_group.pub_keys.map(&:key)
+            end
+
+            @host.sftp.file.open("#{ssh_target}", 'w') do |f|
+              f.write ssh_keys.uniq * "\n"
+            end
+          end
 
           # Cleanup
           @host.exec "chmod -R 2775 #{@guest.deploy_path}#{@model.www_root}"
