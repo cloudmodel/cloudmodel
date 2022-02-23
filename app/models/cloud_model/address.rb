@@ -128,12 +128,20 @@ module CloudModel
 
     # Get tinc subnet bitmask
     def tinc_subnet
-      16
+      if CloudModel.config.tinc_network
+        NetAddr.parse_net(CloudModel.config.tinc_network).netmask.to_s.gsub(/^\//, '').to_i
+      else
+        16
+      end
     end
 
     # Get tinc network
     def tinc_network
-      NetAddr.parse_net("#{CloudModel::Host.last.private_network.ip}/#{tinc_subnet}").network.to_s
+      if CloudModel.config.tinc_network
+        NetAddr.parse_net(CloudModel.config.tinc_network).network.to_s
+      else
+        '10.42.0.0'
+      end
     end
 
     # get NetAddr object

@@ -1,0 +1,13 @@
+<%- if vpn_client.os == 'macOS' -%>
+#!/bin/sh
+
+ifconfig $INTERFACE up mtu 1280
+ifconfig $INTERFACE inet <%= vpn_client.address %> <%= CloudModel::Address.from_str(CloudModel.config.tinc_network).cidr.nth(1).to_s %> netmask 255.255.255.255
+route add -net <%= CloudModel::Address.from_str(CloudModel.config.tinc_network).ip.to_s %> <%= CloudModel::Address.from_str(CloudModel.config.tinc_network).cidr.nth(1).to_s %> <%= CloudModel::Address.from_str(CloudModel.config.tinc_network).netmask %>
+<%- else -%>
+#!/bin/sh
+
+ip link set $INTERFACE up
+ip addr add <%= vpn_client.address %>/32 dev $INTERFACE
+ip route add <%= CloudModel.config.tinc_network %> dev $INTERFACE
+<%- end -%>

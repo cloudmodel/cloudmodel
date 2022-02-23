@@ -356,6 +356,7 @@ en:
       cloud_model/vpn_client:
         name: Client Name
         tinc_public_key: Public Key
+        os: Client OS
         address: IP Address
         created_at: Created At
       cloud_model/mongodb_replication_set:

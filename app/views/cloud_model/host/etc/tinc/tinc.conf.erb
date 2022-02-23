@@ -1,4 +1,4 @@
-Name = <%=raw host.name.downcase %>
+Name = <%=raw host.name.downcase.gsub('-', '_') %>
 AddressFamily = ipv4
 BindToInterface = eth0
 <% (CloudModel::Host.where(:tinc_public_key.ne => nil) - [host]).map{|h| h.name.downcase}.each do |name| -%>

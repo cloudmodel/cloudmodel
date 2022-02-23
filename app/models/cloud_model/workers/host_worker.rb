@@ -75,11 +75,11 @@ module CloudModel
 
         mkdir_p "#{root}/etc/tinc/vpn/hosts/"
         CloudModel::VpnClient.each do |client|
-          render_to_remote "/cloud_model/host/etc/tinc/client", "#{root}/etc/tinc/vpn/hosts/#{client.name.shellescape}", client: client
+          render_to_remote "/cloud_model/host/etc/tinc/client", "#{root}/etc/tinc/vpn/hosts/#{client.name.downcase.gsub('-', '_').shellescape}", client: client
         end
 
         CloudModel::Host.each do |host|
-          render_to_remote "/cloud_model/host/etc/tinc/host", "#{root}/etc/tinc/vpn/hosts/#{host.name.shellescape}", host: host
+          render_to_remote "/cloud_model/host/etc/tinc/host", "#{root}/etc/tinc/vpn/hosts/#{host.name.downcase.gsub('-', '_').shellescape}", host: host
         end
 
         true

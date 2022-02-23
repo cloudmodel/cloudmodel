@@ -3,10 +3,11 @@
 require 'spec_helper'
 
 describe CloudModel::VpnClient do
-  it { expect(subject).to have_timestamps }  
+  it { expect(subject).to have_timestamps }
   it { expect(subject).to have_field(:name).of_type String }
   it { expect(subject).to have_field(:tinc_public_key).of_type String }
   it { expect(subject).to have_field(:address).of_type String }
+  it { expect(subject).to have_field(:os).of_type String }
 
   it { expect(subject).to validate_presence_of(:name) }
   it { expect(subject).to validate_uniqueness_of(:name) }
@@ -16,4 +17,8 @@ describe CloudModel::VpnClient do
   it { expect(subject).to validate_presence_of(:address) }
   it { expect(subject).to validate_format_of(:address).to_allow("127.0.0.1") }
   it { expect(subject).to validate_format_of(:address).not_to_allow("256.2.1.2") }
+
+  describe 'config_tarball' do
+    pending
+  end
 end

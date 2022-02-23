@@ -1,0 +1,12 @@
+Name = <%= vpn_client.name.downcase.gsub('-', '_') %>
+TCPonly = no
+<%- if vpn_client.os == 'macOS' -%>
+Device = utun42
+Port = 666
+<%- else -%>
+Device = /dev/net/tun
+<%- end -%>
+
+<% CloudModel::Host.where(:tinc_public_key.ne => nil).map{|h| h.name.downcase}.each do |name| -%>
+ConnectTo = <%= name %>
+<% end-%>
