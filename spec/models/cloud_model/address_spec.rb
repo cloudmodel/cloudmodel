@@ -289,15 +289,30 @@ describe CloudModel::Address do
   end
 
   describe 'tinc_subnet' do
-    it 'should return 16 (always for now)' do
+    it 'should return configured tinc_network netmask if given' do
+      allow(CloudModel.config).to receive(:tinc_network).and_return '10.42.23.0/24'
+
+      expect(subject.tinc_subnet).to eq 24
+    end
+
+    it 'should return 16 if no tinc_network was configured' do
+      allow(CloudModel.config).to receive(:tinc_network).and_return nil
+
       expect(subject.tinc_subnet).to eq 16
     end
   end
 
   describe 'tinc_network' do
-    it 'should get private network from last host and return base address for tinc_subnet' do
-      network = CloudModel::Address.new ip: '10.42.23.16', subnet: 24
-      allow(CloudModel::Host).to receive(:last).and_return(double :host, private_network: network)
+    it 'should return configured tinc_network netmask if given' do
+      allow(CloudModel.config).to receive(:tinc_network).and_return '10.23.42.0/24'
+
+      expect(subject.tinc_network).to eq '10.23.42.0'
+    end
+
+
+    it 'should return 10.42.0.0 if no tinc_network was configured' do
+      allow(CloudModel.config).to receive(:tinc_network).and_return nil
+
       expect(subject.tinc_network).to eq "10.42.0.0"
     end
   end

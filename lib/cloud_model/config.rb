@@ -15,6 +15,7 @@ module CloudModel
     attr_writer :dns_domains
 
     attr_writer :host_mac_address_prefix_init
+    attr_writer :tinc_network, :tinc_client_name
 
     attr_writer :backup_hosts, :monitoring_notifiers
     attr_accessor :issue_url
@@ -104,6 +105,14 @@ module CloudModel
 
     def host_mac_address_prefix_init
       @host_mac_address_prefix_init || '00:00'
+    end
+
+    def tinc_network
+      @tinc_network || '10.42.0.0/16'
+    end
+
+    def tinc_client_name
+      @tinc_client_name || 'cloudmodel'
     end
 
     def backup_hosts

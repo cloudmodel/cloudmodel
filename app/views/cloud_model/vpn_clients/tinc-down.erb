@@ -1,0 +1,14 @@
+<%- if vpn_client.os == 'macOS' -%>
+#!/bin/sh
+
+route delete <%= CloudModel.config.tinc_network %>
+
+ifconfig $INTERFACE inet <%= vpn_client.address %> <%= CloudModel::Address.from_str(CloudModel.config.tinc_network).cidr.nth(1).to_s %> netmask 255.255.255.255 delete
+ifconfig $INTERFACE down
+<%- else -%>
+#!/bin/sh
+
+ip route del <%= CloudModel.config.tinc_network %> dev $INTERFACE
+ip addr del <%= vpn_client.address %>/32 dev $INTERFACE
+ip link set $INTERFACE down
+<%- end -%>

@@ -204,6 +204,28 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'tinc_network' do
+    it 'should allow to set the network used for tinc' do
+      subject.tinc_network = '10.23.42.0/24'
+      expect(subject.tinc_network).to eq '10.23.42.0/24'
+    end
+
+    it 'should default to 10.42.0.0/16' do
+      expect(subject.tinc_network).to eq '10.42.0.0/16'
+    end
+  end
+
+  describe 'tinc_client_name' do
+    it 'should allow to set the name of tinc realm' do
+      subject.tinc_client_name = 'my_tinc_vpn'
+      expect(subject.tinc_client_name).to eq 'my_tinc_vpn'
+    end
+
+    it 'should default to "cloudmodel"' do
+      expect(subject.tinc_client_name).to eq 'cloudmodel'
+    end
+  end
+
   describe 'backup_hosts' do
     it 'should allow to set backup hosts' do
       subject.backup_hosts = %w(10.42.23.1 10.42.23.129)
