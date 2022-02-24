@@ -114,6 +114,8 @@ de:
       cloud_model/mongodb_replication_set:
         one: MongoDB Replikationset
         other: MongoDB Replikationsets
+        state: Status
+        monitoring_last_check_at: Zuletzt überwacht
       cloud_model/redis_sentinel_set:
         one: Redis Replikationset
         other: Redis Replikationsets
@@ -363,9 +365,13 @@ de:
       cloud_model/mongodb_replication_set:
         name: Setname
         services: Dienste
+        state: Status
+        monitoring_last_check_at: Zuletzt überwacht
       cloud_model/redis_sentinel_set:
         name: Setname
         services: Dienste
+        state: Status
+        monitoring_last_check_at: Zuletzt überwacht
       cloud_model/host_template:
         id: Bezeichner
         build_state: Erstellungsstatus

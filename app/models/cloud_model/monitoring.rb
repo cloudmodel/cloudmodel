@@ -5,6 +5,7 @@ require_relative "monitoring/guest_checks"
 require_relative "monitoring/service_checks"
 require_relative "monitoring/lxd_custom_volume_checks"
 require_relative "monitoring/mongodb_replication_set_checks"
+require_relative "monitoring/redis_sentinel_set_checks"
 
 module CloudModel
   module Monitoring
@@ -24,3 +25,4 @@ end
 
 CloudModel::Monitoring.register_check CloudModel::Monitoring::HostChecks
 CloudModel::Monitoring.register_check CloudModel::Monitoring::MongodbReplicationSetChecks
+CloudModel::Monitoring.register_check CloudModel::Monitoring::RedisSentinelSetChecks

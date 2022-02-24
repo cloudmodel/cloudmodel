@@ -8,15 +8,24 @@ describe CloudModel::Monitoring::RedisSentinelSetChecks do
 
   it { expect(subject).to be_a CloudModel::Monitoring::BaseChecks }
 
+  describe '.check' do
+    pending
+  end
+
   describe 'acquire_data' do
-    it 'should be nil for now' do
-      expect(subject.acquire_data).to eq nil
+    it 'should get set status' do
+      allow(redis_sentinel_set).to receive(:status).and_return 'ok' => 1.0
+      expect(subject.acquire_data).to eq 'ok' => 1.0
+    end
+  end
+
+  describe 'line_prefix' do
+    it 'should return "[_Redis Sentinel_] "' do
+      expect(subject.line_prefix).to eq "[_Redis Sentinel_] "
     end
   end
 
   describe 'check' do
-    it 'should be nil for now' do
-      expect(subject.check).to eq nil
-    end
+    pending
   end
 end

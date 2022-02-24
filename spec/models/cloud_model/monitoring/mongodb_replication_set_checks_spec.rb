@@ -8,10 +8,20 @@ describe CloudModel::Monitoring::MongodbReplicationSetChecks do
 
   it { expect(subject).to be_a CloudModel::Monitoring::BaseChecks }
 
+  describe '.check' do
+    pending
+  end
+
   describe 'acquire_data' do
     it 'should get set status' do
       allow(mongodb_replication_set).to receive(:status).and_return 'ok' => 1.0
       expect(subject.acquire_data).to eq 'ok' => 1.0
+    end
+  end
+
+  describe 'line_prefix' do
+    it 'should return "[_Mongo Repl_] "' do
+      expect(subject.line_prefix).to eq "[_Mongo Repl_] "
     end
   end
 
