@@ -80,4 +80,8 @@ describe CloudModel::RedisSentinelSet do
       expect(subject.sentinel_hosts).to eq [{"ip"=>"10.42.23.17", "port"=>26379}, {"ip"=>"10.42.23.117", "port"=>1337}]
     end
   end
+
+  describe 'status' do
+    pending
+  end
 end
