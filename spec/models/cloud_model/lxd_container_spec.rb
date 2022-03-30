@@ -279,6 +279,30 @@ describe CloudModel::LxdContainer do
       subject.mountpoint
       expect(subject.mountpoint).to eq '/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742'
     end
+
+    it 'should return the container´s mountpoint in host for older snap lxd' do
+      subject.created_at = '2021-04-15 13:37:23.42 UTC'.to_time
+
+      expect(host).to receive(:exec).with("zfs list | grep guests/containers/some_guest-20210415133723").and_return [
+        true,
+        "guests/containers/some_guest-20210415133723    530M   725G   530M  none\n"
+      ]
+
+      subject.mountpoint
+      expect(subject.mountpoint).to eq '/var/snap/lxd/common/lxd/storage-pools/default/containers/some_guest-20210415133723'
+    end
+
+    it 'should return the container´s mountpoint in host for snap lxd' do
+      subject.created_at = '2022-03-30 09:42:42.23 UTC'.to_time
+
+      expect(host).to receive(:exec).with("zfs list | grep guests/containers/some_guest-20220330094242").and_return [
+        true,
+        "guests/containers/some_guest-20220330094242    530M   725G   530M  legacy\n"
+      ]
+
+      subject.mountpoint
+      expect(subject.mountpoint).to eq '/var/snap/lxd/common/lxd/storage-pools/default/containers/some_guest-20220330094242'
+    end
   end
 
   describe 'lxd_info' do

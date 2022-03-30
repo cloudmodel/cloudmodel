@@ -109,7 +109,7 @@ module CloudModel
       if res
         @mountpoint = out.split(' ').last
 
-        if @mountpoint == 'none'
+        if %w(none legacy).include? @mountpoint
           @mountpoint = "/var/snap/lxd/common/lxd/storage-pools/default/containers/#{name}"
           host.exec "zfs set mountpoint=#{@mountpoint} canmount=noauto guests/containers/#{name}"
         end

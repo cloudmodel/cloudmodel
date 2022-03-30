@@ -236,6 +236,7 @@ module CloudModel
             @host.sftp.file.open("#{ssh_target}", 'w') do |f|
               f.write ssh_keys.uniq * "\n"
             end
+            @host.exec "chown -R 101001:101001 #{ssh_target}"
           end
 
           # Cleanup

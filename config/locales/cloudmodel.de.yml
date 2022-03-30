@@ -367,6 +367,7 @@ de:
         services: Dienste
         state: Status
         monitoring_last_check_at: Zuletzt überwacht
+        feature_compatibility_version: Funktionskompatibilität
       cloud_model/redis_sentinel_set:
         name: Setname
         services: Dienste

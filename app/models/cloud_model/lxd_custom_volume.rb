@@ -91,8 +91,11 @@ module CloudModel
     end
 
     def usage_bytes
-      if check_result = guest.monitoring_last_check_result and sys_info = check_result['system'] and df = sys_info['df'] and info = df["guests/custom/#{name}".to_sym] or info = df["guests/custom/default_#{name}".to_sym]
-        info['used'].to_i*1024
+      begin
+        if check_result = guest.monitoring_last_check_result and sys_info = check_result['system'] and df = sys_info['df'] and info = df["guests/custom/#{name}".to_sym] or info = df["guests/custom/default_#{name}".to_sym]
+          info['used'].to_i*1024
+        end
+      rescue
       end
     end
 

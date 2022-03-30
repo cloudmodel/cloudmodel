@@ -364,6 +364,7 @@ en:
         services: Services
         state: State
         monitoring_last_check_at: Last Monitored
+        feature_compatibility_version: Feature Compatibility
       cloud_model/redis_sentinel_set:
         name: Set Name
         services: Services
