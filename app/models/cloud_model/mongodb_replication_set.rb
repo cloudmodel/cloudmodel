@@ -1,4 +1,8 @@
 module CloudModel
+  def self.mongodb_version_path
+    ["3.2", "3.4", "3.6", "4.0", "4.2", "4.4", "5.0"]
+  end
+
   class MongodbReplicationSet
     include Mongoid::Document
     include Mongoid::Timestamps
@@ -20,6 +24,13 @@ module CloudModel
 
     def add_service service
       service.update_attribute :mongodb_replication_set_id, id
+    end
+
+    def feature_compatibility_version
+      begin
+        db_command(getParameter: 1, featureCompatibilityVersion: 1).first['featureCompatibilityVersion']['version']
+      rescue
+      end
     end
 
     def init_rs_cmd
@@ -183,6 +194,61 @@ module CloudModel
     # def remove host
     #   eval "rs.remove('#{host}')"
     # end
+
+    def update_feature_compatibility_version! version, options={}
+      unless CloudModel::mongodb_version_path.index(version)
+        puts "Version #{version} is not in the allowed versions (#{CloudModel::mongodb_version_path * ', '})"
+        return false
+      end
+
+      if services.blank?
+        puts "No services found"
+        return false
+      end
+
+      features = feature_compatibility_version
+
+      if version == features
+        puts "Already on requested feature level #{version}"
+        return false
+      end
+      if version < features
+        puts "You can not downgrade a replication set (#{features} => #{version})"
+        return false
+      end
+
+      if latest_compatible_version = CloudModel::mongodb_version_path[CloudModel::mongodb_version_path.index(features) + 1]
+        puts "# Check if version of current services is #{latest_compatible_version}"
+        deployed = false
+        # ensure all guests are up to there set mongo version
+        services.each do |service|
+          unless current_version = service.service_status['version']
+            puts "Service #{service.name} on guest #{service.guest.host.name}:#{service.guest.name} not running?"
+          end
+          service.update_attribute :mongodb_version, latest_compatible_version
+          if service.mongodb_version > current_version
+            puts "### Service #{service.name} on guest #{service.guest.host.name}:#{service.guest.name} needs updating (#{current_version} => #{service.mongodb_version})"
+            service.guest.redeploy! force: true, debug: options[:debug]
+            deployed = true
+          end
+        end
+        if deployed
+          puts "# Waiting for service to restart"
+          sleep 60
+        end
+        puts "# Set Feature Compatibility Version to #{latest_compatible_version}"
+        puts db_command(setFeatureCompatibilityVersion: latest_compatible_version)
+      else
+        puts "There is no newer version available as the current compatibility version (#{features})"
+        return false
+      end
+
+      if latest_compatible_version < version
+        #next_version = CloudModel::mongodb_version_path[CloudModel::mongodb_version_path.index(latest_compatible_version) + 1]
+        update_feature_compatibility_version! version, options
+      end
+      true
+    end
 
   end
 end

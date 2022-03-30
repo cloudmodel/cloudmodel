@@ -7,6 +7,12 @@ describe CloudModel::MongodbReplicationSet do
 
   it { expect(subject).to have_field(:name).of_type(String) }
 
+  describe 'CloudModel.mongodb_version_path' do
+    it 'should return known versions of mongodb' do
+      expect(CloudModel.mongodb_version_path).to eq ["3.2", "3.4", "3.6", "4.0", "4.2", "4.4", "5.0"]
+    end
+  end
+
   describe 'guests' do
     pending
   end
@@ -35,6 +41,14 @@ describe CloudModel::MongodbReplicationSet do
       expect(service).to receive(:update_attribute).with(:mongodb_replication_set_id, subject.id)
 
       subject.add_service service
+    end
+  end
+
+  describe 'feature_compatibility_version' do
+    it 'should get the feature_compatibility_version from db' do
+      expect(subject).to receive(:db_command).with(getParameter: 1, featureCompatibilityVersion: 1).and_return [{'featureCompatibilityVersion' => {'version' => '4.2'}}]
+
+      expect(subject.feature_compatibility_version).to eq '4.2'
     end
   end
 
@@ -105,11 +119,15 @@ describe CloudModel::MongodbReplicationSet do
     pending
   end
 
-  describe 'add' do
-    pending
-  end
+  # describe 'add' do
+  #   pending
+  # end
+  #
+  # describe 'remove' do
+  #   pending
+  # end
 
-  describe 'remove' do
+  describe 'update_feature_compatibility_version!' do
     pending
   end
 end
