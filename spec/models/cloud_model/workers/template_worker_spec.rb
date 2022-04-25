@@ -20,14 +20,19 @@ describe CloudModel::Workers::TemplateWorker do
     end
   end
 
-  context '#ubuntu_version' do
-    it 'should be 18.04.5 by default' do
-      expect(subject.ubuntu_version).to eq '18.04.5'
+  context '#os_version' do
+    it 'should get os version from template' do
+      template = double 'Template', os_version: 'basic-2.0'
+      subject.instance_variable_set :@template, template
+      expect(subject.os_version).to eq 'basic-2.0'
     end
+  end
 
-    it 'should be configured verion' do
-      CloudModel.config.ubuntu_version = '42.04'
-      expect(subject.ubuntu_version).to eq '42.04'
+  context '#ubuntu_version' do
+    it 'should get ubuntu version from template (deprecated)' do
+      template = double 'Template', os_version: 'ubuntu-18.04.5'
+      subject.instance_variable_set :@template, template
+      expect(subject.ubuntu_version).to eq '18.04.5'
     end
   end
 
@@ -52,7 +57,7 @@ describe CloudModel::Workers::TemplateWorker do
 
   context '#ubuntu_image' do
     it 'should generate ubuntu tar ball name' do
-      CloudModel.config.ubuntu_version = '42.04.5'
+      allow(subject).to receive(:ubuntu_version).and_return '42.04.5'
       allow(subject).to receive(:ubuntu_arch).and_return 'MOS6502'
       expect(subject.ubuntu_image).to eq 'ubuntu-base-42.04.5-base-MOS6502.tar.gz'
     end

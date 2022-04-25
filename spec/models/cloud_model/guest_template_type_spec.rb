@@ -6,6 +6,7 @@ describe CloudModel::GuestTemplateType do
   it { expect(subject).to have_timestamps }
 
   #it { expect(subject).to have_field(:name).of_type String }
+  it { expect(subject).to have_field(:os_version).of_type(String).with_default_value_of "ubuntu-#{CloudModel.config.ubuntu_version}" }
   it { expect(subject).to have_field(:components).of_type(Array).with_default_value_of [] }
   it { expect(subject).to have_many(:templates).of_type CloudModel::GuestTemplate}
 
@@ -16,8 +17,10 @@ describe CloudModel::GuestTemplateType do
       core_template = double CloudModel::GuestCoreTemplate, arch: 'MOS6502'
       template = double CloudModel::GuestTemplate
       expect(CloudModel::GuestCoreTemplate).to receive(:last_useable).with(host).and_return core_template
+      allow(subject).to receive(:os_version).and_return 'basic-2.0'
       expect(subject.templates).to receive(:create).with(
         core_template: core_template,
+        os_version: 'basic-2.0',
         arch: 'MOS6502'
       ).and_return template
 
@@ -79,12 +82,14 @@ describe CloudModel::GuestTemplateType do
 
   describe 'name' do
     it 'should handle GuestTemplateType without components' do
-      expect(subject.name).to eq 'CloudModel Guest Template without components'
+      subject.os_version = 'basic-2.0'
+      expect(subject.name).to eq 'basic-2.0 without components'
     end
 
     it 'should concatinate components to name' do
+      subject.os_version = 'basic-7.0'
       subject.components = [:nginx, :'mongodb@5.0', :redis]
-      expect(subject.name).to eq 'CloudModel Guest Template with NGINX, MongoDB 5.0, Redis'
+      expect(subject.name).to eq 'basic-7.0 with NGINX, MongoDB 5.0, Redis'
     end
   end
 end

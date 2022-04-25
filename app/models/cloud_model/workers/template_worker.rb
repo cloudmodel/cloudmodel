@@ -9,8 +9,12 @@ module CloudModel
         @template
       end
 
+      def os_version
+        @template.os_version
+      end
+
       def ubuntu_version
-        CloudModel.config.ubuntu_version
+        @template.os_version.gsub(/^ubuntu-/, '')
       end
 
       def ubuntu_kernel_flavour
