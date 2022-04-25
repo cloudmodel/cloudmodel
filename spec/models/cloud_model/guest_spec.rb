@@ -12,6 +12,7 @@ describe CloudModel::Guest do
   it { expect(subject).to have_field(:current_lxd_container_id).of_type BSON::ObjectId }
   it { expect(subject).to have_many(:guest_certificates).of_type CloudModel::GuestCertificate}
 
+  it { expect(subject).to have_field(:os_version).of_type(String).with_default_value_of "ubuntu-#{CloudModel.config.ubuntu_version}" }
   it { expect(subject).to have_field(:name).of_type String }
 
   it { expect(subject).to have_field(:private_address).of_type String }
@@ -513,7 +514,8 @@ describe CloudModel::Guest do
     it 'should find or create GuestTemplateType for needed components' do
       template_type = double CloudModel::GuestTemplateType
       allow(subject).to receive(:components_needed).and_return [:nginx, :ruby]
-      expect(CloudModel::GuestTemplateType).to receive(:find_or_create_by).with(components: [:nginx, :ruby]).and_return template_type
+      allow(subject).to receive(:os_version).and_return 'basic-2.0'
+      expect(CloudModel::GuestTemplateType).to receive(:find_or_create_by).with(components: [:nginx, :ruby], os_version: 'basic-2.0').and_return template_type
       expect(subject.template_type).to eq template_type
     end
   end

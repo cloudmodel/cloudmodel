@@ -5,6 +5,7 @@ module CloudModel
     include CloudModel::Mixins::ENumFields
     prepend CloudModel::Mixins::SmartToString
 
+    field :os_version, type: String, default: "ubuntu-#{CloudModel.config.ubuntu_version}"
     field :arch, type: String
 
     belongs_to :template_type, class_name: "CloudModel::GuestTemplateType"

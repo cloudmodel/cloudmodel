@@ -18,6 +18,7 @@ module CloudModel
     embeds_many :lxd_custom_volumes, class_name: "CloudModel::LxdCustomVolume", :cascade_callbacks => true
     field :current_lxd_container_id, type: BSON::ObjectId
     has_many :guest_certificates, class_name: "CloudModel::GuestCertificate"
+    field :os_version, type: String, default: "ubuntu-#{CloudModel.config.ubuntu_version}"
 
     accepts_nested_attributes_for :lxd_custom_volumes, allow_destroy: true
     accepts_nested_attributes_for :services, allow_destroy: true
@@ -230,7 +231,7 @@ module CloudModel
     end
 
     def template_type
-      CloudModel::GuestTemplateType.find_or_create_by components: components_needed
+      CloudModel::GuestTemplateType.find_or_create_by components: components_needed, os_version: os_version
     end
 
     def template

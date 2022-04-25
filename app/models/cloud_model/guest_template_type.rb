@@ -6,13 +6,15 @@ module CloudModel
 
     has_many :templates, class_name: 'CloudModel::GuestTemplate'
 
-    field :name, type: String
+    #field :name, type: String
     field :components, type: Array, default: []
+    field :os_version, type: String, default: "ubuntu-#{CloudModel.config.ubuntu_version}"
 
     def new_template host
-      core_template = CloudModel::GuestCoreTemplate.last_useable(host)
+      core_template = CloudModel::GuestCoreTemplate.where(os_version: os_version).last_useable(host)
       templates.create(
         core_template: core_template,
+        os_version: os_version,
         arch: core_template.arch
       )
     end
@@ -44,9 +46,9 @@ module CloudModel
 
     def name
       if components.empty?
-        "CloudModel Guest Template without components"
+        "#{os_version} without components"
       else
-        "CloudModel Guest Template with #{componant_names * ', '}"
+        "#{os_version} with #{componant_names * ', '}"
       end
     end
   end

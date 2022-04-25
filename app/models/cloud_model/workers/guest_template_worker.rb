@@ -115,13 +115,13 @@ module CloudModel
 
         @template = template
 
-        template.update_attributes build_state: :running, os_version: "ubuntu-#{ubuntu_version}"
+        template.update_attributes build_state: :running, os_version: os_version
 
         mkdir_p build_path
         mkdir_p download_path
 
         steps = [
-          ["Download Ubutu Base #{ubuntu_version}", :fetch_ubuntu],
+          ["Download #{os_version}", :fetch_ubuntu],
           ["Populate system with image", :populate_root],
           ["Update base system", :update_base],
           ["Install basic utils", :install_utils],
