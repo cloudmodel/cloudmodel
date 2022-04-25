@@ -506,7 +506,7 @@ describe CloudModel::Guest do
       allow(subject).to receive(:services).and_return [
         double(components_needed: [:solr]),
       ]
-      expect(subject.components_needed).to eq [:java8, :solr]
+      expect(subject.components_needed).to eq [:'java@8', :solr]
     end
   end
 
