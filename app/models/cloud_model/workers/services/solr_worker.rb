@@ -43,6 +43,12 @@ module CloudModel
         def service_name
           "solr"
         end
+
+        def auto_start
+          mkdir_p overlay_path
+          render_to_remote "/cloud_model/guest/etc/systemd/system/solr.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"
+          super
+        end
       end
     end
   end
