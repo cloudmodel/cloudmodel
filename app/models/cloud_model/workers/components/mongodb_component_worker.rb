@@ -3,7 +3,7 @@ module CloudModel
     module Components
       class MongodbComponentWorker < BaseComponentWorker
         def mongoversion
-          @options[:component].try(:version) || "4.0"
+          @options[:component].try(:version) || "5.0"
         end
 
         def build build_path
