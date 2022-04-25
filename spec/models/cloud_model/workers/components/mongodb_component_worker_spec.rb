@@ -14,12 +14,12 @@ describe CloudModel::Workers::Components::MongodbComponentWorker do
       allow(subject).to receive :chroot!
     end
 
-    it 'should apt-get mongodb-org with default version 4.0' do
+    it 'should apt-get mongodb-org with default version 5.0' do
       expect(subject).to receive(:chroot!).with('/tmp/build', "apt-get install gnupg -y", "Failed to install key management")
 
-      expect(subject).to receive(:chroot!).with('/tmp/build', "wget -q -O - https://www.mongodb.org/static/pgp/server-4.0.asc | sudo apt-key add - ", "Failed to add mongodb key")
+      expect(subject).to receive(:chroot!).with('/tmp/build', "wget -q -O - https://www.mongodb.org/static/pgp/server-5.0.asc | sudo apt-key add - ", "Failed to add mongodb key")
 
-      expect(subject).to receive(:chroot!).with('/tmp/build', "echo 'deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse' | sudo tee /etc/apt/sources.list.d/mongodb-org-4.0.list", "Failed to add mongodb to list if repos")
+      expect(subject).to receive(:chroot!).with('/tmp/build', "echo 'deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/5.0 multiverse' | sudo tee /etc/apt/sources.list.d/mongodb-org-5.0.list", "Failed to add mongodb to list if repos")
 
       expect(subject).to receive(:chroot!).with('/tmp/build', "apt-get update", "Failed to update packages")
 

@@ -21,9 +21,9 @@ describe CloudModel::Components::SolrComponent do
       expect(subject.name).to eq :solr
     end
 
-    it 'should return :solr@42.23 if version is set to 42.23' do
+    it 'should return :solr if version is given' do
       subject.version = "42.23"
-      expect(subject.name).to eq :'solr@42.23'
+      expect(subject.name).to eq :solr
     end
   end
 
@@ -49,8 +49,14 @@ describe CloudModel::Components::SolrComponent do
   end
 
   describe 'requirements' do
-    it 'should require :java8' do
-      expect(subject.requirements).to eq [:java8]
+    it 'should require :java@8' do
+      expect(subject.requirements).to eq [:'java@8']
     end
+
+    it 'should require :java@11 if solr is version 8 (or greater)' do
+      subject.version = '8.11.1'
+      expect(subject.requirements).to eq [:'java@11']
+    end
+
   end
 end

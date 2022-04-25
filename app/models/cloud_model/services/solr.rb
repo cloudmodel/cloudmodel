@@ -4,13 +4,12 @@ module CloudModel
       field :port, type: Integer, default: 8080
       belongs_to :deploy_solr_image, class_name: 'CloudModel::SolrImage', inverse_of: :services
 
-
       def kind
         :http
       end
 
       def components_needed
-        ([:solr] + super).uniq
+        ([:"solr@#{deploy_solr_image.solr_version}"] + super).uniq
       end
 
       def read_solr_json uri

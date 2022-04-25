@@ -144,7 +144,7 @@ module CloudModel
         end
 
         @host.guests.where(:external_address.exists => true).each do |guest|
-          unless guest.external_address.empty?
+          unless guest.external_address.blank?
             #commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{guest.private_address} ! -d #{tinc_network} -j SNAT --to-source #{guest.external_address}"
             #commands << "#{ip4tables_bin} -t nat -A POSTROUTING -o eth0 -s #{guest.private_address} -j SNAT --to-source #{guest.external_address}"
             #commands << "#{ip4tables_bin} -t nat -A POSTROUTING -d #{guest.private_address} -j SNAT --to-source #{guest.external_address}"

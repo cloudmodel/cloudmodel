@@ -16,8 +16,9 @@ describe CloudModel::Services::Solr do
 
   describe 'components_needed' do
     it 'should require solr components' do
+      expect(subject).to receive(:deploy_solr_image).and_return(double solr_version: '42.23')
       # java is required by solr component dependencies
-      expect(subject.components_needed).to eq [:solr]
+      expect(subject.components_needed).to eq [:'solr@42.23']
     end
   end
 
