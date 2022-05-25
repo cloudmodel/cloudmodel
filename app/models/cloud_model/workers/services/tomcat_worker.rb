@@ -19,7 +19,7 @@ module CloudModel
           # Read manifest
           manifest = ''
           @host.sftp.file.open( "#{target}/manifest.yml") do |f|
-            manifest = YAML.load(f.read)
+            manifest = YAML.load(f.read, permitted_classes: [Symbol, Time])
           end
 
           comment_sub_step "Write tomcat config"

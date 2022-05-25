@@ -130,14 +130,14 @@ module CloudModel
     # Get generic infos about the LXD
     def lxd_info
       success, result = lxc "info"
-      YAML.load(result).deep_transform_keys { |key| key.to_s.underscore }
+      YAML.load(result, permitted_classes: [Symbol, Time]).deep_transform_keys { |key| key.to_s.underscore }
     end
 
     # Get infos about the container
     def live_lxc_info
       success, result = lxc "list #{name} --format yaml"
       if success
-        result = YAML.load(result).first
+        result = YAML.load(result, permitted_classes: [Symbol, Time]).first
 
         result ||= {}
 
