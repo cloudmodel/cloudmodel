@@ -386,7 +386,7 @@ module CloudModel
     def live_lxc_info
       success, result = exec('lxc list --format yaml')
       if success
-        result = YAML.load(result)
+        result = YAML.load(result, permitted_classes: [Symbol, Time])
 
         result ||= []
         info = {}

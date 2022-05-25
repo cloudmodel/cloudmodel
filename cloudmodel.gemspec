@@ -29,8 +29,10 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'bcrypt-ruby', '~> 3.0', '>= 3.0.0'
   spec.add_dependency 'netaddr', '~> 2.0', '>= 2.0.4'
-  spec.add_dependency 'net-sftp', '~> 2.1', '>= 2.1.0'
-  spec.add_dependency 'net-ping', '~> 2.0'
+  spec.add_dependency 'net-ftp'#, '~> 2.1', '>= 2.1.0'
+  spec.add_dependency 'net-sftp'#, '~> 2.1', '>= 2.1.0'
+  spec.add_dependency 'net-ping'#, '~> 2.0'
+  spec.add_dependency 'net-smtp'#, '~> 2.0'
 
   # For service checks
   spec.add_dependency 'redis'

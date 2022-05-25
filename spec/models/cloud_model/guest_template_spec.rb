@@ -147,7 +147,7 @@ describe CloudModel::GuestTemplate do
       allow(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return true
 
-      expect(worker).to receive(:build_template).with(subject, debug: true).and_return true
+      expect(worker).to receive(:build_template).with(subject, {debug: true}).and_return true
 
       expect(subject.build! host, debug: true).to eq true
     end
