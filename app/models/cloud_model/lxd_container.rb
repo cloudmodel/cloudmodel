@@ -137,7 +137,7 @@ module CloudModel
     def live_lxc_info
       success, result = lxc "list #{name} --format yaml"
       if success
-        result = YAML.load(result, permitted_classes: [Symbol, Time]).first
+        result = YAML.load(result, permitted_classes: [Symbol, Time]).find{|i| i['name'] == name}
 
         result ||= {}
 

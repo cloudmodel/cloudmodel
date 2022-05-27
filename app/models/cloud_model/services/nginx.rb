@@ -13,6 +13,7 @@ module CloudModel
 
       field :passenger_supported, type: Mongoid::Boolean, default: false
       field :passenger_env, type: String, default: 'production'
+      field :passenger_ruby_version, type: String, default: CloudModel.config.ruby_version
       field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
 
       # field :fastcgi_supported, type: Mongoid::Boolean, default: false
@@ -70,7 +71,7 @@ module CloudModel
         end
 
         if passenger_supported or capistrano_supported
-          components = [:ruby] + components
+          components = [:"ruby@#{passenger_ruby_version}"] + components
           if deploy_web_image
             components += deploy_web_image.additional_components.map &:to_sym
           end

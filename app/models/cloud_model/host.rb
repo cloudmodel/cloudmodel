@@ -384,19 +384,23 @@ module CloudModel
     end
 
     def live_lxc_info
-      success, result = exec('lxc list --format yaml')
-      if success
-        result = YAML.load(result, permitted_classes: [Symbol, Time])
+      begin
+        success, result = exec('lxc list --format yaml')
+        if success
+          result = YAML.load(result, permitted_classes: [Symbol, Time])
 
-        result ||= []
-        info = {}
+          result ||= []
+          info = {}
 
-        result.each do |c|
-          info[c.delete('name')] = c
+          result.each do |c|
+            info[c.delete('name')] = c
+          end
+
+          info
+        else
+          {}
         end
-
-        info
-      else
+      rescue
         {}
       end
     end

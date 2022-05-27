@@ -7,4 +7,4 @@ User=www
 Group=www
 EnvironmentFile=/etc/default/rails
 WorkingDirectory=/var/www/rails/current
-ExecStart=/usr/local/bin/bundle exec rake %i
+ExecStart=/usr/local/rvm/bin/rvm default do bundle exec rake %i

@@ -11,8 +11,8 @@ WorkingDirectory=<%= path %>
 PIDFile=/tmp/delayed_job.pid
 
 Environment = RAILS_ENV=<%= model.passenger_env %>
-ExecStart=<%= path %>/bin/delayed_job --pid_dir=/tmp/ start
-ExecStop=<%= path %>/bin/delayed_job --pid_dir=/tmp/ stop
+ExecStart=/usr/local/rvm/bin/rvm default do <%= path %>/bin/delayed_job --pid_dir=/tmp/ start
+ExecStop=/usr/local/rvm/bin/rvm default do <%= path %>/bin/delayed_job --pid_dir=/tmp/ stop
 User=www
 Group=www
 UMask=0002

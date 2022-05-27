@@ -7,7 +7,7 @@ AssertPathExists=/var/www/rails/current
 Type=simple
 WorkingDirectory=/var/www/rails/current
 
-ExecStart=/bin/bash -lc 'RAILS_ENV=production bundle exec rake cloudmodel:monitoring:check'
+ExecStart=/bin/bash -lc 'RAILS_ENV=production /usr/local/rvm/bin/rvm default do bundle exec rake cloudmodel:monitoring:check'
 KillSignal=SIGINT
 User=www
 Group=www
