@@ -59,7 +59,7 @@ describe CloudModel::Config do
     end
 
     it 'should default to "PATH=/bin:/sbin:/usr/bin:/usr/local/bin bundle"' do
-      expect(subject.bundle_command).to eq "PATH=/usr/local/bin:/bin:/sbin:/usr/bin bundle"
+      expect(subject.bundle_command).to eq "/usr/local/rvm/bin/rvm default do bundle"
     end
   end
 

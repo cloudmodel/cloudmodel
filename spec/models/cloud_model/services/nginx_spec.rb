@@ -15,6 +15,7 @@ describe CloudModel::Services::Nginx do
 
   it { expect(subject).to have_field(:passenger_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:passenger_env).of_type(String).with_default_value_of('production') }
+  it { expect(subject).to have_field(:passenger_ruby_version).of_type(String).with_default_value_of(CloudModel.config.ruby_version) }
   it { expect(subject).to have_field(:delayed_jobs_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
 
   # it { expect(subject).to have_field(:fastcgi_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
@@ -69,14 +70,15 @@ describe CloudModel::Services::Nginx do
 
     it 'should require nginx and ruby if passenger supported' do
       subject.passenger_supported = true
-      expect(subject.components_needed).to eq [:ruby, :nginx]
+      expect(subject.components_needed).to eq [:'ruby@2.5', :nginx]
     end
 
     it 'should require nginx, ruby, and additional components from deployed WebImage' do
       web_image = double CloudModel::WebImage, additional_components: ['xml', 'imagemagick']
+      subject.passenger_ruby_version = '3.1'
       subject.passenger_supported = true
       allow(subject).to receive(:deploy_web_image).and_return web_image
-      expect(subject.components_needed).to eq [:ruby, :nginx, :xml, :imagemagick]
+      expect(subject.components_needed).to eq [:'ruby@3.1', :nginx, :xml, :imagemagick]
     end
 
     it 'should require web app components'

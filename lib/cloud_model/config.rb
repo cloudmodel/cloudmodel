@@ -43,7 +43,7 @@ module CloudModel
     end
 
     def bundle_command
-      @bundle_command || 'PATH=/usr/local/bin:/bin:/sbin:/usr/bin bundle'
+      @bundle_command || '/usr/local/rvm/bin/rvm default do bundle'
     end
 
     # If true do not sync images on deploy

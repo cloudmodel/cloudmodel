@@ -14,7 +14,9 @@ PATH
       mongoid-grid_fs (~> 2.3)
       mysql2
       net-ftp
+      net-imap
       net-ping
+      net-pop
       net-sftp
       net-smtp
       netaddr (~> 2.0, >= 2.0.4)
@@ -164,7 +166,15 @@ GEM
     net-ftp (0.1.3)
       net-protocol
       time
+    net-imap (0.2.3)
+      digest
+      net-protocol
+      strscan
     net-ping (2.0.8)
+    net-pop (0.1.1)
+      digest
+      net-protocol
+      timeout
     net-protocol (0.1.3)
       timeout
     net-sftp (3.0.0)
@@ -245,6 +255,7 @@ GEM
       actionpack (>= 5.2)
       activesupport (>= 5.2)
       sprockets (>= 3.0.0)
+    strscan (3.0.3)
     sync (0.5.0)
     term-ansicolor (1.7.1)
       tins (~> 1.0)
@@ -254,7 +265,7 @@ GEM
     time (0.2.0)
       date
     timecop (0.9.5)
-    timeout (0.2.0)
+    timeout (0.3.0)
     tins (1.31.1)
       sync
     tzinfo (2.0.4)
