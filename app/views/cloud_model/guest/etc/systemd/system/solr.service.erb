@@ -8,7 +8,11 @@ User=solr
 Group=solr
 PermissionsStartOnly=true
 ExecStartPre=/bin/chown -R solr:solr /var/solr/data
+<%- if model.deploy_solr_image.solr_version < '7.0' -%>
+ExecStart=/opt/solr/bin/solr start -f -m <%= model.heap_size %> -s /var/solr/solr -p <%= model.port %> -a "-Dsolr.data.dir=/var/solr/data -Dsolr.data.logs=/var/solr/log -Xloggc:/var/solr/log/solr_gc.log"
+<%- else -%>
 ExecStart=/opt/solr/bin/solr start -f -s /var/solr/solr -p <%= model.port %> -a "-Dsolr.data.dir=/var/solr/data -Dsolr.data.logs=/var/solr/log -Xloggc:/var/solr/log/solr_gc.log"
+<%- end -%>
 ExecStop=/opt/solr/bin/solr stop -p 8080
 Restart=always
 
