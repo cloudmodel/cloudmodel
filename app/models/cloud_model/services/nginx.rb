@@ -57,8 +57,6 @@ module CloudModel
 
       belongs_to :deploy_redis_sentinel_set, class_name: 'CloudModel::RedisSentinelSet', optional: true
 
-      field :daily_rake_task, type: String, default: nil
-
       def kind
         :http
       end

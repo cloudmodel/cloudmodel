@@ -55,8 +55,6 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:deploy_redis_port).of_type(Integer).with_default_value_of(6379) }
   it { expect(subject).to belong_to(:deploy_redis_sentinel_set).with_optional.of_type(CloudModel::RedisSentinelSet) }
 
-  it { expect(subject).to have_field(:daily_rake_task).of_type(String).with_default_value_of nil }
-
   describe 'kind' do
     it 'should return :http' do
       expect(subject.kind).to eq :http

@@ -1,0 +1,10 @@
+[Unit]
+Description=Call rake task <%= service.rake_task %> inside /var/www/rails/current
+
+[Service]
+Nice=19
+User=www
+Group=www
+EnvironmentFile=/etc/default/rails
+WorkingDirectory=/var/www/rails/current
+ExecStart=/usr/local/rvm/bin/rvm default do bundle exec rake <%= service.rake_task %>
