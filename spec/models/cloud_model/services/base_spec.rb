@@ -26,6 +26,7 @@ describe CloudModel::Services::Base do
         solr: CloudModel::Services::Solr,
         tomcat: CloudModel::Services::Tomcat,
         collabora: CloudModel::Services::Collabora,
+        rake: CloudModel::Services::Rake,
         backup: CloudModel::Services::Backup,
         monitoring: CloudModel::Services::Monitoring,
       })

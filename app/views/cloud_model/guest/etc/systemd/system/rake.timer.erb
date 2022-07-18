@@ -1,0 +1,17 @@
+[Unit]
+Description=Call rake task <%= service.rake_task %> on schedule
+
+[Timer]
+<%- if service.rake_timer_on_boot -%>
+OnBootSec=<%= service.rake_timer_on_boot_sec %>
+<%- end -%>
+<%- if service.rake_timer_on_calendar -%>
+OnCalendar=<%= service.rake_timer_on_calendar_val %>
+<%- end -%>
+AccuracySec=<%= service.rake_timer_accuracy_sec %>
+<%- if service.rake_timer_persistent -%>
+Persistent=true
+<%- end -%>
+
+[Install]
+WantedBy=timers.target

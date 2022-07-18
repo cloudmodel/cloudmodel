@@ -198,6 +198,9 @@ en:
       cloud_model/services/collabora:
         one: Collabora Office Service
         other: Collabore Office Services
+      cloud_model/services/rake:
+        one: Rake Service
+        other: Rake Services
       cloud_model/services/monitoring:
         one: Monitoring Service
         other: Monitoring Services
@@ -555,6 +558,14 @@ en:
         deploy_war_image: Deploy WAR Image
       cloud_model/services/collabora:
         wopi_host: Web Application Open Platform Host
+      cloud_model/services/rake:
+        rake_task: Rake Task
+        rake_timer_on_calendar: Execute on Calendar
+        rake_timer_on_calendar_val: Execute periodically Rake at
+        rake_timer_accuracy_sec: Execution Accuracy in Seconds
+        rake_timer_persistent: Force Execution if missed
+        rake_timer_on_boot: Execution on Boot
+        rake_timer_on_boot_sec: Seconds before executing at Boot
 
   issues:
     general:

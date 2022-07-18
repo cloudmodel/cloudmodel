@@ -261,14 +261,6 @@ module CloudModel
           # TODO: Resolve dependencies
           # Services::Ssh.new(@host, @options).write_config
 
-          if @model.daily_rake_task
-            render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.service", "#{@guest.deploy_path}/etc/systemd/system/rake@.service", 644
-            render_to_remote "/cloud_model/guest/etc/systemd/system/rake@.timer", "#{@guest.deploy_path}/etc/systemd/system/rake@.timer", 644
-            mkdir_p "#{@guest.deploy_path}/etc/systemd/system/timers.target.wants"
-            chroot @guest.deploy_path, "ln -s /etc/systemd/system/rake@.timer /etc/systemd/system/timers.target.wants/rake@#{@model.daily_rake_task.shellescape}.timer"
-            @host.exec "chown -R 100000:100000 #{@guest.deploy_path}/etc/systemd/system/rake@.service #{@guest.deploy_path}/etc/systemd/system/rake@.timer"
-          end
-
           super
         end
       end

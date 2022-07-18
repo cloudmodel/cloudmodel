@@ -200,6 +200,9 @@ de:
       cloud_model/services/collabora:
         one: Collabora Office-Dienst
         other: Collabore Office-Dienste
+      cloud_model/services/rake:
+        one: Rake-Dienst
+        other: Rake-Dienste
       cloud_model/services/monitoring:
         one: Monitordienst
         other: Monitordienste
@@ -558,6 +561,14 @@ de:
         deploy_war_image: WAR Image installieren
       cloud_model/services/collabora:
         wopi_host: Web Application Open Platform Host
+      cloud_model/services/rake:
+        rake_task: Rake Aufgabe
+        rake_timer_on_calendar: Ausführen nach Kalender
+        rake_timer_on_calendar_val: Rake wiederholt ausführen um
+        rake_timer_accuracy_sec: Ausführungsgenauigkeit in Sekunden
+        rake_timer_persistent: Erzwinge Ausführung wenn übersprungen
+        rake_timer_on_boot: Ausführen beim Start
+        rake_timer_on_boot_sec: Sekunden bevor Ausführung beim Start
 
   issues:
     general:
