@@ -40,8 +40,8 @@ module CloudModel
             usage = 100.0 * (total - available) / total
 
             do_check_value :mem_usage, usage, {
-              critical: 90,
-              warning: 80
+              critical: 95,
+              warning: 90
               }, unit: '%'
           end
         end
