@@ -80,12 +80,13 @@ module CloudModel
             @model.guest.exec! "/bin/touch #{@model.www_root}/current/tmp/restart.txt", "Failed to restart service"
             if @model.delayed_jobs_supported
               # Stop delayed job if used
-              comment_sub_step "Stop deloyed job daemon to restart it"
-              command = "/usr/bin/sudo -u www RAILS_ENV=#{@model.passenger_env} #{@model.www_root}/current/bin/delayed_job stop --pid-dir=/tmp/"
+              comment_sub_step "Restarting deloyed job daemon"
+              #command = "/usr/bin/sudo -u www RAILS_ENV=#{@model.passenger_env} #{@model.www_root}/current/bin/delayed_job stop --pid-dir=/tmp/"
+              command = "/bin/systemctl restart delayed_jobs"
               #puts command
               success, data = @model.guest.exec command
               unless success
-                puts "Error stopping dj: #{data}"
+                puts "Error restarting dj: #{data}"
               end
             end
           rescue Exception => e
