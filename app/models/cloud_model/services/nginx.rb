@@ -15,6 +15,7 @@ module CloudModel
       field :passenger_env, type: String, default: 'production'
       field :passenger_ruby_version, type: String, default: CloudModel.config.ruby_version
       field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
+      field :delayed_jobs_queues, type: Array, default: ['default']
 
       # field :fastcgi_supported, type: Mongoid::Boolean, default: false
       # field :fastcgi_location, type: String, default: ".php$"
@@ -89,6 +90,14 @@ module CloudModel
         else
           super
         end
+      end
+
+      def delayed_jobs_queues=(queues)
+        if queues.is_a? String
+          queues = queues.split(' ')
+        end
+
+        super queues
       end
 
       def external_uri

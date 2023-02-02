@@ -254,6 +254,7 @@ en:
         last_deploy_finished_at: Last Deployed
         monitoring_last_check_at: Last Monitored
       cloud_model/guest:
+        id: Guest ID
         name: Hostname
         host: Hardware Host
         address: Network Address
@@ -531,6 +532,7 @@ en:
         passenger_supported: Support Rack Server?
         passenger_env: Rails Environment
         delayed_jobs_supported: "Support Delayed::Job Service?"
+        delayed_jobs_queues: "Delayed::Job Queues"
 
         deployment: Project Deployment
         capistrano_supported: Support Capistrano?

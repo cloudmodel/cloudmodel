@@ -79,14 +79,15 @@ module CloudModel
             @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"
             @model.guest.exec! "/bin/touch #{@model.www_root}/current/tmp/restart.txt", "Failed to restart service"
             if @model.delayed_jobs_supported
-              # Stop delayed job if used
-              comment_sub_step "Restarting deloyed job daemon"
-              #command = "/usr/bin/sudo -u www RAILS_ENV=#{@model.passenger_env} #{@model.www_root}/current/bin/delayed_job stop --pid-dir=/tmp/"
-              command = "/bin/systemctl restart delayed_jobs"
-              #puts command
-              success, data = @model.guest.exec command
-              unless success
-                puts "Error restarting dj: #{data}"
+              @model.delayed_jobs_queues.each do |q|
+                # Stop delayed job if used
+                comment_sub_step "Restarting delayed job queue #{q}"
+                command = "/bin/systemctl restart delayed_jobs@#{q.shellescape}"
+                #puts command
+                success, data = @model.guest.exec command
+                unless success
+                  puts "Error restarting delayed job queue #{q}: #{data}"
+                end
               end
             end
           rescue Exception => e
@@ -168,8 +169,10 @@ module CloudModel
 
           if @model.delayed_jobs_supported
             comment_sub_step "Write Delayed::Jobs systemd"
-            render_to_remote "/cloud_model/guest/etc/systemd/system/delayed_jobs.service", "#{@guest.deploy_path}/etc/systemd/system/delayed_jobs.service", guest: @guest, model: @model
-            chroot! @guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs.service /etc/systemd/system/multi-user.target.wants/delayed_jobs.service", "Failed to enable delayed_jobs service"
+            render_to_remote "/cloud_model/guest/etc/systemd/system/delayed_jobs@.service", "#{@guest.deploy_path}/etc/systemd/system/delayed_jobs@.service", guest: @guest, model: @model
+            @model.delayed_jobs_queues.each do |q|
+              chroot! @guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs@.service /etc/systemd/system/multi-user.target.wants/delayed_jobs@#{q.shellescape}.service", "Failed to enable delayed_jobs service for queue #{q}"
+            end
           end
 
           deploy_web_image
