@@ -1,10 +1,22 @@
 require 'spec_helper'
 
 describe CloudModel::Workers::Services::NginxWorker do
-  let(:host) {double CloudModel::Host}
-  let(:guest) {double CloudModel::Guest, host: host}
-  let(:model) {CloudModel::Services::Nginx.new}
+  let(:host) {CloudModel::Host.new}
+  let(:guest) {CloudModel::Guest.new host: host}
+  let(:model) {CloudModel::Services::Nginx.new guest: guest}
   subject {CloudModel::Workers::Services::NginxWorker.new guest, model}
+
+  before do
+    allow(guest).to receive(:deploy_path).and_return('/path/to/install')
+    allow(host).to receive(:sftp)
+    allow(host).to receive(:exec)
+    allow(host).to receive(:ssh_connection)
+    allow(subject).to receive(:render_to_remote)
+    allow(subject).to receive(:chroot)
+    allow(subject).to receive(:chroot!)
+    allow(subject).to receive(:mkdir_p)
+    allow(subject).to receive(:comment_sub_step)
+  end
 
   describe '.unroll_web_image' do
     pending
@@ -30,8 +42,6 @@ describe CloudModel::Workers::Services::NginxWorker do
 
     before do
       allow(guest).to receive(:deploy_path).and_return('/path/to/install')
-      allow(subject).to receive(:mkdir_p)
-      allow(subject).to receive(:comment_sub_step)
       model.web_locations.new web_app: web_app
     end
 
@@ -158,6 +168,38 @@ describe CloudModel::Workers::Services::NginxWorker do
   end
 
   describe '.write_config' do
+    before do
+      allow(guest).to receive(:deploy_path).and_return "/var/www/rails/#{Time.now.to_i}"
+    end
+
+    it "should not link delayed jobs service by default" do
+      expect(subject).not_to receive(:chroot!).with(guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs@.service /etc/systemd/system/multi-user.target.wants/delayed_jobs@default.service", "Failed to enable delayed_jobs service for queue default")
+      subject.write_config
+    end
+
+    it "should link delayed jobs service for queue default if delayed_jobs_supported" do
+      model.delayed_jobs_supported = true
+      expect(subject).to receive(:chroot!).with(guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs@.service /etc/systemd/system/multi-user.target.wants/delayed_jobs@default.service", "Failed to enable delayed_jobs service for queue default")
+      subject.write_config
+    end
+
+    it "should link delayed jobs service for given queues only if delayed_jobs_supported" do
+      model.delayed_jobs_supported = true
+      model.delayed_jobs_queues = ['foo', 'bar']
+      expect(subject).not_to receive(:chroot!).with(guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs@.service /etc/systemd/system/multi-user.target.wants/delayed_jobs@default.service", "Failed to enable delayed_jobs service for queue default")
+      expect(subject).to receive(:chroot!).with(guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs@.service /etc/systemd/system/multi-user.target.wants/delayed_jobs@foo.service", "Failed to enable delayed_jobs service for queue foo")
+      expect(subject).to receive(:chroot!).with(guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs@.service /etc/systemd/system/multi-user.target.wants/delayed_jobs@bar.service", "Failed to enable delayed_jobs service for queue bar")
+      subject.write_config
+    end
+
+    it "should escape queue names" do
+      model.delayed_jobs_supported = true
+      model.delayed_jobs_queues = ['foo/bar']
+      expect(subject).not_to receive(:chroot!).with(guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs@.service /etc/systemd/system/multi-user.target.wants/delayed_jobs@default.service", "Failed to enable delayed_jobs service for queue default")
+      expect(subject).to receive(:chroot!).with(guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs@.service /etc/systemd/system/multi-user.target.wants/delayed_jobs@foo\/bar.service", "Failed to enable delayed_jobs service for queue foo/bar")
+      subject.write_config
+    end
+
     pending
   end
 

@@ -17,6 +17,7 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:passenger_env).of_type(String).with_default_value_of('production') }
   it { expect(subject).to have_field(:passenger_ruby_version).of_type(String).with_default_value_of(CloudModel.config.ruby_version) }
   it { expect(subject).to have_field(:delayed_jobs_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
+  it { expect(subject).to have_field(:delayed_jobs_queues).of_type(Array).with_default_value_of(['default']) }
 
   # it { expect(subject).to have_field(:fastcgi_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
   # it { expect(subject).to have_field(:fastcgi_location).of_type(String).with_default_value_of('.php$') }

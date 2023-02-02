@@ -256,6 +256,7 @@ de:
         last_deploy_finished_at: Zuletzt erfolgreich installiert
         monitoring_last_check_at: Zuletzt überwacht
       cloud_model/guest:
+        id: GastID
         name: Hostname
         host: Hostrechner
         address: Netzwerkadresse
@@ -534,6 +535,7 @@ de:
         passenger_supported: Rack unterstützen
         passenger_env: Rails-Umgebung
         delayed_jobs_supported: "Delayed::Job Service unterstützen"
+        delayed_jobs_queues: "Delayed::Job Warteschlangen"
 
         deployment: Projekt deployen
         capistrano_supported: Capistrano unterstützen
