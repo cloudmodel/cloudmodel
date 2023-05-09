@@ -194,6 +194,22 @@ module CloudModel
 
                 hash[context][dev][k] = v ? v.split(' ').first : '-'
               end
+            when 'zpools'
+              zp = line.split("\t").map(&:strip)
+
+              hash[context][zp[0]] = {
+                size: zp[1],
+                alloc: zp[2],
+                free: zp[3],
+                expandsz: zp[4],
+                frag_percentage: zp[5],
+                cap_percentage: zp[6],
+                dedup: zp[7],
+                health: zp[8],
+                altroot: zp[9]
+              }
+
+              puts
             when 'sensors'
               if sensors_adapter.nil?
                 sensors_adapter = line.strip

@@ -100,11 +100,28 @@ module CloudModel
         end
       end
 
+      def check_zpools
+        if sys_info = data[:system] and sys_info['zpools']
+          usages = [0]
+          messages = []
+          sys_info['zpools'].each do |pool_name, pool_data|
+            messages << "#{pool_name}: #{pool_data[:cap_percentage]}%"
+            usages << pool_data[:cap_percentage].to_f
+          end
+
+          do_check_value :zpools_usage, usages.max, {
+            critical: 90,
+            warning: 75
+            }, unit: '%', message: messages * "\n"
+        end
+      end
+
       def check
         if check_system_info
           check_md
           check_sensors
           check_smart
+          check_zpools
           true
         else
           false

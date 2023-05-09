@@ -70,7 +70,7 @@ module CloudModel
 
             do_check_value :disks_usage, usage, {
               critical: 90,
-              warning: 70
+              warning: 80
               }, unit: '%', message: message
           end
         end
