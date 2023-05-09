@@ -585,6 +585,7 @@ en:
       mdtools: RAID has issues
       sensors: Sensors reported critial values
       smart: SMART reports issues
+      zpools_usage: ZPOOL usage up to %{value}
     cloud_model/guest:
       <<: *sysinfo_issues
       sys_boot_failed: Booting for %{value} and still not up

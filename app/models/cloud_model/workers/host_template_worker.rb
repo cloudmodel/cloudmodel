@@ -87,7 +87,7 @@ module CloudModel
       def install_check_mk_agent
         chroot! build_path, "apt-get install check-mk-agent lm-sensors smartmontools -y", "Failed to install CheckMKAgent"
 
-        %w(cgroup_cpu lxd sensors smart systemd).each do |plugin|
+        %w(cgroup_cpu zfs lxd sensors smart systemd).each do |plugin|
           render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/plugins/#{plugin}", "#{build_path}/usr/lib/check_mk_agent/plugins/#{plugin}", 0755
         end
 

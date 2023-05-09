@@ -586,6 +586,9 @@ de:
     cloud_model/host:
       <<: *sysinfo_issues
       mdtools: RAID hat Probleme
+      sensors: Sensoren melden kritische Werte
+      smart: SMART meldet Probleme
+      zpools_usage: ZPOOL-Nutzung bis zu %{value}
     cloud_model/guest:
       <<: *sysinfo_issues
       sys_boot_failed: Neustart benötigt %{value} und ist noch nicht beendet
