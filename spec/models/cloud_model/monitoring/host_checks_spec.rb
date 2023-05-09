@@ -34,13 +34,18 @@ describe CloudModel::Monitoring::HostChecks do
     pending
   end
 
+  describe 'check_zpools' do
+    pending
+  end
+
   describe 'check' do
-    it 'should call check_system_info and check md, sensors, smart' do
+    it 'should call check_system_info and check md, sensors, smart, zpools' do
       expect(subject).to receive(:check_system_info).and_return true
 
       expect(subject).to receive(:check_md).and_return true
       expect(subject).to receive(:check_sensors).and_return true
       expect(subject).to receive(:check_smart).and_return true
+      expect(subject).to receive(:check_zpools).and_return true
 
       expect(subject.check).to eq true
     end
