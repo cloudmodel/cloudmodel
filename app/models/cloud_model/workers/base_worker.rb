@@ -63,16 +63,19 @@ module CloudModel
         return true if @chroot_prepared[chroot_dir] and not options[:force]
 
         unless @host.mounted_at? "#{chroot_dir}/proc"
+          mkdir_p "#{chroot_dir}/proc"
           @host.exec! "mount -t proc none #{chroot_dir}/proc", 'Failed to mount proc to build system'
         end
         unless @host.mounted_at? "#{chroot_dir}/sys"
+          mkdir_p "#{chroot_dir}/sys"
           @host.exec! "mount --bind /sys #{chroot_dir}/sys", 'Failed to mount sys to build system'
         end
         unless @host.mounted_at? "#{chroot_dir}/dev"
+          mkdir_p "#{chroot_dir}/dev"
           @host.exec! "mount --bind /dev #{chroot_dir}/dev", 'Failed to mount dev to build system'
         end
         unless @host.mounted_at? "#{chroot_dir}/dev/pts"
-          @host.exec! "mount --bind /dev #{chroot_dir}/dev/pts", 'Failed to mount dev to build system'
+          @host.exec! "mount --bind /dev/pts #{chroot_dir}/dev/pts", 'Failed to mount dev/pts to build system'
         end
 
         @chroot_prepared[chroot_dir] = true
@@ -83,16 +86,16 @@ module CloudModel
         chroot_dir = chroot_dir.gsub(/[\/]$/, '') # Remove tailing slashes from path
 
         if @host.mounted_at? "#{chroot_dir}/dev/pts"
-          @host.exec! "umount #{chroot_dir}/dev/pts", 'Failed to unmount dev to build system'
+          @host.exec! "umount #{chroot_dir}/dev/pts", 'Failed to unmount dev/pts from build system'
         end
         if @host.mounted_at? "#{chroot_dir}/dev"
-          @host.exec! "umount #{chroot_dir}/dev", 'Failed to unmount dev to build system'
+          @host.exec! "umount #{chroot_dir}/dev", 'Failed to unmount dev from build system'
         end
         if @host.mounted_at? "#{chroot_dir}/sys"
-          @host.exec! "umount #{chroot_dir}/sys", 'Failed to unmount sys to build system'
+          @host.exec! "umount #{chroot_dir}/sys", 'Failed to unmount sys from build system'
         end
         if @host.mounted_at? "#{chroot_dir}/proc"
-          @host.exec! "umount #{chroot_dir}/proc", 'Failed to unmount proc to build system'
+          @host.exec! "umount #{chroot_dir}/proc", 'Failed to unmount proc from build system'
         end
 
         @chroot_prepared[chroot_dir] = false
