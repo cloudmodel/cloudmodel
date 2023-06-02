@@ -298,8 +298,10 @@ module CloudModel
                 end
               end
             else
-              hash[context]['data'] ||= ''
-              hash[context]['data'] << line
+              unless line.blank?
+                hash[context]['data'] ||= ''
+                hash[context]['data'] << line
+              end
             end
           else
             real_context, sep = context.split(':')

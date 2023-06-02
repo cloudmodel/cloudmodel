@@ -25,7 +25,20 @@ module CloudModel
       # Store the current data to the subject
       def store_data
         attrs = {monitoring_last_check_at: Time.now, monitoring_last_check_result: data}
-        @subject.update_attributes attrs
+
+        if @subject.update_attributes attrs
+          true
+        else
+          #pp data
+          #pp @subject.errors.as_json
+          pp data[:system].keys
+          #pp data[:system]["labels:sep(0)"]
+          data[:system].each do |k,v|
+            puts "#{k}: #{v.to_json.size}"
+          end
+          raise "Failed to store monitoring data"#, "Data:\n #{data}"
+        end
+        #@subject.update_attributes attrs
       end
 
       # Get the data for the subject
