@@ -21,36 +21,36 @@ module CloudModel
         end
       end
 
-      data = result['data']
+      if data = result['data']
+        lines = data.lines.to_a
 
-      lines = data.lines.to_a
+        base = lines.shift
+        base_ts, *base_usage = base.split(' ') if base
 
-      base = lines.shift
-      base_ts, *base_usage = base.split(' ') if base
+        raw = {}
+        lines.reverse.each do |line|
+          ts,*usage = line.split(' ')
 
-      raw = {}
-      lines.reverse.each do |line|
-        ts,*usage = line.split(' ')
+          age = 1.0*(base_ts.to_i - ts.to_i)/1000000000
 
-        age = 1.0*(base_ts.to_i - ts.to_i)/1000000000
-
-        if age <= 15 * 60
-          raw[15] = [ts, usage]
+          if age <= 15 * 60
+            raw[15] = [ts, usage]
+          end
+          if age <= 5 * 60
+            raw[5] = [ts, usage]
+          end
+          if age <= 1 * 60
+            raw[1] = [ts, usage]
+          end
         end
-        if age <= 5 * 60
-          raw[5] = [ts, usage]
-        end
-        if age <= 1 * 60
-          raw[1] = [ts, usage]
-        end
+
+        result['cpus'] = cpus #raw[1][1].size
+
+        result['last_minute_percentage'], result['last_minute_percentage_by_cpus'] = calc_usage.call [base_ts, base_usage], raw[1]
+        result['last_5_minutes_percentage'], result['last_5_minutes_percentage_by_cpus'] = calc_usage.call [base_ts, base_usage], raw[5]
+        result['last_15_minutes_percentage'], result['last_15_minutes_percentage_by_cpus'] = calc_usage.call [base_ts, base_usage], raw[15]
+        result
       end
-
-      result['cpus'] = cpus #raw[1][1].size
-
-      result['last_minute_percentage'], result['last_minute_percentage_by_cpus'] = calc_usage.call [base_ts, base_usage], raw[1]
-      result['last_5_minutes_percentage'], result['last_5_minutes_percentage_by_cpus'] = calc_usage.call [base_ts, base_usage], raw[5]
-      result['last_15_minutes_percentage'], result['last_15_minutes_percentage_by_cpus'] = calc_usage.call [base_ts, base_usage], raw[15]
-      result
     end
 
     def self.parse result
@@ -61,6 +61,8 @@ module CloudModel
       sensor = nil
       sensor_result = nil
       lxd_yaml = ''
+      _in_systemd_units_block = "unknown"
+      _systemd_unit = ''
 
       result.lines.each do |line|
         if line[0..2] == '<<<'
@@ -104,7 +106,9 @@ module CloudModel
           end
 
           context = line.gsub(/^<<</, '').gsub(/>>>\n$/, '')
-          hash[context] = {}
+          unless context =~ /:/
+            hash[context] ||= {}
+          end
         else # some data
           if hash[context]
             case context
@@ -176,6 +180,11 @@ module CloudModel
                   hash[context]['devs'][dev] ||= {}
                   hash[context]['devs'][dev]['status'] = parts.shift
                   hash[context]['devs'][dev]['raid_level'] = parts.shift
+                  if hash[context]['devs'][dev]['raid_level'] =~ /\A\(/
+                    hash[context]['devs'][dev]['status_note'] = hash[context]['devs'][dev]['raid_level'].delete('()')
+                    hash[context]['devs'][dev]['raid_level'] = parts.shift
+                  end
+
                   disks = {}
                   parts.each do |part|
                     disk, i = part.scan(/(.*)\[([0-9+])\]/).first
@@ -208,8 +217,6 @@ module CloudModel
                 health: zp[8],
                 altroot: zp[9]
               }
-
-              puts
             when 'sensors'
               if sensors_adapter.nil?
                 sensors_adapter = line.strip
@@ -249,12 +256,60 @@ module CloudModel
               hash[context][unit]['description'] = parts * ' '
             when 'lxd'
               lxd_yaml << line
+            when "systemd_units"
+              #_in_systemd_units_block ||= "unknown"
+              if line.strip =~ /\A\[.*\]\z/
+                _in_systemd_units_block = line.strip.delete('[]')
+                puts "Switched systemd units block to #{_in_systemd_units_block}"
+              else
+                case _in_systemd_units_block
+                when 'list-unit-files'
+                  _systemd_unit, state, preset = line.split(' ')
+
+                  hash[context][_systemd_unit] ||= {}
+                  hash[context][_systemd_unit]['state'] = state
+                  hash[context][_systemd_unit]['preset'] = preset
+                when 'all'
+                  _systemd_unit, loaded, active, sub, *description = line.split(' ')
+
+                  hash[context][_systemd_unit] ||= {}
+                  hash[context][_systemd_unit]['load'] = loaded
+                  hash[context][_systemd_unit]['active'] = active
+                  hash[context][_systemd_unit]['sub'] = sub
+                  hash[context][_systemd_unit]['description'] = description * ' '
+                when 'status'
+                  unless _systemd_unit
+                    _systemd_unit = line.split(' ')[1]
+                    puts "Switched systemd unit to #{_systemd_unit}"
+                  end
+
+                  if line.blank?
+                    _systemd_unit = nil
+                  else
+                    hash[context][_systemd_unit] ||= {}
+                    hash[context][_systemd_unit]['status'] ||= ''
+                    hash[context][_systemd_unit]['status'] << line.force_encoding('ASCII-8BIT').encode("UTF-8", invalid: :replace, undef: :replace)
+                    #puts "#{_systemd_unit}: #{hash[context][_systemd_unit]['status']}"
+                  end
+
+                  #puts line
+                else
+                  puts line
+                end
+              end
             else
               hash[context]['data'] ||= ''
               hash[context]['data'] << line
             end
           else
-            puts line
+            real_context, sep = context.split(':')
+            if sep
+              hash[real_context] ||= {}
+              hash[real_context]["data_#{sep}"] ||= ''
+              hash[real_context]["data_#{sep}"] << line
+            else
+              puts "#{context}: #{line}"
+            end
           end
 
           #hash[context][:_debug] ||= ''
