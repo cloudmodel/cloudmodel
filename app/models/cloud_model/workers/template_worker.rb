@@ -47,6 +47,49 @@ module CloudModel
         end
       end
 
+      def debootstrap_debian
+
+        # gettting the key does not work for now; apt debian-keyring debian-archive-keyring is to old on ubuntu 18.04
+
+        @host.exec! "apt-get install debootstrap  -y", "Failed to install debootstrap"
+        @host.exec "debootstrap --arch #{@template.arch} testing #{build_path} http://ftp.de.debian.org/debian/"#, "Failed to debootstrap"
+
+        # debootstrap --arch amd64 bookworm /cloud/build/host/test http://ftp.de.debian.org/debian/
+
+        # Copy resolv.conf
+        @host.exec! "cp /etc/resolv.conf #{build_path}/etc", "Failed to copy resolve conf"
+
+        # Don't start services on install
+        # render_to_remote "/cloud_model/support/usr/sbin/policy-rc.d", "#{build_path}/usr/sbin/policy-rc.d", 0755
+        # Don't install docs
+        render_to_remote  "/cloud_model/support/etc/dpkg/dpkg.cfg.d/01_nodoc", "#{build_path}/etc/dpkg/dpkg.cfg.d/01_nodoc"
+
+        chroot! build_path, "apt-get install software-properties-common -y", "Failed to update sources"
+        chroot! build_path, "apt-add-repository contrib -y", "Failed to update sources"
+
+
+        # apt-get install debootstrap
+        # debootstrap --arch amd64 testing /cloud/build/host/test http://ftp.de.debian.org/debian/
+        # debootstrap --arch amd64 bookworm /cloud/build/host/test http://ftp.de.debian.org/debian/
+        # LANG=C.UTF-8 chroot /cloud/build/host/test /bin/bash
+
+        # apt install makedev
+        # mount none /proc -t proc
+        # cd /dev
+        # MAKEDEV generic
+
+        ## ZFS
+
+        # apt-get install software-properties-common -y
+        # apt-add-repository contrib -y
+        # apt-get install zfsutils-linux -y
+
+
+        ## TODO Change kernel install
+
+        # apt-get install linux-image-cloud-amd64 -y
+      end
+
       def populate_root
         @host.exec! "cd #{build_path} && tar xzpf #{download_path}#{ubuntu_image}", "Failed to unpack system image!"
         # Copy resolv.conf
