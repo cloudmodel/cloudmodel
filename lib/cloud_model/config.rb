@@ -9,6 +9,7 @@ module CloudModel
     attr_writer :dns_servers
 
     attr_writer :ubuntu_mirror, :ubuntu_deb_src, :ubuntu_version, :ubuntu_name, :ubuntu_kernel_flavour
+    attr_writer :debian_version
     attr_writer :php_version, :ruby_version
 
     attr_accessor :admin_email, :email_domain
@@ -73,6 +74,10 @@ module CloudModel
 
     def ubuntu_version
       @ubuntu_version || "18.04.5"
+    end
+
+    def debian_version
+      @debian_version || "12"
     end
 
     def ubuntu_major_version

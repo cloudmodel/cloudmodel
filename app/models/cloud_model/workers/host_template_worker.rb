@@ -14,6 +14,8 @@ module CloudModel
       end
 
       def install_utils
+        comment_sub_step 'Install console-setup'
+        chroot! build_path, "apt-get install console-setup -y", "Failed to install console-setup"
         comment_sub_step 'Install mdadm'
         chroot! build_path, "apt-get install mdadm -y", "Failed to install mdadm"
         # comment_sub_step 'Install btrfs'
@@ -50,31 +52,23 @@ module CloudModel
       end
 
       def install_lxd
-        comment_sub_step 'Install apparmor'
-        chroot! build_path, "apt-get install apparmor-utils -y", "Failed to install apparmor"
-        comment_sub_step 'Install snapd'
-        chroot! build_path, "apt-get install snapd -y", "Failed to install snapd"
-
-        #
-        # Snap is recommended to install LXD, but does not work in chroot environment
-        # A possibility would be to install LXD snap on boot. It fails with return code of 0
-        # if the snap is already installed:
-        #
-        # > snap install lxd
-        #
-        # For now we use apt-get version for compatibility
-
-        comment_sub_step 'Install LXD'
         chroot! build_path, "apt-get install lxd -y", "Failed to install LXD"
 
-        mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
+        # comment_sub_step 'Install apparmor'
+        # chroot! build_path, "apt-get install apparmor-utils -y", "Failed to install apparmor"
+        # comment_sub_step 'Install snapd'
+        # chroot! build_path, "apt-get install snapd -y", "Failed to install snapd"
+        # comment_sub_step 'Install LXD snap'
+        # chroot! build_path, "snap install lxd", "Failed to install LXD"
+        #
+        # mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
         #mkdir_p "#{build_path}/etc/systemd/system/sockets.target.wants"
         #chroot! build_path, "ln -s /lib/systemd/system/lxd.socket /etc/systemd/system/sockets.target.wants/lxd.socket", "Failed to add lxd to autostart"
-        chroot! build_path, "ln -s /lib/systemd/system/lxd-containers.service /etc/systemd/system/basic.target.wants/lxd-containers.service", "Failed to add lxd to autostart"
+        #chroot! build_path, "ln -s /lib/systemd/system/lxd-containers.service /etc/systemd/system/basic.target.wants/lxd-containers.service", "Failed to add lxd to autostart"
 
 
-        comment_sub_step 'Create guests directory'
-        mkdir_p "#{build_path}/cloud/guests"
+        #comment_sub_step 'Create guests directory'
+        #mkdir_p "#{build_path}/cloud/guests"
       end
 
       def install_exim
@@ -85,8 +79,13 @@ module CloudModel
       end
 
       def install_check_mk_agent
-        chroot! build_path, "apt-get install check-mk-agent lm-sensors smartmontools -y", "Failed to install CheckMKAgent"
+        chroot! build_path, "apt-get install lm-sensors smartmontools -y", "Failed to install CheckMKAgent dependencies"
 
+        # curl https://raw.githubusercontent.com/Checkmk/checkmk/2.2.0/agents/check_mk_agent.linux or https://raw.githubusercontent.com/Checkmk/checkmk/master/agents/check_mk_agent.linux to /usr/bin/check_mk_agent
+        chroot! build_path, "curl -s https://raw.githubusercontent.com/Checkmk/checkmk/2.2.0/agents/check_mk_agent.linux >/usr/bin/check_mk_agent && chmod 755 /usr/bin/check_mk_agent", "Failed to install CheckMKAgent"
+
+
+        mkdir_p "#{build_path}/usr/lib/check_mk_agent/plugins/"
         %w(cgroup_cpu zfs lxd sensors smart systemd).each do |plugin|
           render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/plugins/#{plugin}", "#{build_path}/usr/lib/check_mk_agent/plugins/#{plugin}", 0755
         end
@@ -103,7 +102,8 @@ module CloudModel
       end
 
       def install_kernel
-        chroot! build_path, "apt-get install --install-recommends linux-image-#{ubuntu_kernel_flavour} -y", "Failed to install linux kernel"
+        #chroot! build_path, "apt-get install --install-recommends linux-image-#{ubuntu_kernel_flavour} -y", "Failed to install linux kernel"
+        chroot! build_path, "apt-get install --install-recommends linux-image-#{ubuntu_arch} -y", "Failed to install linux kernel"
       end
 
       def install_grub
@@ -130,8 +130,7 @@ module CloudModel
         mkdir_p download_path
 
         steps = [
-          ["Download #{os_version}", :fetch_ubuntu],
-          ["Populate system with image", :populate_root],
+          ["De-Bootstrap system", :debootstrap_debian],
           ["Update base system", :update_base],
           ["Install kernel", :install_kernel],
           ["Install basic utils", :install_utils],

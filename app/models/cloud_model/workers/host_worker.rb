@@ -31,6 +31,13 @@ module CloudModel
         render_to_remote '/cloud_model/host/etc/fstab', "#{root}/etc/fstab", host: @host, timestamp: @timestamp
       end
 
+      def set_authorized_keys options={}
+        prepare_chroot root
+        @host.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "/root/.ssh/authorized_keys"
+        # TODO: Add mode where no initial_root_pw is given, but external ip is used
+        # @host.update_attribute :initial_root_pw, nil
+      end
+
       def boot_deploy_root options={}
         comment_sub_step 'Ensure /boot is mounted'
         @host.unmount_boot_fs
@@ -51,6 +58,7 @@ module CloudModel
         #render_to_remote "/cloud_model/host/etc/default/grub", "#{root}/etc/default/grub", root: @deploy_lv
 
         comment_sub_step 'Setup grub bootloader'
+        chroot! root, "mdadm --detail --scan >> /etc/mdadm/mdadm.conf", "Failed to update mdadm.conf"
         chroot! root, "update-initramfs -u", "Failed to update initram"
         chroot! root, "grub-install  --no-floppy --recheck /dev/sda", 'Failed to install grub on sda'
         chroot! root, "grub-mkconfig -o /boot/grub/grub.cfg", 'Failed to config grub'
@@ -227,17 +235,19 @@ module CloudModel
         ensure_cloud_filesystem
 
         # make sure there is a HostTemplate and find out its tar file
-        tarball = CloudModel::HostTemplate.last_useable(@host,
+        template = CloudModel::HostTemplate.last_useable(@host,
           indent: current_indent + 2,
           counter_prefix: "#{current_counter_prefix}",
           prepend_output: " [Building]\n"
-        ).tarball
+        )
 
+        # TODO: only do this if needed
+        upload_template template
 
         #
         # Populate deploy root with system image
         #
-        @host.exec! "cd #{root} && tar xzpf #{tarball}", "Failed to unpack system image!"
+        @host.exec! "cd #{root} && tar xzpf #{template.tarball}", "Failed to unpack system image!"
 
         mkdir_p "#{root}/inst"
       end
@@ -368,6 +378,7 @@ module CloudModel
         build_start_at = Time.now
 
         steps = [
+          ['Allow to access with SSH key', :set_authorized_keys],
           ['Prepare disk for new system', :make_deploy_disk],
           ['Upsync system images', :sync_inst_images],
           ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],

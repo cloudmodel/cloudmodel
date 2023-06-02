@@ -167,6 +167,19 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'debian_version' do
+    it 'should allow to set Debian version' do
+      subject.debian_version = '18'
+      expect(subject.debian_version).to eq '18'
+    end
+
+    it 'should default to 12' do
+      expect(subject.debian_version).to eq '12'
+    end
+  end
+
+
+
   describe 'admin_email' do
     it 'should allow to set email of admin for notifications and external services like certificate generation' do
       subject.admin_email = 'admin@example.com'
