@@ -140,12 +140,15 @@ module CloudModel
             when 'cpu'
               parts = line.strip.split(' ')
               hash[context] ||= {}
-              hash[context]['last_minute_load'] = parts.shift
-              hash[context]['last_5_minutes_load'] = parts.shift
-              hash[context]['last_15_minutes_load'] = parts.shift
-              hash[context]['x1'] = parts.shift
-              hash[context]['x2'] = parts.shift
-              hash[context]['cpus'] = parts.shift
+              # only parse line 1 on current check_mk_agent
+              unless parts[1].blank?
+                hash[context]['last_minute_load'] = parts.shift
+                hash[context]['last_5_minutes_load'] = parts.shift
+                hash[context]['last_15_minutes_load'] = parts.shift
+                hash[context]['x1'] = parts.shift
+                hash[context]['x2'] = parts.shift
+                hash[context]['cpus'] = parts.shift
+              end
             when 'md'
               parts = line.strip.split(':')
               key = parts.shift.try(:strip)
@@ -260,7 +263,7 @@ module CloudModel
               #_in_systemd_units_block ||= "unknown"
               if line.strip =~ /\A\[.*\]\z/
                 _in_systemd_units_block = line.strip.delete('[]')
-                puts "Switched systemd units block to #{_in_systemd_units_block}"
+                #puts "Switched systemd units block to #{_in_systemd_units_block}"
               else
                 case _in_systemd_units_block
                 when 'list-unit-files'
@@ -280,7 +283,7 @@ module CloudModel
                 when 'status'
                   unless _systemd_unit
                     _systemd_unit = line.split(' ')[1]
-                    puts "Switched systemd unit to #{_systemd_unit}"
+                    #puts "Switched systemd unit to #{_systemd_unit}"
                   end
 
                   if line.blank?
