@@ -140,7 +140,9 @@ module CloudModel
         name: new_name,
         private_address: host.dhcp_private_address,
         external_address: external_address.blank? ? nil : host.dhcp_external_address,
-        external_hostname: external_address.blank? ? nil : external_hostname
+        external_hostname: external_address.blank? ? nil : external_hostname,
+        external_alt_names: external_alt_names.blank? ? [] : external_alt_names,
+        os_version: os_version
       )
 
       lxd_custom_volumes.each do |volume|
@@ -153,7 +155,13 @@ module CloudModel
       end
 
       services.each do |service|
-        new_service_document = service.as_document
+        old_service_document = service.as_document
+        new_service_document = {}
+
+        service.class.new.attributes.keys.each do |k|
+          new_service_document[k.to_s] = old_service_document[k.to_s]
+        end
+
         new_service_document.delete('_id')
         new_service_document.delete('monitoring_last_check_result')
         new_service_document.delete('updated_at')
