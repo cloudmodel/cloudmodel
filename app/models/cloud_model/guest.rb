@@ -158,7 +158,7 @@ module CloudModel
         old_service_document = service.as_document
         new_service_document = {}
 
-        service.class.new.attributes.keys.each do |k|
+        service.class.new.fields.keys.each do |k|
           new_service_document[k.to_s] = old_service_document[k.to_s]
         end
 
