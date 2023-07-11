@@ -79,6 +79,10 @@ module CloudModel
         false
       end
 
+      def update_crt(options = {})
+        # No ssl certs used by default, do nothing
+      end
+
       def backupable?
         false
       end

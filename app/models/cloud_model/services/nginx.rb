@@ -246,6 +246,14 @@ module CloudModel
         "#{policies.map{|k,v| "#{k} #{v.uniq * ' '}"} * ';'};"
       end
 
+      def update_crt(options = {})
+        if ssl_supported? and not ssl_certbot?
+          puts "  - Updating nginx '#{name}' cert #{ssl_cert.name} on guest #{guest.name}" if options[:debug]
+          guest.host.exec!("echo '#{ssl_cert.crt}' | lxc file push - #{guest.current_lxd_container.name}/etc/nginx/ssl/#{guest.external_hostname}.crt", "Failed to copy crt")
+          guest.host.exec!("lxc exec #{guest.current_lxd_container.name} -- systemctl reload nginx", "Failed to reload nginx")
+        end
+      end
+
       def redeploy(options = {})
         unless redeployable? or options[:force]
           return false

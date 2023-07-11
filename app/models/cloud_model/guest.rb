@@ -215,6 +215,18 @@ module CloudModel
       certificates.count > 0
     end
 
+    def update_crt options={}
+      puts "Updating certs on guest #{name}" if options[:debug]
+      guest_certificates.each do |certificate|
+        puts "  - Updating cert #{certificate.name} on guest #{name} not implemented" if options[:debug]
+        # TODO: Upload crt of guest certificates
+      end
+
+      services.each do |service|
+        service.update_crt options
+      end
+    end
+
     def has_service_type?(service_type)
       service_type = service_type.to_s unless service_type.is_a? String
       services.select{|s| s._type == service_type}.count > 0
