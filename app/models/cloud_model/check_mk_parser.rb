@@ -336,7 +336,8 @@ module CloudModel
           parse_cgroup_cpu hash['cgroup_cpu'], hash['cpu']['cpus']
         elsif hash['lxc_container_cpu']
           # Ubuntu 22.04 guest
-          parse_cgroup_cpu hash['cgroup_cpu'], hash['lxc_container_cpu']['num_cpus']
+          res = parse_cgroup_cpu hash['cgroup_cpu'], hash['lxc_container_cpu']['num_cpus']
+          hash['cpu'] ||= res
         end
       end
 
