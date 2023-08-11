@@ -131,7 +131,6 @@ module CloudModel
       new_name = options[:name] || name
 
       new_guest = host.guests.new(
-        external_alt_names: external_alt_names,
         lxd_autostart_priority: lxd_autostart_priority,
         lxd_autostart_delay: lxd_autostart_delay,
         root_fs_size: root_fs_size,

@@ -18,7 +18,7 @@ location ^~ <%= model.location_with_leading_slash %> {
   add_header X-Download-Options "noopen" always;
   add_header X-Frame-Options "SAMEORIGIN" always;
   add_header X-Permitted-Cross-Domain-Policies "none" always;
-  add_header X-Robots-Tag "none" always;
+  add_header X-Robots-Tag "noindex, nofollow" always;
   add_header X-XSS-Protection "1; mode=block" always;
 
   # set max upload size
@@ -138,7 +138,7 @@ location ^~ <%= model.location_with_leading_slash %> {
     add_header X-Download-Options "noopen" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Permitted-Cross-Domain-Policies "none" always;
-    add_header X-Robots-Tag "none" always;
+    add_header X-Robots-Tag "noindex, nofollow" always;
     add_header X-XSS-Protection "1; mode=block" always;
 
     # Optional: Don't log access to assets

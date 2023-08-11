@@ -149,7 +149,7 @@ module CloudModel
         def write_config
           comment_sub_step "Config nginx"
 
-          render_to_remote "/cloud_model/guest/etc/nginx/nginx.conf", "#{@guest.deploy_path}/etc/nginx/nginx.conf", guest: @guest, model: @model
+          render_to_guest "/cloud_model/guest/etc/nginx/nginx.conf", "/etc/nginx/nginx.conf", 0600, guest: @guest, model: @model
 
           chroot! @guest.deploy_path, "groupadd -f -r -g 1001 www && id -u www || useradd -c 'added by cloud_model for nginx' -d /var/www -s /bin/bash -r -g 1001 -u 1001 www", "Failed to add www user"
 

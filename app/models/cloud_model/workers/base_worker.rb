@@ -68,14 +68,16 @@ module CloudModel
         end
         unless @host.mounted_at? "#{chroot_dir}/sys"
           mkdir_p "#{chroot_dir}/sys"
-          @host.exec! "mount --bind /sys #{chroot_dir}/sys", 'Failed to mount sys to build system'
+          # @host.exec! "mount --bind /sys #{chroot_dir}/sys", 'Failed to mount sys to build system'
+          @host.exec! "mount -t sysfs sys #{chroot_dir}/sys", 'Failed to mount sys to build system'
         end
         unless @host.mounted_at? "#{chroot_dir}/dev"
           mkdir_p "#{chroot_dir}/dev"
           @host.exec! "mount --bind /dev #{chroot_dir}/dev", 'Failed to mount dev to build system'
         end
         unless @host.mounted_at? "#{chroot_dir}/dev/pts"
-          @host.exec! "mount --bind /dev/pts #{chroot_dir}/dev/pts", 'Failed to mount dev/pts to build system'
+          # @host.exec! "mount --bind /dev/pts #{chroot_dir}/dev/pts", 'Failed to mount dev/pts to build system'
+          @host.exec! "mount -t devpts pts #{chroot_dir}/dev/pts", 'Failed to mount dev/pts to build system'
         end
 
         @chroot_prepared[chroot_dir] = true

@@ -32,9 +32,9 @@ module CloudModel
         "#{base_name.camelcase} #{version}".strip
       end
 
-      def worker host
+      def worker template, host, options = {}
         worker_class = "CloudModel::Workers::Components::#{base_name.to_s.gsub(/[^a-z0-9_]*/, '').camelcase}ComponentWorker".constantize
-        worker_class.new host, component: self
+        worker_class.new template, host, options.merge(component: self)
       end
 
       def requirements

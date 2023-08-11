@@ -149,6 +149,14 @@ module CloudModel
                 hash[context]['x2'] = parts.shift
                 hash[context]['cpus'] = parts.shift
               end
+            when 'lxc_container_cpu'
+              lines = line.strip.split("/n")
+              hash[context] ||= {}
+
+              lines.each do |line|
+                parts = line.split(' ')
+                hash[context][parts.shift] ||= parts * ' '
+              end
             when 'md'
               parts = line.strip.split(':')
               key = parts.shift.try(:strip)
@@ -322,7 +330,15 @@ module CloudModel
         end
       end
 
-      parse_cgroup_cpu hash['cgroup_cpu'], hash['cpu']['cpus'] if hash['cgroup_cpu']
+      if hash['cgroup_cpu']
+        if hash['cpu']
+          # Ubuntu 18.04 guest/host
+          parse_cgroup_cpu hash['cgroup_cpu'], hash['cpu']['cpus']
+        elsif hash['lxc_container_cpu']
+          # Ubuntu 22.04 guest
+          parse_cgroup_cpu hash['cgroup_cpu'], hash['lxc_container_cpu']['num_cpus']
+        end
+      end
 
       hash
     end

@@ -16,7 +16,11 @@ module CloudModel
           _prepare_collabora_repository build_path
 
           chroot! build_path, "apt-get update", "Failed to update packages"
-          chroot! build_path, "apt-get install apt-transport-https ca-certificates loolwsd code-brand -y", "Failed to install collabora"
+          if CloudModel.debian_name(@template.os_version) == 'Bionic Beaver'
+            chroot! build_path, "apt-get install apt-transport-https ca-certificates loolwsd code-brand -y", "Failed to install collabora"
+          else
+            chroot! build_path, "apt-get install apt-transport-https ca-certificates coolwsd code-brand -y", "Failed to install collabora"
+          end
         end
       end
     end

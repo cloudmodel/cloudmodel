@@ -29,6 +29,8 @@ module CloudModel
         chroot! build_path, "ln -s /etc/systemd/system/guest_zpool.service /etc/systemd/system/basic.target.wants/guest_zpool.service", "Failed to add guest_zpool to autostart"
         comment_sub_step 'Install curl and nano'
         chroot! build_path, "apt-get install sudo curl nano -y", "Failed to install curl and nano"
+        comment_sub_step 'Install debootstrap'
+        chroot! build_path, "apt-get install sudo debootstrap -y", "Failed to install debootstrap"
       end
 
       def install_network
@@ -81,9 +83,7 @@ module CloudModel
       def install_check_mk_agent
         chroot! build_path, "apt-get install lm-sensors smartmontools -y", "Failed to install CheckMKAgent dependencies"
 
-        # curl https://raw.githubusercontent.com/Checkmk/checkmk/2.2.0/agents/check_mk_agent.linux or https://raw.githubusercontent.com/Checkmk/checkmk/master/agents/check_mk_agent.linux to /usr/bin/check_mk_agent
         chroot! build_path, "curl -s https://raw.githubusercontent.com/Checkmk/checkmk/2.2.0/agents/check_mk_agent.linux >/usr/bin/check_mk_agent && chmod 755 /usr/bin/check_mk_agent", "Failed to install CheckMKAgent"
-
 
         mkdir_p "#{build_path}/usr/lib/check_mk_agent/plugins/"
         %w(cgroup_cpu zfs lxd sensors smart systemd).each do |plugin|
@@ -160,7 +160,7 @@ module CloudModel
           e.backtrace.each do |bt|
             puts "\tfrom #{bt}"
           end
-          cleanup_chroot build_path
+          #cleanup_chroot build_path
           raise "Failed to build host image!"
         end
 

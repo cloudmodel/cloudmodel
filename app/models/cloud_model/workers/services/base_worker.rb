@@ -3,8 +3,9 @@ module CloudModel
     module Services
       class BaseWorker  < CloudModel::Workers::BaseWorker
 
-        def initialize guest, model
-          @guest = guest
+        def initialize lxc, model
+          @lxc = lxc
+          @guest = @lxc.guest
           @host = @guest.host
           @model = model
         end
@@ -20,6 +21,20 @@ module CloudModel
         def mkdir_p path
           super path
           host.exec! "chown -R 100000:100000 #{path}", "failed to set owner for #{path}"
+        end
+
+        def render_to_guest template, remote_file, *param_array
+          perm = if false and param_array.first.is_a? Integer
+            param_array.shift
+          else
+            '0600'
+          end
+
+          locals = param_array.pop || {}
+
+          content = render(template, locals)
+
+          host.exec!("echo #{content.gsub(";", "\;").shellescape} | lxc file push - #{@lxc.name}/#{remote_file} --mode #{perm}", "Failed to render #{template}")
         end
 
         def render_to_remote template, remote_file, *param_array

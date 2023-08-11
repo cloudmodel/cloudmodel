@@ -73,11 +73,14 @@ module CloudModel
         #@lxc = guest.lxd_containers.create! guest_template: guest.template, created_at: Time.now, updated_at: Time.now
         @lxc.save!
         @lxc.mount
+        host.exec!("echo #{"Deployed at #{Time.now} with CloudModel".shellescape} | lxc file push - #{@lxc.name}/etc/deployed", "Failed to render deploy stemp")
       end
 
       def mount_lxd_container
-        @lxc = guest.lxd_containers.last
+        @lxc = guest.lxd_containers.desc(:created_at).first
+        comment_sub_step "Mounting guests/containers/#{name} to #{mountpoint}"
         @lxc.mount
+        host.exec!("echo #{"Resumed deployment at #{Time.now} with CloudModel".shellescape} | lxc file push - #{@lxc.name}/etc/deployed.resume", "Failed to render deploy stemp")
       end
 
       def ensure_lxd_custom_volumes
@@ -95,7 +98,7 @@ module CloudModel
       def start_lxd_container
         cleanup_chroot guest.deploy_path
         @lxc.unmount
-        host.exec! "rm -f #{@lxc.mountpoint}/*", "Failed to clear mountpoint for container"
+        #host.exec! "rm -f #{@lxc.mountpoint}/*", "Failed to clear mountpoint for container"
         guest.update_attributes deploy_state: :booting
         guest.stop
         guest.start @lxc
@@ -103,6 +106,7 @@ module CloudModel
 
 
       def config_services
+        #@lxc.mount
         guest.deploy_path = "#{@lxc.mountpoint}/rootfs"
 
         guest.services.each do |service|
@@ -110,7 +114,7 @@ module CloudModel
           increase_indent
           begin
             service_worker_class = "CloudModel::Workers::Services::#{service.class.model_name.element.camelcase}Worker".constantize
-            service_worker = service_worker_class.new guest, service
+            service_worker = service_worker_class.new @lxc, service
             service_worker.set_indent current_indent
 
             service_worker.write_config

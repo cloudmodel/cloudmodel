@@ -1,6 +1,12 @@
 #!/bin/bash
 mkdir -p /var/cache/cgroup_load
 
-cat /sys/fs/cgroup/cpu/cpuacct.usage_percpu > "/var/cache/cgroup_load/`date +%s%N`"
+if test -f "/sys/fs/cgroup/cpu/cpuacct.usage_percpu"; then
+  # Ubuntu 18.04
+  cat /sys/fs/cgroup/cpu/cpuacct.usage_percpu > "/var/cache/cgroup_load/`date +%s%N`"
+else
+  # Debian 12
+  cat /sys/fs/cgroup/cpuacct.usage_percpu > "/var/cache/cgroup_load/`date +%s%N`"
+fi
 
 rm `ls -t /var/cache/cgroup_load/* | awk 'NR>60'`
