@@ -1,7 +1,13 @@
 #!/bin/bash
 
 now_ts=`date +%s%N`
-now_cau=`cat /sys/fs/cgroup/cpu/cpuacct.usage_percpu`
+if test -f "/sys/fs/cgroup/cpu/cpuacct.usage_percpu"; then
+  # Ubuntu 18.04
+  now_cau=`cat /sys/fs/cgroup/cpu/cpuacct.usage_percpu`
+else
+  # Debian 12
+  now_cau=`cat /sys/fs/cgroup/cpuacct.usage_percpu`
+fi
 IFS=" "
 set $now_cau
 now_c1=$1

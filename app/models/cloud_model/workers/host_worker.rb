@@ -322,8 +322,21 @@ module CloudModel
 
       def config_lxd
         chroot root, "/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests"
+        # lxc profile device add default root disk path=/ pool=guests
         # lxc storage set default volume.zfs.use_refquota true
         chroot root, "/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=#{host.private_address}/#{host.private_network.subnet} ipv4.nat=true"
+      end
+
+      def recover_lxd
+        # # lxd recover
+       #  This LXD server currently has the following storage pools:
+       #  Would you like to recover another storage pool? (yes/no) [default=no]: yes
+       #  Name of the storage pool: default
+       #  Name of the storage backend (dir, zfs): zfs
+       #  Source of the storage pool (block device, volume group, dataset, path, ... as applicable): guests
+       #  Additional storage pool configuration property (KEY=VALUE, empty when done): zfs.pool_name=guests
+       #  Additional storage pool configuration property (KEY=VALUE, empty when done):
+       #  Would you like to recover another storage pool? (yes/no) [default=no]:
       end
 
       def update_tinc
@@ -368,6 +381,87 @@ module CloudModel
         end
 
         @host.sync_inst_images
+      end
+
+      def merge_lxd_4
+
+
+        #zpool export guests
+        #zpool import guests guests-old
+        #lxd init --auto --storage-backend zfs --storage-pool guests
+
+
+        # curl https://linuxcontainers.org/downloads/lxd/lxd-4.24.tar.gz >lxd-4.24.tar.gz
+        # tar xzf lxd-4.24.tar.gz
+        # cd lxd-4.24
+        # make deps
+        # export CGO_CFLAGS="-I/root/lxd-4.24/vendor/raft/include/ -I/root/lxd-4.24/vendor/dqlite/include/"
+        # export CGO_LDFLAGS="-L/root/lxd-4.24/vendor/raft/.libs -L/root/lxd-4.24/vendor/dqlite/.libs/"
+        # export LD_LIBRARY_PATH="/root/lxd-4.24/vendor/raft/.libs/:/root/lxd-4.24/vendor/dqlite/.libs/"
+        # export CGO_LDFLAGS_ALLOW="(-Wl,-wrap,pthread_create)|(-Wl,-z,now)"
+        # make lxd-migrate
+
+        # git clone https://github.com/lxc/lxd.git
+        # cd lxd
+        # git checkout stable-4.0
+        # make deps
+        # export CGO_CFLAGS="-I/root/go/deps/raft/include/ -I/root/go/deps/dqlite/include/"
+        # export CGO_LDFLAGS="-L/root/go/deps/raft/.libs -L/root/go/deps/dqlite/.libs/"
+        # export LD_LIBRARY_PATH="/root/go/deps/raft/.libs/:/root/go/deps/dqlite/.libs/"
+        # export CGO_LDFLAGS_ALLOW="(-Wl,-wrap,pthread_create)|(-Wl,-z,now)"
+
+
+
+        #apt-get install alpine-chroot-install -y
+        ## Alpine v3.16 is the last with lxd 4
+        #alpine-chroot-install -b v3.16 -d /alpine
+        #mount -t proc proc /alpine/proc
+        #mount -t sysfs sys /alpine/sys
+        #mount -o bind /dev /alpine/dev
+        #mount -t devpts pts /alpine/dev/pts
+        #/alpine/enter-chroot
+
+        #mkdir -p /var/lib/lxd
+        #mount /dev/md4 /var/lib/lxd
+
+        # apt-get install arch-install-scripts -y
+
+        # debootstrap --include acl,attr,autoconf,automake,dnsmasq-base,ebtables,git,golang,libtool,libacl1-dev,libcap-dev,liblz4-dev,libsqlite3-dev,libudev-dev,libuv1-dev,make,pkg-config,rsync,squashfs-tools,tar,xz-utils,sqlite3,zfsutils-linux bullseye bullseye http://de.archive.ubuntu.com/ubuntu
+
+ #        debootstrap --include wget bullseye bullseye
+#         mount -t proc proc bullseye/proc
+#         mount -t sysfs sys bullseye/sys
+#         mount -o bind /dev bullseye/dev
+#         mount -t devpts pts bullseye/dev/pts
+#         chroot bullseye
+#
+#
+#         wget -O /usr/share/keyrings/calenhad.gpg https://apt.calenhad.com/debian/calenhad.gpg
+#         echo "deb [signed-by=/usr/share/keyrings/calenhad.gpg] https://apt.calenhad.com/debian bullseye main" >> /etc/apt/sources.list
+#         apt-get update
+#
+#
+#
+#
+#         # apt-get install acl attr autoconf automake dnsmasq-base git golang libacl1-dev libcap-dev liblxc1 liblxc-dev libsqlite3-dev libtool libudev-dev liblz4-dev libuv1-dev make pkg-config rsync squashfs-tools tar tcl xz-utils ebtables zfsutils-linux git binutils make csh g++ sed gawk  autotools-dev liblz4-dev libsqlite-dev -y
+#
+#         #apt-get install acl attr autoconf automake dnsmasq-base ebtables git golang libtool libacl1-dev libcap-dev liblxc1 liblxc-dev liblz4-dev libsqlite3-dev libudev-dev libuv1-dev make pkg-config rsync squashfs-tools tar xz-utils sqlite3 zfsutils-linux  -y
+#
+#         # git clone https://github.com/lxc/lxd.git
+# #         cd lxd
+# #         git checkout stable-4.0
+# #         make deps
+# #         export CGO_CFLAGS="-I/root/go/deps/raft/include/ -I/root/go/deps/dqlite/include/"
+# #         export CGO_LDFLAGS="-L/root/go/deps/raft/.libs -L/root/go/deps/dqlite/.libs/"
+# #         export LD_LIBRARY_PATH="/root/go/deps/raft/.libs/:/root/go/deps/dqlite/.libs/"
+# #         export CGO_LDFLAGS_ALLOW="(-Wl,-wrap,pthread_create)|(-Wl,-z,now)"
+# #         make
+#
+#
+#         umount bullseye/sys/
+#         umount bullseye/proc
+#         umount bullseye/dev/pts
+#         umount bullseye/dev
       end
 
       def deploy options={}

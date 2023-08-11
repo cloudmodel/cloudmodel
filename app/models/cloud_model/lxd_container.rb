@@ -110,9 +110,13 @@ module CloudModel
         @mountpoint = out.split(' ').last
 
         if %w(none legacy).include? @mountpoint
-          @mountpoint = "/var/snap/lxd/common/lxd/storage-pools/default/containers/#{name}"
+          #@mountpoint = "/var/snap/lxd/common/lxd/storage-pools/default/containers/#{name}"
+          host.exec("mkdir -p /var/lib/lxd/storage-pools/default/containers")
+          @mountpoint = "/var/lib/lxd/storage-pools/default/containers/#{name}"
           host.exec "zfs set mountpoint=#{@mountpoint} canmount=noauto guests/containers/#{name}"
         end
+
+        #puts @mountpoint
 
         @mountpoint
       else

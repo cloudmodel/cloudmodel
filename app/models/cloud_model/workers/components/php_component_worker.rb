@@ -3,7 +3,7 @@ module CloudModel
     module Components
       class PhpComponentWorker < BaseComponentWorker
         def php_version
-          7.4
+          CloudModel.config.php_version
         end
 
         def build build_path
@@ -12,7 +12,7 @@ module CloudModel
 
           packages = %w(php-fpm)
           packages += %w(php-curl php-mbstring php-zip php-gd php-dom)
-          packages += %w(php-intl php-bcmath php-gmp php-apcu php-apcu-bc)
+          packages += %w(php-intl php-bcmath php-gmp php-apcu)
 
           packages.map! do |package|
             package.gsub(/^php-/, "php#{CloudModel.config.php_version}-")

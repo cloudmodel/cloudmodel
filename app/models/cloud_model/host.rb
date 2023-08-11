@@ -307,7 +307,7 @@ module CloudModel
       success, data = exec command
 
       unless success
-        raise "#{message}: #{data}"
+        raise "#{message}:\n\n#{data}"
       end
       data
     end

@@ -18,7 +18,8 @@ module CloudModel
           @host.sftp.remove!(temp_file_name)
 
           solr_version = @model.deploy_solr_image.solr_version.shellescape
-          chroot @guest.deploy_path, "ln -s /opt/solr-#{solr_version} /opt/solr"
+          #chroot @guest.deploy_path, "ln -s /opt/solr-#{solr_version} /opt/solr"
+          @host.exec! "rm #{install_path}/solr; ln -s /opt/solr-#{solr_version} #{install_path}/solr", "Failed to create link to solr version"
           # Patch log4j config to set path to log
           @host.exec "sed -i 's/solr\.log=logs/solr.log=\/var\/solr\/log/' #{install_path.shellescape}/solr-#{solr_version}/server/resources/log4j.properties"
 
@@ -35,9 +36,10 @@ module CloudModel
           mkdir_p "#{config_path}/cache"
           mkdir_p "#{config_path}/data"
 
-          chroot @guest.deploy_path, "chown -R 100999:100999 /var/solr"
+          #chroot @guest.deploy_path, "chown -R 100999:100999 /var/solr"
+          @host.exec! "chown -R 100999:100999  #{config_path}", "Failed to setup rights"
 
-          render_to_remote "/cloud_model/guest/etc/systemd/system/solr.service", "#{@guest.deploy_path}/etc/systemd/system/solr.service", 0755, guest: @guest, model: @model
+          render_to_guest "/cloud_model/guest/etc/systemd/system/solr.service", "/etc/systemd/system/solr.service", 0755, guest: @guest, model: @model
         end
 
         def service_name

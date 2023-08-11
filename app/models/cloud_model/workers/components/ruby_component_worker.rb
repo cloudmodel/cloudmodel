@@ -12,7 +12,11 @@ module CloudModel
 
           # Install some packages needed for rails and curl needed for installing rvm
           packages = %w(git zlib1g-dev curl)
-          packages << 'bcrypt' # bcrypt
+          if CloudModel.debian_name(@template.os_version) == 'Bionic Beaver'
+            packages << 'bcrypt' # bcrypt @ Ubuntu 18.04
+          else
+            #packages << 'libcrypt1' # bcrypt @ Ubuntu 22.04, already seems to install automatically
+          end
           packages << 'nodejs' # JS interpreter
           chroot! build_path, "apt-get install #{packages * ' '} -y", "Failed to install packages for deployment of rails app"
 
@@ -20,7 +24,10 @@ module CloudModel
           chroot! build_path, "curl -sSL https://get.rvm.io | bash -s master --ruby=ruby-#{rubyversion}", "Failed to install RVM"
 
           # Install bundler 1 and 2
-          chroot! build_path, "gem install bundler", "Failed to install current bundler"
+          unless rubyversion =~ /\A2./
+            # Do not install bundler > 1 on ruby 2.x
+            chroot! build_path, "gem install bundler", "Failed to install current bundler"
+          end
           chroot! build_path, "gem install bundler -v '~>1.0'", "Failed to install legacy bundler v1"
 
           # Remove installation files of RVM

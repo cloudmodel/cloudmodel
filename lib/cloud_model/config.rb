@@ -93,11 +93,11 @@ module CloudModel
     end
 
     def php_version
-      @php_version || "7.4"
+      @php_version || "8.2"
     end
 
     def ruby_version
-      @ruby_version || "2.5"
+      @ruby_version || "3.1"
     end
 
     def ubuntu_kernel_flavour

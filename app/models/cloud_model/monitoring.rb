@@ -24,5 +24,5 @@ module CloudModel
 end
 
 CloudModel::Monitoring.register_check CloudModel::Monitoring::HostChecks
-CloudModel::Monitoring.register_check CloudModel::Monitoring::MongodbReplicationSetChecks
-CloudModel::Monitoring.register_check CloudModel::Monitoring::RedisSentinelSetChecks
+#CloudModel::Monitoring.register_check CloudModel::Monitoring::MongodbReplicationSetChecks
+#CloudModel::Monitoring.register_check CloudModel::Monitoring::RedisSentinelSetChecks

@@ -21,8 +21,8 @@ module CloudModel
         comment_sub_step 'Install ppa support'
         chroot! build_path, "apt-get install apt-transport-https ca-certificates software-properties-common -y", "Failed to install ppa support"
 
-        comment_sub_step 'Install rsync'
-        chroot! build_path, "apt-get install sudo rsync -y", "Failed to install rsync"
+        comment_sub_step 'Install rsync and curl'
+        chroot! build_path, "apt-get install sudo rsync curl -y", "Failed to install rsync and curl"
 
         comment_sub_step 'Install nano editor'
         chroot! build_path, "apt-get install sudo nano -y", "Failed to install nano"
@@ -49,12 +49,16 @@ module CloudModel
       end
 
       def install_check_mk_agent
-        chroot! build_path, "apt-get install check-mk-agent -y", "Failed to install CheckMKAgent"
+        #chroot! build_path, "apt-get install check-mk-agent -y", "Failed to install CheckMKAgent"
+
+        chroot! build_path, "curl -s https://raw.githubusercontent.com/Checkmk/checkmk/2.2.0/agents/check_mk_agent.linux >/usr/bin/check_mk_agent && chmod 755 /usr/bin/check_mk_agent", "Failed to install CheckMKAgent"
+
         render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk@.service", "#{build_path}/etc/systemd/system/check_mk@.service"
         render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk.socket", "#{build_path}/etc/systemd/system/check_mk.socket"
         mkdir_p "#{build_path}/etc/systemd/system/sockets.target.wants"
         chroot! build_path, "ln -s /etc/systemd/system/check_mk.socket /etc/systemd/system/sockets.target.wants/check_mk.socket", "Failed to add check_mk to autostart"
 
+        mkdir_p "#{build_path}/usr/lib/check_mk_agent/plugins/"
         %w(cgroup_mem cgroup_cpu df_k systemd).each do |sensor|
           render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/plugins/#{sensor}", "#{build_path}/usr/lib/check_mk_agent/plugins/#{sensor}", 0755
         end
@@ -176,7 +180,7 @@ module CloudModel
           begin
             c = CloudModel::Components::BaseComponent.from_sym(component_type)
             comment_sub_step "Install #{c.human_name}"
-            component = c.worker @host
+            component = c.worker @template, @host
           rescue Exception => e
             CloudModel.log_exception e
             raise "Component :#{component_type} has no worker"
