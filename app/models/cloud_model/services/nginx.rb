@@ -217,7 +217,7 @@ module CloudModel
       end
 
       def worker
-        CloudModel::Workers::Services::NginxWorker.new self.guest, self
+        CloudModel::Workers::Services::NginxWorker.new self.guest.current_lxd_container, self
       end
 
       def content_security_policy
