@@ -27,14 +27,21 @@ module CloudModel
           perm = if false and param_array.first.is_a? Integer
             param_array.shift
           else
-            '0600'
+            "0600"
           end
 
           locals = param_array.pop || {}
 
           content = render(template, locals)
 
-          host.exec!("echo #{content.gsub(";", "\;").shellescape} | lxc file push - #{@lxc.name}/#{remote_file} --mode #{perm}", "Failed to render #{template}")
+          tmp_file = "/tmp/cloudmodel_#{BSON::ObjectId.new}"
+
+          @host.sftp.file.open(tmp_file, 'w', 0600) do |f|
+            f.puts content
+          end
+          host.exec!("lxc file push #{tmp_file.shellescape} #{@lxc.name}/#{remote_file.shellescape} --mode #{perm}", "Failed to upload result of rendering #{template}")
+          #host.exec("rm #{tmp_file.shellescape}")
+          true
         end
 
         def render_to_remote template, remote_file, *param_array
