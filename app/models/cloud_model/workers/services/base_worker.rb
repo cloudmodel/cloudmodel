@@ -40,7 +40,7 @@ module CloudModel
             f.puts content
           end
           host.exec!("lxc file push #{tmp_file.shellescape} #{@lxc.name}/#{remote_file.shellescape} --mode #{perm}", "Failed to upload result of rendering #{template}")
-          #host.exec("rm #{tmp_file.shellescape}")
+          host.exec("rm #{tmp_file.shellescape}")
           true
         end
 
