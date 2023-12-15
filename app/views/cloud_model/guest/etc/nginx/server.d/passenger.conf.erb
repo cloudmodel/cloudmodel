@@ -10,6 +10,7 @@ location <%= location %> {
   passenger_min_instances     3;
   passenger_env_var           HTTP_X_FORWARDED_PROTO $scheme;
   passenger_app_env           <%= model.passenger_env %>;
+  passenger_preload_bundler   on;
 
   location ~ ^/assets/ {
     expires                   max;
