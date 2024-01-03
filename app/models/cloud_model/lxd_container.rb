@@ -143,7 +143,7 @@ module CloudModel
       if success
         result = YAML.load(result, permitted_classes: [Symbol, Time]).find{|i| i['name'] == name}
 
-        result ||= {}
+        result ||= {'name' => name, 'status' => 'Unknown', 'empty' => true}
 
         if result['container']
           container = result.delete('container')
@@ -175,7 +175,7 @@ module CloudModel
         end
         result
       else
-        {}
+        {'name' => name, 'status' => 'Unknown'}
       end
     end
 
