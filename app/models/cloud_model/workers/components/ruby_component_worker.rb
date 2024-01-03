@@ -17,8 +17,11 @@ module CloudModel
           else
             #packages << 'libcrypt1' # bcrypt @ Ubuntu 22.04, already seems to install automatically
           end
-          packages << 'nodejs' # JS interpreter
+          packages << 'nodejs npm' # JS interpreter
           chroot! build_path, "apt-get install #{packages * ' '} -y", "Failed to install packages for deployment of rails app"
+
+          # Install Yarn
+          chroot! build_path, "npm install --global yarn", "Failed to install yarn"
 
           # Install RVM
           chroot! build_path, "curl -sSL https://get.rvm.io | bash -s master --ruby=ruby-#{rubyversion}", "Failed to install RVM"

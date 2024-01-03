@@ -97,6 +97,7 @@ module CloudModel
         # Enable universe sources
         @host.exec! "sed -i \"/^# deb.*universe/ s/^# //\" #{build_path}/etc/apt/sources.list", "Failed to activate universe sources"
         @host.exec! "sed -i \"s*http://archive.ubuntu.com/ubuntu/*#{CloudModel.config.ubuntu_mirror}*\" #{build_path}/etc/apt/sources.list", "Failed to set ubutu mirror"
+        @host.exec! "sed -i \"s*http://security.ubuntu.com/ubuntu/*#{CloudModel.config.ubuntu_mirror}*\" #{build_path}/etc/apt/sources.list", "Failed to set ubutu security mirror"
         @host.exec! "sed -i \"s/^deb-src/# deb-src/\" #{build_path}/etc/apt/sources.list", "Failed to set disable deb-src" unless CloudModel.config.ubuntu_deb_src
         # Don't start services on install
         render_to_remote "/cloud_model/support/usr/sbin/policy-rc.d", "#{build_path}/usr/sbin/policy-rc.d", 0755
