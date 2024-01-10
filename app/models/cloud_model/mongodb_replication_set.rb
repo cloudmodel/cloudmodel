@@ -96,7 +96,7 @@ module CloudModel
       if guests.blank?
         return false, 'No guests found'
       end
-      ret, msg = guests.first.exec "mongo --eval #{init_rs_cmd.shellescape}"
+      ret, msg = guests.first.exec "mongosh --quiet --eval #{init_rs_cmd.shellescape}"
       if ret
         ret = false if msg =~ /"ok"\s\:\s0/
         update_attribute :initiated, true if ret
