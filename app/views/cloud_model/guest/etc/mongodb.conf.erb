@@ -9,6 +9,9 @@ net:
         mode: disabled
 <%- if model.mongodb_replication_set -%>
 
+setParameter:
+   disableSplitHorizonIPCheck: true
+
 replication:
    replSetName: <%= model.mongodb_replication_set.name %>
 <%- end -%>
