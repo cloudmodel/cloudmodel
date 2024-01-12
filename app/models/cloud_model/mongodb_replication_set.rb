@@ -77,7 +77,7 @@ module CloudModel
         begin
           c.database.command(command).documents
         rescue Exception => e
-          [{'retval' => {error: "Can´t execute #{command}"}, 'exception' => e}]
+          [{'retval' => {error: "Can´t execute #{command}"}, 'exception' => e.to_s}]
         ensure
           c.close
         end
