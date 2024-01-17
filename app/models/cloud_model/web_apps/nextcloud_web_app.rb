@@ -26,14 +26,15 @@ module CloudModel
       end
 
       def self.fetch_app_command
-        nextcloud_version = '20.0.7' # TODO: Get latest RCM version from internet
+        #nextcloud_version = 'nextcloud-28.0.1' # TODO: Get latest RCM version from internet
+        nextcloud_version = 'latest'
         # Cache files?
         [
           'mkdir -p /opt/web-app',
           'cd /opt/web-app',
-          "wget https://download.nextcloud.com/server/releases/nextcloud-#{nextcloud_version}.tar.bz2",
-          "tar xjf nextcloud-#{nextcloud_version}.tar.bz2",
-          "rm nextcloud-#{nextcloud_version}.tar.bz2",
+          "wget https://download.nextcloud.com/server/releases/#{nextcloud_version}.tar.bz2",
+          "tar xjf #{nextcloud_version}.tar.bz2",
+          "rm #{nextcloud_version}.tar.bz2",
           'chown -R 100000:100000 /opt/web-app/nextcloud'
         ] * ' && '
       end
@@ -48,7 +49,9 @@ module CloudModel
       end
 
       def configure
-        chroot! @guest.deploy_path, "ln -s /etc/systemd/system/nextcloudcron.timer /etc/systemd/system/timers.target.wants/nextcloudcron.timer", "Failed to enable nextcloudcron timer"
+        [
+          ["ln -s /etc/systemd/system/nextcloudcron.timer /etc/systemd/system/timers.target.wants/nextcloudcron.timer", "enable nextcloudcron timer"]
+        ]
       end
     end
   end

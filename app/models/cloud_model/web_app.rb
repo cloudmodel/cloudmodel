@@ -58,7 +58,7 @@ module CloudModel
     end
 
     def configure
-      return
+      []
     end
   end
 end
