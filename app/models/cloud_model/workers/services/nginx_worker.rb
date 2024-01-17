@@ -158,13 +158,14 @@ module CloudModel
 
           # App Stuff
           # TODO: Move to web locations
-          if @model.passenger_supported?
-            mkdir_p "#{@guest.deploy_path}/etc/nginx/server.d"
-            render_to_remote "/cloud_model/guest/etc/nginx/server.d/passenger.conf", "#{@guest.deploy_path}/etc/nginx/server.d/passenger.conf", guest: @guest, model: @model
-            render_to_remote "/cloud_model/guest/etc/default/rails", "#{@guest.deploy_path}/etc/default/rails", guest: @guest, model: @model
-          elsif @model.capistrano_supported?
-            mkdir_p "#{@guest.deploy_path}/etc/nginx/server.d"
-            render_to_remote "/cloud_model/guest/etc/nginx/server.d/cap-deployed.conf", "#{@guest.deploy_path}/etc/nginx/server.d/cap-deployed.conf", guest: @guest, model: @model
+          mkdir_p "#{@guest.deploy_path}/etc/nginx/server.d"
+          if @model.web_locations.where(location: '/').count == 0
+            if @model.passenger_supported?
+              render_to_remote "/cloud_model/guest/etc/nginx/server.d/passenger.conf", "#{@guest.deploy_path}/etc/nginx/server.d/passenger.conf", guest: @guest, model: @model
+              render_to_remote "/cloud_model/guest/etc/default/rails", "#{@guest.deploy_path}/etc/default/rails", guest: @guest, model: @model
+            elsif @model.capistrano_supported?
+              render_to_remote "/cloud_model/guest/etc/nginx/server.d/cap-deployed.conf", "#{@guest.deploy_path}/etc/nginx/server.d/cap-deployed.conf", guest: @guest, model: @model
+            end
           end
 
           if @model.delayed_jobs_supported
@@ -174,6 +175,7 @@ module CloudModel
               chroot! @guest.deploy_path, "ln -s /etc/systemd/system/delayed_jobs@.service /etc/systemd/system/multi-user.target.wants/delayed_jobs@#{q.shellescape}.service", "Failed to enable delayed_jobs service for queue #{q}"
             end
           end
+
 
           deploy_web_image
 
