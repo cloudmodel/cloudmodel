@@ -140,7 +140,10 @@ module CloudModel
               end
             end
 
-            web_app.configure
+            web_app.configure.each do |configure_cmd|
+              comment_sub_step "Config to #{configure_cmd[1]}"
+              chroot! @guest.deploy_path, configure_cmd[0], "Failed to #{configure_cmd[1]}"
+            end
 
             decrease_indent
           end

@@ -1,0 +1,5 @@
+[Service]
+PermissionsStartOnly=true
+#ExecStartPre=-/usr/bin/apt-get loolwsd code-brand -y
+#ExecStartPre=-/sbin/setcap cap_fowner,cap_mknod,cap_sys_chroot=ep /usr/bin//loolforkit
+#ExecStartPre=-/sbin/setcap cap_sys_admin=ep /usr/bin/loolmount
