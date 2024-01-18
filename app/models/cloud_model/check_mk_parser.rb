@@ -61,6 +61,7 @@ module CloudModel
       sensor = nil
       sensor_result = nil
       lxd_yaml = ''
+      _df_block = true
       _in_systemd_units_block = "unknown"
       _systemd_unit = ''
 
@@ -116,10 +117,19 @@ module CloudModel
               parts = line.strip.split(':')
               key = parts.shift.underscore
               hash[context][key] = (parts * ':').strip
-            when 'df'
+            when 'df', 'df_v2'
               parts = line.strip.split(' ')
               key = parts.shift
-              unless ["[df_inodes_start]", "[df_inodes_end]"].include? key
+              if key == "tmpfs"
+                key = "tmpfs#{parts[-1]}"
+              end
+
+              if ["[df_inodes_start]", "[df_lsblk_start]"].include? key
+                _df_block = false
+              elsif ["[df_inodes_end]", "[df_lsblk_end]"].include? key
+                _df_block = true
+
+              elsif _df_block
                 hash[context][key] ||= {}
                 hash[context][key]['mountpoint'] = parts.pop
                 hash[context][key]['usage'] = parts.pop

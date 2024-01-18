@@ -14,7 +14,7 @@ module CloudModel
       end
 
       def check_existence
-        do_check :existence, 'existence of volume', warning: data == {"error"=>"not found"}
+        do_check :existence, 'existence of volume', warning: not(@subject.volume_exists?)
       end
 
       def check
