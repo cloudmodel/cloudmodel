@@ -351,6 +351,10 @@ module CloudModel
         end
       end
 
+      if hash['df_v2']
+        hash['df'] = hash.delete 'df_v2'
+      end
+
       hash
     end
   end
