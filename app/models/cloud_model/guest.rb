@@ -396,8 +396,20 @@ module CloudModel
     def mem_usage
       if check_result = monitoring_last_check_result and sys_info = check_result['system'] and mem_info = sys_info['mem']
         total = mem_info['mem_total'].to_i
-        available = mem_info['mem_available'].to_i
-        100.0 * (total - available) / total
+        if total > 0
+          available = mem_info['mem_available'].to_i
+          100.0 * (total - available) / total
+        end
+      end
+    end
+
+    def swap_usage
+      if check_result = monitoring_last_check_result and sys_info = check_result['system'] and mem_info = sys_info['mem']
+        total = mem_info['swap_total'].to_i
+        available = mem_info['swap_free'].to_i
+        if total > 0
+          100.0 * (total - available) / total
+        end
       end
     end
 
