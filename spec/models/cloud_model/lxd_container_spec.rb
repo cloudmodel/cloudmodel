@@ -289,7 +289,7 @@ describe CloudModel::LxdContainer do
       ]
 
       subject.mountpoint
-      expect(subject.mountpoint).to eq '/var/snap/lxd/common/lxd/storage-pools/default/containers/some_guest-20210415133723'
+      expect(subject.mountpoint).to eq '/var/lib/lxd/storage-pools/default/containers/some_guest-20210415133723'
     end
 
     it 'should return the container´s mountpoint in host for snap lxd' do
@@ -301,7 +301,7 @@ describe CloudModel::LxdContainer do
       ]
 
       subject.mountpoint
-      expect(subject.mountpoint).to eq '/var/snap/lxd/common/lxd/storage-pools/default/containers/some_guest-20220330094242'
+      expect(subject.mountpoint).to eq '/var/lib/lxd/storage-pools/default/containers/some_guest-20220330094242'
     end
   end
 
@@ -321,6 +321,56 @@ describe CloudModel::LxdContainer do
     end
 
   end
+
+  describe "_unroll_lxc_config_values" do
+    it 'should unroll config values' do
+      expect(subject._unroll_lxc_config_values({
+        'config_a.subconfig_a' => '42',
+        'config_a.subconfig_b' => 23,
+        'config_b.subconfig' => 'foo',
+        'config_c' => 'bar'
+      })).to eq({
+        "config_a"=>{
+          "subconfig_a"=>"42",
+          "subconfig_b"=>23
+        },
+        "config_b"=>{
+          "subconfig"=>"foo"
+        },
+        "config_c"=>"bar"
+      })
+    end
+
+    it 'should prefix if parent object already exisits' do
+      expect(subject._unroll_lxc_config_values({
+        'limit.cpu' => "1",
+        'limit.memory' => '65536',
+        'limit.memory.swap' => 'true'
+      })).to eq({
+        "limit" => {
+          "cpu"=>"1",
+          "memory"=>"65536",
+          "memory.swap"=>"true"
+        }
+      })
+    end
+
+
+    it 'should prefix if child object already exisits' do
+      expect(subject._unroll_lxc_config_values({
+        'limit.cpu' => "1",
+        'limit.memory.swap' => 'true',
+        'limit.memory' => '65536'
+      })).to eq({
+        "limit" => {
+          "cpu"=>"1",
+          "memory"=>"65536",
+          "memory.swap"=>"true"
+        }
+      })
+    end
+  end
+
 
   describe 'live_lxc_info' do
     pending
@@ -359,6 +409,43 @@ describe CloudModel::LxdContainer do
       expect(subject.running?).to eq nil
     end
   end
+
+  describe 'show_config' do
+    it 'should parse lxc result' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(subject).to receive('lxc').with('config show some_guest-20200331133742').and_return([true, {version: 42, data: true, comment: 'works'}.to_yaml])
+      expect(subject.show_config).to eq({
+        data: true,
+        version: 42,
+        comment: 'works'
+      })
+    end
+
+    it 'should parse invalid lxc result' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(subject).to receive('lxc').with('config show some_guest-20200331133742').and_return([true, "foo: 'bar'\n  in: 'valid'"])
+      expect(subject.show_config).to eq({
+        error: "YAML not parseable",
+        returned: "foo: 'bar'\n  in: 'valid'"
+      })
+    end
+
+    it 'should return nil if lxc fails' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(subject).to receive('lxc').with('config show some_guest-20200331133742').and_return([false, ''])
+      expect(subject.show_config).to eq nil
+    end
+
+
+    # res, ret = lxc "config show #{name}"
+    # if res
+    #   YAML.load ret
+    # else
+    #   nil
+    # end
+  end
+
+
 
   describe 'get_config' do
     it 'should get config and return it' do
@@ -400,6 +487,26 @@ describe CloudModel::LxdContainer do
       expect(subject).to receive(:lxc).with('config set some_guest-20200331133742 some\ setting something\ like\ true')
 
       subject.set_config 'some setting', 'something like true'
+    end
+  end
+
+  describe 'unset_config' do
+    it 'should call lxc config unset' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      allow(subject).to receive(:running?).and_return true
+
+      expect(subject).to receive(:lxc).with("config unset some_guest-20200331133742 some_setting")
+
+      subject.unset_config :some_setting
+    end
+
+    it 'should escape variables for shell' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      allow(subject).to receive(:running?).and_return true
+
+      expect(subject).to receive(:lxc).with('config unset some_guest-20200331133742 some\ setting')
+
+      subject.unset_config 'some setting'
     end
   end
 

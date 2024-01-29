@@ -137,6 +137,40 @@ module CloudModel
       YAML.load(result, permitted_classes: [Symbol, Time]).deep_transform_keys { |key| key.to_s.underscore }
     end
 
+    # Unroll lxc config values
+    def _unroll_lxc_config_values values
+      config = {}
+
+      values.each do |k,v|
+        keys = k.split('.')
+        prev = config
+        prefix = ''
+        keys.each_with_index do |sk,i|
+          sk = "#{prefix}#{sk}"
+
+          if i + 1 == keys.size
+            if prev[sk].nil?
+              prev[sk] = v
+            else
+              prev[sk].keys.each do |subkey|
+                prev["#{sk}.#{subkey}"] = prev[sk][subkey]
+              end
+              prev[sk] = v
+            end
+          else
+            if prev[sk].nil? or prev[sk].is_a? Hash
+              prev[sk] ||= {}
+              prev = prev[sk]
+            else
+              prefix = "#{prefix}#{sk}."
+            end
+          end
+        end
+      end
+
+      config
+    end
+
     # Get infos about the container
     def live_lxc_info
       success, result = lxc "list #{name} --format yaml"
@@ -151,27 +185,16 @@ module CloudModel
         end
 
         %w(config expanded_config).each do |field|
-          config = {}
-          if result[field]
-            result[field].each do |k,v|
-              keys = k.split('.')
-              prev = config
-              keys.each_with_index do |sk,i|
-                prev[sk] ||= {}
-                if i + 1 == keys.size
-                  prev[sk] = v
-                else
-                  prev = prev[sk]
-                end
-              end
-            end
-          end
 
-          if config['volatile'] and config['volatile']['id_map']
-            config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
-            config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
+          if result[field]
+            config = _unroll_lxc_config_values result[field]
+
+            if config['volatile'] and config['volatile']['id_map']
+              config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
+              config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
+            end
+            result[field] = config
           end
-          result[field] = config
         end
         result
       else
@@ -196,6 +219,19 @@ module CloudModel
       end
     end
 
+    def show_config
+      res, ret = lxc "config show #{name}"
+      if res
+        begin
+          YAML.load ret
+        rescue
+          {error: "YAML not parseable", returned: ret}
+        end
+      else
+        nil
+      end
+    end
+
     def get_config key
       res, ret = lxc "config get #{name} #{key.to_s.shellescape}"
       if res
@@ -212,6 +248,10 @@ module CloudModel
 
     def set_config key, value
       lxc "config set #{name} #{key.to_s.shellescape} #{value.to_s.shellescape}"
+    end
+
+    def unset_config key
+      lxc "config unset #{name} #{key.to_s.shellescape}"
     end
 
     def config_from_guest
