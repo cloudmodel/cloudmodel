@@ -743,7 +743,125 @@ describe CloudModel::Guest do
   end
 
   describe 'mem_usage' do
-    pending
+    it 'should return percentage used' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {
+          'mem' => {
+            'mem_total' => '65536',
+            'mem_available' => '38911'
+          }
+        }
+      })
+      expect(subject.mem_usage).to eq 100.0-100.0*38911/65536
+    end
+
+    it 'should return nil if total is 0' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {
+          'mem' => {
+            'mem_total' => '0',
+            'mem_available' => '0'
+          }
+        }
+      })
+      expect(subject.mem_usage).to eq nil
+    end
+
+    it 'should return nil if total not given' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {
+          'mem' => {
+            'mem_available' => '38911'
+          }
+        }
+      })
+      expect(subject.mem_usage).to eq nil
+    end
+
+    it 'should return 100% if available not given' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {
+          'mem' => {
+            'mem_total' => '65536'
+          }
+        }
+      })
+      expect(subject.mem_usage).to eq 100.0
+    end
+
+    it 'should return nil if mem not given' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {
+        }
+      })
+      expect(subject.mem_usage).to eq nil
+    end
+
+    it 'should return nil if system not given' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({})
+      expect(subject.mem_usage).to eq nil
+    end
+  end
+
+  describe 'swap_usage' do
+    it 'should return percentage used' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {
+          'mem' => {
+            'swap_total' => '65536',
+            'swap_free' => '38911'
+          }
+        }
+      })
+      expect(subject.swap_usage).to eq 100.0-100.0*38911/65536
+    end
+
+    it 'should return nil if total is 0' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {
+          'mem' => {
+            'swap_total' => '0',
+            'swap_free' => '0'
+          }
+        }
+      })
+      expect(subject.swap_usage).to eq nil
+    end
+
+    it 'should return nil if total not given' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {
+          'mem' => {
+            'swap_free' => '38911'
+          }
+        }
+      })
+      expect(subject.swap_usage).to eq nil
+    end
+
+    it 'should return 100% if free not given' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {
+          'mem' => {
+            'swap_total' => '65536'
+          }
+        }
+      })
+      expect(subject.swap_usage).to eq 100.0
+    end
+
+    it 'should return nil if mem not given' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {
+        }
+      })
+      expect(subject.swap_usage).to eq nil
+    end
+
+    it 'should return nil if system not given' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({})
+      expect(subject.swap_usage).to eq nil
+    end
   end
 
   describe 'cpu_usage' do
