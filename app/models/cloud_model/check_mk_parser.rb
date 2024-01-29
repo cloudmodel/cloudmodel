@@ -83,25 +83,7 @@ module CloudModel
               end
 
               %w(config expanded_config).each do |field|
-                config = {}
-                container[field].each do |k,v|
-                  keys = k.split('.')
-                  prev = config
-                  keys.each_with_index do |sk,i|
-                    prev[sk] ||= {}
-                    if i + 1 == keys.size
-                      prev[sk] = v
-                    else
-                      prev = prev[sk]
-                    end
-                  end
-                end
-
-                if config['volatile'] and config['volatile']['id_map']
-                  config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
-                  config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
-                end
-                container[field] = config
+                container[field] = CloudModel::LxdContainer._unroll_lxc_config_values container[field]
               end
             end
           end
