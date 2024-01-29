@@ -138,7 +138,7 @@ module CloudModel
     end
 
     # Unroll lxc config values
-    def _unroll_lxc_config_values values
+    def self._unroll_lxc_config_values values
       config = {}
 
       values.each do |k,v|
@@ -168,6 +168,11 @@ module CloudModel
         end
       end
 
+      if config['volatile'] and config['volatile']['id_map']
+        config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
+        config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
+      end
+
       config
     end
 
@@ -187,13 +192,7 @@ module CloudModel
         %w(config expanded_config).each do |field|
 
           if result[field]
-            config = _unroll_lxc_config_values result[field]
-
-            if config['volatile'] and config['volatile']['id_map']
-              config['volatile']['id_map']['next'] = JSON.parse config['volatile']['id_map']['next'].gsub('\"', '"')
-              config['volatile']['id_map']['last_state'] = JSON.parse config['volatile']['id_map']['last_state'].gsub('\"', '"')
-            end
-            result[field] = config
+            result[field] = CloudModel::LxdContainer._unroll_lxc_config_values result[field]
           end
         end
         result

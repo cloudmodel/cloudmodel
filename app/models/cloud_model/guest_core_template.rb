@@ -34,8 +34,8 @@ module CloudModel
       scoped.where(build_state_id: 0xf0).max(:created_at)
     end
 
-    def self.new_template_to_build host
-      CloudModel::GuestCoreTemplate.create arch: host.arch
+    def self.new_template_to_build host, attrs = {}
+      CloudModel::GuestCoreTemplate.create attrs.merge(arch: host.arch)
     end
 
     def self.build!(host, options={})

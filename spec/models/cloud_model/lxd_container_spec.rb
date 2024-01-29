@@ -322,9 +322,9 @@ describe CloudModel::LxdContainer do
 
   end
 
-  describe "_unroll_lxc_config_values" do
+  describe "._unroll_lxc_config_values" do
     it 'should unroll config values' do
-      expect(subject._unroll_lxc_config_values({
+      expect(subject.class._unroll_lxc_config_values({
         'config_a.subconfig_a' => '42',
         'config_a.subconfig_b' => 23,
         'config_b.subconfig' => 'foo',
@@ -342,7 +342,7 @@ describe CloudModel::LxdContainer do
     end
 
     it 'should prefix if parent object already exisits' do
-      expect(subject._unroll_lxc_config_values({
+      expect(subject.class._unroll_lxc_config_values({
         'limit.cpu' => "1",
         'limit.memory' => '65536',
         'limit.memory.swap' => 'true'
@@ -357,7 +357,7 @@ describe CloudModel::LxdContainer do
 
 
     it 'should prefix if child object already exisits' do
-      expect(subject._unroll_lxc_config_values({
+      expect(subject.class._unroll_lxc_config_values({
         'limit.cpu' => "1",
         'limit.memory.swap' => 'true',
         'limit.memory' => '65536'
