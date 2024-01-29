@@ -23,6 +23,7 @@ module CloudModel
       'ubuntu-18.04' => 'Bionic Beaver',
       'ubuntu-20.04' => 'Focal Fossa',
       'ubuntu-22.04' => 'Jammy Jellyfish',
+      'ubuntu-24.04' => 'Noble Numbat',
       'debian-11'    => 'Bullseye',
       'debian-12'    => 'Bookworm',
       'debian-13'    => 'Trixie',
