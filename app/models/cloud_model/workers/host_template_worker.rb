@@ -56,18 +56,13 @@ module CloudModel
       def install_lxd
         chroot! build_path, "apt-get install lxd -y", "Failed to install LXD"
 
-        # comment_sub_step 'Install apparmor'
-        # chroot! build_path, "apt-get install apparmor-utils -y", "Failed to install apparmor"
-        # comment_sub_step 'Install snapd'
-        # chroot! build_path, "apt-get install snapd -y", "Failed to install snapd"
-        # comment_sub_step 'Install LXD snap'
-        # chroot! build_path, "snap install lxd", "Failed to install LXD"
-        #
-        # mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
-        #mkdir_p "#{build_path}/etc/systemd/system/sockets.target.wants"
-        #chroot! build_path, "ln -s /lib/systemd/system/lxd.socket /etc/systemd/system/sockets.target.wants/lxd.socket", "Failed to add lxd to autostart"
-        #chroot! build_path, "ln -s /lib/systemd/system/lxd-containers.service /etc/systemd/system/basic.target.wants/lxd-containers.service", "Failed to add lxd to autostart"
+        mkdir_p "/etc/systemd/system/multi-user.target.wants"
+        mkdir_p "/etc/systemd/system/sockets.target.wants"
+        #chroot! build_path, "ln -s /lib/systemd/system/lxd-containers.service /etc/systemd/system/multi-user.target.wants/lxd-containers.service", "Failed to add lxd containers to autostart"
+        #chroot! build_path, "ln -s /lib/systemd/system/lxd-agent.service /etc/systemd/system/multi-user.target.wants/lxd-agent.service", "Failed to add lxd agent to autostart"
+        #chroot! build_path, "ln -s /lib/systemd/system/lxd.socket /etc/systemd/system/sockets.target.wants/lxd.socket", "Failed to add lxd socket to autostart"
 
+        render_to_remote "/cloud_model/host/etc/systemd/system/lxcfs.service", "#{build_path}/etc/systemd/system/lxcfs.service"
 
         #comment_sub_step 'Create guests directory'
         #mkdir_p "#{build_path}/cloud/guests"
