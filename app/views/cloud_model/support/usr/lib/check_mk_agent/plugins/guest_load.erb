@@ -1,0 +1,16 @@
+#!/bin/bash
+
+case "$(uname -m)" in
+  "armv7l" | "armv6l" | "aarch64")
+    CPU_REGEX='^processor'
+    ;;
+  *)
+    CPU_REGEX='^CPU|^processor'
+    ;;
+esac
+NUM_CPUS=$(grep -c -E ${CPU_REGEX} </proc/cpuinfo)
+echo '<<<cpu>>>'
+echo "$(cat /proc/loadavg) ${NUM_CPUS}"
+if [ -f "/proc/sys/kernel/threads-max" ]; then
+  cat /proc/sys/kernel/threads-max
+fi

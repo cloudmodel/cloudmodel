@@ -145,11 +145,24 @@ module CloudModel
     end
 
     def read_config
-      db_command(replSetGetConfig: true).first['config']
+      config = db_command(replSetGetConfig: true, commitmentStatus: true)
+      if config.first['exception']
+        raise RuntimeError, "#{config.first['retval'][:error]}\n\n#{config.first['exception']}"
+      end
+      unless config.first['commitmentStatus']
+        raise RuntimeError, "Previous reconfig has not been committed yet"
+      end
+      config.first['config']
     end
 
     def reconfig
-      config = read_config
+      begin
+        config = read_config
+      rescue Exception => e
+        puts e
+        initiate
+        config = read_config
+      end
 
       new_members = []
       max_member_id = config['members'].map{|m| m['_id']}.max
