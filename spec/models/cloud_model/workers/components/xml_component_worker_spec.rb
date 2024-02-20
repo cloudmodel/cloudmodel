@@ -3,8 +3,9 @@
 require 'spec_helper'
 
 describe CloudModel::Workers::Components::XmlComponentWorker do
+  let(:template) {double}
   let(:host) {double CloudModel::Host}
-  subject {CloudModel::Workers::Components::XmlComponentWorker.new host}
+  subject {CloudModel::Workers::Components::XmlComponentWorker.new template, host}
 
   it { expect(subject).to be_a CloudModel::Workers::Components::BaseComponentWorker }
 

@@ -3,8 +3,9 @@
 require 'spec_helper'
 
 describe CloudModel::Workers::Components::LibfcgiComponentWorker do
+  let(:template) {double}
   let(:host) {double CloudModel::Host}
-  subject {CloudModel::Workers::Components::LibfcgiComponentWorker.new host}
+  subject {CloudModel::Workers::Components::LibfcgiComponentWorker.new template, host}
 
   it { expect(subject).to be_a CloudModel::Workers::Components::BaseComponentWorker }
 

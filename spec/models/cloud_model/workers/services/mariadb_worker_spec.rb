@@ -3,8 +3,9 @@ require 'spec_helper'
 describe CloudModel::Workers::Services::MariadbWorker do
   let(:host) {double CloudModel::Host}
   let(:guest) {double CloudModel::Guest, host: host}
+  let(:lxc) {double CloudModel::LxdContainer, guest: guest}
   let(:model) {CloudModel::Services::Mariadb.new}
-  subject {CloudModel::Workers::Services::MariadbWorker.new guest, model}
+  subject {CloudModel::Workers::Services::MariadbWorker.new lxc, model}
 
   describe 'write_config' do
     pending

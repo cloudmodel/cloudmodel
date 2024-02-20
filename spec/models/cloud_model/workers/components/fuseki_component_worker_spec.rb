@@ -4,8 +4,9 @@ require 'spec_helper'
 require 'net/ftp'
 
 describe CloudModel::Workers::Components::FusekiComponentWorker do
+  let(:template) {double}
   let(:host) {double CloudModel::Host}
-  subject {CloudModel::Workers::Components::FusekiComponentWorker.new host}
+  subject {CloudModel::Workers::Components::FusekiComponentWorker.new template, host}
 
   it { expect(subject).to be_a CloudModel::Workers::Components::BaseComponentWorker }
 

@@ -41,10 +41,11 @@ describe CloudModel::Components::PhpImapComponent do
   describe 'worker' do
     it 'should return worker instance' do
       host = double CloudModel::Host
+      template = double
       worker_class = double CloudModel::Workers::Components::PhpImapComponentWorker
 
-      expect(CloudModel::Workers::Components::PhpImapComponentWorker).to receive(:new).with(host, component: subject).and_return worker_class
-      expect(subject.worker host).to eq worker_class
+      expect(CloudModel::Workers::Components::PhpImapComponentWorker).to receive(:new).with(template, host, {component: subject}).and_return worker_class
+      expect(subject.worker template, host).to eq worker_class
     end
   end
 

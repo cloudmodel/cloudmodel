@@ -3,8 +3,9 @@ require 'spec_helper'
 describe CloudModel::Workers::Services::NginxWorker do
   let(:host) {CloudModel::Host.new}
   let(:guest) {CloudModel::Guest.new host: host}
+  let(:lxc) {double CloudModel::LxdContainer, guest: guest}
   let(:model) {CloudModel::Services::Nginx.new guest: guest}
-  subject {CloudModel::Workers::Services::NginxWorker.new guest, model}
+  subject {CloudModel::Workers::Services::NginxWorker.new lxc, model}
 
   before do
     allow(guest).to receive(:deploy_path).and_return('/path/to/install')
@@ -170,6 +171,7 @@ describe CloudModel::Workers::Services::NginxWorker do
   describe '.write_config' do
     before do
       allow(guest).to receive(:deploy_path).and_return "/var/www/rails/#{Time.now.to_i}"
+      allow(subject).to receive(:render_to_guest)
     end
 
     it "should not link delayed jobs service by default" do

@@ -5,8 +5,9 @@ require 'spec_helper'
 describe CloudModel::Workers::Services::SolrWorker do
   let(:host) {double CloudModel::Host}
   let(:guest) {double CloudModel::Guest, host: host}
+  let(:lxc) {double CloudModel::LxdContainer, guest: guest}
   let(:model) {CloudModel::Services::Solr.new}
-  subject {CloudModel::Workers::Services::SolrWorker.new guest, model}
+  subject {CloudModel::Workers::Services::SolrWorker.new lxc, model}
 
   describe 'write_config' do
     pending
