@@ -12,6 +12,9 @@ describe CloudModel::Host do
   it { expect(subject).to have_field(:cpu_count).of_type(Integer).with_default_value_of -1 }
   it { expect(subject).to have_field(:arch).of_type(String).with_default_value_of 'amd64' }
   it { expect(subject).to have_field(:mac_address_prefix).of_type String }
+  it { expect(subject).to have_field(:system_disks).of_type(Array).with_default_value_of ['sda', 'sdb'] }
+  it { expect(subject).to embed_many(:extra_zpools).of_type CloudModel::Zpool }
+  it { expect(subject).to accept_nested_attributes_for(:extra_zpools) }
 
   it { expect(subject).to have_enum(:stage).with_values(
     0x00 => :pending,
@@ -402,18 +405,38 @@ describe CloudModel::Host do
   end
 
   describe 'ssh_connection' do
-    it "should open a new SSH connection to the host on first call" do
+    before do
+      subject.primary_address = CloudModel::Address.new ip: "192.168.42.14", subnet: 28, gateway: "192.168.42.15"
+      subject.private_network = CloudModel::Address.new ip: "10.42.1.128", subnet: 25, gateway: "10.42.1.129"
+      CloudModel.config.use_external_ip = false
+    end
+
+    it "should open a new SSH connection to the host on first call via external address" do
+      CloudModel.config.use_external_ip = true
       allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
       expect(Net::SSH).to receive(:start).with(subject.primary_address.ip, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_return "SSH CONNECTION"
       expect(subject.ssh_connection).to eq "SSH CONNECTION"
     end
 
+    it "should open a new SSH connection to the host on first call via private address" do
+      allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
+      expect(Net::SSH).to receive(:start).with(subject.private_address, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_return "SSH CONNECTION"
+      expect(subject.ssh_connection).to eq "SSH CONNECTION"
+    end
+
     it "should reuse SSH connection on further calls" do
       allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
-      allow(Net::SSH).to receive(:start).with(subject.primary_address.ip, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_return "SSH CONNECTION"
+      allow(Net::SSH).to receive(:start).with(subject.private_address, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_return "SSH CONNECTION"
       subject.ssh_connection
       expect(Net::SSH).not_to receive(:start)
       expect(subject.ssh_connection).to eq "SSH CONNECTION"
+    end
+
+    it "should try to access host via external address if internal failed" do
+      allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
+      allow(Net::SSH).to receive(:start).with(subject.private_address, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_raise Errno::ENETUNREACH
+      allow(Net::SSH).to receive(:start).with(subject.primary_address.ip, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_return "SSH CONNECTION"
+      subject.ssh_connection
     end
   end
 
@@ -520,7 +543,7 @@ describe CloudModel::Host do
 
     it 'should raise error with given message if exec fails' do
       expect(subject).to receive(:exec).with('command').and_return [false, 'An error occured']
-      expect { subject.exec! 'command', 'message' }.to raise_error(RuntimeError, 'message: An error occured')
+      expect { subject.exec! 'command', 'message' }.to raise_error(RuntimeError, "message:\n\nAn error occured")
     end
   end
 

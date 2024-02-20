@@ -23,10 +23,7 @@ module CloudModel
         comment_sub_step 'Install zfs'
         #chroot! build_path, "apt-get install zfs-dkms -y", "Failed to install zfs"
         chroot! build_path, "apt-get install zfs-initramfs -y", "Failed to install zfs"
-        # Init zfspool on first boot if needed
-        render_to_remote "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{build_path}/etc/systemd/system/guest_zpool.service"
-        mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
-        chroot! build_path, "ln -s /etc/systemd/system/guest_zpool.service /etc/systemd/system/basic.target.wants/guest_zpool.service", "Failed to add guest_zpool to autostart"
+
         comment_sub_step 'Install curl and nano'
         chroot! build_path, "apt-get install sudo curl nano -y", "Failed to install curl and nano"
         comment_sub_step 'Install debootstrap'

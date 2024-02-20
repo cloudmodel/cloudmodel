@@ -5,8 +5,9 @@ require 'spec_helper'
 describe CloudModel::Workers::Services::RedisWorker do
   let(:host) {double CloudModel::Host}
   let(:guest) {double CloudModel::Guest, host: host}
+  let(:lxc) {double CloudModel::LxdContainer, guest: guest}
   let(:model) {CloudModel::Services::Redis.new}
-  subject {CloudModel::Workers::Services::RedisWorker.new guest, model}
+  subject {CloudModel::Workers::Services::RedisWorker.new lxc, model}
 
   describe 'write_config' do
     pending

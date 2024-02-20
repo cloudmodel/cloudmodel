@@ -3,8 +3,9 @@ require 'spec_helper'
 describe CloudModel::Workers::Services::PhpfpmWorker do
   let(:host) {double CloudModel::Host}
   let(:guest) {double CloudModel::Guest, host: host}
+  let(:lxc) {double CloudModel::LxdContainer, guest: guest}
   let(:model) {double CloudModel::Services::Phpfpm}
-  subject {CloudModel::Workers::Services::PhpfpmWorker.new guest, model}
+  subject {CloudModel::Workers::Services::PhpfpmWorker.new lxc, model}
 
   describe 'patch_php_ini' do
     pending

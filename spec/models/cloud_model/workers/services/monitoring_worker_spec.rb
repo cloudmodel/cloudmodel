@@ -5,8 +5,9 @@ require 'spec_helper'
 describe CloudModel::Workers::Services::MonitoringWorker do
   let(:host) {double CloudModel::Host}
   let(:guest) {double CloudModel::Guest, host: host}
+  let(:lxc) {double CloudModel::LxdContainer, guest: guest}
   let(:model) {CloudModel::Services::Monitoring.new}
-  subject {CloudModel::Workers::Services::MonitoringWorker.new guest, model}
+  subject {CloudModel::Workers::Services::MonitoringWorker.new lxc, model}
 
   describe 'write_config' do
     pending

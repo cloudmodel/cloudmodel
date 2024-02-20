@@ -28,7 +28,7 @@ module CloudModel
         # Configure fstab
         #
 
-        render_to_remote '/cloud_model/host/etc/fstab', "#{root}/etc/fstab", host: @host, timestamp: @timestamp
+        render_to_remote '/cloud_model/host/etc/fstab', "#{root}/etc/fstab", host: @host, timestamp: @timestamp, swap_disks: @host.system_disks.map{|d| disk_partition_device d, 2}
       end
 
       def set_authorized_keys options={}
@@ -60,9 +60,11 @@ module CloudModel
         comment_sub_step 'Setup grub bootloader'
         chroot! root, "mdadm --detail --scan >> /etc/mdadm/mdadm.conf", "Failed to update mdadm.conf"
         chroot! root, "update-initramfs -u", "Failed to update initram"
-        chroot! root, "grub-install  --no-floppy --recheck /dev/sda", 'Failed to install grub on sda'
+        chroot! root, "grub-install --no-floppy --recheck /dev/#{@host.system_disks.first}", "Failed to install grub on #{@host.system_disks.first}"
         chroot! root, "grub-mkconfig -o /boot/grub/grub.cfg", 'Failed to config grub'
-        chroot! root, "grub-install --no-floppy /dev/sdb", 'Failed to install grub on sda'
+        @host.system_disks[1..].each do |dev|
+          chroot! root, "grub-install --no-floppy /dev/#{dev}", "Failed to install grub on #{dev}"
+        end
 
         unless options[:no_reboot]
           comment_sub_step 'Reboot Host'
@@ -93,12 +95,31 @@ module CloudModel
         true
       end
 
-      def make_deploy_disk
-        #
-        # Partition disks
-        #
+      def disk_partition_device device, number
+        if not number.is_a? Integer or number < 1
+          raise "Partition number must be a positive integer value. First partition is 1."
+        end
 
-        comment_sub_step 'Partition disks'
+        if device =~ /\A[sh]d/
+          "#{device}#{number}"
+        else
+          "#{device}p#{number}"
+        end
+      end
+
+      def init_raid_device md_data, md
+        if md_data =~ /#{md[:device]} \: active raid1/
+          comment_sub_step "Skip RAID device #{md[:device]} for #{md[:name]}, as already active", indent: 4
+        else
+          comment_sub_step "Init RAID device #{md[:device]} for #{md[:name]}", indent: 4
+          devs = @host.system_disks.map{|dev| "/dev/#{disk_partition_device dev, md[:partition]}"}
+          @host.exec "mdadm --zero-superblock #{devs * ' '}"
+          @host.exec "mdadm --create -e1 -f /dev/#{md[:device]} --level=1 --raid-devices=#{devs.size} #{devs * ' '}"
+        end
+      end
+
+      def init_system_disk
+        comment_sub_step 'Partition system disks'
 
         part_cmd = "sgdisk -go " +
           "-n 1:2048:526335 -t 1:ef02 -c 1:boot " +
@@ -107,91 +128,51 @@ module CloudModel
           "-n 4:134744064:201852927 -t 4:fd00 -c 4:root_b " +
           "-n 5:201852928:403179519 -t 5:fd00 -c 5:cloud " +
           "-n 6:403179520:453511168 -t 6:fd00 -c 6:lxd " +
-          "-N 7 -t 6:8300 -c 6:guests "
+          "-N 7 -t 7:8300 -c 7:guests "
 
-        @host.exec! part_cmd + "/dev/sda", "Failed to create partitions on /dev/sda"
-        @host.exec! part_cmd + "/dev/sdb", "Failed to create partitions on /dev/sdb"
+        @host.system_disks.each do |dev|
+          @host.exec! part_cmd + "/dev/#{dev}", "Failed to create partitions on #{dev}"
+        end
 
-        #
-        # make raid
-        #
-
-        comment_sub_step 'Init RAID'
+        comment_sub_step 'Make RAID'
 
         if md_data = @host.exec('cat /proc/mdstat') and md_data[0] and md_data = md_data[1]
-          comment_sub_step 'Init md0 (boot)', indent: 4
-          unless md_data =~ /md0 \: active raid1 sdb1\[1\] sda1\[0\]/
-            @host.exec 'mdadm --zero-superblock /dev/sda1 /dev/sdb1'
-            @host.exec 'mdadm --create -e1 -f /dev/md0 --level=1 --raid-devices=2 /dev/sda1 /dev/sdb1'
-          end
-
-          comment_sub_step 'Init md1 (cloud)', indent: 4
-          unless md_data =~ /md1 \: active raid1 sdb5\[1\] sda5\[0\]/
-            @host.exec 'mdadm --zero-superblock /dev/sda5 /dev/sdb5'
-            @host.exec 'mdadm --create -e1 -f /dev/md1 --level=1 --raid-devices=2 /dev/sda5 /dev/sdb5'
-          end
-
-          comment_sub_step 'Init md2 (root_a)', indent: 4
-          unless md_data =~ /md2 \: active raid1 sdb3\[1\] sda3\[0\]/
-            @host.exec 'mdadm --zero-superblock /dev/sda3 /dev/sdb3'
-            @host.exec 'mdadm --create -e1 -f /dev/md2 --level=1 --raid-devices=2 /dev/sda3 /dev/sdb3'
-          end
-
-          comment_sub_step 'Init md3 (root_b)', indent: 4
-          unless md_data =~ /md3 \: active raid1 sdb4\[1\] sda4\[0\]/
-            @host.exec 'mdadm --zero-superblock /dev/sda4 /dev/sdb4'
-            @host.exec 'mdadm --create -e1 -f /dev/md3 --level=1 --raid-devices=2 /dev/sda4 /dev/sdb4'
-          end
-
-          comment_sub_step 'Init md4 (lxd)', indent: 4
-          unless md_data =~ /md4 \: active raid1 sdb6\[1\] sda6\[0\]/
-            @host.exec 'mdadm --zero-superblock /dev/sda6 /dev/sdb6'
-            @host.exec 'mdadm --create -e1 -f /dev/md4 --level=1 --raid-devices=2 /dev/sda6 /dev/sdb6'
-          end
+          init_raid_device md_data, name: 'boot', device: 'md0', partition: 1
+          init_raid_device md_data, name: 'cloud', device: 'md1', partition: 5
+          init_raid_device md_data, name: 'root_a', device: 'md2', partition: 3
+          init_raid_device md_data, name: 'root_b', device: 'md3', partition: 4
+          init_raid_device md_data, name: 'lxd', device: 'md4', partition: 6
         else
           raise 'Failed to stat md data'
         end
 
-        #
-        # make swap
-        #
-
         comment_sub_step 'Make swap space'
 
-        @host.exec! 'mkswap /dev/sda2', 'Failed to create swap on sda'
-        @host.exec! 'mkswap /dev/sdb2', 'Failed to create swap on sdb'
-
-        #
-        # make boot
-        #
+        @host.system_disks.each do |dev|
+          @host.exec! "mkswap /dev/#{disk_partition_device dev, 2}", "Failed to create swap on #{dev}"
+        end
 
         comment_sub_step 'Format boot array'
 
-        @host.exec! 'mkfs.ext2 /dev/md0', 'Failed to create fs for boot'
+        @host.exec! 'mkfs.ext2 /dev/md0', 'Failed to create boot filesystem'
 
         comment_sub_step 'Format cloud array'
 
-        # make ext4 ls
-        @host.exec! 'mkfs.ext4 /dev/md1', 'Failed to create cloud fs'
+        @host.exec! 'mkfs.ext4 /dev/md1', 'Failed to create cloud filesystem'
         @host.exec 'mkdir -p /cloud'
-        @host.exec! 'mount /dev/md1 /cloud', 'Failed to mount /cloud'
+        @host.exec! 'mount /dev/md1 /cloud', 'Failed to mount cloud filesystem'
 
         comment_sub_step 'Format lxd array'
 
-        @host.exec! 'mkfs.ext4 /dev/md4', 'Failed to create lxd fs'
+        @host.exec! 'mkfs.ext4 /dev/md4', 'Failed to create lxd filesystem'
         @host.exec 'mkdir -p /var/lib/lxd'
-        @host.exec! 'mount /dev/md4 /var/lib/lxd', 'Failed to mount /cloud'
-
-        #
-        # The rest is quite similar to redeploy
-        #
-        # TODO: SSH connection to new host for sync images etc. without entering password
+        @host.exec! 'mount /dev/md4 /var/lib/lxd', 'Failed to mount lxd filesystem'
       end
 
       def ensure_cloud_filesystem
         unless @host.mounted_at? '/cloud'
           mkdir_p "/cloud"
-          @host.exec! 'mount /dev/md1 /cloud', 'Failed to mount /cloud'
+          @host.exec! 'mount /dev/md1 /cloud', 'Failed to mount cloud filesystem'
         end
       end
 
@@ -230,7 +211,6 @@ module CloudModel
         end
       end
 
-
       def populate_deploy_root
         ensure_cloud_filesystem
 
@@ -250,6 +230,15 @@ module CloudModel
         @host.exec! "cd #{root} && tar xzpf #{template.tarball}", "Failed to unpack system image!"
 
         mkdir_p "#{root}/inst"
+      end
+
+      def render_guest_zpool_service
+        # Init zfspool on first boot if needed
+        #comment_sub_step 'render guest_zpool service'
+        render_to_remote "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{root}/etc/systemd/system/guest_zpool.service", zpools:
+          @host.extra_zpools.as_hash.merge(default: "mirror #{@host.system_disks.map{|d| disk_partition_device d, 7} * ' '}")
+        mkdir_p "#{root}/etc/systemd/system/basic.target.wants"
+        chroot! root, "ln -s /etc/systemd/system/guest_zpool.service /etc/systemd/system/basic.target.wants/guest_zpool.service", "Failed to add guest_zpool to autostart"
       end
 
       def config_deploy_root
@@ -286,8 +275,8 @@ module CloudModel
         render_to_remote "/cloud_model/host/etc/tinc/tinc.conf", "#{root}/etc/tinc/vpn/tinc.conf", host: @host
         render_to_remote "/cloud_model/host/etc/tinc/tinc-up", "#{root}/etc/tinc/vpn/tinc-up", 0755, host: @host
 
-        comment_sub_step 'render fstab'
 
+        comment_sub_step 'render fstab'
         config_fstab
 
         comment_sub_step 'config open files'
@@ -346,10 +335,6 @@ module CloudModel
         end
       end
 
-      # def copy_lxd
-      #   @host.exec! "cp -a /var/lib/lxd #{root}/var/lib/ && rm -f #{root}/var/lib/lxd/unix.socket", "Failed to copy lxd files"
-      # end
-      #
       def make_keys
         mkdir_p "#{root}/etc/tinc/vpn/"
         render_to_remote "/cloud_model/host/etc/tinc/rsa_key.priv", "#{root}/etc/tinc/vpn/rsa_key.priv", 0600, host: @host
@@ -383,87 +368,6 @@ module CloudModel
         @host.sync_inst_images
       end
 
-      def merge_lxd_4
-
-
-        #zpool export guests
-        #zpool import guests guests-old
-        #lxd init --auto --storage-backend zfs --storage-pool guests
-
-
-        # curl https://linuxcontainers.org/downloads/lxd/lxd-4.24.tar.gz >lxd-4.24.tar.gz
-        # tar xzf lxd-4.24.tar.gz
-        # cd lxd-4.24
-        # make deps
-        # export CGO_CFLAGS="-I/root/lxd-4.24/vendor/raft/include/ -I/root/lxd-4.24/vendor/dqlite/include/"
-        # export CGO_LDFLAGS="-L/root/lxd-4.24/vendor/raft/.libs -L/root/lxd-4.24/vendor/dqlite/.libs/"
-        # export LD_LIBRARY_PATH="/root/lxd-4.24/vendor/raft/.libs/:/root/lxd-4.24/vendor/dqlite/.libs/"
-        # export CGO_LDFLAGS_ALLOW="(-Wl,-wrap,pthread_create)|(-Wl,-z,now)"
-        # make lxd-migrate
-
-        # git clone https://github.com/lxc/lxd.git
-        # cd lxd
-        # git checkout stable-4.0
-        # make deps
-        # export CGO_CFLAGS="-I/root/go/deps/raft/include/ -I/root/go/deps/dqlite/include/"
-        # export CGO_LDFLAGS="-L/root/go/deps/raft/.libs -L/root/go/deps/dqlite/.libs/"
-        # export LD_LIBRARY_PATH="/root/go/deps/raft/.libs/:/root/go/deps/dqlite/.libs/"
-        # export CGO_LDFLAGS_ALLOW="(-Wl,-wrap,pthread_create)|(-Wl,-z,now)"
-
-
-
-        #apt-get install alpine-chroot-install -y
-        ## Alpine v3.16 is the last with lxd 4
-        #alpine-chroot-install -b v3.16 -d /alpine
-        #mount -t proc proc /alpine/proc
-        #mount -t sysfs sys /alpine/sys
-        #mount -o bind /dev /alpine/dev
-        #mount -t devpts pts /alpine/dev/pts
-        #/alpine/enter-chroot
-
-        #mkdir -p /var/lib/lxd
-        #mount /dev/md4 /var/lib/lxd
-
-        # apt-get install arch-install-scripts -y
-
-        # debootstrap --include acl,attr,autoconf,automake,dnsmasq-base,ebtables,git,golang,libtool,libacl1-dev,libcap-dev,liblz4-dev,libsqlite3-dev,libudev-dev,libuv1-dev,make,pkg-config,rsync,squashfs-tools,tar,xz-utils,sqlite3,zfsutils-linux bullseye bullseye http://de.archive.ubuntu.com/ubuntu
-
- #        debootstrap --include wget bullseye bullseye
-#         mount -t proc proc bullseye/proc
-#         mount -t sysfs sys bullseye/sys
-#         mount -o bind /dev bullseye/dev
-#         mount -t devpts pts bullseye/dev/pts
-#         chroot bullseye
-#
-#
-#         wget -O /usr/share/keyrings/calenhad.gpg https://apt.calenhad.com/debian/calenhad.gpg
-#         echo "deb [signed-by=/usr/share/keyrings/calenhad.gpg] https://apt.calenhad.com/debian bullseye main" >> /etc/apt/sources.list
-#         apt-get update
-#
-#
-#
-#
-#         # apt-get install acl attr autoconf automake dnsmasq-base git golang libacl1-dev libcap-dev liblxc1 liblxc-dev libsqlite3-dev libtool libudev-dev liblz4-dev libuv1-dev make pkg-config rsync squashfs-tools tar tcl xz-utils ebtables zfsutils-linux git binutils make csh g++ sed gawk  autotools-dev liblz4-dev libsqlite-dev -y
-#
-#         #apt-get install acl attr autoconf automake dnsmasq-base ebtables git golang libtool libacl1-dev libcap-dev liblxc1 liblxc-dev liblz4-dev libsqlite3-dev libudev-dev libuv1-dev make pkg-config rsync squashfs-tools tar xz-utils sqlite3 zfsutils-linux  -y
-#
-#         # git clone https://github.com/lxc/lxd.git
-# #         cd lxd
-# #         git checkout stable-4.0
-# #         make deps
-# #         export CGO_CFLAGS="-I/root/go/deps/raft/include/ -I/root/go/deps/dqlite/include/"
-# #         export CGO_LDFLAGS="-L/root/go/deps/raft/.libs -L/root/go/deps/dqlite/.libs/"
-# #         export LD_LIBRARY_PATH="/root/go/deps/raft/.libs/:/root/go/deps/dqlite/.libs/"
-# #         export CGO_LDFLAGS_ALLOW="(-Wl,-wrap,pthread_create)|(-Wl,-z,now)"
-# #         make
-#
-#
-#         umount bullseye/sys/
-#         umount bullseye/proc
-#         umount bullseye/dev/pts
-#         umount bullseye/dev
-      end
-
       def deploy options={}
         return false unless @host.deploy_state == :pending or options[:force]
 
@@ -473,12 +377,13 @@ module CloudModel
 
         steps = [
           ['Allow to access with SSH key', :set_authorized_keys],
-          ['Prepare disk for new system', :make_deploy_disk],
+          ['Prepare disk for new system', :init_system_disk],
           ['Upsync system images', :sync_inst_images],
           ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
           ['Populate volume with new system image', :populate_deploy_root],
           ['Make crypto keys', :make_keys],
           ['Config new system', :config_deploy_root],
+          ['Render guest_zpool.service', :render_guest_zpool_service],
           # TODO: apply existing guests and restore backups
           ['Config LXD', :config_lxd],
           ['Update TINC config', :update_tinc],
@@ -504,7 +409,6 @@ module CloudModel
           ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
           ['Populate volume with new system image', :populate_deploy_root],
           ['Config new system', :config_deploy_root],
-          #['Copy LXD config', :copy_lxd],
           ['Copy crypto keys from old system', :copy_keys],
           ['Write boot config and reboot', :boot_deploy_root],
         ]

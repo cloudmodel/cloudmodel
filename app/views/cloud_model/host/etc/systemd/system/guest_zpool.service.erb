@@ -5,14 +5,16 @@ Conflicts=shutdown.target
 
 [Service]
 Type=oneshot
+<%- zpools.each do |name, zparams| -%>
 # Try to create guests pool; exists with error code if already exist
-ExecStartPre=-/sbin/zpool create guests mirror sda7 sdb7
+ExecStartPre=-/sbin/zpool create <%= name.to_s.shellescape %> <%=raw zparams.to_s.split.map(&:shellescape) * ' ' %>
 # Try to force mount guests pool; exists with error if already mounted
-ExecStartPre=-/sbin/zpool import -f guests
-# Init lxd if zpool create did not exit with error code aka create success
-ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests
-ExecStart=/bin/echo 'done'
+ExecStartPre=-/sbin/zpool import -f <%= name.to_s%>
 
+<%- end -%>
+# Init lxd if zpool create did not exit with error code aka create success
+ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool default
+ExecStart=/bin/echo 'done'
 
 [Install]
 WantedBy=basic.target

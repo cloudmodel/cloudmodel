@@ -3,8 +3,9 @@
 require 'spec_helper'
 
 describe CloudModel::Workers::Components::MariadbComponentWorker do
+  let(:template) {double}
   let(:host) {double CloudModel::Host}
-  subject {CloudModel::Workers::Components::MariadbComponentWorker.new host}
+  subject {CloudModel::Workers::Components::MariadbComponentWorker.new template, host}
 
   it { expect(subject).to be_a CloudModel::Workers::Components::BaseComponentWorker }
 

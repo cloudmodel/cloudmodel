@@ -3,9 +3,10 @@
 require 'spec_helper'
 
 describe CloudModel::Workers::Components::JavaComponentWorker do
+  let(:template) {double}
   let(:host) {double CloudModel::Host}
   let(:component) {double CloudModel::Components::JavaComponent, version: nil}
-  subject {CloudModel::Workers::Components::JavaComponentWorker.new host, component: component}
+  subject {CloudModel::Workers::Components::JavaComponentWorker.new template, host, component: component}
 
   it { expect(subject).to be_a CloudModel::Workers::Components::BaseComponentWorker }
 

@@ -55,7 +55,7 @@ describe CloudModel::GuestCoreTemplate do
   describe '#new_template_to_build' do
     it 'should create new GuestTemplate' do
       template = double
-      expect(CloudModel::GuestCoreTemplate).to receive(:create).with(arch: 'MOS6502').and_return template
+      expect(CloudModel::GuestCoreTemplate).to receive(:create).with({arch: 'MOS6502'}).and_return template
       expect(CloudModel::GuestCoreTemplate.new_template_to_build host).to eq template
     end
   end

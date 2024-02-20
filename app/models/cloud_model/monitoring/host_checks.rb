@@ -1,7 +1,7 @@
 module CloudModel
   module Monitoring
     class HostChecks < CloudModel::Monitoring::BaseChecks
-      require_relative "mixins/sysinfo_checks_mixin"
+      #require_relative "mixins/sysinfo_checks_mixin"
       include CloudModel::Monitoring::Mixins::SysinfoChecksMixin
 
       def self.check options = {}
@@ -9,7 +9,7 @@ module CloudModel
 
         CloudModel::Host.scoped.each do |host|
           unless [:booting, :not_started].include?(host.deploy_state)
-            puts "[_Monitoring_] Treading #{host}"
+            puts "[_Monitoring_] Threading #{host}"
             threads << Thread.new do
               Rails.application.executor.wrap do
                 handle_cloudmodel_monitoring_exception host, host, 2 do
@@ -89,7 +89,7 @@ module CloudModel
         if sys_info = data[:system] and sys_info['smart']
           failures = []
 
-          (['sda', 'sdb'] - sys_info['smart'].keys).each do |v|
+          (@subject.system_disks - sys_info['smart'].keys).each do |v|
             failures << "#{v} not found"
           end
 

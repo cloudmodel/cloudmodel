@@ -53,6 +53,9 @@ module CloudModel
     field :cpu_count, type: Integer, default: -1
     field :arch, type: String, default: 'amd64'
     field :mac_address_prefix, type: String
+    field :system_disks, type: Array, default: ['sda', 'sdb']
+    embeds_many :extra_zpools, class_name: "CloudModel::Zpool", inverse_of: :host
+    accepts_nested_attributes_for :extra_zpools, allow_destroy: true
 
     enum_field :stage, {
       0x00 => :pending,
@@ -86,6 +89,7 @@ module CloudModel
       end
     end
     accepts_nested_attributes_for :addresses, allow_destroy: true
+
     embeds_many :firewall_rules, class_name: "CloudModel::FirewallRule", inverse_of: :host
     accepts_nested_attributes_for :firewall_rules, allow_destroy: true
 
@@ -219,11 +223,20 @@ module CloudModel
           private_network.list_ips.first
         end
 
-        Net::SSH.start(host_ip, "root",
-          keys: ["#{CloudModel.config.data_directory}/keys/id_rsa"],
-          keys_only: true,
-          password: ''
-        )
+        begin
+          Net::SSH.start(host_ip, "root",
+            keys: ["#{CloudModel.config.data_directory}/keys/id_rsa"],
+            keys_only: true,
+            password: ''
+          )
+        rescue Errno::EHOSTUNREACH, Errno::ETIMEDOUT, Errno::ENETUNREACH
+          # If not reachable via VPN, try external IP
+          Net::SSH.start(primary_address.ip, "root",
+            keys: ["#{CloudModel.config.data_directory}/keys/id_rsa"],
+            keys_only: true,
+            password: ''
+          )
+        end
       end
     end
 

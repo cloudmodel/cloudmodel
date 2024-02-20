@@ -264,13 +264,13 @@ describe CloudModel::ItemIssue do
 
     it 'should use I18n version of title for key if no title is set, but a key' do
       subject.key = :something
-      expect(subject.title).to eq "translation missing: en.issues.something"
+      expect(subject.title).to eq "Translation missing: en.issues.something"
     end
 
     it 'should use I18n version of title for subject key if no title is set, but a key and subject' do
       subject.key = :something
       subject.subject = CloudModel::Host.new
-      expect(subject.title).to eq "translation missing: en.issues.cloud_model/host.something"
+      expect(subject.title).to eq "Translation missing: en.issues.cloud_model/host.something"
     end
 
     it 'should be blank if not key or title is set' do
