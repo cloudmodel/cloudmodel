@@ -2,7 +2,7 @@
 
 echo '<<<smart>>>'
 
-for dev in /dev/sd[a-z]; do
+for dev in /dev/sd[a-z] /dev/nvme*n1; do
   cmd="smartctl -a $dev"
   res=`$cmd`
   smart_state_id="SMART overall-health self-assessment test result: "

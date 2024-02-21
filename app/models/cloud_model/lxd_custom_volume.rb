@@ -9,6 +9,7 @@ module CloudModel
     embedded_in :guest, class_name: "CloudModel::Guest"
 
     field :name, type: String
+    field :pool, type: String, default: 'default'
     field :disk_space, type: Integer, default: 10737418240
 
     field :mount_point, type: String
@@ -49,22 +50,22 @@ module CloudModel
     end
 
     def volume_exists?
-      success, output = lxc "storage volume show default #{name.shellescape}"
+      success, output = lxc "storage volume show #{pool.shellescape} #{name.shellescape}"
       not(success == false and ["Error: not found", "Error: Storage pool volume not found"].include? output.strip)
     end
 
     def create_volume
-      lxc "storage volume create default #{name.shellescape}"
+      lxc "storage volume create #{pool.shellescape} #{name.shellescape}"
     end
 
     def create_volume!
       unless guest.deploy_state == :not_started
-        lxc! "storage volume create default #{name.shellescape}", "Failed to init LXD volume"
+        lxc! "storage volume create #{pool.shellescape} #{name.shellescape}", "Failed to init LXD volume"
       end
     end
 
     def destroy_volume
-      lxc "storage volume delete default #{name.shellescape}"
+      lxc "storage volume delete #{pool.shellescape} #{name.shellescape}"
     end
 
     def to_param
@@ -77,7 +78,7 @@ module CloudModel
 
     # Get infos about the volume
     def lxc_show
-      success, result = lxc "storage volume show default #{name.shellescape}"
+      success, result = lxc "storage volume show #{pool.shellescape} #{name.shellescape}"
       begin
         YAML.load(result, permitted_classes: [Symbol, Time]).deep_transform_keys { |key| key.to_s.underscore }
       rescue
@@ -92,7 +93,7 @@ module CloudModel
 
     def usage_bytes
       begin
-        if check_result = guest.monitoring_last_check_result and sys_info = check_result['system'] and df = sys_info['df'] and info = df["guests/custom/#{name}".to_sym] or info = df["guests/custom/default_#{name}".to_sym]
+        if check_result = guest.monitoring_last_check_result and sys_info = check_result['system'] and df = sys_info['df'] and info = df["guests/custom/#{name}".to_sym] or info = df["guests/custom/#{pool.shellescape}_#{name}".to_sym]
           info['used'].to_i*1024
         end
       rescue
@@ -108,7 +109,7 @@ module CloudModel
     end
 
     def host_path
-      "/var/lib/lxd/storage-pools/default/custom/#{name}/"
+      "/var/lib/lxd/storage-pools/#{pool.shellescape}/custom/#{name}/"
     end
 
     # Backup

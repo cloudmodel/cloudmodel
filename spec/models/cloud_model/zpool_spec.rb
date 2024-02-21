@@ -25,4 +25,26 @@ describe CloudModel::Zpool do
       })
     end
   end
+
+  describe 'create_lxd_storage' do
+    it 'should create lxd storage using zpool' do
+      host = double CloudModel::Host
+      allow(subject).to receive(:host).and_return host
+      subject.name = "data"
+
+      expect(host).to receive(:exec).with('lxc storage create data zfs source=data')
+
+      subject.create_lxd_storage
+    end
+
+    it 'should escape name' do
+      host = double CloudModel::Host
+      allow(subject).to receive(:host).and_return host
+      subject.name = "data; rm -rf /"
+
+      expect(host).to receive(:exec).with('lxc storage create data\\;\\ rm\\ -rf\\ / zfs source=data\\;\\ rm\\ -rf\\ /')
+
+      subject.create_lxd_storage
+    end
+  end
 end

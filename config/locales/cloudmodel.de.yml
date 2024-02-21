@@ -218,6 +218,9 @@ de:
       cloud_model/vpn_client:
         one: VPN Client
         other: VPN Clients
+      cloud_model/zpools:
+        one: ZPool
+        other: ZPools
     attributes:
       cloud_model/address:
         ip: IP Adresse
@@ -247,6 +250,8 @@ de:
         primary_address: Primäre Adresse
         private_network: VPN Netzwerk
         addresses: Subnetzwerke
+        system_disks: Systemlaufwerke
+        extra_zpools: Zusätzliche ZPools
         guests: Gastsysteme
         state: Status
         memory_size: RAM
@@ -332,6 +337,7 @@ de:
         device_name: Gerätename
       cloud_model/lxd_custom_volume:
         name: Laufwerksname
+        pool: Speicherpool
         mount_point: Einhängpunkt
         disk_space: Laufwerksgröße
         writeable: Schreibbar?

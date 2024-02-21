@@ -1,19 +1,32 @@
 [Unit]
 Description=Bootstrap zfs pool for guests
-Before=network.target lxd.service lxd.socket
+After=network.target lxd.service lxd.socket
 Conflicts=shutdown.target
 
 [Service]
 Type=oneshot
-<%- zpools.each do |name, zparams| -%>
+
 # Try to create guests pool; exists with error code if already exist
-ExecStartPre=-/sbin/zpool create <%= name.to_s.shellescape %> <%=raw zparams.to_s.split.map(&:shellescape) * ' ' %>
+ExecStartPre=-/sbin/zpool create guests <%=raw guests_init_string.to_s.split.map(&:shellescape) * ' ' %>
 # Try to force mount guests pool; exists with error if already mounted
-ExecStartPre=-/sbin/zpool import -f <%= name.to_s%>
+ExecStartPre=-/sbin/zpool import -f guests
+
+<%- host.extra_zpools.each do |zpool| -%>
+# Try to create <%= zpool.name.to_s.shellescape %> pool; exists with error code if already exist
+ExecStartPre=-/sbin/zpool create <%= zpool.name.to_s.shellescape %> <%=raw zpool.init_string.to_s.split.map(&:shellescape) * ' ' %>
+# Try to force mount <%= zpool.name.to_s.shellescape %> pool; exists with error if already mounted
+ExecStartPre=-/sbin/zpool import -f <%= zpool.name.to_s.shellescape%>
 
 <%- end -%>
 # Init lxd if zpool create did not exit with error code aka create success
 ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool default
+
+<%- host.extra_zpools.each do |zpool| -%>
+ExecStartPre=-/usr/bin/lxc storage create <%= zpool.name.shellescape %> zfs source=<%= zpool.name.shellescape %>
+
+<%- end -%>
+ExecStartPre=-/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=<%= host.private_address %>/<%= host.private_network.subnet %> ipv4.nat=true
+
 ExecStart=/bin/echo 'done'
 
 [Install]

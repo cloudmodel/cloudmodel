@@ -121,14 +121,28 @@ module CloudModel
       def init_system_disk
         comment_sub_step 'Partition system disks'
 
-        part_cmd = "sgdisk -go " +
-          "-n 1:2048:526335 -t 1:ef02 -c 1:boot " +
-          "-n 2:526336:67635199 -t 2:8200 -c 2:swap " +
-          "-n 3:67635200:134744063 -t 3:fd00 -c 3:root_a " +
-          "-n 4:134744064:201852927 -t 4:fd00 -c 4:root_b " +
-          "-n 5:201852928:403179519 -t 5:fd00 -c 5:cloud " +
-          "-n 6:403179520:453511168 -t 6:fd00 -c 6:lxd " +
-          "-N 7 -t 7:8300 -c 7:guests "
+        block_size = 2048
+        offset_size = 1
+        boot_size = 512
+        swap_size = 256*1024
+        root_size = 32*1024
+        cloud_size = 96*1024
+        lxd_size = 24*1024
+
+        part_cmd = "sgdisk -go "
+        part_cmd += "-n 1:#{offset_size*block_size}:#{(offset_size+boot_size)*block_size-1} -t 1:ef02 -c 1:boot "
+        offset_size += boot_size
+        part_cmd += "-n 2:#{offset_size*block_size}:#{(offset_size+swap_size)*block_size-1} -t 2:8200 -c 2:swap "
+        offset_size += swap_size
+        part_cmd += "-n 3:#{offset_size*block_size}:#{(offset_size+root_size)*block_size-1} -t 3:fd00 -c 3:root_a "
+        offset_size += root_size
+        part_cmd += "-n 4:#{offset_size*block_size}:#{(offset_size+root_size)*block_size-1} -t 4:fd00 -c 4:root_b "
+        offset_size += root_size
+        part_cmd += "-n 5:#{offset_size*block_size}:#{(offset_size+cloud_size)*block_size-1} -t 5:fd00 -c 5:cloud "
+        offset_size += cloud_size
+        part_cmd += "-n 6:#{offset_size*block_size}:#{(offset_size+lxd_size)*block_size-1} -t 6:fd00 -c 6:lxd "
+        offset_size += lxd_size
+        part_cmd += "-N 7 -t 7:8300 -c 7:guests "
 
         @host.system_disks.each do |dev|
           @host.exec! part_cmd + "/dev/#{dev}", "Failed to create partitions on #{dev}"
@@ -235,8 +249,7 @@ module CloudModel
       def render_guest_zpool_service
         # Init zfspool on first boot if needed
         #comment_sub_step 'render guest_zpool service'
-        render_to_remote "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{root}/etc/systemd/system/guest_zpool.service", zpools:
-          @host.extra_zpools.as_hash.merge(default: "mirror #{@host.system_disks.map{|d| disk_partition_device d, 7} * ' '}")
+        render_to_remote "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{root}/etc/systemd/system/guest_zpool.service", guests_init_string: "mirror #{@host.system_disks.map{|d| disk_partition_device d, 7} * ' '}", host: @host
         mkdir_p "#{root}/etc/systemd/system/basic.target.wants"
         chroot! root, "ln -s /etc/systemd/system/guest_zpool.service /etc/systemd/system/basic.target.wants/guest_zpool.service", "Failed to add guest_zpool to autostart"
       end
@@ -378,14 +391,13 @@ module CloudModel
         steps = [
           ['Allow to access with SSH key', :set_authorized_keys],
           ['Prepare disk for new system', :init_system_disk],
-          #['Upsync system images', :sync_inst_images],
           ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
           ['Populate volume with new system image', :populate_deploy_root],
           ['Make crypto keys', :make_keys],
           ['Config new system', :config_deploy_root],
           ['Render guest_zpool.service', :render_guest_zpool_service],
-          # TODO: apply existing guests and restore backups
           ['Config LXD', :config_lxd],
+          # TODO: apply existing guests and restore backups
           ['Update TINC config', :update_tinc],
           ['Write boot config and reboot', :boot_deploy_root],
         ]
