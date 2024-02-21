@@ -1,7 +1,7 @@
 module CloudModel
   module Monitoring
     class HostChecks < CloudModel::Monitoring::BaseChecks
-      #require_relative "mixins/sysinfo_checks_mixin"
+      require_relative "mixins/sysinfo_checks_mixin"
       include CloudModel::Monitoring::Mixins::SysinfoChecksMixin
 
       def self.check options = {}

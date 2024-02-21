@@ -32,7 +32,7 @@ module CloudModel
       end
 
       def set_authorized_keys options={}
-        prepare_chroot root
+        #prepare_chroot root
         @host.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "/root/.ssh/authorized_keys"
         # TODO: Add mode where no initial_root_pw is given, but external ip is used
         # @host.update_attribute :initial_root_pw, nil
@@ -378,7 +378,7 @@ module CloudModel
         steps = [
           ['Allow to access with SSH key', :set_authorized_keys],
           ['Prepare disk for new system', :init_system_disk],
-          ['Upsync system images', :sync_inst_images],
+          #['Upsync system images', :sync_inst_images],
           ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
           ['Populate volume with new system image', :populate_deploy_root],
           ['Make crypto keys', :make_keys],
