@@ -453,15 +453,12 @@ describe CloudModel::Host do
   end
 
   describe 'ssh_address' do
-    it 'should return private address' do
-      subject.private_network = '10.42.23.0/24'
-      expect(subject.ssh_address).to eq '10.42.23.1'
-    end
+    it 'should return address of ssh connection' do
+      connection = double Net::SSH::Connection::Session
+      allow(subject).to receive(:ssh_connection).and_return connection
+      allow(connection).to receive(:host).and_return '10.42.23.1'
 
-    it 'should return primary address if initial root pw is set' do
-      subject.primary_address = '198.51.100.42'
-      subject.initial_root_pw = 'P455w0rD'
-      expect(subject.ssh_address).to eq '198.51.100.42'
+      expect(subject.ssh_address).to eq '10.42.23.1'
     end
   end
 

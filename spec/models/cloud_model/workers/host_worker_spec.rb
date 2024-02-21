@@ -217,23 +217,23 @@ describe CloudModel::Workers::HostWorker do
 
       expect(host).to receive(:exec!).with(
       "sgdisk -go " +
-      "-n 1:2048:526335 -t 1:ef02 -c 1:boot " +
-      "-n 2:526336:67635199 -t 2:8200 -c 2:swap " +
-      "-n 3:67635200:134744063 -t 3:fd00 -c 3:root_a " +
-      "-n 4:134744064:201852927 -t 4:fd00 -c 4:root_b " +
-      "-n 5:201852928:403179519 -t 5:fd00 -c 5:cloud " +
-      "-n 6:403179520:453511168 -t 6:fd00 -c 6:lxd " +
+      "-n 1:2048:1050623 -t 1:ef02 -c 1:boot " +
+      "-n 2:1050624:537921535 -t 2:8200 -c 2:swap " +
+      "-n 3:537921536:605030399 -t 3:fd00 -c 3:root_a " +
+      "-n 4:605030400:672139263 -t 4:fd00 -c 4:root_b " +
+      "-n 5:672139264:873465855 -t 5:fd00 -c 5:cloud " +
+      "-n 6:873465856:923797503 -t 6:fd00 -c 6:lxd " +
       "-N 7 -t 7:8300 -c 7:guests /dev/sdz",
       "Failed to create partitions on sdz"
       )
       expect(host).to receive(:exec!).with(
       "sgdisk -go " +
-      "-n 1:2048:526335 -t 1:ef02 -c 1:boot " +
-      "-n 2:526336:67635199 -t 2:8200 -c 2:swap " +
-      "-n 3:67635200:134744063 -t 3:fd00 -c 3:root_a " +
-      "-n 4:134744064:201852927 -t 4:fd00 -c 4:root_b " +
-      "-n 5:201852928:403179519 -t 5:fd00 -c 5:cloud " +
-      "-n 6:403179520:453511168 -t 6:fd00 -c 6:lxd " +
+      "-n 1:2048:1050623 -t 1:ef02 -c 1:boot " +
+      "-n 2:1050624:537921535 -t 2:8200 -c 2:swap " +
+      "-n 3:537921536:605030399 -t 3:fd00 -c 3:root_a " +
+      "-n 4:605030400:672139263 -t 4:fd00 -c 4:root_b " +
+      "-n 5:672139264:873465855 -t 5:fd00 -c 5:cloud " +
+      "-n 6:873465856:923797503 -t 6:fd00 -c 6:lxd " +
       "-N 7 -t 7:8300 -c 7:guests /dev/nvme09n2",
       "Failed to create partitions on nvme09n2"
       )
@@ -362,9 +362,7 @@ describe CloudModel::Workers::HostWorker do
     it 'should render zpool init script to be started at first boot' do
       host.system_disks = ['sda', 'sdb']
 
-      expect(subject).to receive(:render_to_remote).with "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{@root}/etc/systemd/system/guest_zpool.service", zpools: {
-        default: "mirror sda7 sdb7"
-      }
+      expect(subject).to receive(:render_to_remote).with "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{@root}/etc/systemd/system/guest_zpool.service", guests_init_string: "mirror sda7 sdb7", host: host
       expect(subject).to receive(:mkdir_p).with "#{@root}/etc/systemd/system/basic.target.wants"
       expect(subject).to receive(:chroot!).with @root, "ln -s /etc/systemd/system/guest_zpool.service /etc/systemd/system/basic.target.wants/guest_zpool.service", "Failed to add guest_zpool to autostart"
 
@@ -375,10 +373,7 @@ describe CloudModel::Workers::HostWorker do
       host.system_disks = ['nvme11n1', 'nvme02n1']
       host.extra_zpools.new name: 'data', init_string: "mirror sda sdb"
 
-      expect(subject).to receive(:render_to_remote).with "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{@root}/etc/systemd/system/guest_zpool.service", zpools: {
-        default: "mirror nvme11n1p7 nvme02n1p7",
-        data: "mirror sda sdb"
-      }
+      expect(subject).to receive(:render_to_remote).with "/cloud_model/host/etc/systemd/system/guest_zpool.service", "#{@root}/etc/systemd/system/guest_zpool.service", guests_init_string: "mirror nvme11n1p7 nvme02n1p7", host: host
       expect(subject).to receive(:mkdir_p).with "#{@root}/etc/systemd/system/basic.target.wants"
       expect(subject).to receive(:chroot!).with @root, "ln -s /etc/systemd/system/guest_zpool.service /etc/systemd/system/basic.target.wants/guest_zpool.service", "Failed to add guest_zpool to autostart"
 

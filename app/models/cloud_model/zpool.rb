@@ -17,5 +17,9 @@ module CloudModel
       end
       hash
     end
+
+    def create_lxd_storage
+      host.exec "lxc storage create #{name.shellescape} zfs source=#{name.shellescape}"
+    end
   end
 end

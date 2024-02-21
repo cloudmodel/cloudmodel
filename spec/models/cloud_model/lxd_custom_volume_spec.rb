@@ -6,6 +6,7 @@ describe CloudModel::LxdCustomVolume do
   it { expect(subject).to have_timestamps }
 
   it { expect(subject).to have_field(:name).of_type(String) }
+  it { expect(subject).to have_field(:pool).of_type(String).with_default_value_of 'default' }
   it { expect(subject).to have_field(:disk_space).of_type(Integer).with_default_value_of 10*1024*1024*1024 }
   it { expect(subject).to have_field(:mount_point).of_type(String) }
   it { expect(subject).to have_field(:writeable).of_type(Mongoid::Boolean).with_default_value_of true }
@@ -95,12 +96,44 @@ describe CloudModel::LxdCustomVolume do
 
       expect(subject.volume_exists?).to eq true
     end
+
+    it 'should use diffent pool' do
+      subject.pool = 'data'
+      subject.name = 'some_guest-var-large-data'
+      allow(subject).to receive(:lxc).with('storage volume show data some_guest-var-large-data').and_return [true, '']
+
+      expect(subject.volume_exists?).to eq true
+    end
+
+    it 'should escape pool and name' do
+      subject.pool = 'data; rm -rf'
+      subject.name = 'some_guest-var-large-data|killall sshd'
+      allow(subject).to receive(:lxc).with('storage volume show data\\;\\ rm\\ -rf some_guest-var-large-data\\|killall\\ sshd').and_return [true, '']
+
+      expect(subject.volume_exists?).to eq true
+    end
   end
 
   describe 'create_volume' do
     it 'should call lxd to create volume' do
       subject.name = 'some_guest-var-data'
       expect(subject).to receive(:lxc).with('storage volume create default some_guest-var-data')
+
+      subject.create_volume
+    end
+
+    it 'should use diffent pool' do
+      subject.pool = 'data'
+      subject.name = 'some_guest-var-large-data'
+      allow(subject).to receive(:lxc).with('storage volume create data some_guest-var-large-data').and_return [true, '']
+
+      subject.create_volume
+    end
+
+    it 'should escape pool and name' do
+      subject.pool = 'data; rm -rf'
+      subject.name = 'some_guest-var-large-data|killall sshd'
+      allow(subject).to receive(:lxc).with('storage volume create data\\;\\ rm\\ -rf some_guest-var-large-data\\|killall\\ sshd').and_return [true, '']
 
       subject.create_volume
     end
@@ -112,6 +145,26 @@ describe CloudModel::LxdCustomVolume do
       subject.guest = guest
       subject.name = 'some_guest-var-data'
       expect(subject).to receive(:lxc!).with('storage volume create default some_guest-var-data', 'Failed to init LXD volume')
+
+      subject.create_volume!
+    end
+
+    it 'should use diffent pool' do
+      allow(guest).to receive(:deploy_state).and_return(:finished)
+      subject.guest = guest
+      subject.pool = 'data'
+      subject.name = 'some_guest-var-large-data'
+      allow(subject).to receive(:lxc!).with('storage volume create data some_guest-var-large-data', "Failed to init LXD volume").and_return [true, '']
+
+      subject.create_volume!
+    end
+
+    it 'should escape pool and name' do
+      allow(guest).to receive(:deploy_state).and_return(:finished)
+      subject.guest = guest
+      subject.pool = 'data; rm -rf'
+      subject.name = 'some_guest-var-large-data|killall sshd'
+      allow(subject).to receive(:lxc!).with('storage volume create data\\;\\ rm\\ -rf some_guest-var-large-data\\|killall\\ sshd', "Failed to init LXD volume").and_return [true, '']
 
       subject.create_volume!
     end
@@ -143,6 +196,22 @@ describe CloudModel::LxdCustomVolume do
     it 'should call lxd to destroy volume' do
       subject.name = 'some_guest-var-data'
       expect(subject).to receive(:lxc).with('storage volume delete default some_guest-var-data')
+
+      subject.destroy_volume
+    end
+
+    it 'should use diffent pool' do
+      subject.pool = 'data'
+      subject.name = 'some_guest-var-large-data'
+      allow(subject).to receive(:lxc).with('storage volume delete data some_guest-var-large-data').and_return [true, '']
+
+      subject.destroy_volume
+    end
+
+    it 'should escape pool and name' do
+      subject.pool = 'data; rm -rf'
+      subject.name = 'some_guest-var-large-data|killall sshd'
+      allow(subject).to receive(:lxc).with('storage volume delete data\\;\\ rm\\ -rf some_guest-var-large-data\\|killall\\ sshd').and_return [true, '']
 
       subject.destroy_volume
     end
@@ -178,6 +247,34 @@ describe CloudModel::LxdCustomVolume do
       expect(subject.lxc_show).to eq 'test_data' => {'value' => 'something'}
     end
 
+    it 'should use diffent pool' do
+      subject.pool = 'data'
+      subject.name = 'some_guest-var-large-data'
+      allow(subject).to receive(:lxc).with('storage volume show data some_guest-var-large-data').and_return [
+        true,
+        <<~YAML
+          test_data:
+            value: something with data storage pool
+        YAML
+      ]
+
+      expect(subject.lxc_show).to eq 'test_data' => {'value' => 'something with data storage pool'}
+    end
+
+    it 'should escape pool and name' do
+      subject.pool = 'data; rm -rf'
+      subject.name = 'some_guest-var-large-data|killall sshd'
+      allow(subject).to receive(:lxc).with('storage volume show data\\;\\ rm\\ -rf some_guest-var-large-data\\|killall\\ sshd').and_return [
+        true,
+        <<~YAML
+          test_data:
+            value: something with malicious
+        YAML
+      ]
+
+      expect(subject.lxc_show).to eq 'test_data' => {'value' => 'something with malicious'}
+    end
+
     it 'should return nil if lxc show fails' do
       subject.name = 'some_guest-var-data'
 
@@ -210,6 +307,24 @@ describe CloudModel::LxdCustomVolume do
       allow(subject).to receive(:lxc_show).and_return nil
 
       expect(subject.used?).to eq nil
+    end
+  end
+
+  describe 'usage_bytes' do
+    pending
+  end
+
+  describe 'usage_percentage' do
+    it 'should calculate percentage usage' do
+      allow(subject).to receive(:usage_bytes).and_return 26625
+      subject.disk_space = 65536
+
+      expect(subject.usage_percentage).to eq 40.62652587890625
+
+      allow(subject).to receive(:usage_bytes).and_return 256
+      subject.disk_space = 512
+
+      expect(subject.usage_percentage).to eq 50.0
     end
   end
 
