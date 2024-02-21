@@ -245,7 +245,8 @@ module CloudModel
     end
 
     def ssh_address
-      initial_root_pw ? primary_address.ip : private_address
+      ssh_connection.host
+      #initial_root_pw ? primary_address.ip : private_address
     end
 
     def shell

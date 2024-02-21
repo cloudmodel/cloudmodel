@@ -60,6 +60,8 @@ module CloudModel
         @chroot_prepared ||= {}
         chroot_dir = chroot_dir.gsub(/[\/]$/, '') # Remove tailing slashes from path
 
+        #puts @host.exec "ls #{chroot_dir}/dev"
+
         return true if @chroot_prepared[chroot_dir] and not options[:force]
 
         unless @host.mounted_at? "#{chroot_dir}/proc"
