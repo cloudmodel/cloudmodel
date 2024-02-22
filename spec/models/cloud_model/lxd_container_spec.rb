@@ -528,9 +528,13 @@ describe CloudModel::LxdContainer do
       volume = Factory.build :lxd_custom_volume, mount_point: 'floppies/cbm1541'
       allow(volume).to receive(:lxc!) # prevent from really trying to create a volume
       guest.lxd_custom_volumes << volume
+      volume_extra = Factory.build :lxd_custom_volume, pool: 'dev9', mount_point: 'floppies/cbm1581'
+      allow(volume_extra).to receive(:lxc!) # prevent from really trying to create a volume
+      guest.lxd_custom_volumes << volume_extra
 
       allow(subject).to receive(:lxc)
       expect(subject).to receive(:lxc).with('storage volume attach default some_guest-floppies-cbm1541 some_guest-20200331133742 floppies/cbm1541')
+      expect(subject).to receive(:lxc).with('storage volume attach dev9 some_guest-floppies-cbm1581 some_guest-20200331133742 floppies/cbm1581')
 
       subject.config_from_guest
     end
