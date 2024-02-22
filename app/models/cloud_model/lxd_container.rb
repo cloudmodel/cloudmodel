@@ -264,7 +264,7 @@ module CloudModel
 
       # Attach custom storage volumes
       guest.lxd_custom_volumes.each do |volume|
-        lxc "storage volume attach default #{volume.name} #{name} #{volume.mount_point}"
+        lxc "storage volume attach #{volume.pool} #{volume.name} #{name} #{volume.mount_point}"
       end
     end
   end
