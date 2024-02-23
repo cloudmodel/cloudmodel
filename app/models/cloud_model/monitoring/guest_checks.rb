@@ -1,6 +1,7 @@
 module CloudModel
   module Monitoring
     class GuestChecks < CloudModel::Monitoring::BaseChecks
+      require_relative "mixins/sysinfo_checks_mixin" unless Rails.env.development?
       include CloudModel::Monitoring::Mixins::SysinfoChecksMixin
 
       def indent_size

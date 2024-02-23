@@ -93,7 +93,8 @@ module CloudModel
 
     def usage_bytes
       begin
-        if check_result = guest.monitoring_last_check_result and sys_info = check_result['system'] and df = sys_info['df'] and info = df["guests/custom/#{name}".to_sym] or info = df["guests/custom/#{pool.shellescape}_#{name}".to_sym]
+        zfs_pool = pool == 'default' ? 'guests' : pool
+        if check_result = guest.monitoring_last_check_result and sys_info = check_result['system'] and df = sys_info['df'] and info = df["#{zfs_pool}/custom/#{name}".to_sym] or info = df["#{zfs_pool}/custom/default_#{name}".to_sym]
           info['used'].to_i*1024
         end
       rescue

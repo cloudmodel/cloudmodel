@@ -18,6 +18,7 @@ module CloudModel
       end
 
       def check
+        data
         check_existence
       end
     end
