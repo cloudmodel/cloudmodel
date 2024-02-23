@@ -31,7 +31,7 @@ describe CloudModel::Monitoring::LxdCustomVolumeChecks do
   end
 
   describe 'check_existence' do
-    it 'check if volume exists' do
+    it 'check if volume exists, returning true' do
       allow(volume).to receive(:volume_exists?).and_return true
       allow(subject).to receive(:data).and_return "some"=>"info"
       expect(subject).to receive(:do_check).with(
@@ -42,7 +42,7 @@ describe CloudModel::Monitoring::LxdCustomVolumeChecks do
       subject.check_existence
     end
 
-    it 'check if volume exists' do
+    it 'check if volume exists, returning false' do
       allow(volume).to receive(:volume_exists?).and_return false
       allow(subject).to receive(:data).and_return "error"=>"not found"
       expect(subject).to receive(:do_check).with(
@@ -56,6 +56,7 @@ describe CloudModel::Monitoring::LxdCustomVolumeChecks do
 
   describe 'check' do
     it 'should call existence check' do
+      expect(subject).to receive(:data)
       expect(subject).to receive(:check_existence)
       subject.check
     end
