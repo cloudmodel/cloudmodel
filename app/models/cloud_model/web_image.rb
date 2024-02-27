@@ -110,7 +110,7 @@ module CloudModel
       update_attribute :build_state, :pending
 
       begin
-        CloudModel::call_rake 'cloudmodel:web_image:build', web_image_id: id
+        CloudModel::WebImageJobs::BuildJob.perform_later id.to_s
       rescue Exception => e
         update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
@@ -150,7 +150,7 @@ module CloudModel
       end
 
       begin
-        CloudModel::call_rake 'cloudmodel:web_image:redeploy', web_image_id: id
+        CloudModel::WebImageJobs::RedeployJob.perform_later id.to_s
       rescue Exception => e
         update_attributes redeploy_state: :failed, redeploy_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e

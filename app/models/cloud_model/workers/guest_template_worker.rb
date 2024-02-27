@@ -115,7 +115,10 @@ module CloudModel
       end
 
       def build_core_template template, options={}
-        return false unless template.build_state == :pending or options[:force]
+        unless template.build_state == :pending or options[:force]
+          puts "Template not pending"
+          return false
+        end
 
         @template = template
 

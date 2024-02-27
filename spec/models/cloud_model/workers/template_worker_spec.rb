@@ -8,7 +8,9 @@ describe CloudModel::Workers::TemplateWorker do
 
   context '#download_path' do
     it 'should point to download path' do
-      expect(subject.download_path).to eq "/cloud/build/downloads/"
+      username = Faker::Internet.username
+      allow(CloudModel.config).to receive(:data_directory).and_return "/homes/#{username}/www/admin/data"
+      expect(subject.download_path).to eq "/homes/#{username}/www/admin/data/build/downloads/"
     end
   end
 

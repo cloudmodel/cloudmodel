@@ -602,24 +602,30 @@ describe CloudModel::Guest do
   end
 
   describe 'deploy' do
-    it 'should call rake cloudmodel:host:deploy with host´s and guest´s id' do
+    it 'should enqueue job to deploy host with host´s and guest´s id' do
       subject.host = host
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:guest:deploy', host_id: host.id, guest_id: subject.id)
-      subject.deploy
+      job = double "ActiveJob"
+      expect(CloudModel::GuestJobs::DeployJob).to receive(:perform_later).with(subject.id.to_s).and_return job
+
+      expect(subject.deploy).to eq job
     end
 
-    it 'should add an error if call_rake excepts' do
+    it 'should add an error if job enqueue excepts' do
       subject.host = host
-      allow(CloudModel).to receive(:call_rake).with('cloudmodel:guest:deploy', host_id: host.id, guest_id: subject.id).and_raise 'ERROR 42'
-      subject.deploy
+      expect(CloudModel::GuestJobs::DeployJob).to receive(:perform_later).with(subject.id.to_s).and_raise 'ERROR 42'
+
+      expect(subject.deploy).to eq false
+
       expect(subject.deploy_state).to eq :failed
       expect(subject.deploy_last_issue).to eq 'Unable to enqueue job! Try again later.'
     end
 
-    it 'should not call rake if not deployable' do
+    it 'should not enqueue deplayed job if not deployable' do
       subject.host = host
-      expect(CloudModel).not_to receive(:call_rake).with('cloudmodel:guest:deploy', host_id: host.id, guest_id: subject.id)
+      job = double "ActiveJob"
+      expect(CloudModel::GuestJobs::DeployJob).not_to receive(:perform_later)
       allow(subject).to receive(:deployable?).and_return false
+
       expect(subject.deploy).to eq false
     end
   end
@@ -651,24 +657,28 @@ describe CloudModel::Guest do
   end
 
   describe 'redeploy' do
-    it 'should call rake cloudmodel:host:deploy with host´s and guest´s id' do
+    it 'should enquere job host redeploy with host´s and guest´s id' do
       subject.host = host
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:guest:redeploy', host_id: host.id, guest_id: subject.id)
-      subject.redeploy
+      job = double "ActiveJob"
+      expect(CloudModel::GuestJobs::RedeployJob).to receive(:perform_later).with(subject.id.to_s).and_return job
+
+      expect(subject.redeploy).to eq job
     end
 
-    it 'should add an error if call_rake excepts' do
+    it 'should add an error if enqueue excepts' do
       subject.host = host
-      allow(CloudModel).to receive(:call_rake).with('cloudmodel:guest:redeploy', host_id: host.id, guest_id: subject.id).and_raise 'ERROR 42'
-      subject.redeploy
+      expect(CloudModel::GuestJobs::RedeployJob).to receive(:perform_later).with(subject.id.to_s).and_raise 'ERROR 42'
+
+      expect(subject.redeploy).to eq false
       expect(subject.deploy_state).to eq :failed
       expect(subject.deploy_last_issue).to eq 'Unable to enqueue job! Try again later.'
     end
 
-    it 'should not call rake if not deployable' do
+    it 'should not enqueue job if not deployable' do
       subject.host = host
-      expect(CloudModel).not_to receive(:call_rake).with('cloudmodel:guest:redeploy', host_id: host.id, guest_id: subject.id)
+      expect(CloudModel::GuestJobs::RedeployJob).not_to receive(:perform_later)
       allow(subject).to receive(:deployable?).and_return false
+
       expect(subject.redeploy).to eq false
     end
   end
@@ -708,18 +718,22 @@ describe CloudModel::Guest do
     let!(:guest2) { Factory :guest, name: 'g2', private_address: '10.42.0.25' }
     let!(:guest3) { Factory :guest, name: 'g3', private_address: '10.42.0.4' }
 
-    it 'should call rake cloudmodel:host:deploy_many with list of guest ids' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:guest:redeploy_many', guest_ids: "#{guest1.id} #{guest3.id}")
-      CloudModel::Guest.redeploy ['2600', guest1.id.to_s, guest3.id]
+    it 'should enqueue job cloudmodel:host:deploy_many with list of guest ids' do
+      job = double "ActiveJob"
+      expect(CloudModel::GuestJobs::RedeployManyJob).to receive(:perform_later).with([guest1.id, guest3.id]).and_return job
+
+      expect(CloudModel::Guest.redeploy ['2600', guest1.id.to_s, guest3.id]).to eq job
 
       expect(guest1.reload.deploy_state).to eq :pending
       expect(guest2.reload.deploy_state).to eq :not_started
       expect(guest3.reload.deploy_state).to eq :pending
     end
 
-    it 'should add an error if call_rake excepts' do
-      allow(CloudModel).to receive(:call_rake).with('cloudmodel:guest:redeploy_many', guest_ids: [guest1.id, guest3.id] * '').and_raise 'ERROR 42'
-      CloudModel::Guest.redeploy ['2600', guest1.id.to_s, guest3.id]
+    it 'should add an error if enqueue excepts' do
+      expect(CloudModel::GuestJobs::RedeployManyJob).to receive(:perform_later).with([guest1.id, guest3.id]).and_raise 'ERROR 42'
+
+      expect(CloudModel::Guest.redeploy ['2600', guest1.id.to_s, guest3.id]).to eq false
+
       expect(guest1.reload.deploy_state).to eq :failed
       expect(guest1.deploy_last_issue).to eq 'Unable to enqueue job! Try again later.'
       expect(guest2.deploy_state).to eq :not_started
@@ -728,8 +742,9 @@ describe CloudModel::Guest do
       expect(guest3.deploy_last_issue).to eq 'Unable to enqueue job! Try again later.'
     end
 
-    it 'should not call rake if not deployable' do
-      expect(CloudModel).not_to receive(:call_rake).with('cloudmodel:guest:redeploy_many', guest_ids: [guest1.id, guest3.id].map(&:to_s))
+    it 'should not call enqueue job if not deployable' do
+      expect(CloudModel::GuestJobs::RedeployManyJob).not_to receive(:perform_later)
+
       expect(CloudModel::Guest.redeploy ['2600']).to eq false
     end
   end

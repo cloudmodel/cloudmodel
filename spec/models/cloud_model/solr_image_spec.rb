@@ -159,24 +159,26 @@ describe CloudModel::SolrImage do
   end
 
   describe 'build' do
-    it 'should call rake to build SolrImage' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:solr_image:build', solr_image_id: subject.id).and_return true
+    it 'should enqueue job to build SolrImage' do
+      job = double "ActiveJob"
+      expect(CloudModel::SolrImageJobs::BuildJob).to receive(:perform_later).with(subject.id).and_return job
       allow(subject).to receive(:buildable?).and_return true
 
-      expect(subject.build).to eq true
+      expect(subject.build).to eq job
     end
 
     it 'should set build_state to :pending' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:solr_image:build', solr_image_id: subject.id).and_return true
+      job = double "ActiveJob"
+      expect(CloudModel::SolrImageJobs::BuildJob).to receive(:perform_later).with(subject.id).and_return job
       allow(subject).to receive(:buildable?).and_return true
 
-      expect(subject.build).to eq true
+      expect(subject.build).to eq job
 
       expect(subject.build_state).to eq :pending
     end
 
-    it 'should return false and not run rake if not buildable' do
-      expect(CloudModel).not_to receive(:call_rake)
+    it 'should return false and not enqueue job if not buildable' do
+      expect(CloudModel::SolrImageJobs::BuildJob).not_to receive(:perform_later)
       allow(subject).to receive(:buildable?).and_return false
 
       expect(subject.build).to eq false
@@ -184,15 +186,16 @@ describe CloudModel::SolrImage do
     end
 
     it 'should allow to force build if not buildable' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:solr_image:build', solr_image_id: subject.id).and_return true
+      job = double "ActiveJob"
+      expect(CloudModel::SolrImageJobs::BuildJob).to receive(:perform_later).with(subject.id).and_return job
       allow(subject).to receive(:buildable?).and_return false
 
-      expect(subject.build force:true).to eq true
+      expect(subject.build force:true).to eq job
       expect(subject.build_state).to eq :pending
     end
 
-    it 'should mark template build as failed if rake is not callable and return false' do
-      allow(CloudModel).to receive(:call_rake).and_raise 'Rake failed to call'
+    it 'should mark template build as failed if enqueue job raises an error' do
+      expect(CloudModel::SolrImageJobs::BuildJob).to receive(:perform_later).and_raise 'Rake failed to call'
 
       expect(subject.build).to eq false
       expect(subject.build_state).to eq :failed
