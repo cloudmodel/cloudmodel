@@ -262,7 +262,7 @@ module CloudModel
         update_attribute :redeploy_web_image_state, :pending
 
         begin
-          CloudModel::call_rake 'cloudmodel:services:nginx:redeploy', guest_id: guest.id, service_id: id
+          CloudModel::Services::NginxJobs::RedeployJob.perform_later id.to_s, guest.id.to_s
         rescue Exception => e
           update_attributes redeploy_web_image_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
           CloudModel.log_exception e

@@ -96,6 +96,17 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'job_queue' do
+    it 'should allow to set job queue name' do
+      subject.job_queue = :cloud_model
+      expect(subject.job_queue).to eq :cloud_model
+    end
+
+    it 'should default to :default' do
+      expect(subject.job_queue).to eq :default
+    end
+  end
+
   describe 'ubuntu_mirror' do
     it 'should allow to set Ubuntu mirror server' do
       subject.ubuntu_mirror = 'http://de.archive.ubuntu.com/ubuntu/'

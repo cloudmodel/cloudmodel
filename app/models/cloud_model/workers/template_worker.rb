@@ -2,7 +2,7 @@ module CloudModel
   module Workers
     class TemplateWorker < BaseWorker
       def download_path
-        "/cloud/build/downloads/"
+        "#{CloudModel.config.data_directory}/build/downloads/"
       end
 
       def error_log_object
@@ -39,6 +39,7 @@ module CloudModel
       end
 
       def fetch_ubuntu
+        FileUtils.mkdir_p download_path
         begin
           @host.sftp.stat!("#{download_path}#{ubuntu_image}")
         rescue

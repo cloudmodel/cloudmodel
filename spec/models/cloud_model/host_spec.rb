@@ -686,20 +686,22 @@ describe CloudModel::Host do
   end
 
   describe 'deploy' do
-    it 'should call rake cloudmodel:host:deploy with host´s id' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:host:deploy', host_id: subject.id)
+    it 'should enqueue job to depoly host with host´s id' do
+      job = double "ActiveJob"
+      expect(CloudModel::HostJobs::DeployJob).to receive(:perform_later).with(subject.id).and_return job
       subject.deploy
     end
 
-    it 'should add an error if call_rake excepts' do
-      allow(CloudModel).to receive(:call_rake).with('cloudmodel:host:deploy', host_id: subject.id).and_raise 'ERROR 42'
-      subject.deploy
+    it 'should add an error if enqueue job excepts' do
+      expect(CloudModel::HostJobs::DeployJob).to receive(:perform_later).with(subject.id).and_raise 'ERROR 42'
+
+      expect(subject.deploy).to eq false
       expect(subject.deploy_state).to eq :failed
       expect(subject.deploy_last_issue).to eq 'Unable to enqueue job! Try again later.'
     end
 
-    it 'should not call rake if not deployable' do
-      expect(CloudModel).not_to receive(:call_rake).with('cloudmodel:host:deploy', host_id: subject.id)
+    it 'should not enqueue job if not deployable' do
+      expect(CloudModel::HostJobs::DeployJob).not_to receive(:perform_later)
       allow(subject).to receive(:deployable?).and_return false
       subject.deploy
     end
@@ -732,20 +734,24 @@ describe CloudModel::Host do
   end
 
   describe 'redeploy' do
-    it 'should call rake cloudmodel:host:deploy with host´s id' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:host:redeploy', host_id: subject.id)
-      subject.redeploy
+    it 'should enqueue job to redeploy host with host´s id' do
+      job = double "ActiveJob"
+      expect(CloudModel::HostJobs::RedeployJob).to receive(:perform_later).with(subject.id).and_return job
+
+      expect(subject.redeploy).to eq job
     end
 
-    it 'should add an error if call_rake excepts' do
-      allow(CloudModel).to receive(:call_rake).with('cloudmodel:host:redeploy', host_id: subject.id).and_raise 'ERROR 42'
-      subject.redeploy
+    it 'should add an error if enqueue job excepts' do
+      expect(CloudModel::HostJobs::RedeployJob).to receive(:perform_later).and_raise 'ERROR 42'
+
+      expect(subject.redeploy).to eq false
+
       expect(subject.deploy_state).to eq :failed
       expect(subject.deploy_last_issue).to eq 'Unable to enqueue job! Try again later.'
     end
 
-    it 'should not call rake if not deployable' do
-      expect(CloudModel).not_to receive(:call_rake).with('cloudmodel:host:redeploy', host_id: subject.id)
+    it 'should not enqueue job if not deployable' do
+      expect(CloudModel::HostJobs::RedeployJob).not_to receive(:perform_later)
       allow(subject).to receive(:deployable?).and_return false
       subject.redeploy
     end

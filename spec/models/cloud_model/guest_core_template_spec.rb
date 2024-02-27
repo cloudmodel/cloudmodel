@@ -82,24 +82,27 @@ describe CloudModel::GuestCoreTemplate do
   end
 
   describe 'build' do
-    it 'should call rake to build GuestCoreTemplate' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:guest_core_template:build', host_id: host.id, template_id: subject.id).and_return true
+    it 'should enqueue job to build GuestCoreTemplate' do
+      job = double "ActiveJob"
+      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(host.id.to_s, subject.id.to_s).and_return job
       allow(subject).to receive(:buildable?).and_return true
 
-      expect(subject.build host).to eq true
+      expect(subject.build host).to eq job
     end
 
     it 'should set build_state to :pending' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:guest_core_template:build', host_id: host.id, template_id: subject.id).and_return true
+      job = double "ActiveJob"
+      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(host.id.to_s, subject.id.to_s).and_return job
+
       allow(subject).to receive(:buildable?).and_return true
 
-      expect(subject.build host).to eq true
+      expect(subject.build host).to eq job
 
       expect(subject.build_state).to eq :pending
     end
 
-    it 'should return false and not run rake if not buildable' do
-      expect(CloudModel).not_to receive(:call_rake)
+    it 'should return false and not run enqueue job if not buildable' do
+      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).not_to receive(:perform_later)
       allow(subject).to receive(:buildable?).and_return false
 
       expect(subject.build host).to eq false
@@ -107,15 +110,17 @@ describe CloudModel::GuestCoreTemplate do
     end
 
     it 'should allow to force build if not buildable' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:guest_core_template:build', host_id: host.id, template_id: subject.id).and_return true
+      job = double "ActiveJob"
+      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(host.id.to_s, subject.id.to_s).and_return job
       allow(subject).to receive(:buildable?).and_return false
 
-      expect(subject.build host, force:true).to eq true
+      expect(subject.build host, force:true).to eq job
       expect(subject.build_state).to eq :pending
     end
 
     it 'should mark template build as failed if rake is not callable and return false' do
-      allow(CloudModel).to receive(:call_rake).and_raise 'Rake failed to call'
+      job = double "ActiveJob"
+      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(host.id.to_s, subject.id.to_s).and_raise 'failed to queue job'
 
       expect(subject.build host).to eq false
       expect(subject.build_state).to eq :failed

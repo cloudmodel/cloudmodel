@@ -180,40 +180,44 @@ describe CloudModel::WebImage do
   end
 
   describe 'build' do
-    it 'should call rake to build WebImage' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:web_image:build', web_image_id: subject.id).and_return true
+    it 'should enqueue job to build WebImage' do
+      job = double "ActiveJob"
+      expect(CloudModel::WebImageJobs::BuildJob).to receive(:perform_later).with(subject.id).and_return job
+
       allow(subject).to receive(:buildable?).and_return true
 
-      expect(subject.build).to eq true
+      expect(subject.build).to eq job
     end
 
     it 'should set build_state to :pending' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:web_image:build', web_image_id: subject.id).and_return true
+      job = double "ActiveJob"
+      expect(CloudModel::WebImageJobs::BuildJob).to receive(:perform_later).with(subject.id).and_return job
       allow(subject).to receive(:buildable?).and_return true
 
-      expect(subject.build).to eq true
+      expect(subject.build).to eq job
 
       expect(subject.build_state).to eq :pending
     end
 
-    it 'should return false and not run rake if not buildable' do
-      expect(CloudModel).not_to receive(:call_rake)
+    it 'should return false and not enqueue job if not buildable' do
+      expect(CloudModel::WebImageJobs::BuildJob).not_to receive(:perform_later)
       allow(subject).to receive(:buildable?).and_return false
 
       expect(subject.build).to eq false
       expect(subject.build_state).to eq :not_started
     end
 
-    it 'should allow to force build if not buildable' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:web_image:build', web_image_id: subject.id).and_return true
+    it 'should allow to force enqueue if not buildable' do
+      job = double "ActiveJob"
+      expect(CloudModel::WebImageJobs::BuildJob).to receive(:perform_later).with(subject.id).and_return job
       allow(subject).to receive(:buildable?).and_return false
 
-      expect(subject.build force:true).to eq true
+      expect(subject.build force:true).to eq job
       expect(subject.build_state).to eq :pending
     end
 
-    it 'should mark template build as failed if rake is not callable and return false' do
-      allow(CloudModel).to receive(:call_rake).and_raise 'Rake failed to call'
+    it 'should mark template build as failed if enqueue raises error' do
+      expect(CloudModel::WebImageJobs::BuildJob).to receive(:perform_later).and_raise 'Rake failed to call'
 
       expect(subject.build).to eq false
       expect(subject.build_state).to eq :failed
@@ -267,24 +271,28 @@ describe CloudModel::WebImage do
   end
 
   describe 'redeploy' do
-    it 'should call rake to redeploy WebImage' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:web_image:redeploy', web_image_id: subject.id).and_return true
+    it 'should enqueue job to redeploy WebImage' do
+      job = double "ActiveJob"
+      expect(CloudModel::WebImageJobs::RedeployJob).to receive(:perform_later).with(subject.id).and_return job
+
       allow(subject).to receive(:redeployable?).and_return true
 
-      expect(subject.redeploy).to eq true
+      expect(subject.redeploy).to eq job
     end
 
     it 'should set redeploy_state to :pending' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:web_image:redeploy', web_image_id: subject.id).and_return true
+      job = double "ActiveJob"
+      expect(CloudModel::WebImageJobs::RedeployJob).to receive(:perform_later).with(subject.id).and_return job
       allow(subject).to receive(:redeployable?).and_return true
 
-      expect(subject.redeploy).to eq true
+      expect(subject.redeploy).to eq job
 
       expect(subject.redeploy_state).to eq :pending
     end
 
     it 'should mark services as pending if redeployble' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:web_image:redeploy', web_image_id: subject.id).and_return true
+      job = double "ActiveJob"
+      expect(CloudModel::WebImageJobs::RedeployJob).to receive(:perform_later).with(subject.id).and_return job
       allow(subject).to receive(:redeployable?).and_return true
 
       service1 = double CloudModel::Services::Nginx, redeployable?: false
@@ -293,28 +301,29 @@ describe CloudModel::WebImage do
       expect(service1).not_to receive :update_attribute
       expect(service2).to receive(:update_attribute).with(:redeploy_web_image_state, :pending)
 
-      expect(subject.redeploy).to eq true
+      expect(subject.redeploy).to eq job
       expect(subject.redeploy_state).to eq :pending
     end
 
-    it 'should return false and not run rake if not redeployable' do
-      expect(CloudModel).not_to receive(:call_rake)
+    it 'should return false and not enqueue job if not redeployable' do
+      expect(CloudModel::WebImageJobs::RedeployJob).not_to receive(:perform_later)
       allow(subject).to receive(:redeployable?).and_return false
 
       expect(subject.redeploy).to eq false
       expect(subject.redeploy_state).to eq :not_started
     end
 
-    it 'should allow to force redeploy if not redeployable' do
-      expect(CloudModel).to receive(:call_rake).with('cloudmodel:web_image:redeploy', web_image_id: subject.id).and_return true
+    it 'should allow to force enqueue redeploy if not redeployable' do
+      job = double "ActiveJob"
+      expect(CloudModel::WebImageJobs::RedeployJob).to receive(:perform_later).with(subject.id).and_return job
       allow(subject).to receive(:redeployable?).and_return false
 
-      expect(subject.redeploy force:true).to eq true
+      expect(subject.redeploy force:true).to eq job
       expect(subject.redeploy_state).to eq :pending
     end
 
-    it 'should mark template build as failed if rake is not callable and return false' do
-      allow(CloudModel).to receive(:call_rake).and_raise 'Rake failed to call'
+    it 'should mark template build as failed if enqueue job raises error' do
+      expect(CloudModel::WebImageJobs::RedeployJob).to receive(:perform_later).and_raise 'Rake failed to call'
 
       expect(subject.redeploy).to eq false
       expect(subject.redeploy_state).to eq :failed

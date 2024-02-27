@@ -93,7 +93,7 @@ module CloudModel
       update_attribute :build_state, :pending
 
       begin
-        CloudModel::call_rake 'cloudmodel:solr_image:build', solr_image_id: id
+        CloudModel::SolrImageJobs::BuildJob.perform_later id.to_s
       rescue Exception => e
         update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e

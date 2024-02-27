@@ -6,7 +6,7 @@ module CloudModel
     attr_writer :skip_sync_images
     # Use external IP, useful for testing without setting up a VPN for your development box or if you have troubles with tinc
     attr_writer :use_external_ip
-    attr_writer :dns_servers
+    attr_writer :dns_servers, :job_queue
 
     attr_writer :ubuntu_mirror, :ubuntu_deb_src, :ubuntu_version, :ubuntu_name, :ubuntu_kernel_flavour
     attr_writer :debian_version
@@ -58,6 +58,10 @@ module CloudModel
 
     def dns_servers
       @dns_servers || %w(1.1.1.1 8.8.8.8 9.9.9.10)
+    end
+
+    def job_queue
+      @job_queue || :default
     end
 
     def ubuntu_mirror

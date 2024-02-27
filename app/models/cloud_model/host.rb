@@ -455,10 +455,11 @@ module CloudModel
       update_attribute :deploy_state, :pending
 
       begin
-        CloudModel::call_rake 'cloudmodel:host:deploy', host_id: id
+        CloudModel::HostJobs::DeployJob.perform_later id.to_s
       rescue Exception => e
         update_attributes deploy_state: :failed, deploy_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
+        return false
       end
     end
 
@@ -478,10 +479,11 @@ module CloudModel
       update_attribute :deploy_state, :pending
 
       begin
-        CloudModel::call_rake 'cloudmodel:host:redeploy', host_id: id
+        CloudModel::HostJobs::RedeployJob.perform_later id.to_s
       rescue Exception => e
         update_attributes deploy_state: :failed, deploy_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
+        return false
       end
     end
 
