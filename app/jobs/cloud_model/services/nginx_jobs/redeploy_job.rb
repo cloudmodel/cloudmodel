@@ -1,6 +1,6 @@
 module CloudModel
   module Services
-    module WebImageJobs
+    module NginxJobs
       class RedeployJob < CloudModel::BaseJob
         def perform(service_id, guest_id)
           raise "No GUEST_ID given" unless guest_id
