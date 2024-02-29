@@ -84,7 +84,7 @@ describe CloudModel::GuestCoreTemplate do
   describe 'build' do
     it 'should enqueue job to build GuestCoreTemplate' do
       job = double "ActiveJob"
-      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(host.id.to_s, subject.id.to_s).and_return job
+      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_return job
       allow(subject).to receive(:buildable?).and_return true
 
       expect(subject.build host).to eq job
@@ -92,7 +92,7 @@ describe CloudModel::GuestCoreTemplate do
 
     it 'should set build_state to :pending' do
       job = double "ActiveJob"
-      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(host.id.to_s, subject.id.to_s).and_return job
+      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_return job
 
       allow(subject).to receive(:buildable?).and_return true
 
@@ -111,7 +111,7 @@ describe CloudModel::GuestCoreTemplate do
 
     it 'should allow to force build if not buildable' do
       job = double "ActiveJob"
-      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(host.id.to_s, subject.id.to_s).and_return job
+      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_return job
       allow(subject).to receive(:buildable?).and_return false
 
       expect(subject.build host, force:true).to eq job
@@ -120,7 +120,7 @@ describe CloudModel::GuestCoreTemplate do
 
     it 'should mark template build as failed if rake is not callable and return false' do
       job = double "ActiveJob"
-      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(host.id.to_s, subject.id.to_s).and_raise 'failed to queue job'
+      expect(CloudModel::GuestCoreTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_raise 'failed to queue job'
 
       expect(subject.build host).to eq false
       expect(subject.build_state).to eq :failed

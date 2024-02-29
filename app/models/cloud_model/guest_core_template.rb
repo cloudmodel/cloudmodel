@@ -54,7 +54,7 @@ module CloudModel
       update_attributes build_state: :pending, arch: host.arch
 
       begin
-        CloudModel::GuestCoreTemplateJobs::BuildJob.perform_later host.id.to_s, id.to_s
+        CloudModel::GuestCoreTemplateJobs::BuildJob.perform_later id.to_s, host.id.to_s
       rescue Exception => e
         update_attributes build_state: :failed, build_last_issue: 'Unable to enqueue job! Try again later.'
         CloudModel.log_exception e
