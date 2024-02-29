@@ -84,7 +84,7 @@ describe CloudModel::HostTemplate do
   describe 'build' do
     it 'should enqueue job to build HostTemplate' do
       job = double "ActiveJob"
-      expect(CloudModel::HostTemplateJobs::BuildJob).to receive(:perform_later).with(host.id, subject.id).and_return job
+      expect(CloudModel::HostTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_return job
 
       allow(subject).to receive(:buildable?).and_return true
 
@@ -93,7 +93,7 @@ describe CloudModel::HostTemplate do
 
     it 'should set build_state to :pending' do
       job = double "ActiveJob"
-      expect(CloudModel::HostTemplateJobs::BuildJob).to receive(:perform_later).with(host.id, subject.id).and_return job
+      expect(CloudModel::HostTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_return job
       allow(subject).to receive(:buildable?).and_return true
 
       expect(subject.build host).to eq job
@@ -112,7 +112,7 @@ describe CloudModel::HostTemplate do
 
     it 'should allow to force enqueue build if not buildable' do
       job = double "ActiveJob"
-      expect(CloudModel::HostTemplateJobs::BuildJob).to receive(:perform_later).with(host.id, subject.id).and_return job
+      expect(CloudModel::HostTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_return job
 
       allow(subject).to receive(:buildable?).and_return false
 
@@ -121,7 +121,7 @@ describe CloudModel::HostTemplate do
     end
 
     it 'should mark template build as failed if enqueue job raises anerror' do
-      expect(CloudModel::HostTemplateJobs::BuildJob).to receive(:perform_later).with(host.id, subject.id).and_raise 'Rake failed to call'
+      expect(CloudModel::HostTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_raise 'Rake failed to call'
 
       expect(subject.build host).to eq false
       expect(subject.build_state).to eq :failed

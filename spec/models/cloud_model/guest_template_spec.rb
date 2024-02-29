@@ -75,7 +75,7 @@ describe CloudModel::GuestTemplate do
   describe 'build' do
     it 'should call enqueue job to build GuestTemplate' do
       job = double "ActiveJob"
-      expect(CloudModel::GuestTemplateJobs::BuildJob).to receive(:perform_later).with(host.id, subject.id).and_return job
+      expect(CloudModel::GuestTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_return job
 
       allow(subject).to receive(:buildable?).and_return true
 
@@ -84,7 +84,7 @@ describe CloudModel::GuestTemplate do
 
     it 'should set build_state to :pending' do
       job = double "ActiveJob"
-      expect(CloudModel::GuestTemplateJobs::BuildJob).to receive(:perform_later).with(host.id, subject.id).and_return job
+      expect(CloudModel::GuestTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_return job
       allow(subject).to receive(:buildable?).and_return true
 
       expect(subject.build host).to eq job
@@ -102,7 +102,7 @@ describe CloudModel::GuestTemplate do
 
     it 'should allow to force build if not buildable' do
       job = double "ActiveJob"
-      expect(CloudModel::GuestTemplateJobs::BuildJob).to receive(:perform_later).with(host.id, subject.id).and_return job
+      expect(CloudModel::GuestTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_return job
       allow(subject).to receive(:buildable?).and_return false
 
       expect(subject.build host, force:true).to eq job
@@ -110,7 +110,7 @@ describe CloudModel::GuestTemplate do
     end
 
     it 'should mark template build as failed if rake is not callable and return false' do
-      expect(CloudModel::GuestTemplateJobs::BuildJob).to receive(:perform_later).with(host.id, subject.id).and_raise 'failed to enqueue'
+      expect(CloudModel::GuestTemplateJobs::BuildJob).to receive(:perform_later).with(subject.id.to_s, host.id.to_s).and_raise 'failed to enqueue'
 
       expect(subject.build host).to eq false
       expect(subject.build_state).to eq :failed
