@@ -36,13 +36,14 @@ module CloudModel
         comment_sub_step 'Install bridge-utils'
         chroot! build_path, "apt-get install bridge-utils -y", "Failed to install bridge-utils"
 
+        mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
+
         comment_sub_step 'Setup NTP service'
         chroot! build_path, "apt-get install ntp -y", "Failed to install ntp"
         chroot! build_path, "ln -s /lib/systemd/system/ntpsec.service /etc/systemd/system/basic.target.wants/ntpsec.service", "Failed to add ntp to autostart"
 
         comment_sub_step 'Setup Firewall service'
         render_to_remote "/cloud_model/host/etc/systemd/system/firewall.service", "#{build_path}/etc/systemd/system/firewall.service"
-        mkdir_p "#{build_path}/etc/systemd/system/basic.target.wants"
         chroot! build_path, "ln -s /etc/systemd/system/firewall.service /etc/systemd/system/basic.target.wants/firewall.service", "Failed to add firewall to autostart"
       end
 
