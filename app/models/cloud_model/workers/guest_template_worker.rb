@@ -166,6 +166,11 @@ module CloudModel
       #---
 
       def fetch_core_template
+        if @template.core_template.blank?
+          @template.core_template = CloudModel::GuestCoreTemplate.create! arch: @host.arch, os_version: @template.os_version
+          @template.core_template.build! @host
+        end
+
         begin
           @host.sftp.stat!("#{@template.core_template.tarball}")
         rescue
@@ -203,7 +208,7 @@ module CloudModel
         mkdir_p download_path
 
         steps = [
-          ["Download Core Template #{@template.core_template.id} (#{@template.created_at})", :fetch_core_template],
+          ["Download Core Template #{@template.core_template.try(:id)} (#{@template.created_at})", :fetch_core_template],
           ["Install Components", :install_components],
           ["Pack template tarball", :pack_template],
           ["Create lxd manifest", :pack_manifest],

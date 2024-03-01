@@ -15,7 +15,7 @@ module CloudModel
       templates.create(
         core_template: core_template,
         os_version: os_version,
-        arch: core_template.arch
+        arch: host.arch
       )
     end
 

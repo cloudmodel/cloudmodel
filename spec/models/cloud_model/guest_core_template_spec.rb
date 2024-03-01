@@ -180,16 +180,11 @@ describe CloudModel::GuestCoreTemplate do
       expect(subject.class.last_useable host).to eq template
     end
 
-    it 'should build new template if non is found' do
-      template = double subject.class
+    it 'should return nil if non is found' do
       options = double
       expect(subject.class).to receive(:where).with(arch: 'MOS6502', build_state_id: 0xf0).and_return []
-      expect(subject.class).to receive(:new_template_to_build).with(host).and_return template
 
-      expect(template).to receive(:build_state=).with :pending
-      expect(template).to receive(:build!).with(host, options)
-
-      expect(subject.class.last_useable host, options).to eq template
+      expect(subject.class.last_useable host, options).to eq nil
     end
   end
 
