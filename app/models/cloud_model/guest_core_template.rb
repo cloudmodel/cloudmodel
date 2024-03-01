@@ -78,12 +78,12 @@ module CloudModel
 
     def self.last_useable(host, options={})
       template = self.where(arch: host.arch, build_state_id: 0xf0).last
-      unless template
-        template = new_template_to_build host
-        template.build_state = :pending
-        template.build!(host, options)
-      end
-      template
+      # unless template
+      #   template = new_template_to_build host
+      #   template.build_state = :pending
+      #   template.build(host, options)
+      # end
+      # template
     end
 
     def tarball
