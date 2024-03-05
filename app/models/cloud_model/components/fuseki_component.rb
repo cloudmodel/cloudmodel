@@ -2,7 +2,7 @@ module CloudModel
   module Components
     class FusekiComponent < BaseComponent
       def requirements
-        [:java]
+        [:'java@17']
       end
     end
   end
