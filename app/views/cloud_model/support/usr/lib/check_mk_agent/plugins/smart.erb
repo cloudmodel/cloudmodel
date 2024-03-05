@@ -3,14 +3,17 @@
 echo '<<<smart>>>'
 
 for dev in /dev/sd[a-z] /dev/nvme*n1; do
-  cmd="smartctl -a $dev"
-  res=`$cmd`
-  smart_state_id="SMART overall-health self-assessment test result: "
+  if [ -e "${dev}" ];
+  then
+    cmd="smartctl -a $dev"
+    res=`$cmd`
+    smart_state_id="SMART overall-health self-assessment test result: "
 
-  echo "[$dev]"
-  echo "$res" | grep "$smart_state_id" | sed "s|$smart_state_id|  SMART Status: |"
-  # Get SATA smart values
-  echo "$res" | grep Always | sed "s|^[ 0-9]*\([A-Za-z_-]*\).*  \(.*\)$|  \1: \2|" | sed "s|_| |g"
-  # Get NVMW smart values
-  echo "$res" | sed -n '/^=== START OF SMART DATA SECTION ===$/,/^Error Information ($/p' | grep ':' | sed -E -e "s/^(.*):\W*/  \1: /g" | grep -v "SMART overall-health self-assessment test result"
+    echo "[$dev]"
+    echo "$res" | grep "$smart_state_id" | sed "s|$smart_state_id|  SMART Status: |"
+    # Get SATA smart values
+    echo "$res" | grep Always | sed "s|^[ 0-9]*\([A-Za-z_-]*\).*  \(.*\)$|  \1: \2|" | sed "s|_| |g"
+    # Get NVMW smart values
+    echo "$res" | sed -n '/^=== START OF SMART DATA SECTION ===$/,/^Error Information ($/p' | grep ':' | sed -E -e "s/^(.*):\W*/  \1: /g" | grep -v "SMART overall-health self-assessment test result"
+  fi
 done 2>/dev/null
