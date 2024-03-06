@@ -50,8 +50,8 @@ describe CloudModel::Components::FusekiComponent do
   end
 
   describe 'requirements' do
-    it 'should require :java' do
-      expect(subject.requirements).to eq [:java]
+    it 'should require Java 17' do
+      expect(subject.requirements).to eq [:'java@17']
     end
   end
 end
