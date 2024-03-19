@@ -26,6 +26,7 @@ module CloudModel
           solr: CloudModel::Services::Solr,
           tomcat: CloudModel::Services::Tomcat,
           collabora: CloudModel::Services::Collabora,
+          jitsi: CloudModel::Services::Jitsi,
           rake: CloudModel::Services::Rake,
           backup: CloudModel::Services::Backup,
           monitoring: CloudModel::Services::Monitoring,
@@ -64,7 +65,7 @@ module CloudModel
       end
 
       def used_ports
-        [port]
+        [[port, :tcp]]
       end
 
       def kind

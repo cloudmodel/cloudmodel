@@ -5,21 +5,18 @@ module CloudModel
         @host = host
 
         host_services = {
-          'ssh' => {
-            'port' => 22
+          22 => {
+            protocols: [:tcp],
+            service: :ssh
           },
-          'tinc-tcp' => {
-            'port' => 655,
-            'proto' => 'tcp'
-          },
-          'tinc-udp' => {
-            'port' => 655,
-            'proto' => 'udp'
+          655 => {
+            protocols: [:tcp, :udp],
+            service: :tinc
           }
         }
 
         rules = {
-          @host.primary_address.ip  => {
+          @host.primary_address.ip => {
             'interface' => 'eth0',
             'services' => host_services
           }
@@ -43,20 +40,19 @@ module CloudModel
 
                 services = guest.services.where(public_service: true).to_a
                 services.each do |service|
-                  rules[ip]['services']["#{service.kind}"] ||= {}
-                  rules[ip]['services']["#{service.kind}"]['port'] ||= []
-                  rules[ip]['services']["#{service.kind}"]['port'] << service.port
-
-                  if service.try :ssl_port and service.try :ssl_supported
-                    rules[ip]['services']["#{service.kind}s"] ||= {}
-                    rules[ip]['services']["#{service.kind}s"]['port'] ||= []
-                    rules[ip]['services']["#{service.kind}s"]['port'] << service.ssl_port
+                  service.used_ports.each do |port, proto|
+                    rules[ip]['services'][port] ||= {
+                      service: service.kind,
+                      protocols: []
+                    }
+                    rules[ip]['services'][port][:protocols] << proto
                   end
                 end
               end
             end
           end
         end
+
         @rules = rules
       end
 
@@ -94,9 +90,9 @@ module CloudModel
         [ip4tables_bin, ip6tables_bin]
       end
 
-      def handle_ssh(host, options)
+      def handle_ssh(host, port, options)
         commands = []
-        ports = options[:port]
+
         iptables = iptables_bin(host)
         interface = options[:interface] || 'eth0'
 
@@ -109,29 +105,29 @@ module CloudModel
           end
         end
 
-        ports.each do |port|
-          if(options[:trust])
-            parse_ports(options[:trust]).each do |s|
-              #commands << "#{iptables} -A INPUT -i #{interface} -m conntrack --ctstate NEW -p tcp -s #{s} -d #{host} --dport #{port} -j ACCEPT"
-              commands << "#{iptables} -A INPUT -m conntrack --ctstate NEW -p tcp -s #{s} -d #{host} --dport #{port} -j ACCEPT"
-            end
-          end
 
-          if ssh_deep_inspect?
-            # Capture SSH connections
-            commands << "#{iptables} -A INPUT -i #{interface} -m conntrack --ctstate NEW -p tcp -d #{host} --dport #{port} -j SSH_CHECK"
-          else
-            commands << "#{iptables} -A INPUT -i #{interface} -p tcp -d #{host} --dport #{port} ! --syn -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
-            commands << "#{iptables} -A INPUT -i #{interface} -p tcp -d #{host} --dport #{port} --syn -m recent --name SSH_brutes --update --seconds 20 -j REJECT"
-            commands << "#{iptables} -A INPUT -i #{interface} -p tcp -d #{host} --dport #{port} --syn -m recent --name sshconn --update --seconds 60 --hitcount 6 -j SSH_ATTACKED"
-            commands << "#{iptables} -A INPUT -i #{interface} -p tcp -d #{host} --dport #{port} --syn -m recent --name sshconn --set"
-            commands << "#{iptables} -A INPUT -i #{interface} -p tcp -d #{host} --dport #{port} --syn -j ACCEPT"
-          end
-
-          if(options[:nat])
-             commands += nat(host, interface, port, 'tcp', options[:nat])
+        if(options[:trust])
+          parse_ports(options[:trust]).each do |s|
+            #commands << "#{iptables} -A INPUT -i #{interface} -m conntrack --ctstate NEW -p tcp -s #{s} -d #{host} --dport #{port} -j ACCEPT"
+            commands << "#{iptables} -A INPUT -m conntrack --ctstate NEW -p tcp -s #{s} -d #{host} --dport #{port} -j ACCEPT"
           end
         end
+
+        if ssh_deep_inspect?
+          # Capture SSH connections
+          commands << "#{iptables} -A INPUT -i #{interface} -m conntrack --ctstate NEW -p tcp -d #{host} --dport #{port} -j SSH_CHECK"
+        else
+          commands << "#{iptables} -A INPUT -i #{interface} -p tcp -d #{host} --dport #{port} ! --syn -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
+          commands << "#{iptables} -A INPUT -i #{interface} -p tcp -d #{host} --dport #{port} --syn -m recent --name SSH_brutes --update --seconds 20 -j REJECT"
+          commands << "#{iptables} -A INPUT -i #{interface} -p tcp -d #{host} --dport #{port} --syn -m recent --name sshconn --update --seconds 60 --hitcount 6 -j SSH_ATTACKED"
+          commands << "#{iptables} -A INPUT -i #{interface} -p tcp -d #{host} --dport #{port} --syn -m recent --name sshconn --set"
+          commands << "#{iptables} -A INPUT -i #{interface} -p tcp -d #{host} --dport #{port} --syn -j ACCEPT"
+        end
+
+        if(options[:nat])
+           commands += nat(host, interface, port, 'tcp', options[:nat])
+        end
+
 
         commands
       end
@@ -186,17 +182,14 @@ module CloudModel
         commands
       end
 
-      def build_commands(host, host_options, protocol, rule_options)
-        options = host_options.merge rule_options
-
-        if protocol == :ssh
-          commands = handle_ssh(host, options)
+      def build_commands(host, port, protocol, options)
+        if options[:service] == :ssh
+          commands = handle_ssh(host, port, {interface: options[:interface]})
         else
           iptables = iptables_bin(host)
           interface = options[:interface] || 'eth0'
-          proto = options[:proto] || 'tcp'
 
-          commands = ["#{iptables} -A INPUT -i #{interface} -m conntrack --ctstate NEW -p #{proto}"]
+          commands = ["#{iptables} -A INPUT -i #{interface} -m conntrack --ctstate NEW -p #{protocol}"]
           #commands = ["#{iptables} -A INPUT -m conntrack --ctstate NEW -p #{proto}"]
 
           if options[:shost] and options[:shost] != 'any'
@@ -221,22 +214,18 @@ module CloudModel
           end
           commands = cmds
 
-          if options[:port] and options[:port] != 'any'
+          if port != 'any'
             cmds = []
             commands.each do |c|
-              options[:port].each do |p|
-                cmds << "#{c} --dport #{p}"
-              end
+              cmds << "#{c} --dport #{port}"
             end
             commands = cmds
           end
 
           commands.map!{|c| "#{c} -j ACCEPT"}
 
-          if options[:port] and options[:nat]
-            options[:port].each do |port|
-              commands += nat(host, interface, port, proto, options[:nat])
-            end
+          if  options[:nat]
+            commands += nat(host, interface, port, protocol, options[:nat])
           end
         end
 
@@ -304,18 +293,10 @@ module CloudModel
           interfaces << host_options[:interface] || 'eth0'
 
           if services = host_options.delete(:services)
-            services.each do |protocol, config|
-              parsed = if [Integer, String].include? config.class
-                {port: parse_ports(config)}
-              else
-                config.keys.each do |key|
-                  config[(key.to_sym rescue key) || key] = config.delete(key)
-                end
-                config[:port] = parse_ports config[:port]
-                config
+            services.each do |port, service_config|
+              (service_config.delete(:protocols) || [:tcp]).each do |protocol|
+                commands += build_commands(host, port, protocol.to_sym, host_options.merge(service_config))
               end
-
-              commands += build_commands(host, host_options, protocol.to_sym, parsed)
             end
           end
         end
@@ -350,8 +331,6 @@ module CloudModel
         end
 
         commands * "\n"
-
-        #commands.map{|c| "echo '#{c}'\n#{c}"} * "\n"
       end
 
       def write_scripts options = {root: ''}

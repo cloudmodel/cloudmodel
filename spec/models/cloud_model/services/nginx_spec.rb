@@ -85,25 +85,25 @@ describe CloudModel::Services::Nginx do
 
   describe 'used_ports' do
     it 'should return http port by default' do
-      expect(subject.used_ports).to eq [80]
+      expect(subject.used_ports).to eq [[80, :tcp]]
     end
 
     it 'should return http and https port if ssl enabled' do
       subject.ssl_supported = true
-      expect(subject.used_ports).to eq [80, 443]
+      expect(subject.used_ports).to eq [[80, :tcp], [443, :tcp]]
     end
 
     it 'should return https port if ssl_only' do
       subject.ssl_supported = true
       subject.ssl_only = true
-      expect(subject.used_ports).to eq [443]
+      expect(subject.used_ports).to eq [[443, :tcp]]
     end
 
     it 'should return custom ports' do
       subject.ssl_supported = true
       subject.ssl_port = 445
       subject.port = 8080
-      expect(subject.used_ports).to eq [8080, 445]
+      expect(subject.used_ports).to eq [[8080, :tcp], [445, :tcp]]
     end
   end
 

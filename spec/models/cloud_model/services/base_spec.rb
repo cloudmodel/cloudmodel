@@ -23,6 +23,7 @@ describe CloudModel::Services::Base do
         mariadb: CloudModel::Services::Mariadb,
         neo4j: CloudModel::Services::Neo4j,
         fuseki: CloudModel::Services::Fuseki,
+        jitsi: CloudModel::Services::Jitsi,
         solr: CloudModel::Services::Solr,
         tomcat: CloudModel::Services::Tomcat,
         collabora: CloudModel::Services::Collabora,
@@ -103,7 +104,7 @@ describe CloudModel::Services::Base do
   describe 'used_ports' do
     it 'should return array with result of call to :port of the specific class' do
       allow(subject).to receive(:port).and_return(8080)
-      expect(subject.used_ports).to eq [8080]
+      expect(subject.used_ports).to eq [[8080, :tcp]]
     end
   end
 

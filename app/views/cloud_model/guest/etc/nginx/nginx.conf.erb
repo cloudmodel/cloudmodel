@@ -1,151 +1,55 @@
-user                              www www;
-worker_processes                  6;
+user                            www www;
+worker_processes                6;
 
-error_log                         /var/log/nginx/error_log info;
+error_log                       /var/log/nginx/error.log warn;
 
-include /etc/nginx/modules-enabled/*.conf;
+include                         /etc/nginx/modules-enabled/*.conf;
+
+pid                             /var/run/nginx.pid;
 
 events {
-  worker_connections              512;
-  use                             epoll;
+  worker_connections            1024;
+  use                           epoll;
 }
 
 http {
-  server_names_hash_max_size      1024;
-  server_names_hash_bucket_size   64;
-  server_tokens                   off;
+  include                       /etc/nginx/mime.types;
+  default_type                  application/octet-stream;
+  log_format                    main  \'$remote_addr - $remote_user [$time_local] \"$request\" \'
+                                  \'$status $body_bytes_sent \"$http_referer\" \'
+                                  \'\"$http_user_agent\" \"$http_x_forwarded_for\"\';
+  access_log                    /var/log/nginx/access.log  main;
 
-  include                         /etc/nginx/mime.types;
-  default_type                    application/octet-stream;
+  server_names_hash_max_size    1024;
+  #server_names_hash_bucket_size 64;
+  server_tokens                 off;
 
-  log_format main
-    '$remote_addr - $remote_user [$time_local] '
-    '"$request" $status $bytes_sent '
-    '"$http_referer" "$http_user_agent" '
-    '"$gzip_ratio"';
+  client_header_timeout         10m;
+  client_body_timeout           10m;
+  send_timeout                  10m;
 
-  client_header_timeout           10m;
-  client_body_timeout             10m;
-  send_timeout                    10m;
+  connection_pool_size          256;
+  client_header_buffer_size     1k;
+  large_client_header_buffers   4 16k;
+  request_pool_size             4k;
 
-  connection_pool_size            256;
-  client_header_buffer_size       1k;
-  large_client_header_buffers     4 16k;
-  request_pool_size               4k;
+  gzip                          on;
+  gzip_min_length               1100;
+  gzip_buffers                  4 8k;
+  gzip_types                    text/plain text/css application/x-javascript;
 
-  gzip                            on;
-  gzip_min_length                 1100;
-  gzip_buffers                    4 8k;
-  gzip_types                      text/plain text/css application/x-javascript;
+  output_buffers                1 32k;
+  postpone_output               1460;
 
-  output_buffers                  1 32k;
-  postpone_output                 1460;
+  sendfile                      on;
+  tcp_nopush                    on;
+  tcp_nodelay                   on;
 
-  sendfile                        on;
-  tcp_nopush                      on;
-  tcp_nodelay                     on;
-
-  keepalive_timeout               75 20;
+  keepalive_timeout             75 20;
   types_hash_max_size 2048;
 
-  ignore_invalid_headers          on;
+  ignore_invalid_headers        on;
 
-  index                           index.html;
-
-  include /etc/nginx/conf.d/*.conf;
-<%-
-  protocols = []
-  protocols << :http unless model.ssl_supported? and model.ssl_only?
-  protocols << :https if model.ssl_supported?
--%>
-<%- protocols.each do |protocol| -%>
-
-  server {
-    listen                        <%= protocol == :https ? "#{model.ssl_port} ssl http2 deferred" : model.port %>;
-<%- if model.ssl_certbot? -%>
-    server_name                   <%= ([model.guest.external_hostname] + model.guest.external_alt_names) * ' ' %>;
-<%- end -%>
-
-<%- if protocol == :http and model.ssl_supported? and model.ssl_enforce? -%>
-    add_header                    Cache-Control "public, must-revalidate";
-    add_header                    Strict-Transport-Security max-age=63072000;
-    expires                       90d;
-    root                          /var/www/empty;
-    location / {
-      rewrite                     ^/(.*)$  https://<%= guest.external_hostname %>/$1  permanent;
-      return                      444;
-    }
-<%- else -%>
-    root                          <%= model.www_root %>/current/public/;
-
-    add_header Referrer-Policy "same-origin" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Download-Options "noopen" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Permitted-Cross-Domain-Policies "none" always;
-    # add_header X-Robots-Tag "none" always;
-    add_header X-XSS-Protection "1; mode=block;" always;
-    more_clear_headers 'Server' 'X-Powered-By' 'X-Runtime';
-    add_header Content-Security-Policy "<%=raw model.content_security_policy %>" always;
-    add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" always;
-
-    # Remove X-Powered-By, which is an information leak
-    fastcgi_hide_header X-Powered-By;
-
-    client_max_body_size          600M;
-    client_body_buffer_size       128k;
-    client_header_timeout         30m;
-    client_body_timeout           30m;
-    send_timeout                  30m;
-    # Compression
-    gzip                          on;
-    gzip_buffers                  16 8k;
-    # compression level between 1 and 9
-    gzip_comp_level               9;
-    gzip_http_version             1.0;
-    gzip_min_length               0;
-    gzip_types                    text/plain text/css image/x-icon image/bmp application/x-javascript text/xml application/xml application/xml+rss text/javascript;
-    gzip_vary                     on;
-    gzip_proxied                  any;
-    # Some version of IE 6 don't handle compression well on some mime-types, so just disable them
-    gzip_disable                  "MSIE [1-6].(?!.*SV1)";
-
-<%- if protocol == :https -%>
-    <%- if model.ssl_enforce? or model.ssl_only? -%>
-    add_header                    Strict-Transport-Security max-age=63072000 always;
-    <%- end -%>
-    ssl                           on;
-    ssl_certificate               ssl/<%= guest.external_hostname %>.crt;
-    ssl_certificate_key           ssl/<%= guest.external_hostname %>.key;
-    ssl_client_certificate        ssl/<%= guest.external_hostname %>.ca.crt;
-    ssl_dhparam                   ssl/dhparam.pem;
-    ssl_session_timeout           10m;
-
-    ssl_protocols                 TLSv1.3 TLSv1.2;
-    ssl_prefer_server_ciphers     on;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-    ssl_stapling                  on;
-    ssl_stapling_verify           on;
-    resolver                      8.8.4.4 8.8.8.8 valid=300s;
-    resolver_timeout              10s;
-    ssl_session_cache             shared:SSL:10m;
-
-<%- end -%>
-    location = /robots.txt {
-      allow all;
-      log_not_found off;
-      access_log off;
-    }
-
-    location /nginx_status {
-      stub_status                 on;
-      access_log                  off;
-      allow                       <%= model.host.private_network.ip %>/16;
-      deny all;
-    }
-
-    include /etc/nginx/server.d/*;
-<%- end -%>
-  }
-<%- end -%>
+  include                       /etc/nginx/conf.d/*.conf;
+  include                       /etc/nginx/sites-enabled/*.conf;
 }
