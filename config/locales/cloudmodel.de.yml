@@ -197,6 +197,9 @@ de:
       cloud_model/services/neo4j:
         one: Neo4j-Dienst
         other: Neo4j-Dienste
+      cloud_model/services/jitsi:
+        one: Jitsi Meet-Dienst
+        other: Jitsi Meet-Dienste
       cloud_model/services/collabora:
         one: Collabora Office-Dienst
         other: Collabore Office-Dienste

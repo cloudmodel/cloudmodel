@@ -83,9 +83,9 @@ module CloudModel
       def used_ports
         if ssl_supported?
           if ssl_only?
-            [ssl_port]
+            [[ssl_port, :tcp]]
           else
-            [port, ssl_port]
+            [[port, :tcp], [ssl_port, :tcp]]
           end
         else
           super
