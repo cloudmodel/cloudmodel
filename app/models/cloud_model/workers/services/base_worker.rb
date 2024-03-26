@@ -23,6 +23,18 @@ module CloudModel
           host.exec! "chown -R 100000:100000 #{path}", "failed to set owner for #{path}"
         end
 
+        def upload_to_guest content, remote_file, perm = "0600"
+          tmp_file = "/tmp/cloudmodel_#{BSON::ObjectId.new}"
+
+          @host.sftp.file.open(tmp_file, 'w', 0600) do |f|
+            f.puts content
+          end
+
+          host.exec!("lxc file push #{tmp_file.shellescape} #{@lxc.name}/#{remote_file.shellescape} -p --mode #{perm}", "Failed to upload #{remote_file}")
+          host.exec("rm #{tmp_file.shellescape}")
+          true
+        end
+
         def render_to_guest template, remote_file, *param_array
           perm = if false and param_array.first.is_a? Integer
             param_array.shift
@@ -34,15 +46,7 @@ module CloudModel
 
           content = render(template, locals)
 
-          tmp_file = "/tmp/cloudmodel_#{BSON::ObjectId.new}"
-
-          @host.sftp.file.open(tmp_file, 'w', 0600) do |f|
-            f.puts content
-          end
-
-          host.exec!("lxc file push #{tmp_file.shellescape} #{@lxc.name}/#{remote_file.shellescape} -p --mode #{perm}", "Failed to upload result of rendering #{template}")
-          host.exec("rm #{tmp_file.shellescape}")
-          true
+          upload_to_guest content, remote_file, perm
         end
 
         def render_to_remote template, remote_file, *param_array

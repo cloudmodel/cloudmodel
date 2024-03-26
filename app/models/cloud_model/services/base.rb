@@ -27,6 +27,7 @@ module CloudModel
           tomcat: CloudModel::Services::Tomcat,
           collabora: CloudModel::Services::Collabora,
           jitsi: CloudModel::Services::Jitsi,
+          forgejo: CloudModel::Services::Forgejo,
           rake: CloudModel::Services::Rake,
           backup: CloudModel::Services::Backup,
           monitoring: CloudModel::Services::Monitoring,

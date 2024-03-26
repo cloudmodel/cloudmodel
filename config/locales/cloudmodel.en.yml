@@ -198,6 +198,9 @@ en:
       cloud_model/services/jitsi:
         one: Jitsi Meet Service
         other: Jitsi Meet Services
+      cloud_model/services/forgejo:
+        one: Forgejo Service
+        other: Forgejo Services
       cloud_model/services/collabora:
         one: Collabora Office Service
         other: Collabore Office Services
