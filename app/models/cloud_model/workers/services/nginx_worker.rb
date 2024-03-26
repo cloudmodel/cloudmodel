@@ -167,7 +167,9 @@ module CloudModel
           # TODO: Move to web locations
           mkdir_p "#{@guest.deploy_path}/etc/nginx/server.d"
           if @model.web_locations.where(location: '/').count == 0
-            if @model.passenger_supported?
+            if @model.reverse_proxy_supported?
+              render_to_remote "/cloud_model/guest/etc/nginx/server.d/proxy.conf", "#{@guest.deploy_path}/etc/nginx/server.d/proxy.conf", guest: @guest, model: @model
+            elsif @model.passenger_supported?
               render_to_remote "/cloud_model/guest/etc/nginx/server.d/passenger.conf", "#{@guest.deploy_path}/etc/nginx/server.d/passenger.conf", guest: @guest, model: @model
               render_to_remote "/cloud_model/guest/etc/default/rails", "#{@guest.deploy_path}/etc/default/rails", guest: @guest, model: @model
             elsif @model.capistrano_supported?

@@ -17,6 +17,9 @@ module CloudModel
       field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
       field :delayed_jobs_queues, type: Array, default: ['default']
 
+      field :reverse_proxy_supported, type: Mongoid::Boolean, default: false
+      field :reverse_proxy_for, type: String, default: nil
+
       # field :fastcgi_supported, type: Mongoid::Boolean, default: false
       # field :fastcgi_location, type: String, default: ".php$"
       # field :fastcgi_pass, type: String, default: "127.0.0.1:9000"
