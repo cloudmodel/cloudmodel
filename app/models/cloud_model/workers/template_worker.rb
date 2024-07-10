@@ -29,8 +29,17 @@ module CloudModel
         "ubuntu-base-#{ubuntu_version}-base-#{ubuntu_arch}.tar.gz"
       end
 
+      def fetch_os
+        if os_version =~ /ubuntu-/
+          fetch_ubuntu
+          populate_root
+        else
+          debootstrap_debian
+        end
+      end
+
       def ubuntu_url
-        if(ubuntu_version =~ /-beta/)
+        if ubuntu_version =~ /-beta/
           version = ubuntu_version.split('-')
           "http://cdimage.ubuntu.com/ubuntu-base/releases/#{version[0]}/#{version[1].gsub('beta', 'beta-')}/#{ubuntu_image}"
         else
@@ -53,7 +62,7 @@ module CloudModel
         # gettting the key does not work for now; apt debian-keyring debian-archive-keyring is to old on ubuntu 18.04
 
         @host.exec! "apt-get install debootstrap  -y", "Failed to install debootstrap"
-        @host.exec "debootstrap --arch #{@template.arch} bookworm #{build_path} http://ftp.de.debian.org/debian/"#, "Failed to debootstrap"
+        @host.exec "debootstrap --arch #{@template.arch.shellescape} #{CloudModel.debian_short_name(os_version).shell_escape} #{build_path} http://ftp.de.debian.org/debian/"#, "Failed to debootstrap"
 
         # debootstrap --arch amd64 bookworm /cloud/build/host/test http://ftp.de.debian.org/debian/
 
@@ -63,6 +72,7 @@ module CloudModel
         # Don't start services on install
         # render_to_remote "/cloud_model/support/usr/sbin/policy-rc.d", "#{build_path}/usr/sbin/policy-rc.d", 0755
         # Don't install docs
+        mkdir_p "#{build_path}/etc/dpkg/dpkg.cfg.d"
         render_to_remote  "/cloud_model/support/etc/dpkg/dpkg.cfg.d/01_nodoc", "#{build_path}/etc/dpkg/dpkg.cfg.d/01_nodoc"
 
         chroot! build_path, "apt-get install software-properties-common -y", "Failed to update sources"

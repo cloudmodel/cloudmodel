@@ -127,7 +127,7 @@ module CloudModel
         mkdir_p download_path
 
         steps = [
-          ["De-Bootstrap system", :debootstrap_debian],
+          ["De-Bootstrap system", :fetch_os],
           ["Update base system", :update_base],
           ["Install kernel", :install_kernel],
           ["Install basic utils", :install_utils],

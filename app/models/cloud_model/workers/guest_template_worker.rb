@@ -128,8 +128,7 @@ module CloudModel
         mkdir_p download_path
 
         steps = [
-          ["Download #{os_version}", :fetch_ubuntu],
-          ["Populate system with image", :populate_root],
+          ["Download #{os_version}", :fetch_os],
           ["Update base system", :update_base],
           ["Install basic utils", :install_utils],
           ["Install network utils", :install_network],
