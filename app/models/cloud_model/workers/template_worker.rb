@@ -62,7 +62,7 @@ module CloudModel
         # gettting the key does not work for now; apt debian-keyring debian-archive-keyring is to old on ubuntu 18.04
 
         @host.exec! "apt-get install debootstrap  -y", "Failed to install debootstrap"
-        @host.exec "debootstrap --arch #{@template.arch.shellescape} #{CloudModel.debian_short_name(os_version).shell_escape} #{build_path} http://ftp.de.debian.org/debian/"#, "Failed to debootstrap"
+        @host.exec "debootstrap --arch #{@template.arch.shellescape} #{CloudModel.debian_short_name(os_version).shellescape} #{build_path} http://ftp.de.debian.org/debian/"#, "Failed to debootstrap"
 
         # debootstrap --arch amd64 bookworm /cloud/build/host/test http://ftp.de.debian.org/debian/
 
