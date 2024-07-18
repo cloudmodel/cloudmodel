@@ -1,6 +1,6 @@
 module CloudModel
   def self.mongodb_version_path
-    ["3.2", "3.4", "3.6", "4.0", "4.2", "4.4", "5.0", "6.0"]
+    ["3.2", "3.4", "3.6", "4.0", "4.2", "4.4", "5.0", "6.0", "7.0", "8.0"]
   end
 
   class MongodbReplicationSet

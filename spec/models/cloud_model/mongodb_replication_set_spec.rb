@@ -9,7 +9,7 @@ describe CloudModel::MongodbReplicationSet do
 
   describe 'CloudModel.mongodb_version_path' do
     it 'should return known versions of mongodb' do
-      expect(CloudModel.mongodb_version_path).to eq ["3.2", "3.4", "3.6", "4.0", "4.2", "4.4", "5.0", "6.0"]
+      expect(CloudModel.mongodb_version_path).to eq ["3.2", "3.4", "3.6", "4.0", "4.2", "4.4", "5.0", "6.0", "7.0", "8.0"]
     end
   end
 
