@@ -1,0 +1,20 @@
+[Unit]
+Description=Ethernet Network Connectivity
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Config ethernet of host
+
+ExecStart=/bin/ip link set eth0 up
+ExecStart=/bin/ip addr add <%= guest.private_address %>/<%= host.private_network.subnet %> dev eth0
+ExecStart=/bin/ip route add default via <%= host.private_address %> dev eth0
+
+# Bring Network down
+
+ExecStop=/bin/ip addr flush dev eth0
+ExecStop=/bin/ip link set dev eth0 down
+
+[Install]
+WantedBy=network.target

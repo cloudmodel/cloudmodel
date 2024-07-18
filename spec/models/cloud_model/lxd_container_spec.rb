@@ -515,7 +515,7 @@ describe CloudModel::LxdContainer do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       guest.root_fs_size = 170 * 1024
 
-      expect(subject).to receive(:set_config).with('raw.lxc', "'lxc.mount.auto = cgroup'")
+      expect(subject).to receive(:set_config).with('raw.lxc', "lxc.mount.auto = cgroup\nlxc.apparmor.profile = unconfined")
       expect(guest).to receive(:configure_lxd_container).with(subject)
       expect(subject).to receive(:lxc).with("config device set some_guest-20200331133742 root size 174080")
       expect(subject).to receive(:lxc).with("network attach lxdbr0 some_guest-20200331133742 eth0")

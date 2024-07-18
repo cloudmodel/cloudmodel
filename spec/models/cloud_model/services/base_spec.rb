@@ -22,6 +22,7 @@ describe CloudModel::Services::Base do
         redis: CloudModel::Services::Redis,
         mariadb: CloudModel::Services::Mariadb,
         neo4j: CloudModel::Services::Neo4j,
+        forgejo: CloudModel::Services::Forgejo,
         fuseki: CloudModel::Services::Fuseki,
         jitsi: CloudModel::Services::Jitsi,
         solr: CloudModel::Services::Solr,
