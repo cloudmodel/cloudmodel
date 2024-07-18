@@ -143,9 +143,6 @@ de:
       cloud_model/web_location:
         one: Web Anwendungsverzeichnis
         other: Web Anwendungsverzeichnise
-      cloud_model/web_app:
-        one: Webanwendung
-        other: Webanwendungen
       cloud_model/web_apps/static_web_app:
         one: Statische Seiten
         other: Statische Seiten
@@ -351,7 +348,6 @@ de:
         state: Status
         monitoring_last_check_at: Zuletzt überwacht
       cloud_model/certificate:
-        name: Name
         name: Name
         ca: Zertifizierungsstelle
         key: Privater Schlüssel
@@ -586,8 +582,8 @@ de:
 
   issues:
     general:
-      no_check: '%{value} existiert nicht'
-      check_crashed: 'Absturz bei Prüfung - %{value}'
+      no_check: "%{value} existiert nicht"
+      check_crashed: "Absturz bei Prüfung - %{value}"
     sysinfo: &sysinfo_issues
       sys_info_available: Kann die Systeminformationen nicht zugreifen
       cpu_minute_usage: Prozessorauslastung in der letzten Minute von %{value}
