@@ -158,14 +158,21 @@ module CloudModel
       end
 
       def config_network
-        mkdir_p "#{guest.deploy_path}/etc/systemd/network"
-        render_to_remote "/cloud_model/support/etc/systemd/network/eth0.network", "#{guest.deploy_path}/etc/systemd/network/eth0.network", 0644, address: guest.private_address, subnet: host.private_network.subnet, gateway: host.private_address
+        if true
+          mkdir_p "#{guest.deploy_path}/etc/systemd/system"
+          render_to_remote "/cloud_model/guest/etc/systemd/system/network.service", "#{guest.deploy_path}/etc/systemd/system/network.service", guest: @guest, host: @host
+          chroot guest.deploy_path, "ln -sf /etc/systemd/system/network.service /etc/systemd/system/multi-user.target.wants/"
+          render_to_remote "/cloud_model/support/etc/systemd/resolved.conf", "#{guest.deploy_path}/etc/systemd/resolved.conf", host: @host
+        else
+          mkdir_p "#{guest.deploy_path}/etc/systemd/network"
+          render_to_remote "/cloud_model/support/etc/systemd/network/eth0.network", "#{guest.deploy_path}/etc/systemd/network/eth0.network", 0644, address: guest.private_address, subnet: host.private_network.subnet, gateway: host.private_address
 
-        chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.service /etc/systemd/system/dbus-org.freedesktop.network1.service"
-        chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.service /etc/systemd/system/multi-user.target.wants/systemd-networkd.service"
-        chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.socket /etc/systemd/system/sockets.target.wants/systemd-networkd.socket"
-        mkdir_p "#{guest.deploy_path}/etc/systemd/system/network-online.target.wants"
-        chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd-wait-online.service /etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service"
+          chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.service /etc/systemd/system/dbus-org.freedesktop.network1.service"
+          chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.service /etc/systemd/system/multi-user.target.wants/systemd-networkd.service"
+          chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd.socket /etc/systemd/system/sockets.target.wants/systemd-networkd.socket"
+          mkdir_p "#{guest.deploy_path}/etc/systemd/system/network-online.target.wants"
+          chroot guest.deploy_path, "ln -sf /lib/systemd/system/systemd-networkd-wait-online.service /etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service"
+        end
         # config mail out
         render_to_remote "/cloud_model/guest/etc/msmtprc", "#{guest.deploy_path}/etc/msmtprc", guest: guest
       end

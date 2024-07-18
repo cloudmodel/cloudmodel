@@ -254,7 +254,11 @@ module CloudModel
     end
 
     def config_from_guest
-      set_config 'raw.lxc', "'lxc.mount.auto = cgroup'"
+      raw_lxc_config = "lxc.mount.auto = cgroup"
+
+      raw_lxc_config += "\nlxc.apparmor.profile = unconfined"
+
+      set_config 'raw.lxc', raw_lxc_config
       guest.configure_lxd_container self
 
       lxc "config device set #{name} root size #{guest.root_fs_size}" # todo: fix disk quota
