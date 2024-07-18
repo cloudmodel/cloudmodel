@@ -138,9 +138,6 @@ en:
       cloud_model/web_location:
         one: Web Application Location
         other: Web Application Locations
-      cloud_model/web_app:
-        one: Web Application
-        other: Web Applications
       cloud_model/web_apps/static_web_app:
         one: Static Pages
         other: Static Pages
@@ -583,8 +580,8 @@ en:
 
   issues:
     general:
-      no_check: '%{value} does not exist'
-      check_crashed: 'Check crashed - %{value}'
+      no_check: "%{value} does not exist"
+      check_crashed: "Check crashed - %{value}"
     sysinfo: &sysinfo_issues
       sys_info_available: Unable to access system information
       cpu_minute_usage: CPU usage in the last minute of %{value}
