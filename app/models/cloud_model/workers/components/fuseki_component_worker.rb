@@ -7,6 +7,8 @@ module CloudModel
         def build build_path
           ftp_host = 'ftp-stud.hs-esslingen.de'
 
+          chroot! build_path, "apt-get install gnupg curl -y", "Failed to install key management"
+
           ftp = Net::FTP.new(ftp_host)
           ftp.login
           ftp.chdir('Mirrors/ftp.apache.org/dist/jena/binaries/')
@@ -15,7 +17,7 @@ module CloudModel
           fuseki_url = "ftp://#{ftp_host}#{ftp.pwd}/#{latest_fuseki}"
           ftp.close
 
-          chroot! build_path, "cd /opt && wget -q #{fuseki_url.shellescape} && tar xzf #{latest_fuseki.shellescape} && mv #{latest_fuseki.gsub(/.tar.gz$/, '').shellescape} fuseki && rm #{latest_fuseki.shellescape}", "Failed to download fuseki"
+          chroot! build_path, "cd /opt && curl -fsSLo #{latest_fuseki.shellescape} #{fuseki_url.shellescape} && tar xzf #{latest_fuseki.shellescape} && mv #{latest_fuseki.gsub(/.tar.gz$/, '').shellescape} fuseki && rm #{latest_fuseki.shellescape}", "Failed to download fuseki"
 
           # todo: render systemd unit
 

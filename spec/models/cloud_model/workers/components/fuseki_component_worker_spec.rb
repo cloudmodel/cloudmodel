@@ -30,7 +30,7 @@ describe CloudModel::Workers::Components::FusekiComponentWorker do
       expect(subject).to receive(:chroot!).with(
         '/tmp/build',
         'cd /opt && ' +
-        'wget -q ftp://ftp-stud.hs-esslingen.de/Mirrors/ftp.apache.org/dist/jena/binaries/apache-jena-fuseki-42.23.0.tar.gz && '+
+        'curl -fsSLo apache-jena-fuseki-42.23.0.tar.gz ftp://ftp-stud.hs-esslingen.de/Mirrors/ftp.apache.org/dist/jena/binaries/apache-jena-fuseki-42.23.0.tar.gz && '+
         'tar xzf apache-jena-fuseki-42.23.0.tar.gz && '+
         'mv apache-jena-fuseki-42.23.0 fuseki && '+
         'rm apache-jena-fuseki-42.23.0.tar.gz',
