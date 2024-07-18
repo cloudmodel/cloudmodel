@@ -17,7 +17,8 @@ module CloudModel
           else
             #packages << 'libcrypt1' # bcrypt @ Ubuntu 22.04, already seems to install automatically
           end
-          packages << 'nodejs npm' # JS interpreter
+          packages += %w(nodejs npm) # JS interpreter
+          packages += %w(libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libgbm1 libasound2 libpangocairo-1.0-0 libxss1 libgtk-3-0) # Required for chrome/pupeteer
           chroot! build_path, "apt-get install #{packages * ' '} -y", "Failed to install packages for deployment of rails app"
 
           # Install Yarn
