@@ -73,7 +73,7 @@ module CloudModel
         begin
           run_with_clean_env "Yarn install", [
             "cd #{@web_image.build_path.shellescape}",
-            "npm install -g yarn",
+            "npm install yarn",
             "yarn install --production --non-interactive --modules-folder #{@web_image.build_path.shellescape}/node_modules"
           ] * ' && '
         rescue CloudModel::ExecutionException => e
@@ -240,7 +240,7 @@ module CloudModel
       def run_step step, command
         Rails.logger.debug "### #{step}: #{command}"
         command = "PATH=/bin:#{ENV["PATH"].shellescape} #{command}"
-        puts command
+        #puts command
         c_out = `#{command}`
         unless $?.success?
           Rails.logger.error "Error running command:\n  #{command}\n  #{$?}\n#{c_out.lines.map{|l| "    #{l}"} * ""}\n#----"
