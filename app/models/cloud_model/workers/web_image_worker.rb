@@ -73,7 +73,7 @@ module CloudModel
         begin
           run_with_clean_env "Yarn install", [
             "cd #{@web_image.build_path.shellescape}",
-            "npm install yarn",
+            "npm install -g yarn",
             "yarn install --production --non-interactive --modules-folder #{@web_image.build_path.shellescape}/node_modules"
           ] * ' && '
         rescue CloudModel::ExecutionException => e
@@ -108,7 +108,7 @@ module CloudModel
           @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to package image.'
           return false
         end
-        FileUtils.mv "#{@web_image.build_path}-building.tar.bz2" "#{@web_image.build_path}.tar.bz2"
+        FileUtils.mv "#{@web_image.build_path}-building.tar.bz2", "#{@web_image.build_path}.tar.bz2"
 
         return true
       end
