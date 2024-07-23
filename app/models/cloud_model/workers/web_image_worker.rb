@@ -7,8 +7,9 @@ module CloudModel
       end
 
       def checkout_git
+        puts "git clone #{@web_image.git_server.shellescape}:#{@web_image.git_repo.shellescape} #{@web_image.build_path.shellescape}"
         unless File.directory?(@web_image.build_path)
-          unless system "mkdir -p #{@web_image.build_path.shellescape}"
+          unless FileUtils.mkdir_p @web_image.build_path
             raise "Could not make checkout directory '#{@web_image.build_path}'"
             return false
           end
@@ -16,9 +17,10 @@ module CloudModel
           begin
             run_with_clean_env "Cloning", "git clone #{@web_image.git_server.shellescape}:#{@web_image.git_repo.shellescape} #{@web_image.build_path.shellescape}"
           rescue Exception => e
+            puts e.trace
             CloudModel.log_exception e
             @web_image.update_attributes build_state: :failed, build_last_issue: "Unable to clone repository '#{@web_image.git_repo}'."
-            system "rm -rf #{@web_image.build_path.shellescape}"
+            FileUtils.rm_rf @web_image.build_path
             return false
           end
         end
@@ -60,22 +62,38 @@ module CloudModel
         rescue CloudModel::ExecutionException => e
           CloudModel.log_exception e
           @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to build image.'
-          system "rm -rf #{@web_image.build_gem_home.shellescape}"
+          FileUtils.rm_rf @web_image.build_gem_home
           return false
         end
 
         return true
       end
 
+      def yarn_install
+        begin
+          run_with_clean_env "Yarn install", [
+            "cd #{@web_image.build_path.shellescape}",
+            "npm install yarn",
+            "yarn install --production --non-interactive --modules-folder #{@web_image.build_path.shellescape}/node_modules"
+          ] * ' && '
+        rescue CloudModel::ExecutionException => e
+          CloudModel.log_exception e
+          @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to install yarn packages.'
+          FileUtils.rm_rf @web_image.build_gem_home
+          return false
+        end
+        return true
+      end
+
       def build_assets
         begin
-          system "rm -rf #{@web_image.build_path.shellescape}/public/assets"
+          FileUtils.rm_rf "#{@web_image.build_path}/public/assets"
 
           run_with_clean_env "Building Assets", "cd #{@web_image.build_path.shellescape} && #{CloudModel.config.bundle_command} exec rake RAILS_ENV=production RAILS_GROUPS=assets assets:precompile"
         rescue CloudModel::ExecutionException => e
           CloudModel.log_exception e
           @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to build assets.'
-          system "rm -rf #{@web_image.build_path}/public/assets"
+          FileUtils.rm_rf "#{@web_image.build_path}/public/assets"
           return false
         end
 
@@ -90,7 +108,7 @@ module CloudModel
           @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to package image.'
           return false
         end
-        system "mv #{@web_image.build_path.shellescape}-building.tar.bz2 #{@web_image.build_path.shellescape}.tar.bz2"
+        FileUtils.mv "#{@web_image.build_path}-building.tar.bz2" "#{@web_image.build_path}.tar.bz2"
 
         return true
       end
@@ -100,7 +118,7 @@ module CloudModel
         @web_image.update_attributes build_state: :running, build_last_issue: nil
 
         if options[:clean]
-          system "rm -rf #{@web_image.build_path.shellescape}"
+          FileUtils.rm_rf @web_image.build_path
         end
 
         begin
@@ -110,8 +128,16 @@ module CloudModel
           end
 
           @web_image.update_attributes build_state: :bundling
-          unless bundle_image
-            return false
+          if File.file? "#{@web_image.build_path.shellescape}/Gemfile"
+            unless bundle_image
+              return false
+            end
+          end
+
+          if File.file? "#{@web_image.build_path.shellescape}/package.json"
+            unless yarn_install
+              return false
+            end
           end
 
           if @web_image.has_assets
@@ -200,10 +226,12 @@ module CloudModel
             ENV["RUBYOPT"] = ENV["RUBYOPT"].sub("-rbundler/setup", "")
           end
 
-          #puts "----"
-          #puts command
-          #puts "----"
-          Rails.logger.debug ENV.to_json
+          # puts "----"
+          # pp ENV
+          # puts "----"
+          # puts command
+          # puts "----"
+          # Rails.logger.debug ENV.to_json
 
           run_step step, command
         end
@@ -211,7 +239,8 @@ module CloudModel
 
       def run_step step, command
         Rails.logger.debug "### #{step}: #{command}"
-        command = "PATH=/bin:#{ENV["PATH"]} #{command}"
+        command = "PATH=/bin:#{ENV["PATH"].shellescape} #{command}"
+        puts command
         c_out = `#{command}`
         unless $?.success?
           Rails.logger.error "Error running command:\n  #{command}\n  #{$?}\n#{c_out.lines.map{|l| "    #{l}"} * ""}\n#----"
