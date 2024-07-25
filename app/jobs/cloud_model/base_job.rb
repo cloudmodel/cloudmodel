@@ -8,5 +8,10 @@ module CloudModel
     # def provider_job
     #   Delayed::Job.find provider_job_id
     # end
+
+    def self.human_name
+      ns, subject, action = name.split('::')
+      "#{action.gsub(/Job$/, '')} #{subject.gsub(/Jobs$/, '')}"
+    end
   end
 end
