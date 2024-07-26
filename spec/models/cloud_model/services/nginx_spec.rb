@@ -69,7 +69,7 @@ describe CloudModel::Services::Nginx do
 
     it 'should require nginx and ruby if passenger supported' do
       subject.passenger_supported = true
-      expect(subject.components_needed).to eq [:'ruby@3.1', :nginx]
+      expect(subject.components_needed).to eq [:'ruby@3.2', :nginx]
     end
 
     it 'should require nginx, ruby, and additional components from deployed WebImage' do

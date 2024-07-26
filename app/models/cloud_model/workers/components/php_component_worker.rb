@@ -7,8 +7,10 @@ module CloudModel
         end
 
         def build build_path
-          chroot! build_path, "add-apt-repository ppa:ondrej/php -y", "Failed to add php ppa"
-          chroot! build_path, "apt-get update", "Failed to update apt"
+          if @template.os_version =~ /ubuntu-/
+            chroot! build_path, "add-apt-repository ppa:ondrej/php -y", "Failed to add php ppa"
+            chroot! build_path, "apt-get update", "Failed to update apt"
+          end
 
           packages = %w(php-fpm)
           packages += %w(php-curl php-mbstring php-zip php-gd php-dom)

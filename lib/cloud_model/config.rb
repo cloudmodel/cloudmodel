@@ -8,7 +8,7 @@ module CloudModel
     attr_writer :use_external_ip
     attr_writer :dns_servers, :job_queue
 
-    attr_writer :ubuntu_mirror, :ubuntu_deb_src, :ubuntu_version, :ubuntu_name, :ubuntu_kernel_flavour
+    attr_writer :ubuntu_mirror, :ubuntu_deb_src, :ubuntu_version, :ubuntu_name
     attr_writer :debian_version
     attr_writer :php_version, :ruby_version
 
@@ -77,7 +77,7 @@ module CloudModel
     end
 
     def ubuntu_version
-      @ubuntu_version || "18.04.5"
+      @ubuntu_version || "22.04.4"
     end
 
     def debian_version
@@ -97,15 +97,11 @@ module CloudModel
     end
 
     def php_version
-      @php_version || "8.2"
+      @php_version || "8.3"
     end
 
     def ruby_version
-      @ruby_version || "3.1"
-    end
-
-    def ubuntu_kernel_flavour
-      @ubuntu_kernel_flavour || "generic-hwe-18.04"
+      @ruby_version || "3.2"
     end
 
     def dns_domains

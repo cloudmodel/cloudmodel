@@ -74,7 +74,7 @@ module CloudModel
           run_with_clean_env "Yarn install", [
             "cd #{@web_image.build_path.shellescape}",
             "npm install yarn",
-            "yarn install --production --non-interactive --modules-folder #{@web_image.build_path.shellescape}/node_modules"
+            "yarn install --production --non-interactive --no-bin-links --modules-folder #{@web_image.build_path.shellescape}/node_modules"
           ] * ' && '
         rescue CloudModel::ExecutionException => e
           CloudModel.log_exception e
