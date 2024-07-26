@@ -38,17 +38,6 @@ describe CloudModel::Workers::TemplateWorker do
     end
   end
 
-  context '#ubuntu_kernel_flavour' do
-    it 'should be generic-hwe-18.04 by default' do
-      expect(subject.ubuntu_kernel_flavour).to eq 'generic-hwe-18.04'
-    end
-
-    it 'should be configured kernel flavour' do
-      CloudModel.config.ubuntu_kernel_flavour = 'generic-hwe-42.04'
-      expect(subject.ubuntu_kernel_flavour).to eq 'generic-hwe-42.04'
-    end
-  end
-
   context '#ubuntu_arch' do
     it 'should return arch of template' do
       template = double 'Template', arch: 'amd64'

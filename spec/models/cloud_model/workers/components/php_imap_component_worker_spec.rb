@@ -15,7 +15,7 @@ describe CloudModel::Workers::Components::PhpImapComponentWorker do
     end
 
     it 'should apt-get mariadb php module' do
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install php8.2-imap -y', 'Failed to install php imap module')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install php8.3-imap -y', 'Failed to install php imap module')
 
       subject.build '/tmp/build'
     end

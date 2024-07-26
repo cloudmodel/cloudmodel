@@ -135,8 +135,8 @@ describe CloudModel::Config do
       expect(subject.ubuntu_version).to eq '18.10'
     end
 
-    it 'should default to 18.04.5' do
-      expect(subject.ubuntu_version).to eq '18.04.5'
+    it 'should default to 22.04.4' do
+      expect(subject.ubuntu_version).to eq '22.04.4'
     end
   end
 
@@ -151,8 +151,8 @@ describe CloudModel::Config do
       expect(subject.ubuntu_major_version).to eq '19.10'
     end
 
-    it 'should default to 18.04' do
-      expect(subject.ubuntu_major_version).to eq '18.04'
+    it 'should default to 22.04' do
+      expect(subject.ubuntu_major_version).to eq '22.04'
     end
   end
 
@@ -164,17 +164,6 @@ describe CloudModel::Config do
 
     it 'should default to Bionic Beaver' do
       expect(subject.ubuntu_name).to eq 'Bionic Beaver'
-    end
-  end
-
-  describe 'ubuntu_kernel_flavour' do
-    it 'should allow to set Ubuntu version' do
-      subject.ubuntu_kernel_flavour = 'generic'
-      expect(subject.ubuntu_kernel_flavour).to eq 'generic'
-    end
-
-    it 'should default to 18.04' do
-      expect(subject.ubuntu_kernel_flavour).to eq 'generic-hwe-18.04'
     end
   end
 

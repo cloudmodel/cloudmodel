@@ -99,7 +99,6 @@ module CloudModel
       end
 
       def install_kernel
-        #chroot! build_path, "apt-get install --install-recommends linux-image-#{ubuntu_kernel_flavour} -y", "Failed to install linux kernel"
         chroot! build_path, "apt-get install --install-recommends linux-image-#{ubuntu_arch} -y", "Failed to install linux kernel"
       end
 
