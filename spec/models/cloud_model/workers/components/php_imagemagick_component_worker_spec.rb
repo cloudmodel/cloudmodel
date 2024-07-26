@@ -15,7 +15,7 @@ describe CloudModel::Workers::Components::PhpImagemagickComponentWorker do
     end
 
     it 'should apt-get imagemagick php module' do
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install php8.3-imagick -y', 'Failed to install php imagemagick module')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install php8.2-imagick -y', 'Failed to install php imagemagick module')
 
       subject.build '/tmp/build'
     end

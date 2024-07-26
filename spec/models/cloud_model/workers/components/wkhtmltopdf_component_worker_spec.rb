@@ -15,7 +15,6 @@ describe CloudModel::Workers::Components::WkhtmltopdfComponentWorker do
     before do
       allow(subject).to receive :chroot!
       allow(URI).to receive(:parse).and_return uri
-      allow(CloudModel.config).to receive(:ubuntu_short_name).and_return 'quick'
     end
 
     it 'should apt-get wkhtmltopdf dependencies' do
