@@ -4,7 +4,7 @@
     "properties": {
         "architecture": "<%= template.lxd_arch %>",
         "description": "<%= template.name %>",
-        "name": "<%= cloudmodel-<%= template.id %>-<%= template.os_version %>-<%= CloudModel.debian_name(template.os_version).gsub(" ", "").underscore %>-<%= template.arch %>",
+        "name": "cloudmodel-<%= template.id %>-<%= template.os_version %>-<%= CloudModel.debian_name(template.os_version).gsub(" ", "").underscore %>-<%= template.arch %>",
         "os": "<%= template.os_version.split('-').first %>",
         "release": "<%= CloudModel.debian_name template.os_version %>",
         "variant": "<%= template.os_version.split('-').last %>"
