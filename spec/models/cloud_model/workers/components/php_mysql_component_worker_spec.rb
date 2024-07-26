@@ -15,7 +15,7 @@ describe CloudModel::Workers::Components::PhpMysqlComponentWorker do
     end
 
     it 'should apt-get mariadb php module' do
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install php8.3-mysql -y', 'Failed to install php mysql module')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install php8.2-mysql -y', 'Failed to install php mysql module')
 
       subject.build '/tmp/build'
     end

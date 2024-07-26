@@ -156,17 +156,6 @@ describe CloudModel::Config do
     end
   end
 
-  describe 'ubuntu_name' do
-    it 'should allow to set Ubuntu version nickname' do
-      subject.ubuntu_name = 'Cosmic Cuttlefish'
-      expect(subject.ubuntu_name).to eq 'Cosmic Cuttlefish'
-    end
-
-    it 'should default to Bionic Beaver' do
-      expect(subject.ubuntu_name).to eq 'Bionic Beaver'
-    end
-  end
-
   describe 'debian_version' do
     it 'should allow to set Debian version' do
       subject.debian_version = '18'

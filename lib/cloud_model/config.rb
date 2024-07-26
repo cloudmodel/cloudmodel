@@ -8,7 +8,7 @@ module CloudModel
     attr_writer :use_external_ip
     attr_writer :dns_servers, :job_queue
 
-    attr_writer :ubuntu_mirror, :ubuntu_deb_src, :ubuntu_version, :ubuntu_name
+    attr_writer :ubuntu_mirror, :ubuntu_deb_src, :ubuntu_version
     attr_writer :debian_version
     attr_writer :php_version, :ruby_version
 
@@ -88,16 +88,8 @@ module CloudModel
       ubuntu_version.split('.')[0..1] * '.'
     end
 
-    def ubuntu_name
-      @ubuntu_name || "Bionic Beaver"
-    end
-
-    def ubuntu_short_name
-      ubuntu_name.split.first.downcase
-    end
-
     def php_version
-      @php_version || "8.3"
+      @php_version || "8.2"
     end
 
     def ruby_version
