@@ -426,6 +426,7 @@ en:
         git_repo: GIT Repository
         git_branch: GIT Branch
         git_commit: GIT Commit
+        master_key: Rails Master Key
         additional_components: Add Components
         updated_at: Last Updated
         has_assets: Compile Assets?
