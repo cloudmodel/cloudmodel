@@ -15,6 +15,8 @@ module CloudModel
     field :has_assets, type: Mongoid::Boolean, default: false
     field :has_mongodb, type: Mongoid::Boolean, default: false
     field :has_redis, type: Mongoid::Boolean, default: false
+    field :master_key, type: String, default: nil
+
 
     field :additional_components, type: Array, default: []
 
@@ -49,6 +51,7 @@ module CloudModel
     validates :git_server, presence: true
     validates :git_repo, presence: true
     validates :git_branch, presence: true
+    validates :master_key, length: {is: 32}, allow_blank: true
 
     used_in_guests_as 'services.deploy_web_image_id'
 

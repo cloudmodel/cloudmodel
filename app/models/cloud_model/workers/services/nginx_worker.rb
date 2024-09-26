@@ -32,6 +32,11 @@ module CloudModel
             end
           end
 
+          if @model.deploy_web_image.master_key
+            @host.exec! "echo -n '#{@model.deploy_web_image.master_key}' >#{deploy_path}/config/master.key", "Failed to set master key"
+          end
+
+
           mkdir_p "#{deploy_path}/tmp"
           @host.exec "touch #{deploy_path}/tmp/restart.txt"
         end

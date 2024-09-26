@@ -428,6 +428,7 @@ de:
         git_repo: GIT Repository
         git_branch: GIT Branch
         git_commit: GIT Commit
+        master_key: Rails Hauptschlüssel
         additional_components: Zusätzliche Komponenten
         updated_at: Letztes Update
         has_assets: Assets erzeugen?
