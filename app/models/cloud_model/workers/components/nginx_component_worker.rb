@@ -30,7 +30,7 @@ module CloudModel
             chroot! build_path, "apt-get install nginx-extras libnginx-mod-http-passenger certbot python-certbot-nginx -y", "Failed to install nginx+passenger+certbot"
           else
             chroot! build_path, "apt-get update", "Failed to update packages"
-            chroot! build_path, "apt-get install nginx-extras libnginx-mod-http-passenger certbot python3-certbot-nginx -y", "Failed to install nginx+passenger+certbot"
+            chroot! build_path, "apt-get install nginx-extras libnginx-mod-http-passenger certbot python3-certbot-nginx python3-venv python3-pip -y", "Failed to install nginx+passenger+certbot+python3"
           end
           log_dir_path = "/var/log/nginx"
           @host.exec! "rm -rf #{build_path}#{log_dir_path}", "Failed to clear log dir"
