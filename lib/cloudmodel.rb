@@ -1,6 +1,7 @@
 require 'mongoid-grid_fs'
 require "cloud_model/config"
 require "cloud_model/engine"
+require "cloud_model/monitoring"
 #require "cloud_model/call_rake"
 require "cloud_model/execution_exception"
 
