@@ -1,3 +1,6 @@
+require_relative "services/base_checks"
+Dir[File.expand_path("../services/*", __FILE__)].each { |f| require f }
+
 module CloudModel
   module Monitoring
     class ServiceChecks < CloudModel::Monitoring::BaseChecks
