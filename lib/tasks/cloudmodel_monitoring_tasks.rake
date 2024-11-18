@@ -1,4 +1,4 @@
-require_relative "../../app/models/cloud_model/monitoring"
+#require_relative "../../app/models/cloud_model/monitoring"
 
 namespace :cloudmodel do
   namespace :monitoring do

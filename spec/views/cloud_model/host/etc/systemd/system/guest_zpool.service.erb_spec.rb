@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe "cloud_model/host/etc/systemd/system/guest_zpool.service", type: :view do
+describe "cloud_model/host/etc/systemd/system/guest_zpool_service", type: :view do
   it 'should init guests ZFS pool' do
     host = Factory.build :host, private_network_attributes: {ip: '10.42.23.1', subnet: 25}
 

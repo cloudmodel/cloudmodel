@@ -23,7 +23,7 @@ Gem::Specification.new do |spec|
 
   spec.files = Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
 
-  spec.add_dependency 'rails', '>= 6.0.3'
+  spec.add_dependency 'rails', '~>7.2'#'>= 6.0.3'
   spec.add_dependency 'mongoid',  '>= 7.1.2'
   spec.add_dependency 'mongoid-grid_fs', '~> 2.3'
 

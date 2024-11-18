@@ -96,7 +96,7 @@ describe CloudModel::AddressResolution do
       CloudModel::AddressResolution.create! ip: '10.42.23.13', name: 'test.example.com'
       subject.ip = '10.42.23.13'
       expect(subject).not_to be_valid
-      expect(subject.errors[:ip]).to eq ["is already taken"]
+      expect(subject.errors[:ip]).to eq ["has already been taken"]
     end
   end
 
