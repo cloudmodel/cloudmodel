@@ -20,8 +20,15 @@ describe CloudModel::Workers::BaseWorker do
     it 'should call render_to_string on a new instance of ActionController::Base and pass return value' do
       action_controller = double(ActionController::Base)
       allow(ActionController::Base).to receive(:new).and_return action_controller
-      expect(action_controller).to receive(:render_to_string).with(template: 'my_template', locals: {a:1, b:2}).and_return 'rendered template'
+      expect(action_controller).to receive(:render_to_string).with(template: 'my_template', locals: {a:1, b:2}, layout: false).and_return 'rendered template'
       expect(subject.render 'my_template', a: 1, b: 2).to eq 'rendered template'
+    end
+
+    it 'should translate dots to underscores' do
+      action_controller = double(ActionController::Base)
+      allow(ActionController::Base).to receive(:new).and_return action_controller
+      expect(action_controller).to receive(:render_to_string).with(template: 'system_d/my_template_conf', locals: {a:1, b:2}, layout: false).and_return 'rendered template'
+      expect(subject.render 'system.d/my_template.conf', a: 1, b: 2).to eq 'rendered template'
     end
   end
 

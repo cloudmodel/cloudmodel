@@ -23,12 +23,17 @@ module CloudModel
         host
       end
 
+      def translate_template_name template
+        # Needed for Rails 7+
+        template.gsub('.', '_')
+      end
+
       def render template, locals={}
-        ActionController::Base.new.render_to_string(template: template, locals: locals)
+        ActionController::Base.new.render_to_string(template: "#{translate_template_name template}", locals: locals, layout: false)
       end
 
       def template_exists? template
-        not ActionController::Base.new.lookup_context.find_all(template).blank?
+        not ActionController::Base.new.lookup_context.find_all(translate_template_name template).blank?
       end
 
       # render_to_remote template, remote_file, [[perms], locals]
