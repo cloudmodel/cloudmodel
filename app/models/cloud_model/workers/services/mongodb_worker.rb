@@ -11,7 +11,7 @@ module CloudModel
 
           comment_sub_step "Write mongodb config"
           @host.sftp.file.open("#{@guest.deploy_path.shellescape}/etc/mongod.conf", 'w') do |f|
-            f.write render("/cloud_model/guest/etc/mongodb.conf", guest: @guest, model: @model)
+            f.write render("/cloud_model/guest/etc/mongodb_conf", guest: @guest, model: @model)
           end
         end
 
@@ -21,7 +21,7 @@ module CloudModel
 
         def auto_start
           mkdir_p overlay_path
-          render_to_remote "/cloud_model/guest/etc/systemd/system/mongodb.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"
+          render_to_remote "/cloud_model/guest/etc/systemd/system/mongodb_service_d/fix_perms_conf", "#{overlay_path}/fix_perms.conf"
           super
         end
       end
