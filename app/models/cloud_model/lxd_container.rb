@@ -202,7 +202,7 @@ module CloudModel
     end
 
     def lxc_info
-      if container_info = host.monitoring_last_check_result['system']['lxd']
+      if host.monitoring_last_check_result and host.monitoring_last_check_result['system'] and container_info = host.monitoring_last_check_result['system']['lxd']
         container_info.find{|c| c['name'] == name} || {'name' => name, 'status' => 'Unknown'}
       else
         {'name' => name, 'status' => 'Unknown'}
