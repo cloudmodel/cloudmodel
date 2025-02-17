@@ -6,6 +6,7 @@ describe CloudModel::MongodbReplicationSet do
   it { expect(subject).to have_timestamps }
 
   it { expect(subject).to have_field(:name).of_type(String) }
+  it { expect(subject).to have_field(:active).of_type(Mongoid::Boolean) }
 
   describe 'CloudModel.mongodb_version_path' do
     it 'should return known versions of mongodb' do

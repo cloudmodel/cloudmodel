@@ -11,6 +11,7 @@ module CloudModel
 
     field :name, type: String # Name of the replication set
     field :initiated, type: Boolean, default: false
+    field :active, type: Boolean
 
     def guests
       CloudModel::Guest.where("services.mongodb_replication_set_id" => id)

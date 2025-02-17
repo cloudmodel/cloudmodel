@@ -7,6 +7,7 @@ describe CloudModel::RedisSentinelSet do
   it { expect(subject).to belong_to(:master_service).of_type(CloudModel::Services::Redis).with_optional }
 
   it { expect(subject).to have_field(:name).of_type(String) }
+  it { expect(subject).to have_field(:active).of_type(Mongoid::Boolean) }
 
   describe 'services' do
     it 'should get array with all services using set' do

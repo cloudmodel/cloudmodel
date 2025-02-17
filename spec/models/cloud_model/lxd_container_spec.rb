@@ -380,7 +380,7 @@ describe CloudModel::LxdContainer do
     it 'should get lxc info from host´s monitoring_last_check_result' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
 
-      expect(host).to receive(:monitoring_last_check_result).and_return(
+      allow(host).to receive(:monitoring_last_check_result).and_return(
         'system' => {
           'lxd' => [
             {'name' => 'some_guest-20191224234217', 'status' => 'Stopped'},

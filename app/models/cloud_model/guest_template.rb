@@ -8,8 +8,8 @@ module CloudModel
     field :os_version, type: String, default: "ubuntu-#{CloudModel.config.ubuntu_version}"
     field :arch, type: String
 
-    belongs_to :template_type, class_name: "CloudModel::GuestTemplateType"
-    belongs_to :core_template, class_name: "CloudModel::GuestCoreTemplate"
+    belongs_to :template_type, class_name: "CloudModel::GuestTemplateType", optional: true
+    belongs_to :core_template, class_name: "CloudModel::GuestCoreTemplate", optional: true
 
     enum_field :build_state, {
       0x00 => :pending,
