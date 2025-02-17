@@ -29,13 +29,13 @@ module CloudModel
         if @subject.update_attributes attrs
           true
         else
-          #pp data
-          #pp @subject.errors.as_json
-          pp data[:system].keys
+          #pp attrs
+          pp @subject.errors.as_json
+          #pp data[:system].keys
           #pp data[:system]["labels:sep(0)"]
-          data[:system].each do |k,v|
-            puts "#{k}: #{v.to_json.size}"
-          end
+          # data[:system].each do |k,v|
+          #   puts "#{k}: #{v.to_json.size}"
+          # end
           raise "Failed to store monitoring data"#, "Data:\n #{data}"
         end
         #@subject.update_attributes attrs
@@ -171,6 +171,9 @@ module CloudModel
             end
           end
           puts "#{prefix}#{(' ' * indent)}\e[33m! Check for #{subject} crashed\e[39m"
+          puts e.message
+          puts "=" * e.message.length
+          puts e.backtrace
           issue.severity = :warning
           issue.message = "#{e.message}\n\n#{e.backtrace * "\n"}"
           issue.value = e.message

@@ -21,8 +21,8 @@ module CloudModel
         comment_sub_step 'Install ppa support'
         chroot! build_path, "apt-get install apt-transport-https ca-certificates software-properties-common -y", "Failed to install ppa support"
 
-        comment_sub_step 'Install rsync and curl'
-        chroot! build_path, "apt-get install sudo rsync curl -y", "Failed to install rsync and curl"
+        comment_sub_step 'Install rsync, wget, and curl'
+        chroot! build_path, "apt-get install sudo rsync wget curl -y", "Failed to install rsync, wget, and curl"
 
         comment_sub_step 'Install nano editor'
         chroot! build_path, "apt-get install sudo nano -y", "Failed to install nano"

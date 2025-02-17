@@ -8,6 +8,8 @@ module CloudModel
     prepend CloudModel::Mixins::SmartToString
 
     field :name, type: String
+    field :active, type: Boolean
+
     belongs_to :master_service, class_name: "CloudModel::Services::Redis", optional: true
 
     def services
