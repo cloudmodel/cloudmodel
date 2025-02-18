@@ -53,6 +53,8 @@ module CloudModel
       field :deploy_mongodb_host, type: String
       field :deploy_mongodb_port, type: Integer, default: 27017
       field :deploy_mongodb_database, type: String
+      field :deploy_mongodb_write_concern, type: String, default: 'majority'
+      field :deploy_mongodb_read_preference, type: String, default: 'primary'
 
       belongs_to :deploy_mongodb_replication_set, class_name: 'CloudModel::MongodbReplicationSet', optional: true
 
@@ -60,6 +62,8 @@ module CloudModel
       field :deploy_redis_port, type: Integer, default: 6379
 
       belongs_to :deploy_redis_sentinel_set, class_name: 'CloudModel::RedisSentinelSet', optional: true
+
+      validates :deploy_mongodb_read_preference, inclusion: {in: :allowed_deploy_mongodb_read_preferences}
 
       def kind
         :http
@@ -201,6 +205,10 @@ module CloudModel
         end
 
         data
+      end
+
+      def allowed_deploy_mongodb_read_preferences
+        ['nearest', 'primary', 'primary_preferred', 'secondary', 'secondary_preferred']
       end
 
       def www_home

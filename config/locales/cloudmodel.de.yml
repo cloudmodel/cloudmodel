@@ -67,6 +67,16 @@ de:
   cloud_model/services/nginx:
     deploy_mongodb_replication_set_manual: Eigene MongoDB Konfiguration
     deploy_redis_sentinel_set_manual: Eigene Redis Konfiguration
+    deploy_mongodb_read_preferences:
+      nearest: Nächster Knoten
+      primary: Primärer Knoten
+      primary_preferred: Primären Knoten bevorzugen
+      secondary: Sekundärer Knoten
+      secondary_preferred: Sekundären Knoten bevorzugen
+    deploy_mongodb_write_concerns:
+      majority: Mehrheit der Knoten
+      1: 1 Knoten
+      2: 2 Knoten
 
   mongoid:
     errors:
@@ -560,6 +570,8 @@ de:
         deploy_mongodb_host: MongoDB Host
         deploy_mongodb_port: MongoDB Port
         deploy_mongodb_database: MongoDB Datenbank
+        deploy_mongodb_write_concern: MongoDB Schreibpräferenz
+        deploy_mongodb_read_preference: MongoDB Lesepräferenz
 
         deploy_redis_sentinel_set_id: Redis Sentinel Set
         deploy_redis_host: Redis Host
