@@ -7,9 +7,9 @@
         - <%= service.private_address %>:<%= service.port %>
         <% end -%>
       options:
-        read: :primary
+        read: :<%= model.deploy_mongodb_read_preference %>
         write:
-          w: majority
+          w: <%= model.deploy_mongodb_write_concern %>
       <% else -%>
         - <%= model.deploy_mongodb_host %>:<%= model.deploy_mongodb_port %>
       <% end -%>
@@ -23,9 +23,9 @@
         <% end -%>
       options:
         read:
-          mode: :primary
+          mode: :<%= model.deploy_mongodb_read_preference %>
         write:
-          w: majority
+          w: <%= model.deploy_mongodb_write_concern %>
       <% else -%>
         - <%= model.deploy_mongodb_host %>:<%= model.deploy_mongodb_port %>
       <% end -%>

@@ -51,6 +51,9 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:deploy_mongodb_port).of_type(Integer).with_default_value_of(27017) }
   it { expect(subject).to have_field(:deploy_mongodb_database).of_type(String) }
   it { expect(subject).to belong_to(:deploy_mongodb_replication_set).with_optional.of_type(CloudModel::MongodbReplicationSet) }
+  it { expect(subject).to have_field(:deploy_mongodb_write_concern).of_type(String).with_default_value_of 'majority' }
+  it { expect(subject).to have_field(:deploy_mongodb_read_preference).of_type(String).with_default_value_of 'primary' }
+
 
   it { expect(subject).to have_field(:deploy_redis_host).of_type(String) }
   it { expect(subject).to have_field(:deploy_redis_port).of_type(Integer).with_default_value_of(6379) }
@@ -121,6 +124,18 @@ describe CloudModel::Services::Nginx do
 
   describe 'service_status' do
     pending
+  end
+
+  describe 'allowed_deploy_mongodb_read_preferences' do
+    it 'should return allowed read prefernce values' do
+      expect(subject.allowed_deploy_mongodb_read_preferences).to eq [
+        'nearest',
+        'primary',
+        'primary_preferred',
+        'secondary',
+        'secondary_preferred'
+      ]
+    end
   end
 
   describe 'www_home' do
