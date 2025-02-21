@@ -204,31 +204,61 @@ describe CloudModel::Guest do
       resolution = double
       subject.external_address = '198.51.100.42'
       subject.external_hostname = 'test42.example.com'
+
       expect(subject).to receive(:external_address_resolution).and_return resolution
-      expect(resolution).to receive(:update_attribute).with(:name, 'test42.example.com')
+      expect(resolution).to receive(:update_attributes).with(name: 'test42.example.com', alt_names: [])
+      subject.apply_address_resolution{true}
+    end
+
+    it 'should set AddressResolution if yield was successful, guest has external address and external hostname and alt_names changed' do
+      resolution = double
+      subject.external_address = '198.51.100.42'
+      subject.external_hostname = 'test42.example.com'
+      subject.external_alt_names = ['test23.example.com', 'production.example.com']
+
+      expect(subject).to receive(:external_address_resolution).and_return resolution
+      expect(resolution).to receive(:update_attributes).with(name: 'test42.example.com', alt_names: ['test23.example.com', 'production.example.com'])
       subject.apply_address_resolution{true}
     end
 
     it 'should set external hostname changed to false' do
       subject.external_address = '198.51.100.42'
-      allow(subject).to receive(:external_address_resolution).and_return double update_attribute: true
+      allow(subject).to receive(:external_address_resolution).and_return double update_attributes: true
       subject.instance_variable_set :@external_hostname_changed, true
+
       subject.apply_address_resolution{true}
       expect(subject.instance_variable_get :@external_hostname_changed).to eq false
     end
 
     it 'should do nothing if yield failed' do
       subject.external_address = '198.51.100.42'
+      subject.external_hostname = 'test42.example.com'
+      subject.external_alt_names = ['test23.example.com', 'production.example.com']
+
       expect(subject).not_to receive(:external_address_resolution)
       subject.instance_variable_set :@external_hostname_changed, true
       subject.apply_address_resolution{false}
       expect(subject.instance_variable_get :@external_hostname_changed).to eq true
     end
 
-    it 'should do nothing if external hostname did not change failed' do
+    it 'should do nothing if external hostname did not change' do
       subject.external_address = '198.51.100.42'
+      subject.external_hostname = 'test42.example.com'
+      subject.external_alt_names = []
+
       expect(subject).not_to receive(:external_address_resolution)
       subject.instance_variable_set :@external_hostname_changed, false
+      subject.apply_address_resolution{true}
+    end
+
+    it 'should set AddressResolution if external hostname did not change, but external alt names' do
+      resolution = double
+      subject.external_address = '198.51.100.42'
+      subject.external_hostname = 'test42.example.com'
+      subject.external_alt_names = ['test23.example.com', 'production.example.com']
+
+      expect(subject).to receive(:external_address_resolution).and_return resolution
+      expect(resolution).to receive(:update_attributes).with(name: 'test42.example.com', alt_names: ["test23.example.com", "production.example.com"])
       subject.apply_address_resolution{true}
     end
 

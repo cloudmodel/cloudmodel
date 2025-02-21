@@ -27,8 +27,8 @@ module CloudModel
 
     field :private_address, type: String
     field :external_address, type: String
-    field :mac_address, type: String
     field :external_alt_names, type: Array, default: []
+    field :mac_address, type: String
 
     field :lxd_autostart_priority, type: Integer, default: 50
     field :lxd_autostart_delay, type: Integer, default: 0
@@ -106,8 +106,8 @@ module CloudModel
     end
 
     def apply_address_resolution
-      if result = yield and @external_hostname_changed and resolution = external_address_resolution
-        resolution.update_attribute :name, @external_hostname
+      if result = yield and (@external_hostname_changed or (not external_alt_names.blank? and external_alt_names_changed?)) and resolution = external_address_resolution
+        resolution.update_attributes name: @external_hostname, alt_names: external_alt_names
         @external_hostname_changed = false
       end
       result
