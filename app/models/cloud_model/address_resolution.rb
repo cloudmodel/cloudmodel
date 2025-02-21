@@ -9,7 +9,7 @@ module CloudModel
 
     field :ip, type: String
     field :name, type: String
-    field :alt_name, type: Array
+    field :alt_names, type: Array
     field :active, type: Boolean, default: false
     field :ptr_active, type: Boolean, default: true
 

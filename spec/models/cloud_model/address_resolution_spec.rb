@@ -7,6 +7,7 @@ describe CloudModel::AddressResolution do
 
   it { expect(subject).to have_field(:ip).of_type String }
   it { expect(subject).to have_field(:name).of_type String }
+  it { expect(subject).to have_field(:alt_names).of_type Array }
   it { expect(subject).to have_field(:active).of_type(Mongoid::Boolean).with_default_value_of false }
   it { expect(subject).to have_field(:ptr_active).of_type(Mongoid::Boolean).with_default_value_of true }
 
