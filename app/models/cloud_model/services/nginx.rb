@@ -4,41 +4,45 @@ module CloudModel
       include CloudModel::Mixins::ENumFields
 
       field :port, type: Integer, default: 80
+
+      embeds_many :location_overwrites, class_name: '::CloudModel::Services::Nginx::LocationOverwrite', inverse_of: :service
+
+      # SSL/TLS settings
       field :ssl_supported, type: Mongoid::Boolean#, default: false
       field :ssl_only, type: Mongoid::Boolean, default: false
       field :ssl_enforce, type: Mongoid::Boolean, default: false
       field :ssl_port, type: Integer, default: 443
       field :ssl_certbot, type: Mongoid::Boolean, default: false
-      belongs_to :ssl_cert, class_name: 'CloudModel::Certificate', inverse_of: :services, optional: true
+      belongs_to :ssl_cert, class_name: '::CloudModel::Certificate', inverse_of: :services, optional: true
 
-      field :passenger_supported, type: Mongoid::Boolean, default: false
-      field :passenger_env, type: String, default: 'production'
-      field :passenger_ruby_version, type: String, default: CloudModel.config.ruby_version
-      field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
-      field :delayed_jobs_queues, type: Array, default: ['default']
-
-      field :reverse_proxy_supported, type: Mongoid::Boolean, default: false
-      field :reverse_proxy_for, type: String, default: nil
-
-      # field :fastcgi_supported, type: Mongoid::Boolean, default: false
-      # field :fastcgi_location, type: String, default: ".php$"
-      # field :fastcgi_pass, type: String, default: "127.0.0.1:9000"
-      # field :fastcgi_index, type: String, default: "index.php"
-
-      field :capistrano_supported, type: Mongoid::Boolean, default: false
-      has_and_belongs_to_many :capistrano_ssh_groups, class_name: CloudModel::SshGroup, inverse_of: :services
-
+      # Content Security Policies
       field :unsafe_inline_script_allowed, type: Mongoid::Boolean, default: false
       field :unsafe_eval_script_allowed, type: Mongoid::Boolean, default: false
       field :google_analytics_supported, type: Mongoid::Boolean, default: false
       field :hubspot_forms_supported, type: Mongoid::Boolean, default: false
       field :pingdom_supported, type: Mongoid::Boolean, default: false
 
-      embeds_many :web_locations, class_name: 'CloudModel::WebLocation', inverse_of: :service
+      # Support reverse proxy
+      field :reverse_proxy_supported, type: Mongoid::Boolean, default: false
+      field :reverse_proxy_for, type: String, default: nil
+
+      # Passenger support
+      field :passenger_supported, type: Mongoid::Boolean, default: false
+      field :passenger_env, type: String, default: 'production'
+      field :passenger_ruby_version, type: String, default: CloudModel.config.ruby_version
+      field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
+      field :delayed_jobs_queues, type: Array, default: ['default']
+
+      # Deploy via capistrano
+      field :capistrano_supported, type: Mongoid::Boolean, default: false
+      has_and_belongs_to_many :capistrano_ssh_groups, class_name: CloudModel::SshGroup, inverse_of: :services
+
+      # WebLocation support
+      embeds_many :web_locations, class_name: '::CloudModel::WebLocation', inverse_of: :service
       accepts_nested_attributes_for :web_locations
 
-      belongs_to :deploy_web_image, class_name: 'CloudModel::WebImage', inverse_of: :services, optional: true
-
+      # WebImage support
+      belongs_to :deploy_web_image, class_name: '::CloudModel::WebImage', inverse_of: :services, optional: true
       enum_field :redeploy_web_image_state, {
         0x00 => :pending,
         0x01 => :running,
@@ -46,24 +50,22 @@ module CloudModel
         0xf1 => :failed,
         0xff => :not_started
       }, default: :not_started
-
       field :redeploy_web_image_last_issue, type: String
 
-
+      # MongoDB config for web image
       field :deploy_mongodb_host, type: String
       field :deploy_mongodb_port, type: Integer, default: 27017
       field :deploy_mongodb_database, type: String
       field :deploy_mongodb_write_concern, type: String, default: 'majority'
       field :deploy_mongodb_read_preference, type: String, default: 'primary'
+      validates :deploy_mongodb_read_preference, inclusion: {in: :allowed_deploy_mongodb_read_preferences}
+      belongs_to :deploy_mongodb_replication_set, class_name: '::CloudModel::MongodbReplicationSet', optional: true
 
-      belongs_to :deploy_mongodb_replication_set, class_name: 'CloudModel::MongodbReplicationSet', optional: true
-
+      # Redis config for web image
       field :deploy_redis_host, type: String
       field :deploy_redis_port, type: Integer, default: 6379
+      belongs_to :deploy_redis_sentinel_set, class_name: '::CloudModel::RedisSentinelSet', optional: true
 
-      belongs_to :deploy_redis_sentinel_set, class_name: 'CloudModel::RedisSentinelSet', optional: true
-
-      validates :deploy_mongodb_read_preference, inclusion: {in: :allowed_deploy_mongodb_read_preferences}
 
       def kind
         :http
