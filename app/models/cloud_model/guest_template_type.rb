@@ -4,7 +4,7 @@ module CloudModel
     include Mongoid::Timestamps
     prepend CloudModel::Mixins::SmartToString
 
-    has_many :templates, class_name: 'CloudModel::GuestTemplate'
+    has_many :templates, class_name: '::CloudModel::GuestTemplate'
 
     #field :name, type: String
     field :components, type: Array, default: []

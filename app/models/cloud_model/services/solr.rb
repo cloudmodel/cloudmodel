@@ -2,7 +2,7 @@ module CloudModel
   module Services
     class Solr < Base
       field :port, type: Integer, default: 8080
-      belongs_to :deploy_solr_image, class_name: 'CloudModel::SolrImage', inverse_of: :services
+      belongs_to :deploy_solr_image, class_name: '::CloudModel::SolrImage', inverse_of: :services
 
       def kind
         :http

@@ -6,6 +6,8 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to be_a CloudModel::Services::Base }
 
   it { expect(subject).to have_field(:port).of_type(Integer).with_default_value_of 80 }
+  it { expect(subject).to embed_many(:location_overwrites).of_type(CloudModel::Services::Nginx::LocationOverwrite).as_inverse_of(:service) }
+
   it { expect(subject).to have_field(:ssl_supported).of_type Mongoid::Boolean }
   it { expect(subject).to have_field(:ssl_only).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:ssl_enforce).of_type(Mongoid::Boolean).with_default_value_of(false) }
@@ -18,11 +20,6 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:passenger_ruby_version).of_type(String).with_default_value_of(CloudModel.config.ruby_version) }
   it { expect(subject).to have_field(:delayed_jobs_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:delayed_jobs_queues).of_type(Array).with_default_value_of(['default']) }
-
-  # it { expect(subject).to have_field(:fastcgi_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
-  # it { expect(subject).to have_field(:fastcgi_location).of_type(String).with_default_value_of('.php$') }
-  # it { expect(subject).to have_field(:fastcgi_pass).of_type(String).with_default_value_of('127.0.0.1:9000') }
-  # it { expect(subject).to have_field(:fastcgi_index).of_type(String).with_default_value_of('index.php') }
 
   it { expect(subject).to have_field(:capistrano_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_and_belong_to_many(:capistrano_ssh_groups).as_inverse_of(:services).of_type CloudModel::SshGroup }
