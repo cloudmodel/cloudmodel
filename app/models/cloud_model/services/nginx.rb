@@ -5,7 +5,8 @@ module CloudModel
 
       field :port, type: Integer, default: 80
 
-      embeds_many :location_overwrites, class_name: '::CloudModel::Services::Nginx::LocationOverwrite', inverse_of: :service
+      embeds_many :location_overwrites, class_name: CloudModel::Services::Nginx::LocationOverwrite, inverse_of: :service
+      accepts_nested_attributes_for :location_overwrites, allow_destroy: true
 
       # SSL/TLS settings
       field :ssl_supported, type: Mongoid::Boolean#, default: false
@@ -13,7 +14,7 @@ module CloudModel
       field :ssl_enforce, type: Mongoid::Boolean, default: false
       field :ssl_port, type: Integer, default: 443
       field :ssl_certbot, type: Mongoid::Boolean, default: false
-      belongs_to :ssl_cert, class_name: '::CloudModel::Certificate', inverse_of: :services, optional: true
+      belongs_to :ssl_cert, class_name: CloudModel::Certificate, inverse_of: :services, optional: true
 
       # Content Security Policies
       field :unsafe_inline_script_allowed, type: Mongoid::Boolean, default: false
@@ -38,11 +39,11 @@ module CloudModel
       has_and_belongs_to_many :capistrano_ssh_groups, class_name: CloudModel::SshGroup, inverse_of: :services
 
       # WebLocation support
-      embeds_many :web_locations, class_name: '::CloudModel::WebLocation', inverse_of: :service
-      accepts_nested_attributes_for :web_locations
+      embeds_many :web_locations, class_name: CloudModel::WebLocation, inverse_of: :service
+      accepts_nested_attributes_for :web_locations, allow_destroy: true
 
       # WebImage support
-      belongs_to :deploy_web_image, class_name: '::CloudModel::WebImage', inverse_of: :services, optional: true
+      belongs_to :deploy_web_image, class_name: CloudModel::WebImage, inverse_of: :services, optional: true
       enum_field :redeploy_web_image_state, {
         0x00 => :pending,
         0x01 => :running,
