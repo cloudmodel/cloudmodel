@@ -93,7 +93,7 @@ module CloudModel
     end
 
     def ruby_version
-      @ruby_version || "3.2"
+      @ruby_version || "3.4"
     end
 
     def dns_domains

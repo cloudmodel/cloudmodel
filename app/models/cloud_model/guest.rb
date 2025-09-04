@@ -216,6 +216,12 @@ module CloudModel
 
     def update_crt options={}
       puts "Updating certs on guest #{name}" if options[:debug]
+
+      unless current_lxd_container
+        puts "  - Guest #{name} not running"
+        return false
+      end
+
       guest_certificates.each do |certificate|
         puts "  - Updating cert #{certificate.name} on guest #{name} not implemented" if options[:debug]
         # TODO: Upload crt of guest certificates

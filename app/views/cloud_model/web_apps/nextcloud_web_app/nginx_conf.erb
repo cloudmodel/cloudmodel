@@ -1,3 +1,6 @@
+#include /etc/nginx/mime.types;
+
+
 location = /.well-known/carddav {
   return 301 $scheme://$host:$server_port<%= model.location_with_slashes %>remote.php/dav;
 }
@@ -95,7 +98,7 @@ location ^~ <%= model.location_with_leading_slash %> {
 
   ### Collabora CODE END
 
-  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>(?:index|remote|public|cron|core\/ajax\/update|status|ocs\/v[12]|updater\/.+|oc[ms]-provider\/.+|.+\/richdocumentscode\/proxy)\.php(?:$|\/) {
+  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>(?:index|remote|public|cron|core\/ajax\/update|status|ocs\/v[12]|updater\/.+|ocs-provider\/.+|.+\/richdocumentscode\/proxy)\.php(?:$|\/) {
     fastcgi_split_path_info ^(.+?\.php)(\/.*|)$;
     set $path_info $fastcgi_path_info;
     try_files $fastcgi_script_name =404;
@@ -112,14 +115,26 @@ location ^~ <%= model.location_with_leading_slash %> {
     fastcgi_request_buffering off;
   }
 
-  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>(?:updater|oc[ms]-provider)(?:$|\/) {
+  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>(?:updater|ocs-provider)(?:$|\/) {
       try_files $uri/ =404;
       index index.php;
   }
 
   # Adding the cache control header for js, css and map files
   # Make sure it is BELOW the PHP block
-  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>.+[^\/]\.(?:css|js|woff2?|svg|gif|map)$ {
+  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>.+[^\/]\.(?:css|js|mjs|woff2?|otf|svg|gif|ico|jpg|png|webp|wasm|tflite|map|ogg|flac)$ {
+    types {
+      text/javascript js mjs;
+      text/css css;
+      application/wasm wasm;
+      image/webp webp;
+      image/avif avif:
+      image/jxl jxl:
+      image/heic heic;
+      image/png png;
+      image/svg+xml svg;
+    }
+
     try_files $uri <%= model.location_with_slashes %>index.php$request_uri;
     add_header Cache-Control "public, max-age=15778463";
     # Add headers to serve security related headers  (It is intended

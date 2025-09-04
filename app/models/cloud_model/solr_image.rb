@@ -3,7 +3,7 @@
 # Gets a solr config from a git repository. This repository has to have 2 contents:
 #   SOLR_VERSION - a text file containing the required version of solr
 #   solr - folder containing the solr config
-# every other contents are ignored
+# any other content is ignored
 
 module CloudModel
   class SolrImage

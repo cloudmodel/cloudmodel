@@ -24,7 +24,7 @@ module CloudModel
 
       Gem::Package::TarWriter.new(tarfile) do |tar|
         tar.add_file "tinc.conf", data_mode do |tf|
-          tf.write ActionController::Base.new.render_to_string(template: "/cloud_model/vpn_clients/tinc.conf", locals: {vpn_client: self})
+          tf.write ActionController::Base.new.render_to_string(template: "/cloud_model/vpn_clients/tinc_conf", locals: {vpn_client: self})
         end
 
         tar.add_file "tinc-up", exec_mode do |tf|

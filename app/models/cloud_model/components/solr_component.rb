@@ -6,7 +6,9 @@ module CloudModel
       end
 
       def requirements
-        if @version and @version > '8.'
+        if @version and @version > '9.'
+          [:'java@21']
+        elsif @version and @version > '8.'
           [:'java@11']
         else
           [:'java@8']
