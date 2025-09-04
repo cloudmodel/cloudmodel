@@ -68,8 +68,8 @@ describe CloudModel::ItemIssue do
 
       subject.subject_chain=[guest.host, guest]
       expect(subject.subject_chain_ids).to eq [
-        {:id=>guest.host_id, :type=>"CloudModel::Host"},
-        {:id=>guest.id, :type=>"CloudModel::Guest"}
+        {'id'=>guest.host_id, 'type'=>"CloudModel::Host"},
+        {'id'=>guest.id, 'type'=>"CloudModel::Guest"}
       ]
     end
   end
