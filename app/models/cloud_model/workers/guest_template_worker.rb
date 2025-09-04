@@ -19,7 +19,10 @@ module CloudModel
         chroot! build_path, "apt-get install sudo gnupg -y", "Failed to install gnupg"
 
         comment_sub_step 'Install ppa support'
-        chroot! build_path, "apt-get install apt-transport-https ca-certificates software-properties-common -y", "Failed to install ppa support"
+        chroot! build_path, "apt-get install apt-transport-https ca-certificates -y", "Failed to install ppa support"
+
+        # Don't try to install software-properties-common on debian < 13, it is included in base template
+        # chroot build_path, "apt-get install software-properties-common -y"
 
         comment_sub_step 'Install rsync, wget, and curl'
         chroot! build_path, "apt-get install sudo rsync wget curl -y", "Failed to install rsync, wget, and curl"
