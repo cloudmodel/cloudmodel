@@ -71,9 +71,12 @@ module CloudModel
         mkdir_p "#{build_path}/etc/dpkg/dpkg.cfg.d"
         render_to_remote  "/cloud_model/support/etc/dpkg/dpkg.cfg.d/01_nodoc", "#{build_path}/etc/dpkg/dpkg.cfg.d/01_nodoc"
 
-        chroot! build_path, "apt-get install software-properties-common -y", "Failed to update sources"
-        chroot! build_path, "apt-add-repository contrib -y", "Failed to update sources"
-
+        ## Add contrib to sources
+        # # This fails on debian >= 13
+        # chroot build_path, "apt-get install software-properties-common -y"#, "Failed to update sources"
+        # chroot! build_path, "apt-add-repository contrib -y", "Failed to update sources"
+        chroot! build_path, 'sed -r -i "s/^deb(.*)$/deb\1 contrib/g" /etc/apt/sources.list', "Failed to update sources"
+        chroot! build_path, 'apt update', "Failed to update sources"
 
         # apt-get install debootstrap
         # debootstrap --arch amd64 testing /cloud/build/host/test http://ftp.de.debian.org/debian/
