@@ -88,6 +88,10 @@ module CloudModel
       def heap_size
         "#{guest.memory_size / 1024 / 1024 - 128}m"
       end
+
+      def mem_size
+        "#{guest.memory_size / 1024 / 1024 - 512}m"
+      end
     end
   end
 end

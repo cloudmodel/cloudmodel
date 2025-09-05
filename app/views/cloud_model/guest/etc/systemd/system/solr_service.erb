@@ -3,16 +3,28 @@ Description=SOLR Search Engine
 After=network.target
 
 [Service]
+<%- if  model.deploy_solr_image.solr_version < '9.0' -%>
 Environment=SOLR_JAVA_MEM="-Xms512m -Xmx<%= model.heap_size %>"
+<%- else -%>
+Environment=SOLR_JETTY_HOST="0.0.0.0"
+<%- end -%>
+LimitFSIZE=infinity
+LimitCPU=infinity
+LimitAS=infinity
+LimitMEMLOCK=infinity
+LimitNOFILE=65000
+LimitNPROC=65000
 User=solr
 Group=solr
 PermissionsStartOnly=true
-ExecStartPre=/usr/bin/mkdir -p /var/solr/data /var/solr/cache /var/solr/log
-ExecStartPre=/bin/chown -R solr:solr /var/solr/data /var/solr/cache /var/solr/log
+ExecStartPre=/usr/bin/mkdir -p /var/solr/data /var/solr/cache /var/solr/log /opt/solr/server/logs/
+ExecStartPre=/bin/chown -R solr:solr /var/solr/data /var/solr/cache /var/solr/log /opt/solr/server/logs/
 <%- if model.deploy_solr_image.solr_version < '7.0' -%>
 ExecStart=/opt/solr/bin/solr start -f -m <%= model.heap_size %> -s /var/solr/solr -p <%= model.port %> -a "-Dsolr.data.dir=/var/solr/data -Dsolr.data.logs=/var/solr/log -Xloggc:/var/solr/log/solr_gc.log"
-<%- else -%>
+<%- elsif  model.deploy_solr_image.solr_version < '9.0' -%>
 ExecStart=/opt/solr/bin/solr start -f -s /var/solr/solr -p <%= model.port %> -a "-Dsolr.data.dir=/var/solr/data -Dsolr.data.logs=/var/solr/log -Xloggc:/var/solr/log/solr_gc.log"
+<%- else %>
+ExecStart=/opt/solr/bin/solr start -f -s /var/solr/solr -p <%= model.port %> -m <%= model.mem_size %>
 <%- end -%>
 ExecStop=/opt/solr/bin/solr stop -p 8080
 Restart=always
