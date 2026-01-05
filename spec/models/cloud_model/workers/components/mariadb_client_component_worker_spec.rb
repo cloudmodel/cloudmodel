@@ -16,7 +16,7 @@ describe CloudModel::Workers::Components::MariadbClientComponentWorker do
 
     it 'should add mariadb dep repo' do
       expect(subject).to receive(:chroot!).with('/tmp/build', "apt-get install curl -y", "Failed to install curl").ordered
-      expect(subject).to receive(:chroot!).with('/tmp/build', "curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash", "Failed to setup mariadb repository").ordered
+      expect(subject).to receive(:chroot!).with('/tmp/build', "curl -sS https://dlm.mariadb.com/MariaDB/mariadb_repo_setup | bash", "Failed to setup mariadb repository").ordered
 
       subject.build '/tmp/build'
     end
