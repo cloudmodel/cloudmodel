@@ -298,7 +298,7 @@ module CloudModel
 
         comment_sub_step 'config ssh keys'
         # Config /root/.ssh/authorized_keys
-        unless File.exists?("#{CloudModel.config.data_directory}/keys/id_rsa")
+        unless File.exist?("#{CloudModel.config.data_directory}/keys/id_rsa")
           # Create key pair if non exists
           local_exec "mkdir -p #{CloudModel.config.data_directory.shellescape}/keys"
           local_exec "ssh-keygen -N '' -t rsa -b 4096 -f #{CloudModel.config.data_directory.shellescape}/keys/id_rsa"

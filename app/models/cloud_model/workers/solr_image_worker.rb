@@ -54,7 +54,7 @@ module CloudModel
 
       def package_build
 
-        solr_config = if File.exists?("#{@solr_image.build_path.shellescape}/solr-config")
+        solr_config = if File.exist?("#{@solr_image.build_path.shellescape}/solr-config")
           "solr-config"
         else
           "solr"

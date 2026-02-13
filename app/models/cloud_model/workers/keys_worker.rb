@@ -10,33 +10,33 @@ module CloudModel
         @host = CloudModel::MockHost.new
         @hosts = CloudModel::Host.all
       end
-    
+
       def add_new_ssh_key(host)
         host.exec("/bin/echo #{@new_public_key.shellescape} >> /root/.ssh/authorized_keys")
       end
-    
+
       def remove_old_ssh_key(host)
         host.exec("/bin/echo #{@new_public_key.shellescape} > /root/.ssh/authorized_keys")
       end
-    
+
       def create_ssh_priv_key
         key_dir = "#{CloudModel.config.data_directory.shellescape}/new_keys"
         local_exec! "rm -rf #{key_dir}", "Failed remove new key dir"
         local_exec! "mkdir -p #{key_dir}", "Failed to create new key dir"
         local_exec "ssh-keygen -N '' -t rsa -b 4096 -f #{key_dir}/id_rsa"
       end
-    
+
       def update_ssh_priv_key
-        if File.exists? "#{CloudModel.config.data_directory.shellescape}/keys"
+        if File.exist? "#{CloudModel.config.data_directory.shellescape}/keys"
           File.rename "#{CloudModel.config.data_directory.shellescape}/keys", "#{CloudModel.config.data_directory.shellescape}/keys_#{Time.now}"
         end
         File.rename "#{CloudModel.config.data_directory.shellescape}/new_keys", "#{CloudModel.config.data_directory.shellescape}/keys"
       end
-    
+
       def read_ssh_pub_key
         @new_public_key = File.read("#{CloudModel.config.data_directory.shellescape}/new_keys/id_rsa.pub").strip
       end
-    
+
       def config_sshd(host)
         mock_host = @host
         begin
@@ -47,7 +47,7 @@ module CloudModel
         end
         host.exec! "systemctl reload sshd", "Failed to reload SSHd"
       end
-    
+
       # def renew_tinc_key(host)
       # end
       #
@@ -56,10 +56,10 @@ module CloudModel
       #
       # def restart_tincd(host)
       # end
-    
+
       def renew options = {}
         build_start_at = Time.now
-      
+
         steps = [
           ['Exchange SSH root keys', [
             ['Generate new key', :create_ssh_priv_key],
@@ -75,10 +75,10 @@ module CloudModel
           #   ['Restart tincd on', :restart_tincd, each: @hosts]
           # ]],
         ]
-      
+
         run_steps :deploy, steps, options
-      
-        puts "Finished renew keys in #{distance_of_time_in_words_to_now build_start_at}"      
+
+        puts "Finished renew keys in #{distance_of_time_in_words_to_now build_start_at}"
       end
     end
   end

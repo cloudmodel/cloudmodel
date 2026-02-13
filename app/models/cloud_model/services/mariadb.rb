@@ -43,7 +43,7 @@ module CloudModel
         Rails.logger.debug command
         Rails.logger.debug `#{command}`
 
-        if $?.success? and File.exists? "#{backup_directory}/#{timestamp}/dump.sql"
+        if $?.success? and File.exist? "#{backup_directory}/#{timestamp}/dump.sql"
           FileUtils.rm_f "#{backup_directory}/latest"
           FileUtils.ln_s "#{backup_directory}/#{timestamp}", "#{backup_directory}/latest"
           cleanup_backups
