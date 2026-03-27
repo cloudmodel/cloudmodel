@@ -24,7 +24,7 @@ ExecStart=/opt/solr/bin/solr start -f -m <%= model.heap_size %> -s /var/solr/sol
 <%- elsif  model.deploy_solr_image.solr_version < '9.0' -%>
 ExecStart=/opt/solr/bin/solr start -f -s /var/solr/solr -p <%= model.port %> -a "-Dsolr.data.dir=/var/solr/data -Dsolr.data.logs=/var/solr/log -Xloggc:/var/solr/log/solr_gc.log"
 <%- else %>
-ExecStart=/opt/solr/bin/solr start -f -s /var/solr/solr -p <%= model.port %> -m <%= model.mem_size %>
+ExecStart=/opt/solr/bin/solr start -f -s /var/solr/solr -Dsolr.disable.allowUrls=true -p <%= model.port %> -m <%= model.mem_size %>
 <%- end -%>
 ExecStop=/opt/solr/bin/solr stop -p 8080
 Restart=always
