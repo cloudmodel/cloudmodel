@@ -1,6 +1,11 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the Redis service inside a guest container.
+      #
+      # Renders `redis.conf` and, if the service is part of a sentinel set,
+      # also renders `sentinel.conf`. Enables both `redis_server` and
+      # `redis_sentinel` systemd units as appropriate, each with a restart drop-in.
       class RedisWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           comment_sub_step "Write redis config"

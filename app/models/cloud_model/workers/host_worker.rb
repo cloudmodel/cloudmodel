@@ -5,6 +5,12 @@ require 'securerandom'
 
 module CloudModel
   module Workers
+    # Worker that provisions and redeploys a physical/virtual {CloudModel::Host}.
+    #
+    # Handles disk partitioning, RAID and ZFS setup, OS image population,
+    # network/firewall/tinc VPN configuration, LXD initialisation, SSH key
+    # setup, and grub boot configuration. Also provides {#update_tinc_host_files}
+    # for refreshing VPN host entries without a full redeploy.
     class HostWorker < BaseWorker
 
       def host

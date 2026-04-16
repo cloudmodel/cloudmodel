@@ -1,7 +1,17 @@
 module CloudModel
   module Services
+    # Apache Solr search platform service embedded in a {Guest}.
+    #
+    # Requires a {SolrImage} that bundles the Solr configuration and version
+    # information. The Solr binary is sourced from the matching {SolrMirror}.
+    # Health checks query the Solr admin API for JVM memory usage and core count.
     class Solr < Base
+      # @!attribute [rw] port
+      #   @return [Integer] Solr HTTP port (default: 8080)
       field :port, type: Integer, default: 8080
+
+      # @!attribute [rw] deploy_solr_image
+      #   @return [CloudModel::SolrImage] the Solr config/version image to deploy
       belongs_to :deploy_solr_image, class_name: '::CloudModel::SolrImage', inverse_of: :services
 
       def kind

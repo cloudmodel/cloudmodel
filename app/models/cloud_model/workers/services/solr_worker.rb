@@ -4,6 +4,11 @@ require 'securerandom'
 module CloudModel
   module Workers
     module Services
+      # Worker that deploys the Solr service inside a guest container.
+      #
+      # Pushes the Solr binary mirror (from {CloudModel::SolrMirror}) to `/opt`
+      # and the Solr configuration image (from {CloudModel::SolrImage}) to
+      # `/var/solr`, then renders the systemd service unit.
       class SolrWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           install_path = "/tmp/opt"

@@ -1,6 +1,10 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that installs the monitoring service unit inside a guest container.
+      #
+      # Renders and enables `monitoring.service` in systemd. No additional
+      # configuration files are written beyond the service unit itself.
       class MonitoringWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
         end

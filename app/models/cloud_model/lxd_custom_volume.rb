@@ -1,4 +1,13 @@
 module CloudModel
+  # A persistent LXD ZFS storage volume embedded in a {Guest}.
+  #
+  # Unlike the root filesystem (which is replaced on every redeploy), custom
+  # volumes survive redeployments and are re-attached to the new container.
+  # They are backed by ZFS datasets under `guests/custom/<name>` on the host.
+  #
+  # The volume name is auto-generated from the guest name and mount point on
+  # validation. Backups are performed via rsync to the configured backup hosts
+  # when `has_backups` is true.
   class LxdCustomVolume
     include Mongoid::Document
     include Mongoid::Timestamps

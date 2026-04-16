@@ -1,11 +1,30 @@
 module CloudModel
   module Services
+    # MongoDB database service embedded in a {Guest}.
+    #
+    # Supports standalone and replica-set configurations. When assigned to a
+    # {MongodbReplicationSet}, the `mongodb_replication_priority` and
+    # `mongodb_replication_arbiter_only` fields control this node's role within
+    # the set. Backups use `mongodump --gzip`.
     class Mongodb < Base
+      # @!attribute [rw] port
+      #   @return [Integer] MongoDB listen port (default: 27017)
       field :port, type: Integer, default: 27017
 
+      # @!attribute [rw] mongodb_version
+      #   @return [String] MongoDB version to install, e.g. `"6.0"` (default: `"5.0"`)
       field :mongodb_version, type: String, default: '5.0'
+
+      # @!attribute [rw] mongodb_replication_priority
+      #   @return [Integer] replica-set election priority (0–100; 0 = never elected)
       field :mongodb_replication_priority, type: Integer, default: 50
+
+      # @!attribute [rw] mongodb_replication_arbiter_only
+      #   @return [Boolean] when true, this node is an arbiter and gets priority 0
       field :mongodb_replication_arbiter_only, type: Boolean, default: false
+
+      # @!attribute [rw] mongodb_replication_set
+      #   @return [CloudModel::MongodbReplicationSet, nil] the replica set this node belongs to
       belongs_to :mongodb_replication_set, class_name: "CloudModel::MongodbReplicationSet", optional: true
 
       validates :mongodb_replication_priority, inclusion: {in: 0..100}

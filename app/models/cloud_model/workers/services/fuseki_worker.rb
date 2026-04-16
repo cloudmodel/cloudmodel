@@ -1,6 +1,10 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the Apache Jena Fuseki service inside a guest container.
+      #
+      # Renders the Shiro security configuration (`shiro.ini`) and the systemd
+      # service unit for Fuseki.
       class FusekiWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           comment_sub_step "Write Fuseki config"

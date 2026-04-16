@@ -1,6 +1,10 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs Collabora Online (CODE) into a guest template chroot.
+      #
+      # Adds the Collabora apt repository, then installs `loolwsd` (or `coolwsd` on
+      # Ubuntu 20.04+) and `code-brand`.
       class CollaboraComponentWorker < BaseComponentWorker
         def _prepare_collabora_repository build_path
           chroot! build_path, "apt-get install dirmngr gnupg -y", "Failed to install key management"

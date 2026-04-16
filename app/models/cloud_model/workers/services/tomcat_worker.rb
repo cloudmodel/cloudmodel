@@ -4,6 +4,12 @@ require 'securerandom'
 module CloudModel
   module Workers
     module Services
+      # Worker that deploys a WAR image to the Tomcat service inside a guest container.
+      #
+      # Extracts the {CloudModel::WarImage} tarball to `/var/tomcat`, reads the
+      # bundled `manifest.yml` for Tomcat configuration parameters, and renders
+      # `server.xml`, `ROOT.xml` (Catalina context), `tomcat-users.xml`, and the
+      # systemd defaults file.
       class TomcatWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           target = "#{@guest.deploy_path}/var/tomcat"

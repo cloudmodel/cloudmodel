@@ -1,6 +1,10 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the MariaDB service inside a guest container.
+      #
+      # Renders `50-server.cnf` with per-guest settings and writes a systemd
+      # drop-in that fixes database directory permissions on startup.
       class MariadbWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           target = '/var/lib/mysql'

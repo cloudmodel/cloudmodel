@@ -1,1 +1,6 @@
---plugin mongoid
+--output-dir doc/yard
+--markup markdown
+app/models/**/*.rb
+lib/**/*.rb
+-
+README.md

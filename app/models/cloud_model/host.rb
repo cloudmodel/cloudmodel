@@ -8,6 +8,22 @@ unless defined?(Zeitwerk)
 end
 
 module CloudModel
+  # Represents a physical or virtual server managed by CloudModel.
+  #
+  # A Host runs Ubuntu or Debian with LXD and ZFS. It is the root of the
+  # management hierarchy: hosts own {Guest}s (LXD containers), network
+  # {Address}es, {FirewallRule}s, and extra {Zpool}s.
+  #
+  # All remote operations (command execution, file transfer, LXD control) go
+  # through an SSH connection established via {#ssh_connection}. CloudModel
+  # authenticates using an RSA key at `{Config#data_directory}/keys/id_rsa`.
+  #
+  # @example Connect and run a command
+  #   success, output = host.exec('uname -r')
+  #
+  # @example Deploy a host asynchronously
+  #   host.deploy   # enqueues HostJobs::DeployJob
+  #   host.deploy!  # runs synchronously
   class Host
 
     module SmartGettersAndSetters

@@ -1,4 +1,13 @@
 module CloudModel
+  # Represents a single LXD container instance embedded in a {Guest}.
+  #
+  # A guest may have multiple LxdContainer records representing successive
+  # deployments (each deploy creates a new container from the current template).
+  # `Guest#current_lxd_container_id` tracks which one is live. Older containers
+  # remain in the database and can be started for rollback purposes.
+  #
+  # All LXD operations are executed via the host's SSH connection using
+  # `lxc` CLI commands.
   class LxdContainer
     include Mongoid::Document
     include Mongoid::Timestamps

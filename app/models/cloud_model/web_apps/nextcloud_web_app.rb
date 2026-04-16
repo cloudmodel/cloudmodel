@@ -1,13 +1,38 @@
 module CloudModel
   module WebApps
+    # Nextcloud file-sharing and collaboration web application.
+    #
+    # Installs the latest Nextcloud release into `/opt/web-app/nextcloud`,
+    # renders the `config.php` configuration file, initialises the MariaDB
+    # user/database via a SQL template, and wires up a systemd cron timer for
+    # background jobs. The MySQL password is generated automatically on create.
     class NextcloudWebApp < ::CloudModel::WebApp
+      # @!attribute [rw] mysql_host
+      #   @return [String] MariaDB hostname (default: `"localhost"`)
       field :mysql_host, type: String, default: 'localhost'
+
+      # @!attribute [rw] mysql_port
+      #   @return [Integer] MariaDB port (default: 3306)
       field :mysql_port, type: Integer, default: 3306
+
+      # @!attribute [rw] mysql_user
+      #   @return [String] MariaDB user (default: `"nextcloud"`)
       field :mysql_user, type: String, default: 'nextcloud'
+
+      # @!attribute [rw] mysql_passwd
+      #   @return [String, nil] MariaDB password; auto-generated on create
       field :mysql_passwd, type: String, default: nil
+
+      # @!attribute [rw] mysql_database
+      #   @return [String] MariaDB database name (default: `"nextcloud"`)
       field :mysql_database, type: String, default: 'nextcloud'
 
+      # @!attribute [rw] nextcloud_instanceid
+      #   @return [String, nil] Nextcloud instance ID stored in `config.php`
       field :nextcloud_instanceid, type: String, default: nil
+
+      # @!attribute [rw] nextcloud_passwordsalt
+      #   @return [String, nil] Nextcloud password salt stored in `config.php`
       field :nextcloud_passwordsalt, type: String, default: nil
 
       before_create :set_mysql_passwd

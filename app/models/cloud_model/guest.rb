@@ -1,6 +1,26 @@
 require 'net/ping'
 
 module CloudModel
+  # An LXD container (guest) running on a {Host}.
+  #
+  # A Guest groups all configuration for a single container: network addresses,
+  # embedded {Services::Base} documents, {LxdContainer} rootfs snapshots, and
+  # {LxdCustomVolume} persistent storage volumes.
+  #
+  # Deployment builds an LXD image from a {GuestTemplate}, creates a container
+  # on the host, renders all service configuration templates, and starts the
+  # container. Redeployment creates a fresh container from the latest template
+  # and atomically switches over.
+  #
+  # Remote commands run inside the container via `lxc exec`, tunnelled through
+  # the host SSH connection:
+  #
+  # @example Run a command inside the guest
+  #   success, output = guest.exec('php --version')
+  #
+  # @example Deploy the guest asynchronously
+  #   guest.deploy    # enqueues GuestJobs::DeployJob
+  #   guest.deploy!   # runs synchronously
   class Guest
     require 'resolv'
     require 'securerandom'

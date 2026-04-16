@@ -1,6 +1,10 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the MongoDB service inside a guest container.
+      #
+      # Renders `mongod.conf` and writes a fix-permissions systemd drop-in so
+      # the MongoDB data directory is owned correctly on startup.
       class MongodbWorker < CloudModel::Workers::Services::BaseWorker
         def service_name
           "mongod"

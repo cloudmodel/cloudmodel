@@ -1,6 +1,11 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the OpenSSH server inside a guest container.
+      #
+      # Renders `sshd_config`, ensures host keys exist (generating them if not),
+      # persists keys to `/inst/hosts_by_ip/` across redeployments, and copies
+      # any client SSH keys for the `www` user.
       class SshWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           comment_sub_step "Write SSH config"

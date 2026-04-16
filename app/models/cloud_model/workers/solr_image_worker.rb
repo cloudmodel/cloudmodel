@@ -1,5 +1,10 @@
 module CloudModel
   module Workers
+    # Worker that builds a {CloudModel::SolrImage} from a Git repository.
+    #
+    # Clones/updates the repository, reads `SOLR_VERSION` to locate the matching
+    # {CloudModel::SolrMirror}, packages the `solr-config` (or `solr`) directory
+    # into a `.tar.bz2`, and stores it in MongoDB GridFS.
     class SolrImageWorker < BaseWorker
 
       def initialize(solr_image)

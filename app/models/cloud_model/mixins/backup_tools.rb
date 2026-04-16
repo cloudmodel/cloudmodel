@@ -1,6 +1,22 @@
 module CloudModel
   module Mixins
-    module BackupTools 
+    # Provides backup rotation helpers for models that store timestamped backup
+    # directories under {#backup_directory}.
+    #
+    # Including classes must implement `backup_directory` returning the absolute
+    # path of the backup root. Backup snapshots are named with 14-digit timestamps
+    # (`YYYYMMDDHHmmSS`). A `latest` symlink is maintained pointing to the most
+    # recent snapshot.
+    #
+    # The retention policy keeps:
+    # - The 3 most recent snapshots unconditionally
+    # - All snapshots from the last 3 days
+    # - One snapshot per day for days 3–6
+    # - One snapshot per week for weeks 1–6
+    # - One snapshot per month for months 1–6
+    module BackupTools
+      # Returns all existing backup timestamps, newest first.
+      # @return [Array<String>] e.g. `["20240315120000", "20240314120000"]`
       def list_backups
         begin
           Dir.entries(backup_directory).select{|x| x.match /\A[0-9]{14}\z/}.sort{|x,y| y<=>x}
@@ -9,6 +25,9 @@ module CloudModel
         end
       end
     
+      # Returns backup timestamps that fall outside the retention policy and can
+      # be safely deleted.
+      # @return [Array<String>] timestamps eligible for deletion
       def list_disposable_backups
         backups = list_backups.sort{|a,b| b<=>a}
       
@@ -53,7 +72,9 @@ module CloudModel
         disposible_backups
       end
     
-      def cleanup_backups  
+      # Deletes all disposable backup directories as determined by {#list_disposable_backups}.
+      # @return [true]
+      def cleanup_backups
         list_disposable_backups.each do |backup|
           FileUtils.rm_rf "#{backup_directory}/#{backup}"
         end

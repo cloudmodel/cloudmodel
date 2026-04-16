@@ -1,15 +1,32 @@
 require 'rubygems/package'
 
 module CloudModel
+  # A non-host device (laptop, CI runner, developer machine) that connects to
+  # the tinc VPN overlay network.
+  #
+  # VpnClient records store the device's tinc public key and static VPN address.
+  # The {#config_tarball} method generates a ready-to-extract tinc configuration
+  # archive for the device, including host key files for every managed host.
   class VpnClient
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::Mixins::HasIssues
     prepend CloudModel::Mixins::SmartToString
 
+    # @!attribute [rw] name
+    #   @return [String] unique device name (lowercase, alphanumeric + hyphens/underscores)
     field :name, type: String
+
+    # @!attribute [rw] tinc_public_key
+    #   @return [String] RSA public key for this device (PEM format)
     field :tinc_public_key, type: String
+
+    # @!attribute [rw] address
+    #   @return [String] static IPv4 address assigned to this device on the VPN
     field :address, type: String
+
+    # @!attribute [rw] os
+    #   @return [String, nil] operating system label (informational)
     field :os, type: String
 
     validates :name, presence: true, uniqueness: true, format: {with: /\A[a-z0-9\-_]+\z/}
@@ -17,6 +34,13 @@ module CloudModel
     validates :address, presence: true, format: /\A((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.)){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\z/
 
 
+    # Generates a tar archive containing a complete tinc configuration for this device.
+    #
+    # The archive includes `tinc.conf`, `tinc-up`, `tinc-down` scripts, and a
+    # `hosts/` directory with keys for this client and every managed host.
+    # Extract it into `/etc/tinc/<network_name>/` on the client device.
+    #
+    # @return [StringIO] an in-memory tar stream
     def config_tarball
       tarfile = StringIO.new("")
       data_mode = 0640

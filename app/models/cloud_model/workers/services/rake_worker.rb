@@ -1,6 +1,11 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that installs a scheduled Rake task service inside a guest container.
+      #
+      # Writes a named systemd timer (`rake-<task>.timer`) and service unit
+      # (`rake-<task>.service`) based on the {CloudModel::Services::Rake} model's
+      # timer configuration, then enables the timer in `timers.target.wants`.
       class RakeWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
         end

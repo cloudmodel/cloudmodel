@@ -1,6 +1,12 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs nginx with the Passenger module and certbot
+      # into a guest template chroot.
+      #
+      # Adds the Phusion Passenger apt repository (and on Ubuntu 18.04 also the
+      # certbot PPA), then installs `nginx-extras`, `libnginx-mod-http-passenger`,
+      # and `certbot` with the nginx plugin.
       class NginxComponentWorker < BaseComponentWorker
         def _prepare_passenger_repository build_path
           chroot! build_path, "apt-get install dirmngr gnupg -y", "Failed to install key management"

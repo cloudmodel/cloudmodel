@@ -3,6 +3,11 @@ require 'net/ftp'
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs Apache Jena Fuseki into a guest template chroot.
+      #
+      # Queries the Apache FTP mirror for the latest `apache-jena-fuseki-*.tar.gz`,
+      # downloads and extracts it to `/opt/fuseki`, and creates a dedicated
+      # `fuseki` system user.
       class FusekiComponentWorker < BaseComponentWorker
         def build build_path
           ftp_host = 'ftp-stud.hs-esslingen.de'

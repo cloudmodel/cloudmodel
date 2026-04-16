@@ -1,5 +1,11 @@
 module CloudModel
   module Workers
+    # Worker that deploys and redeploys a {CloudModel::Guest} (LXD container).
+    #
+    # Orchestrates the full guest deployment lifecycle:
+    # template sync → LXD image import → container creation → custom volume
+    # setup → service configuration → network/firewall → container start.
+    # Each phase is a named step that can be skipped via the `skip_to` option.
     class GuestWorker < BaseWorker
 
       def initialize(guest)

@@ -4,6 +4,14 @@ require 'securerandom'
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the nginx service inside a guest container.
+      #
+      # Handles the full nginx setup: renders `nginx.conf` and the virtual host
+      # config, deploys a {CloudModel::WebImage} (tar-unpacking into a timestamped
+      # directory and symlinking `current`), deploys web locations (web apps with
+      # their config files and systemd units), and writes SSL certificates + DH
+      # params. Also manages Capistrano-style Delayed::Job queues and SSH
+      # `authorized_keys` for the `www` user.
       class NginxWorker < CloudModel::Workers::Services::BaseWorker
 
         def unroll_web_image deploy_path

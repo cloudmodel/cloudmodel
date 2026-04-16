@@ -1,7 +1,18 @@
 module CloudModel
   module Services
+    # OpenSSH server service embedded in a {Guest}.
+    #
+    # SSH is typically the first service added to any guest. It is part of the
+    # core OS image and requires no extra component installation. The service
+    # health check performs a TCP ping on the configured port.
     class Ssh < Base
+      # @!attribute [rw] port
+      #   @return [Integer] SSH listen port (default: 22)
       field :port, type: Integer, default: 22
+
+      # @!attribute [rw] authorized_keys
+      #   @return [Array<String>, nil] raw public key strings to write to authorized_keys
+      #     (deprecated — prefer SSH groups)
       field :authorized_keys, type: Array
 
       # TODO: Handle authorized_keys presets

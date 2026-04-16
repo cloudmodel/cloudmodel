@@ -1,6 +1,12 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs Ruby via RVM into a guest template chroot.
+      #
+      # Imports the RVM GPG key, installs dependencies (git, zlib, curl, Node.js,
+      # Puppeteer system libs), runs `rvm install`, installs bundler 1.x and 2.x,
+      # cleans up RVM download cache, and kills the GPG agent so the chroot can
+      # be cleanly unmounted afterwards.
       class RubyComponentWorker < BaseComponentWorker
         def rubyversion
           @options[:component].try(:version) || CloudModel.config.ruby_version

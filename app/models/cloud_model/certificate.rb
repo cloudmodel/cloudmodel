@@ -1,14 +1,22 @@
 module CloudModel
-  # Handle certificates
+  # Stores a TLS certificate, its private key, and optional CA chain.
+  #
+  # A Certificate can be attached to an Nginx service (via `ssl_cert_id`) or
+  # mounted directly on a guest (via {GuestCertificate}). The {#valid_from} and
+  # {#valid_thru} timestamps are extracted automatically from the X.509 data on
+  # save.
   class Certificate
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::Mixins::UsedInGuestsAs
     include CloudModel::Mixins::HasIssues
     prepend CloudModel::Mixins::SmartToString
-    # Add guests connected via GuestCertificates
+
+    # Extends used_in_guests to include guests connected via GuestCertificates.
     module CertificateUsedInGuest
-      # Get Guests using this certificate
+      # Returns all guests that use this certificate, either directly through
+      # {GuestCertificate} records or through a service's `ssl_cert_id`.
+      # @return [Mongoid::Criteria<CloudModel::Guest>]
       def used_in_guests
         guest_ids = guest_certificates.pluck(:guest_id)
         if guest_ids.blank?
@@ -20,33 +28,47 @@ module CloudModel
     end
     include CertificateUsedInGuest
 
-    # @return [String] Define the name of the certificate
+    # @!attribute [rw] name
+    #   @return [String] human-readable label for this certificate
     field :name, type: String
-    # @return [String] Define the CA of the certificate
+
+    # @!attribute [rw] ca
+    #   @return [String, nil] PEM-encoded CA / intermediate chain
     field :ca, type: String
-    # @return [String] Define the CA of the certificate
+
+    # @!attribute [rw] key
+    #   @return [String] PEM-encoded private key
     field :key, type: String
-    # @return [String] Define the CA of the certificate
+
+    # @!attribute [rw] crt
+    #   @return [String] PEM-encoded X.509 certificate
     field :crt, type: String
-    # @return [Time] Define the CA of the certificate
+
+    # @!attribute [rw] valid_from
+    #   @return [Time] certificate validity start — set automatically from the X.509 data
     field :valid_from, type: Time
-    # @return [Time] Define the CA of the certificate
+
+    # @!attribute [rw] valid_thru
+    #   @return [Time] certificate expiry — set automatically from the X.509 data
     field :valid_thru, type: Time
 
     used_in_guests_as 'services.ssl_cert_id'
 
-    # @!attribute [rw] guest_certificates
-    #   @return [CloudModel::GuestCertificate] Define the CA of the certificate
+    # @!attribute [r] guest_certificates
+    #   @return [Array<CloudModel::GuestCertificate>] join records linking this certificate to guests
     has_many :guest_certificates, class_name: "CloudModel::GuestCertificate"
 
     before_save :set_valid_dates
 
-    # Filter for valid certificates
+    # Returns all certificates whose validity window contains the current time.
+    # @return [Array<CloudModel::Certificate>]
     def self.valid
       scoped.select{|c| c.valid_now?}
     end
 
-    # Get certificate as X509 certificate
+    # Parses the stored PEM string and returns an OpenSSL X.509 certificate.
+    # Returns an empty certificate object if parsing fails.
+    # @return [OpenSSL::X509::Certificate]
     def x509
       begin
         OpenSSL::X509::Certificate.new crt
@@ -55,37 +77,44 @@ module CloudModel
       end
     end
 
-    # Get private key of certificate as PKey
+    # Parses the stored PEM key and returns an OpenSSL PKey object.
+    # @return [OpenSSL::PKey::PKey]
     def pkey
       OpenSSL::PKey.read key
     end
 
-    # Set models valid_from and valid_thru from certificate
+    # Callback: reads `not_before` / `not_after` from the X.509 data and
+    # stores them in {#valid_from} and {#valid_thru}.
     def set_valid_dates
       self.valid_from = x509.not_before
       self.valid_thru = x509.not_after
     end
 
-    # Check if certificate is valid right now
+    # Returns true when the certificate validity window includes the current time.
+    # A blank `valid_from` or `valid_thru` is treated as unbounded.
+    # @return [Boolean]
     def valid_now?
       (valid_from.blank? or valid_from < Time.now) and (valid_thru.blank? or Time.now < valid_thru)
     end
 
-    # Get the common name of the certificate
+    # Returns the Common Name (CN) from the certificate's subject.
+    # @return [String, nil]
     def common_name
       unless x509.subject.to_a.blank?
         x509.subject.to_a.find{|x| x[0] == "CN"}[1]
       end
     end
 
-    # Get the issuer name of the certificate
+    # Returns the Common Name (CN) of the certificate's issuer.
+    # @return [String, nil]
     def issuer
       unless x509.issuer.to_a.blank?
         x509.issuer.to_a.find{|x| x[0] == "CN"}[1]
       end
     end
 
-    # Check if private key matches certificate
+    # Verifies that the stored private key matches the stored certificate.
+    # @return [Boolean]
     def check_key
       x509.check_private_key pkey
     end

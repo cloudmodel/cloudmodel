@@ -1,6 +1,11 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs the Jitsi Meet stack into a guest template chroot.
+      #
+      # Adds the Prosody and Jitsi apt repositories, installs Lua 5.2 and the
+      # Jitsi Meet dependencies. Full Jitsi package installation is currently
+      # commented out pending configuration work.
       class JitsiComponentWorker < BaseComponentWorker
         def build build_path
           puts "Prepare prosody"

@@ -1,6 +1,12 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs wkhtmltopdf into a guest template chroot.
+      #
+      # Installs X font and rendering dependencies, then scrapes the wkhtmltopdf
+      # downloads page to find the correct `.deb` package for the template's OS
+      # version and host architecture, downloads it, and installs it with
+      # `dpkg -i && apt -f install`.
       class WkhtmltopdfComponentWorker < BaseComponentWorker
         def build build_path
           # Dependencies

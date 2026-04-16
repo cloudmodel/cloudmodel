@@ -1,5 +1,13 @@
 module CloudModel
   module Workers
+    # Worker that builds {CloudModel::GuestCoreTemplate} and {CloudModel::GuestTemplate} images.
+    #
+    # For core templates: bootstraps an Ubuntu/Debian root, installs utilities,
+    # networking, SSH, and the check_mk monitoring agent, then tarballs the result.
+    #
+    # For full guest templates: unpacks the core template, installs each component
+    # listed in the {CloudModel::GuestTemplateType}, creates an LXD metadata
+    # tarball, and downloads/archives both artefacts.
     class GuestTemplateWorker < TemplateWorker
 
       def build_path
