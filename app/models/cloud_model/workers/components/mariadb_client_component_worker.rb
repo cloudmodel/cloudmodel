@@ -1,6 +1,12 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs the MariaDB client and development headers
+      # into a guest template chroot.
+      #
+      # Adds the official MariaDB repository via the `mariadb_repo_setup` script
+      # to ensure a recent version, then installs `mariadb-client` and
+      # `libmariadb-dev`.
       class MariadbClientComponentWorker < BaseComponentWorker
         def build build_path
           # Use latest mariadb instead of Ubunu's one

@@ -1,4 +1,13 @@
 module CloudModel
+  # A deployable Rails/Ruby web application image built from a Git repository.
+  #
+  # The build process clones the repository, runs `bundle install`, optionally
+  # compiles assets, packages the result into a tarball, and stores it in
+  # MongoDB GridFS. The tarball is then deployed to all Nginx services that
+  # reference this image via `deploy_web_image_id`.
+  #
+  # Two separate state machines are tracked: {#build_state} for the packaging
+  # step and {#redeploy_state} for rolling the new image out to guests.
   class WebImage
     include Mongoid::Document
     include Mongoid::Timestamps
@@ -7,17 +16,44 @@ module CloudModel
     include CloudModel::Mixins::HasIssues
     prepend CloudModel::Mixins::SmartToString
 
+    # @!attribute [rw] name
+    #   @return [String] unique human-readable label
     field :name, type: String
+
+    # @!attribute [rw] git_server
+    #   @return [String] hostname or IP of the Git server
     field :git_server, type: String
+
+    # @!attribute [rw] git_repo
+    #   @return [String] repository path on the Git server
     field :git_repo, type: String
+
+    # @!attribute [rw] git_branch
+    #   @return [String] branch to build from (default: `"master"`)
     field :git_branch, type: String, default: 'master'
+
+    # @!attribute [rw] git_commit
+    #   @return [String, nil] SHA of the last built commit (set after a successful build)
     field :git_commit, type: String
+
+    # @!attribute [rw] has_assets
+    #   @return [Boolean] whether to run the Rails asset pipeline during build
     field :has_assets, type: Mongoid::Boolean, default: false
+
+    # @!attribute [rw] has_mongodb
+    #   @return [Boolean] whether the application uses MongoDB (wires up mongoid config)
     field :has_mongodb, type: Mongoid::Boolean, default: false
+
+    # @!attribute [rw] has_redis
+    #   @return [Boolean] whether the application uses Redis
     field :has_redis, type: Mongoid::Boolean, default: false
+
+    # @!attribute [rw] master_key
+    #   @return [String, nil] Rails `RAILS_MASTER_KEY` value (32 hex chars); encrypted credentials support
     field :master_key, type: String, default: nil
 
-
+    # @!attribute [rw] additional_components
+    #   @return [Array<Symbol>] extra component symbols required beyond the guest's defaults
     field :additional_components, type: Array, default: []
 
     enum_field :build_state, {
@@ -45,6 +81,8 @@ module CloudModel
 
     field :redeploy_last_issue, type: String
 
+    # @!attribute [rw] file
+    #   @return [Mongoid::GridFS::Fs::File, nil] the packaged tarball stored in GridFS
     belongs_to :file, class_name: "Mongoid::GridFS::Fs::File", optional: true
 
     validates :name, presence: true, uniqueness: true
@@ -65,6 +103,7 @@ module CloudModel
       services
     end
 
+    # @return [Integer, nil] size of the stored GridFS file in bytes
     def file_size
       file.try :length
     end

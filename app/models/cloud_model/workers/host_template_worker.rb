@@ -1,5 +1,11 @@
 module CloudModel
   module Workers
+    # Worker that builds {CloudModel::HostTemplate} images.
+    #
+    # Bootstraps a full host OS (Ubuntu/Debian), installs the Linux kernel,
+    # RAID/ZFS tools, LXD, tinc VPN, Exim mailer, check_mk monitoring agent,
+    # and grub, then tarballs the result for use when provisioning bare-metal
+    # or virtual hosts.
     class HostTemplateWorker < TemplateWorker
       def build_path
         if @options[:build_path]

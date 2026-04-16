@@ -1,6 +1,11 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that installs the backup coordination service inside a guest container.
+      #
+      # Writes a systemd timer + service pair that runs the
+      # `cloudmodel:guest:backup_all` Rake task daily at midnight and once
+      # 15 minutes after boot.
       class BackupWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
         end

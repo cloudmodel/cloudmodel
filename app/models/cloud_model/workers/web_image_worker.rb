@@ -1,5 +1,13 @@
 module CloudModel
   module Workers
+    # Worker that builds and redeploys a {CloudModel::WebImage} Rails application.
+    #
+    # Build pipeline: git clone/pull → `bundle install` → `yarn install`
+    # (if `package.json` exists) → `assets:precompile` (if `has_assets`) →
+    # tar packaging → GridFS storage.
+    #
+    # Redeploy triggers a rolling redeploy on each nginx service that references
+    # this web image.
     class WebImageWorker < BaseWorker
 
       def initialize(web_image)

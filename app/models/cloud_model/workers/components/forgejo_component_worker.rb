@@ -1,6 +1,10 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs Forgejo into a guest template chroot.
+      #
+      # Downloads and installs the Forgejo apt repository package, updates
+      # package lists, and installs `git`, `git-lfs`, and `forgejo-bin`.
       class ForgejoComponentWorker < BaseComponentWorker
         def build build_path
           chroot! build_path, "wget --content-disposition https://code.forgejo.org/forgejo-contrib/-/packages/debian/forgejo-deb-repo/0-0/files/2890", "Failed to get Forgejo apt repo"

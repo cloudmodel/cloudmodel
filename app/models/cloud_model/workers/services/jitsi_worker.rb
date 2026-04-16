@@ -1,6 +1,10 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the Jitsi Meet service inside a guest container.
+      #
+      # Configuration via `write_config` is currently a no-op (Jitsi is
+      # pre-configured by the component installation). Auto-restart is enabled.
       class JitsiWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           # target = '/var/lib/neo4j'

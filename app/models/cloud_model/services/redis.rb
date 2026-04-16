@@ -1,8 +1,22 @@
 module CloudModel
   module Services
+    # Redis key-value store service embedded in a {Guest}.
+    #
+    # Supports standalone and Sentinel high-availability configurations.
+    # When assigned to a {RedisSentinelSet}, `redis_sentinel_port` is used
+    # by the Sentinel process on the same container. {#redis_sentinel_master?}
+    # reflects whether this node is currently the primary.
     class Redis < Base
+      # @!attribute [rw] port
+      #   @return [Integer] Redis data port (default: 6379)
       field :port, type: Integer, default: 6379
+
+      # @!attribute [rw] redis_sentinel_port
+      #   @return [Integer] Redis Sentinel port (default: 26379)
       field :redis_sentinel_port, type: Integer, default: 26379
+
+      # @!attribute [rw] redis_sentinel_set
+      #   @return [CloudModel::RedisSentinelSet, nil] the sentinel set this node belongs to
       belongs_to :redis_sentinel_set, class_name: "CloudModel::RedisSentinelSet", optional: true
 
       def kind

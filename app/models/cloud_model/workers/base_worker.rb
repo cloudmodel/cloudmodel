@@ -1,11 +1,23 @@
 module CloudModel
   module Workers
+    # Minimal host stub used by {KeysWorker}, which does not operate on a real host.
     class MockHost
       def update_attributes attrs
         Rails.logger.debug attrs
       end
     end
 
+    # Abstract base class for all CloudModel workers.
+    #
+    # Workers execute multi-step tasks on remote hosts via Net::SSH/SFTP. The
+    # base class provides:
+    # - ERB template rendering ({#render}, {#render_to_remote})
+    # - chroot execution ({#chroot}, {#chroot!}) with automatic bind-mount
+    #   management ({#prepare_chroot}, {#cleanup_chroot})
+    # - Template archive transfer ({#upload_template}, {#download_template})
+    # - Stepped task execution with skip-to, per-item iteration, and error
+    #   propagation ({#run_steps}, {#run_step_command})
+    # - Progress output helpers ({#comment_sub_step}, {#debug})
     class BaseWorker
       include AbstractController::Rendering
       include ActionView::Helpers::DateHelper
@@ -15,28 +27,45 @@ module CloudModel
         @options = options
       end
 
+      # @return [CloudModel::Host] the host this worker operates on
       def host
         @host
       end
 
+      # @return [Object] the model object whose deploy/build state is updated on failure
       def error_log_object
         host
       end
 
+      # Converts a template path to a form acceptable to Rails 7+ view lookup
+      # by replacing dots with underscores.
+      # @param template [String] original template path
+      # @return [String] sanitised template path
       def translate_template_name template
         # Needed for Rails 7+
         template.gsub('.', '_')
       end
 
+      # Renders an ERB template to a string using ActionController rendering.
+      # @param template [String] view template path (without extension)
+      # @param locals [Hash] local variables passed to the template
+      # @return [String] rendered content
       def render template, locals={}
         ActionController::Base.new.render_to_string(template: "#{translate_template_name template}", locals: locals, layout: false)
       end
 
+      # @param template [String] view template path
+      # @return [Boolean] whether the template exists in the view lookup path
       def template_exists? template
         not ActionController::Base.new.lookup_context.find_all(translate_template_name template).blank?
       end
 
-      # render_to_remote template, remote_file, [[perms], locals]
+      # Renders a template and uploads the result to the remote host via SFTP.
+      #
+      # @overload render_to_remote(template, remote_file, perm, locals)
+      #   @param perm [Integer] file permission (e.g. `0644`)
+      # @overload render_to_remote(template, remote_file, locals)
+      #   Uses default permission `0600`
       def render_to_remote template, remote_file, *param_array
         perm = if param_array.first.is_a? Integer
           param_array.shift
@@ -61,6 +90,11 @@ module CloudModel
         end
       end
 
+      # Bind-mounts proc, sys, dev, and dev/pts into a chroot directory so that
+      # package managers and other tools work correctly inside the chroot.
+      # Results are cached per directory; pass `force: true` to redo.
+      # @param chroot_dir [String] path to the chroot root
+      # @param options [Hash] pass `force: true` to remount even if already done
       def prepare_chroot chroot_dir, options={}
         @chroot_prepared ||= {}
         chroot_dir = chroot_dir.gsub(/[\/]$/, '') # Remove tailing slashes from path
@@ -90,6 +124,9 @@ module CloudModel
         @chroot_prepared[chroot_dir] = true
       end
 
+      # Unmounts proc, sys, dev/pts, and dev from a chroot directory.
+      # @param chroot_dir [String] path to the chroot root
+      # @return [true]
       def cleanup_chroot chroot_dir
         @chroot_prepared ||= {}
         chroot_dir = chroot_dir.gsub(/[\/]$/, '') # Remove tailing slashes from path
@@ -112,6 +149,11 @@ module CloudModel
         true
       end
 
+      # Executes a shell command inside a chroot by rendering a wrapper script,
+      # uploading it, running it, and then removing it.
+      # @param chroot_dir [String] path to the chroot root
+      # @param command [String] shell command to run inside the chroot
+      # @return [Array(Boolean, String)] success flag and command output
       def chroot chroot_dir, command
         key = SecureRandom.uuid
         Rails.logger.debug "CHROOT: #{chroot_dir}: #{command}"
@@ -128,6 +170,12 @@ module CloudModel
         result
       end
 
+      # Like {#chroot} but raises on failure.
+      # @param chroot_dir [String] path to the chroot root
+      # @param command [String] shell command to run inside the chroot
+      # @param message [String] error message prefix on failure
+      # @return [String] command output
+      # @raise [RuntimeError] if the command exits with a non-zero status
       def chroot! chroot_dir, command, message
         success, data = chroot chroot_dir, command
 
@@ -137,10 +185,15 @@ module CloudModel
         data
       end
 
+      # Creates a directory (and parents) on the remote host.
+      # @param path [String] remote directory path to create
       def mkdir_p path
         @host.exec! "mkdir -p #{path.shellescape}", "Failed to make directory #{path}"
       end
 
+      # Runs a shell command locally on the CloudModel controller machine.
+      # @param command [String] shell command
+      # @return [String] combined stdout/stderr output
       def local_exec command
         Rails.logger.debug "LOKAL EXEC: #{command}"
         result = %x(#{command} 2>&1)
@@ -148,6 +201,11 @@ module CloudModel
         result
       end
 
+      # Like {#local_exec} but raises on non-zero exit.
+      # @param command [String] shell command
+      # @param message [String] error message prefix on failure
+      # @return [String] command output
+      # @raise [RuntimeError] if the command fails
       def local_exec! command, message
         result = local_exec command
 
@@ -157,6 +215,9 @@ module CloudModel
         result
       end
 
+      # Downloads a built template tarball from the remote host to the local
+      # data directory using SCP. Skips if `skip_sync_images` is configured.
+      # @param template [CloudModel::GuestTemplate, CloudModel::HostTemplate] the template to download
       def download_template template
         return if CloudModel.config.skip_sync_images
         # Download build template to local distribution
@@ -167,6 +228,9 @@ module CloudModel
         local_exec! command, "Failed to download archived template"
       end
 
+      # Uploads a local template tarball to the remote host using SCP.
+      # Skips if `skip_sync_images` is configured.
+      # @param template [CloudModel::GuestTemplate, CloudModel::HostTemplate] the template to upload
       def upload_template template
         return if CloudModel.config.skip_sync_images
         # Upload build template to host

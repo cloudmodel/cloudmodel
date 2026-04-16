@@ -5,6 +5,11 @@ require 'securerandom'
 
 module CloudModel
   module Workers
+    # Worker that rotates the SSH root key used by CloudModel to access hosts.
+    #
+    # Generates a new 4096-bit RSA key pair, adds the new public key to every
+    # host's `authorized_keys`, atomically switches to the new key, removes the
+    # old key, and reloads `sshd` on each host.
     class KeysWorker < BaseWorker
       def initialize
         @host = CloudModel::MockHost.new

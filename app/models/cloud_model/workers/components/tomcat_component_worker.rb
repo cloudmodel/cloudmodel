@@ -1,6 +1,11 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs Apache Tomcat 8 into a guest template chroot.
+      #
+      # Installs `tomcat8` and `tomcat8-admin`, applies the Ubuntu CA-certificates-java
+      # bug workaround, and renders the custom `tomcat8` launch script and systemd
+      # service unit.
       class TomcatComponentWorker < BaseComponentWorker
         def build build_path
           chroot! build_path, "apt-get install tomcat8 tomcat8-admin -y", "Failed to install tomcat"

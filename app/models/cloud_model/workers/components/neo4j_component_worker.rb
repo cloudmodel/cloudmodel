@@ -1,6 +1,10 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs Neo4j into a guest template chroot.
+      #
+      # Adds the Neo4j 4.1 Debian repository and GPG key, then installs the
+      # `neo4j` package.
       class Neo4jComponentWorker < BaseComponentWorker
         def _prepare_collabora_repository build_path
           chroot! build_path, "apt-get install dirmngr gnupg -y", "Failed to install key management"

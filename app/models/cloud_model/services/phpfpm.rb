@@ -1,8 +1,22 @@
 module CloudModel
   module Services
+    # PHP-FPM FastCGI process manager service embedded in a {Guest}.
+    #
+    # Typically used alongside an Nginx service. Optional PHP extension components
+    # (`php_mysql`, `php_imagemagick`, `php_imap`) can be enabled via
+    # `php_components`. Health checks query the PHP-FPM status page via `cgi-fcgi`.
     class Phpfpm < Base
+      # @!attribute [rw] port
+      #   @return [Integer] FastCGI listen port (default: 9000)
       field :port, type: Integer, default: 9000
+
+      # @!attribute [rw] php_components
+      #   @return [Array<Symbol>] enabled PHP extension components;
+      #     valid values are `[:php_mysql, :php_imagemagick, :php_imap]`
       field :php_components, type: Array, default: []
+
+      # @!attribute [rw] php_upload_max_filesize
+      #   @return [Integer] `upload_max_filesize` in megabytes (default: 2)
       field :php_upload_max_filesize, type: Integer, default: 2 # Size in M
 
       def kind

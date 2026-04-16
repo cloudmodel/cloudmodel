@@ -1,6 +1,13 @@
 module CloudModel
   module Services
+    # Apache Jena Fuseki SPARQL server service embedded in a {Guest}.
+    #
+    # Runs a Fuseki triple-store endpoint. Health checks fetch the Prometheus
+    # metrics endpoint exposed at `/$` and parse the Prometheus text format
+    # into a nested hash of JVM and Fuseki dataset metrics.
     class Fuseki < Base
+      # @!attribute [rw] port
+      #   @return [Integer] Fuseki HTTP port (default: 3030)
       field :port, type: Integer, default: 3030
 
       def kind

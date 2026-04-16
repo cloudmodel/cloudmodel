@@ -1,3 +1,9 @@
 [Service]
+LimitFSIZE=infinity
+LimitCPU=infinity
+LimitAS=infinity
+LimitMEMLOCK=infinity
+LimitNOFILE=65000
+LimitNPROC=65000
 PermissionsStartOnly=true
 ExecStartPre=/bin/chown -R mongodb:mongodb /var/lib/mongodb

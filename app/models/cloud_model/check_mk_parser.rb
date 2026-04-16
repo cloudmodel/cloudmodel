@@ -1,5 +1,23 @@
 module CloudModel
+  # Parses the text output of a `check_mk_agent` run into a structured Ruby hash.
+  #
+  # The check_mk agent emits sections delimited by `<<<section>>>` markers,
+  # each with its own line format. {.parse} dispatches each section to the
+  # appropriate parsing logic and returns a single hash with one key per section.
+  #
+  # Used by {Host#system_info} and {Guest#system_info} to populate
+  # `monitoring_last_check_result`.
   class CheckMkParser
+    # Calculates CPU usage percentages from cgroup CPU accounting data.
+    #
+    # Reads timestamped cumulative CPU jiffie values and computes average usage
+    # over the last 1, 5, and 15-minute windows, normalised by the number of CPUs.
+    #
+    # @param result [Hash] the `cgroup_cpu` section hash (must contain `"data"`)
+    # @param cpus [Integer, String] number of CPUs to normalise against
+    # @return [Hash] the mutated `result` with keys `last_minute_percentage`,
+    #   `last_5_minutes_percentage`, `last_15_minutes_percentage`, and
+    #   `_by_cpus` variants, plus `"cpus"`
     def self.parse_cgroup_cpu result, cpus
       calc_usage = proc do |base, data|
         if base.blank? or data.blank?
@@ -53,6 +71,14 @@ module CloudModel
       end
     end
 
+    # Parses the full text output of a `check_mk_agent` run.
+    #
+    # Each `<<<section>>>` header starts a new context. Supported sections:
+    # `check_mk`, `mem`, `df`/`df_v2`, `mounts`, `cpu`, `md`, `smart`,
+    # `zpools`, `sensors`, `systemd`, `systemd_units`, `lxd`, `cgroup_cpu`.
+    #
+    # @param result [String] raw check_mk_agent output
+    # @return [Hash] structured data keyed by section name
     def self.parse result
       hash = {}
       context = ''

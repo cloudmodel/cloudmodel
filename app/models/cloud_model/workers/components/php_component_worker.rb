@@ -1,6 +1,13 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs PHP-FPM and common PHP extensions into
+      # a guest template chroot.
+      #
+      # On Ubuntu, adds the `ondrej/php` PPA to access newer PHP versions.
+      # Installs `php-fpm`, `php-curl`, `php-mbstring`, `php-zip`, `php-gd`,
+      # `php-dom`, `php-intl`, `php-bcmath`, `php-gmp`, and `php-apcu`,
+      # all versioned to `CloudModel.config.php_version`.
       class PhpComponentWorker < BaseComponentWorker
         def php_version
           CloudModel.config.php_version

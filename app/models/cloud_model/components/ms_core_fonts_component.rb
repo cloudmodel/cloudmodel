@@ -1,19 +1,12 @@
 module CloudModel
   module Components
+    # Component that installs Microsoft Core Fonts into a guest template.
+    #
+    # **IMPORTANT:** Using this component means accepting the Microsoft EULA for
+    # the Core Fonts package. By instantiating this component you confirm that
+    # you have read and agreed to the End-User License Agreement for Microsoft
+    # Software accompanying the fonts (Arial, Courier New, Times New Roman, etc.).
     class MsCoreFontsComponent < BaseComponent
-      # If you use this component, you have to accept the EULA
-      #
-      # END-USER LICENSE AGREEMENT FOR MICROSOFT SOFTWARE
-      #
-      # IMPORTANT-READ CAREFULLY: This Microsoft End-User License Agreement
-      # ("EULA") is a legal agreement between you (either an individual or a
-      # single entity) and Microsoft Corporation for the Microsoft software
-      # accompanying this EULA, which includes computer software and may include
-      # associated media, printed materials, and "on-line" or electronic
-      # documentation ("SOFTWARE PRODUCT" or "SOFTWARE"). By exercising your
-      # rights to make and use copies of the SOFTWARE PRODUCT, you agree to be
-      # bound by the terms of this EULA. If you do not agree to the terms of
-      # this EULA, you may not use the SOFTWARE PRODUCT.
 
       def requirements
         []

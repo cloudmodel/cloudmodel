@@ -1,5 +1,15 @@
 module CloudModel
   module Workers
+    # Worker that generates and installs iptables/ip6tables firewall scripts on a host.
+    #
+    # On initialisation, builds a rule set from the host's addresses and the
+    # public services of its guests (DNAT/SNAT for each public guest IP).
+    # Produces three shell scripts written to `/etc/cloud_model/`:
+    # - `firewall_start` — applies all INPUT and NAT rules
+    # - `firewall_stop` — flushes all rules
+    # - `firewall_list` — lists current rules for both iptables and ip6tables
+    #
+    # SSH access is rate-limited via a brute-force detection chain.
     class FirewallWorker < BaseWorker
       def initialize(host)
         @host = host

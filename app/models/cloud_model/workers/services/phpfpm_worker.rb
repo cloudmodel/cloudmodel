@@ -1,6 +1,11 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the PHP-FPM service inside a guest container.
+      #
+      # Renders the FPM pool config (`www.conf`), the msmtp mail ini, and the
+      # APCu extension ini. Patches `php.ini` for upload/post size limits and
+      # creates the `www` system user.
       class PhpfpmWorker < CloudModel::Workers::Services::BaseWorker
         def patch_php_ini key, value
           chroot! @guest.deploy_path, "sed -i 's/#{key} = .*/#{key} = #{value}/' /etc/php/#{CloudModel.config.php_version}/fpm/php.ini", "Failed to config PHP option #{key}"

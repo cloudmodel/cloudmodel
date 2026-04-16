@@ -1,6 +1,10 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the Neo4j service inside a guest container.
+      #
+      # Renders `neo4j.conf` and writes a systemd fix-permissions drop-in so
+      # the Neo4j data directory has the correct ownership on startup.
       class Neo4jWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           target = '/var/lib/neo4j'

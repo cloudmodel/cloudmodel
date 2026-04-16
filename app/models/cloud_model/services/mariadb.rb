@@ -2,9 +2,22 @@ require 'mysql2'
 
 module CloudModel
   module Services
+    # MariaDB/MySQL database service embedded in a {Guest}.
+    #
+    # Supports standalone and Galera multi-master replication. When assigned to
+    # a {MariadbGaleraCluster}, `mariadb_galera_port` is used for the Galera
+    # replication traffic. Backups use `mysqldump --all-databases`.
     class Mariadb < Base
+      # @!attribute [rw] port
+      #   @return [Integer] MariaDB client port (default: 3306)
       field :port, type: Integer, default: 3306
+
+      # @!attribute [rw] mariadb_galera_port
+      #   @return [Integer] Galera replication port (default: 4567)
       field :mariadb_galera_port, type: Integer, default: 4567
+
+      # @!attribute [rw] mariadb_galera_cluster
+      #   @return [CloudModel::MariadbGaleraCluster, nil] the Galera cluster this node belongs to
       belongs_to :mariadb_galera_cluster, optional: true
 
       def kind

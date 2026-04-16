@@ -1,5 +1,18 @@
 module CloudModel
   module Services
+    # Nginx web server / reverse proxy service embedded in a {Guest}.
+    #
+    # Nginx is the primary public-facing service. It supports:
+    # - Static file serving and reverse proxying
+    # - TLS termination (manual certificate or Certbot)
+    # - Phusion Passenger (for Rails/Ruby apps)
+    # - Capistrano deployments
+    # - {WebImage} deployment (Rails apps packaged as GridFS tarballs)
+    # - {WebLocation}s that mount {WebApp} subclasses at URL path prefixes
+    # - Content Security Policy generation
+    #
+    # The `redeploy_web_image_state` tracks rolling out a new {WebImage} build
+    # independently of the guest's `deploy_state`.
     class Nginx < Base
       include CloudModel::Mixins::ENumFields
 

@@ -1,6 +1,12 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the Forgejo service inside a guest container.
+      #
+      # Generates missing cryptographic secrets (SECRET_KEY, INTERNAL_TOKEN,
+      # LFS_JWT_SECRET, oauth JWT secret) using `forgejo generate secret`,
+      # saves them back to the model, renders `app.ini`, and optionally
+      # uploads a custom SVG logo.
       class ForgejoWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           comment_sub_step "Config forgejo"

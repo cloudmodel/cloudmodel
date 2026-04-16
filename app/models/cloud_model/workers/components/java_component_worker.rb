@@ -1,6 +1,11 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs OpenJDK into a guest template chroot.
+      #
+      # Installs the version-specific `openjdk-N-jre-headless` package, or the
+      # distribution default when no version is specified. Creates the required
+      # `/usr/share/man/man1/` directory which some JDK packages need.
       class JavaComponentWorker < BaseComponentWorker
         def javaversion
           @options[:component].try(:version)

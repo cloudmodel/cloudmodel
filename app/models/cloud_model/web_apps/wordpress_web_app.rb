@@ -1,22 +1,75 @@
 module CloudModel
   module WebApps
+    # WordPress CMS web application.
+    #
+    # Downloads the latest WordPress release, renders `wp-config.php` with
+    # MariaDB credentials and the eight WordPress security keys/salts, and
+    # generates a SQL initialisation script. The MySQL password and all salt
+    # keys are auto-generated on create. The `wp-content` directory is
+    # declared as a persistent folder so it survives container redeployments.
+    #
+    # When `wp_passwd` is set, an HTTP basic-auth password file is rendered
+    # for the WordPress admin area; when blank, WordPress login is public.
     class WordpressWebApp < ::CloudModel::WebApp
+      # @!attribute [rw] mysql_host
+      #   @return [String] MariaDB hostname (default: `"localhost"`)
       field :mysql_host, type: String, default: 'localhost'
+
+      # @!attribute [rw] mysql_port
+      #   @return [Integer] MariaDB port (default: 3306)
       field :mysql_port, type: Integer, default: 3306
+
+      # @!attribute [rw] mysql_user
+      #   @return [String] MariaDB user (default: `"wordpress"`)
       field :mysql_user, type: String, default: 'wordpress'
+
+      # @!attribute [rw] mysql_passwd
+      #   @return [String, nil] MariaDB password; auto-generated on create
       field :mysql_passwd, type: String, default: nil
+
+      # @!attribute [rw] mysql_database
+      #   @return [String] MariaDB database name (default: `"wordpress"`)
       field :mysql_database, type: String, default: 'wordpress'
 
+      # @!attribute [rw] wp_auth_key
+      #   @return [String, nil] WordPress AUTH_KEY; auto-generated on create
       field :wp_auth_key, type: String, default: nil
+
+      # @!attribute [rw] wp_secure_auth_key
+      #   @return [String, nil] WordPress SECURE_AUTH_KEY; auto-generated on create
       field :wp_secure_auth_key, type: String, default: nil
+
+      # @!attribute [rw] wp_logged_in_key
+      #   @return [String, nil] WordPress LOGGED_IN_KEY; auto-generated on create
       field :wp_logged_in_key, type: String, default: nil
+
+      # @!attribute [rw] wp_nonce_key
+      #   @return [String, nil] WordPress NONCE_KEY; auto-generated on create
       field :wp_nonce_key, type: String, default: nil
+
+      # @!attribute [rw] wp_auth_salt
+      #   @return [String, nil] WordPress AUTH_SALT; auto-generated on create
       field :wp_auth_salt, type: String, default: nil
+
+      # @!attribute [rw] wp_secure_auth_salt
+      #   @return [String, nil] WordPress SECURE_AUTH_SALT; auto-generated on create
       field :wp_secure_auth_salt, type: String, default: nil
+
+      # @!attribute [rw] wp_logged_in_salt
+      #   @return [String, nil] WordPress LOGGED_IN_SALT; auto-generated on create
       field :wp_logged_in_salt, type: String, default: nil
+
+      # @!attribute [rw] wp_nonce_salt
+      #   @return [String, nil] WordPress NONCE_SALT; auto-generated on create
       field :wp_nonce_salt, type: String, default: nil
 
+      # @!attribute [rw] wp_passwd
+      #   @return [String, nil] HTTP basic-auth password protecting the WP admin area;
+      #     when blank, login is publicly accessible
       field :wp_passwd, type: String, default: nil
+
+      # @!attribute [rw] wp_allow_xmlrpc
+      #   @return [Boolean] whether to allow XML-RPC access (default: false)
       field :wp_allow_xmlrpc, type: Boolean, default: false
 
       before_create :set_mysql_passwd

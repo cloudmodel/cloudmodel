@@ -1,7 +1,17 @@
 module CloudModel
   module Services
+    # Apache Tomcat Java servlet container service embedded in a {Guest}.
+    #
+    # Deploys a {WarImage} (a Java WAR file stored in GridFS) to the Tomcat
+    # webapps directory. Health checks query the Tomcat manager status API and
+    # parse JVM memory and thread pool metrics.
     class Tomcat < Base
+      # @!attribute [rw] port
+      #   @return [Integer] Tomcat HTTP port (default: 8080)
       field :port, type: Integer, default: 8080
+
+      # @!attribute [rw] deploy_war_image
+      #   @return [CloudModel::WarImage] the WAR file to deploy
       belongs_to :deploy_war_image, class_name: '::CloudModel::WarImage', inverse_of: :services
       validates :deploy_war_image_id, presence: true
 

@@ -1,5 +1,11 @@
 module CloudModel
   module Workers
+    # Abstract base class for template build workers.
+    #
+    # Provides shared OS bootstrap logic (Ubuntu base image download or
+    # `debootstrap` for Debian), base system update, SSH installation, and
+    # tarball packaging. Subclasses ({GuestTemplateWorker}, {HostTemplateWorker})
+    # add their own component/package installation steps.
     class TemplateWorker < BaseWorker
       def download_path
         "#{CloudModel.config.data_directory}/build/downloads/"

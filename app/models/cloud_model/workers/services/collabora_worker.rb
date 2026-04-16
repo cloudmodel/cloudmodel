@@ -1,6 +1,10 @@
 module CloudModel
   module Workers
     module Services
+      # Worker that configures the Collabora Online service inside a guest container.
+      #
+      # Uses `loolconfig` to disable SSL (handled by the nginx reverse proxy),
+      # enable SSL termination, and optionally set the allowed WOPI host.
       class CollaboraWorker < CloudModel::Workers::Services::BaseWorker
         def write_config
           chroot! @guest.deploy_path, "loolconfig set ssl.enable false", "Failed to set collabora ssl option"

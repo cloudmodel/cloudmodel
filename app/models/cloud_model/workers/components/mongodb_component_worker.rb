@@ -1,6 +1,11 @@
 module CloudModel
   module Workers
     module Components
+      # Component worker that installs MongoDB into a guest template chroot.
+      #
+      # Adds the MongoDB apt repository for the requested version (defaults to 7.0),
+      # supporting both Ubuntu and Debian base OS flavours. On Ubuntu 18.04 (Bionic)
+      # also installs the `libreadline5` compatibility package.
       class MongodbComponentWorker < BaseComponentWorker
         def mongoversion
           @options[:component].try(:version) || "7.0"
