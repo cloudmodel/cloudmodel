@@ -21,6 +21,8 @@ module CloudModel
     attr_writer :backup_hosts, :monitoring_notifiers
     attr_accessor :issue_url
 
+    attr_accessor :build_host_name
+
     def initialize(&block)
       configure(&block) if block_given?
     end
