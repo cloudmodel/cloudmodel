@@ -7,6 +7,10 @@ module CloudModel
     # tarball packaging. Subclasses ({GuestTemplateWorker}, {HostTemplateWorker})
     # add their own component/package installation steps.
     class TemplateWorker < BaseWorker
+      # Full PATH prefix for host exec commands to work on non-login shells
+      # (e.g. when the build host runs Arch Linux instead of Debian/Ubuntu).
+      HOST_ENV = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
       def download_path
         "#{CloudModel.config.data_directory}/build/downloads/"
       end
@@ -59,17 +63,29 @@ module CloudModel
         end
       end
 
+      def install_debootstrap
+        success, _ = @host.exec "#{HOST_ENV} which debootstrap"
+        return if success
+
+        apt_success, _ = @host.exec "#{HOST_ENV} which apt-get"
+        if apt_success
+          @host.exec! "#{HOST_ENV} apt-get install debootstrap -y", "Failed to install debootstrap"
+        else
+          @host.exec! "#{HOST_ENV} pacman -S --noconfirm debootstrap", "Failed to install debootstrap"
+        end
+      end
+
       def debootstrap_debian
 
         # gettting the key does not work for now; apt debian-keyring debian-archive-keyring is to old on ubuntu 18.04
 
-        @host.exec! "apt-get install debootstrap  -y", "Failed to install debootstrap"
-        @host.exec "debootstrap --arch #{@template.arch.shellescape} #{CloudModel.debian_short_name(os_version).shellescape} #{build_path} http://ftp.de.debian.org/debian/"#, "Failed to debootstrap"
+        install_debootstrap
+        @host.exec "#{HOST_ENV} debootstrap --arch #{@template.arch.shellescape} #{CloudModel.debian_short_name(os_version).shellescape} #{build_path} http://ftp.de.debian.org/debian/"#, "Failed to debootstrap"
 
         # debootstrap --arch amd64 bookworm /cloud/build/host/test http://ftp.de.debian.org/debian/
 
         # Copy resolv.conf
-        @host.exec! "cp /etc/resolv.conf #{build_path}/etc", "Failed to copy resolve conf"
+        @host.exec! "#{HOST_ENV} cp /etc/resolv.conf #{build_path}/etc", "Failed to copy resolve conf"
 
         # Don't start services on install
         # render_to_remote "/cloud_model/support/usr/sbin/policy-rc.d", "#{build_path}/usr/sbin/policy-rc.d", 0755
