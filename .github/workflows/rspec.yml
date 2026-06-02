@@ -13,10 +13,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v5
-    - name: Set up Ruby 3.2
+    - name: Set up Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: 3.2.x
+        ruby-version: .ruby-version
     - name: Install mongo
       run: | 
         docker run -d -p 27017:27017 mongo:latest mongod --setParameter ttlMonitorSleepSecs=2
