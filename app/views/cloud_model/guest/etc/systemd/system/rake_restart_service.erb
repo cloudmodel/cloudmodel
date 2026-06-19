@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart rake daemon <%= service.rake_task %> on restart.txt change
+
+[Service]
+Type=oneshot
+ExecStart=/bin/systemctl restart rake-<%= service.rake_task %>.service

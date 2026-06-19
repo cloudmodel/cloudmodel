@@ -586,6 +586,10 @@ de:
         wopi_host: Web Application Open Platform Host
       cloud_model/services/rake:
         rake_task: Rake Aufgabe
+        rake_mode: Ausführungsmodus
+        rake_restart_sec: Neustart-Verzögerung (Sekunden)
+        rake_stop_timeout: Shutdown-Timeout (Sekunden)
+        rake_restart_on_touch: Neustart bei Deploy (restart.txt)
         rake_timer_on_calendar: Ausführen nach Kalender
         rake_timer_on_calendar_val: Rake wiederholt ausführen um
         rake_timer_accuracy_sec: Ausführungsgenauigkeit in Sekunden
