@@ -1,0 +1,8 @@
+[Unit]
+Description=Watch restart.txt for rake daemon <%= service.rake_task %>
+
+[Path]
+PathChanged=/var/www/rails/current/tmp/restart.txt
+
+[Install]
+WantedBy=multi-user.target

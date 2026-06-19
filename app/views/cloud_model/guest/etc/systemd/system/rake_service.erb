@@ -1,5 +1,8 @@
 [Unit]
 Description=Call rake task <%= service.rake_task %> inside /var/www/rails/current
+<%- if service.rake_mode != 'timer' -%>
+After=syslog.target network.target
+<%- end -%>
 
 [Service]
 Nice=19
@@ -8,3 +11,16 @@ Group=www
 EnvironmentFile=/etc/default/rails
 WorkingDirectory=/var/www/rails/current
 ExecStart=/usr/local/rvm/bin/rvm default do bundle exec rake <%= service.rake_task %>
+<%- if service.rake_mode == 'restart' -%>
+Restart=always
+RestartSec=<%= service.rake_restart_sec %>
+<%- end -%>
+<%- if service.rake_mode != 'timer' -%>
+KillSignal=SIGTERM
+TimeoutStopSec=<%= service.rake_stop_timeout %>
+<%- end -%>
+<%- if service.rake_mode != 'timer' -%>
+
+[Install]
+WantedBy=multi-user.target
+<%- end -%>
