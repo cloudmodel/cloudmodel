@@ -1,7 +1,11 @@
 # This file is copied to spec/ when you run 'rails generate rspec:install'
 ENV["RAILS_ENV"] ||= 'test'
 
-require 'deep-cover'
+begin
+  require 'deep-cover'
+rescue LoadError
+  # deep-cover is optional — skip if not installed
+end
 require "rails/mongoid"
 require File.expand_path("../dummy/config/environment", __FILE__)
 require 'rspec/rails'

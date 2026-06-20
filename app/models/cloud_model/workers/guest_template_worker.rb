@@ -194,6 +194,8 @@ module CloudModel
       end
 
       def install_components
+        chroot! build_path, "apt-get update", "Failed to update package lists"
+
         @template.template_type.components.each do |component_type|
           begin
             c = CloudModel::Components::BaseComponent.from_sym(component_type)
