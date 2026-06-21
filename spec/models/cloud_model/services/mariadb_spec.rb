@@ -5,6 +5,8 @@ require 'spec_helper'
 describe CloudModel::Services::Mariadb do
   it { expect(subject).to be_a CloudModel::Services::Base }
 
+  it { expect(subject.allow_public_service?).to eq false }
+
   it { expect(subject).to have_field(:port).of_type(Integer).with_default_value_of 3306 }
   it { expect(subject).to have_field(:mariadb_galera_port).of_type(Integer).with_default_value_of 4567 }
 

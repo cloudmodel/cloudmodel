@@ -79,6 +79,7 @@ describe CloudModel::Services::Base do
       guest = double CloudModel::Guest, external_address: '10.42.23.17'
       allow(subject).to receive(:guest).and_return guest
       subject.public_service = true
+      allow(subject).to receive(:allow_public_service?).and_return true
 
       expect(subject.external_address).to eq '10.42.23.17'
     end
@@ -89,6 +90,21 @@ describe CloudModel::Services::Base do
       subject.public_service = false
 
       expect(subject.external_address).to eq nil
+    end
+
+    it 'should not get guest´s external_address if public exposure is not allowed' do
+      guest = double CloudModel::Guest, external_address: '10.42.23.17'
+      allow(subject).to receive(:guest).and_return guest
+      subject.public_service = true
+      allow(subject).to receive(:allow_public_service?).and_return false
+
+      expect(subject.external_address).to eq nil
+    end
+  end
+
+  describe 'allow_public_service?' do
+    it 'should not allow public exposure by default' do
+      expect(subject.allow_public_service?).to eq false
     end
   end
 

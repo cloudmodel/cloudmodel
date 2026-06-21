@@ -13,6 +13,12 @@ describe CloudModel::Services::Fuseki do
     end
   end
 
+  describe 'allow_public_service?' do
+    it 'should not allow public exposure' do
+      expect(subject.allow_public_service?).to eq false
+    end
+  end
+
   describe 'components_needed' do
     it 'should require solr components' do
       # java is required by solr component dependencies

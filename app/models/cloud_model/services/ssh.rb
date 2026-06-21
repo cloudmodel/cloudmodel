@@ -21,6 +21,12 @@ module CloudModel
         :ssh
       end
 
+      # SSH is key-authenticated and brute-force rate-limited, so it may be
+      # exposed to public networks.
+      def allow_public_service?
+        true
+      end
+
       def components_needed
         super # ssh is default to core
       end

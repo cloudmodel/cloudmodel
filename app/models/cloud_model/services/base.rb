@@ -38,6 +38,10 @@ module CloudModel
 
       embedded_in :guest, class_name: "CloudModel::Guest", inverse_of: :services
 
+      # Reject exposing service types that must never be reachable from public
+      # networks (e.g. unauthenticated datastores).
+      validate :public_service_must_be_allowed
+
       # @return [Hash{Symbol => Class}] map of service type keys to their model classes
       def self.service_types
         {
@@ -88,11 +92,21 @@ module CloudModel
         guest.private_address
       end
 
-      # @return [String, nil] the guest's external IP when {#public_service} is true, else `nil`
+      # @return [String, nil] the guest's external IP when {#public_service} is true
+      #   and this service type may be publicly exposed, else `nil`
       def external_address
-        if public_service
+        if public_service && allow_public_service?
           guest.external_address
         end
+      end
+
+      # @return [Boolean] whether this service type is allowed to be exposed to
+      #   public networks via {#public_service}. Defaults to `false` (private):
+      #   services are reachable only on the private/tinc network unless a
+      #   subclass explicitly overrides this to `true` because it is safe to
+      #   expose directly (e.g. authenticated, internet-facing services).
+      def allow_public_service?
+        false
       end
 
       # @return [Array] issue chain for monitoring: `[host, guest, self]`
@@ -154,6 +168,15 @@ module CloudModel
       # @param timestamp [String] backup label to restore (default: `"latest"`)
       def restore timestamp='latest'
         raise "Service has no restore"
+      end
+
+      private
+
+      # Validation: forbid marking a non-exposable service as a public service.
+      def public_service_must_be_allowed
+        if public_service && !allow_public_service?
+          errors.add :public_service, "is not allowed for #{service_type || 'this'} services"
+        end
       end
     end
   end

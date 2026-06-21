@@ -72,6 +72,10 @@ module CloudModel
       #   @return [Boolean] whether to allow XML-RPC access (default: false)
       field :wp_allow_xmlrpc, type: Boolean, default: false
 
+      # MySQL identifiers are interpolated unescaped into the SQL init template,
+      # so restrict them to a safe character set.
+      validates :mysql_user, :mysql_database, format: { with: /\A[a-zA-Z0-9_]+\z/ }
+
       before_create :set_mysql_passwd
       before_create :set_salt_keys
 

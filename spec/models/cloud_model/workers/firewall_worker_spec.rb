@@ -19,6 +19,7 @@ describe CloudModel::Workers::FirewallWorker do
     double 'service',
       kind: :http,
       public_service: true,
+      allow_public_service?: true,
       used_ports: [[80, :tcp]]
   end
   let(:guest) do

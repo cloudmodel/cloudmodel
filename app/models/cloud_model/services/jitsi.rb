@@ -27,6 +27,12 @@ module CloudModel
         :jitsi
       end
 
+      # Jitsi serves WebRTC media (UDP/STUN/TURN) that must be reachable
+      # directly by clients, so it may be exposed to public networks.
+      def allow_public_service?
+        true
+      end
+
       def components_needed
         ([:jitsi] + super).uniq
       end

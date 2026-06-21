@@ -48,7 +48,7 @@ module CloudModel
               if guest = @host.guests.where(external_address: ip).first
                 rules[ip]['nat'] = guest.private_address
 
-                services = guest.services.where(public_service: true).to_a
+                services = guest.services.where(public_service: true).to_a.select(&:allow_public_service?)
                 services.each do |service|
                   service.used_ports.each do |port, proto|
                     rules[ip]['services'][port] ||= {

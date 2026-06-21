@@ -40,6 +40,12 @@ module CloudModel
         :forgejo
       end
 
+      # Forgejo is a self-contained authenticated web application (its own
+      # session/CSRF/JWT secrets), so it may be exposed to public networks.
+      def allow_public_service?
+        true
+      end
+
       def components_needed
         ([:forgejo] + super).uniq
       end

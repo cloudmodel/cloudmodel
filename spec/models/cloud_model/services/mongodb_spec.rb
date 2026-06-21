@@ -20,6 +20,12 @@ describe CloudModel::Services::Mongodb do
     end
   end
 
+  describe 'allow_public_service?' do
+    it 'should not allow public exposure' do
+      expect(subject.allow_public_service?).to eq false
+    end
+  end
+
   describe 'components_needed' do
     it 'should require mongodb with default version' do
       expect(subject.components_needed).to eq [:'mongodb@5.0']

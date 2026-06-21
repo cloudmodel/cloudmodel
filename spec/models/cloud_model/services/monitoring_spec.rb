@@ -5,6 +5,8 @@ require 'spec_helper'
 describe CloudModel::Services::Monitoring do
   it { expect(subject).to be_a CloudModel::Services::Base }
 
+  it { expect(subject.allow_public_service?).to eq false }
+
   it { expect(subject).to have_field(:graphite_web_enabled).of_type(Mongoid::Boolean).with_default_value_of false }
 
   describe 'kind' do

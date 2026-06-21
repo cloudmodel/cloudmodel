@@ -35,10 +35,23 @@ module CloudModel
       #   @return [String, nil] Nextcloud password salt stored in `config.php`
       field :nextcloud_passwordsalt, type: String, default: nil
 
+      # MySQL identifiers are interpolated unescaped into the SQL init template
+      # and a shell command, so restrict them to a safe character set.
+      validates :mysql_user, :mysql_database, format: { with: /\A[a-zA-Z0-9_]+\z/ }
+
       before_create :set_mysql_passwd
+      before_create :set_nextcloud_secrets
 
       def set_mysql_passwd
         self.mysql_passwd = SecureRandom.alphanumeric 16
+      end
+
+      # Generate a per-instance instance id and password salt. The salt is mixed
+      # into Nextcloud's password hashing and credential encryption, so it must
+      # not be a shared constant. Existing/operator-provided values are kept.
+      def set_nextcloud_secrets
+        self.nextcloud_instanceid ||= "oc#{SecureRandom.hex 5}"
+        self.nextcloud_passwordsalt ||= SecureRandom.hex 15
       end
 
       # occ db:add-missing-indices

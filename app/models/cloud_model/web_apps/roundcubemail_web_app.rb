@@ -70,6 +70,10 @@ module CloudModel
       #   @return [String] Roundcube UI skin (default: `"elastic"`)
       field :rcm_skin, type: String, default: 'elastic'
 
+      # MySQL identifiers are interpolated unescaped into the SQL init template
+      # and the init_db shell command, so restrict them to a safe character set.
+      validates :mysql_user, :mysql_database, format: { with: /\A[a-zA-Z0-9_]+\z/ }
+
       before_create :set_rcm_des_key
       before_create :set_mysql_passwd
 
@@ -124,7 +128,7 @@ module CloudModel
       def init_db
         [
           "mysql </root/init_roundcube_user.sq",
-          "mysql #{mysql_database} <#{app_folder}/SQL/mysql.initial.sql"
+          "mysql #{mysql_database.shellescape} <#{app_folder}/SQL/mysql.initial.sql"
         ]
       end
     end
