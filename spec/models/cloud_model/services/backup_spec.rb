@@ -4,6 +4,8 @@ require 'spec_helper'
 
 describe CloudModel::Services::Backup do
   it { expect(subject).to be_a CloudModel::Services::Base }
+
+  it { expect(subject.allow_public_service?).to eq false }
     
   describe 'kind' do
     it 'should return :headless' do

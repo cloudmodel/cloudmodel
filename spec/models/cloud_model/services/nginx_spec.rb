@@ -5,6 +5,8 @@ require 'spec_helper'
 describe CloudModel::Services::Nginx do
   it { expect(subject).to be_a CloudModel::Services::Base }
 
+  it { expect(subject.allow_public_service?).to eq true }
+
   it { expect(subject).to have_field(:port).of_type(Integer).with_default_value_of 80 }
   it { expect(subject).to embed_many(:location_overwrites).of_type(CloudModel::Services::Nginx::LocationOverwrite).as_inverse_of(:service) }
 

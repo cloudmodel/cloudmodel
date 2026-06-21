@@ -15,6 +15,26 @@ describe CloudModel::Services::Redis do
     end
   end
 
+  describe 'allow_public_service?' do
+    it 'should not allow public exposure' do
+      expect(subject.allow_public_service?).to eq false
+    end
+  end
+
+  describe 'public_service validation' do
+    it 'should be invalid when marked as a public service' do
+      subject.public_service = true
+      subject.valid?
+      expect(subject.errors[:public_service]).to be_present
+    end
+
+    it 'should be valid when not a public service' do
+      subject.public_service = false
+      subject.valid?
+      expect(subject.errors[:public_service]).to be_blank
+    end
+  end
+
   describe 'components_needed' do
     it 'should require only redis' do
       expect(subject.components_needed).to eq [:redis]

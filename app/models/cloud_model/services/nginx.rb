@@ -85,6 +85,11 @@ module CloudModel
         :http
       end
 
+      # Nginx is the primary public-facing web server / reverse proxy.
+      def allow_public_service?
+        true
+      end
+
       def components_needed
         components = [:nginx]
 

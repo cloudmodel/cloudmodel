@@ -5,6 +5,8 @@ require 'spec_helper'
 describe CloudModel::Services::Rake do
   it { expect(subject).to be_a CloudModel::Services::Base }
 
+  it { expect(subject.allow_public_service?).to eq false }
+
   it { expect(subject).to have_field(:rake_task).of_type String }
   it { expect(subject).to have_field(:rake_timer_accuracy_sec).of_type(Integer).with_default_value_of 600 }
   it { expect(subject).to have_field(:rake_timer_on_calendar).of_type(Mongoid::Boolean).with_default_value_of true }
