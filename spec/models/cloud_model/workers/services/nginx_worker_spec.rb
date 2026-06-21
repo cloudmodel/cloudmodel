@@ -20,19 +20,187 @@ describe CloudModel::Workers::Services::NginxWorker do
   end
 
   describe '.unroll_web_image' do
-    pending
+    let(:sftp) {double 'Sftp'}
+    let(:web_image) {double 'WebImage', name: 'test-image', file: double('ImageFile', data: 'image_data'), has_mongodb?: false, has_redis?: false, master_key: nil}
+
+    before do
+      allow(model).to receive(:deploy_web_image).and_return(web_image)
+      allow(sftp).to receive(:upload!)
+      allow(sftp).to receive(:remove!)
+      allow(host).to receive(:sftp).and_return(sftp)
+      allow(host).to receive(:exec)
+      allow(host).to receive(:exec!)
+    end
+
+    it 'should return false if no deploy_web_image' do
+      allow(model).to receive(:deploy_web_image).and_return(nil)
+      expect(subject.unroll_web_image('/deploy/path')).to eq false
+    end
+
+    it 'should create deploy directory' do
+      expect(subject).to receive(:mkdir_p).with('/deploy/path')
+      subject.unroll_web_image('/deploy/path')
+    end
+
+    it 'should upload web image tarball' do
+      expect(sftp).to receive(:upload!).with(instance_of(StringIO), anything)
+      subject.unroll_web_image('/deploy/path')
+    end
+
+    it 'should extract tarball to deploy path' do
+      expect(host).to receive(:exec).with(%r{cd /deploy/path && tar xpf})
+      subject.unroll_web_image('/deploy/path')
+    end
+
+    it 'should create config directory' do
+      expect(subject).to receive(:mkdir_p).with('/deploy/path/config')
+      subject.unroll_web_image('/deploy/path')
+    end
+
+    it 'should render mongoid.yml if web image has mongodb' do
+      allow(web_image).to receive(:has_mongodb?).and_return(true)
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/web_image/mongoid.yml', '/deploy/path/config/mongoid.yml', guest: guest, model: model)
+      subject.unroll_web_image('/deploy/path')
+    end
+
+    it 'should render redis.yml if web image has redis' do
+      allow(web_image).to receive(:has_redis?).and_return(true)
+      allow(model).to receive(:deploy_redis_sentinel_set).and_return(nil)
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/web_image/redis.yml', '/deploy/path/config/redis.yml', guest: guest, model: model)
+      subject.unroll_web_image('/deploy/path')
+    end
+
+    it 'should render sentinel.yml if web image has redis with sentinel set' do
+      allow(web_image).to receive(:has_redis?).and_return(true)
+      allow(model).to receive(:deploy_redis_sentinel_set).and_return(double('SentinelSet'))
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/web_image/sentinel.yml', '/deploy/path/config/redis.yml', guest: guest, model: model)
+      subject.unroll_web_image('/deploy/path')
+    end
+
+    it 'should write master key if present' do
+      allow(web_image).to receive(:master_key).and_return('secret123')
+      expect(host).to receive(:exec!).with("echo -n 'secret123' >/deploy/path/config/master.key", 'Failed to set master key')
+      subject.unroll_web_image('/deploy/path')
+    end
+
+    it 'should create tmp directory and touch restart.txt' do
+      expect(subject).to receive(:mkdir_p).with('/deploy/path/tmp')
+      expect(host).to receive(:exec).with('touch /deploy/path/tmp/restart.txt')
+      subject.unroll_web_image('/deploy/path')
+    end
   end
 
   describe '.make_deploy_web_image_id' do
-    pending
+    it 'should return a timestamp string' do
+      expect(subject.make_deploy_web_image_id).to match(/\A\d{14}\z/)
+    end
+
+    it 'should return current UTC time formatted as YYYYMMDDHHmmSS' do
+      freeze_time = Time.utc(2024, 3, 15, 10, 30, 45)
+      allow(Time).to receive(:now).and_return(freeze_time)
+      expect(subject.make_deploy_web_image_id).to eq '20240315103045'
+    end
   end
 
   describe '.deploy_web_image' do
-    pending
+    let(:web_image) {double 'WebImage', name: 'test-image'}
+
+    before do
+      allow(model).to receive(:deploy_web_image).and_return(web_image)
+      allow(model).to receive(:www_root).and_return('/var/www')
+      allow(subject).to receive(:make_deploy_web_image_id).and_return('20240315103045')
+      allow(subject).to receive(:unroll_web_image)
+      allow(host).to receive(:exec!)
+    end
+
+    it 'should do nothing if no deploy_web_image' do
+      allow(model).to receive(:deploy_web_image).and_return(nil)
+      expect(subject).not_to receive(:unroll_web_image)
+      subject.deploy_web_image
+    end
+
+    it 'should unroll web image to timestamped deploy path' do
+      expect(subject).to receive(:unroll_web_image).with('/path/to/install/var/www/20240315103045')
+      subject.deploy_web_image
+    end
+
+    it 'should symlink current to deploy id' do
+      expect(host).to receive(:exec!).with('cd /path/to/install/var/www; rm current; ln -s 20240315103045 current', 'Failed to set current')
+      subject.deploy_web_image
+    end
   end
 
   describe '.redeploy_web_image' do
-    pending
+    let(:web_image) {double 'WebImage', name: 'test-image'}
+    let(:current_lxd_container) {double 'LxdContainer', name: 'test-container'}
+
+    before do
+      allow(model).to receive(:deploy_web_image).and_return(web_image)
+      allow(model).to receive(:redeploy_web_image_state).and_return(:pending)
+      allow(model).to receive(:update_attributes)
+      allow(model).to receive(:www_root).and_return('/var/www')
+      allow(model).to receive(:id).and_return('abc123')
+      allow(model).to receive(:name).and_return('test-service')
+      allow(model).to receive(:delayed_jobs_supported).and_return(false)
+      allow(model).to receive(:guest).and_return(guest)
+      allow(guest).to receive(:name).and_return('test-guest')
+      allow(guest).to receive(:current_lxd_container).and_return(current_lxd_container)
+      allow(guest).to receive(:exec!)
+      allow(guest).to receive(:exec).and_return([true, ''])
+      allow(subject).to receive(:make_deploy_web_image_id).and_return('20240315103045')
+      allow(subject).to receive(:unroll_web_image)
+      allow(host).to receive(:exec!)
+      allow(host).to receive(:exec)
+    end
+
+    it 'should return false if state is not pending and not forced' do
+      allow(model).to receive(:redeploy_web_image_state).and_return(:finished)
+      expect(subject.redeploy_web_image).to eq false
+    end
+
+    it 'should proceed if forced even when state is not pending' do
+      allow(model).to receive(:redeploy_web_image_state).and_return(:finished)
+      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil)
+      subject.redeploy_web_image(force: true)
+    end
+
+    it 'should set state to running' do
+      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil)
+      subject.redeploy_web_image
+    end
+
+    it 'should unroll web image to temp path' do
+      expect(subject).to receive(:unroll_web_image).with("/tmp/webimage_unroll_abc123/var/www/20240315103045")
+      subject.redeploy_web_image
+    end
+
+    it 'should transfer unrolled data to guest via tar' do
+      expect(host).to receive(:exec!).with("cd /tmp/webimage_unroll_abc123 && tar c . | lxc exec test-container -- /bin/tar x -C / --no-same-owner", 'Failed to transfer files')
+      subject.redeploy_web_image
+    end
+
+    it 'should set ownership on deployed files' do
+      expect(guest).to receive(:exec!).with('/bin/chown -R www:www /var/www/20240315103045', 'Failed to set user to www ')
+      subject.redeploy_web_image
+    end
+
+    it 'should symlink current to new deploy' do
+      expect(guest).to receive(:exec!).with('/bin/rm -f /var/www/current', 'Failed to remove old current')
+      expect(guest).to receive(:exec!).with('/bin/ln -s /var/www/20240315103045 /var/www/current', 'Failed to set current')
+      subject.redeploy_web_image
+    end
+
+    it 'should set state to finished on success' do
+      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :finished)
+      subject.redeploy_web_image
+    end
+
+    it 'should set state to failed on exception' do
+      allow(subject).to receive(:unroll_web_image).and_raise(RuntimeError.new('test error'))
+      allow(CloudModel).to receive(:log_exception)
+      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :failed, redeploy_web_image_last_issue: 'test error')
+      subject.redeploy_web_image
+    end
   end
 
   describe '.deploy_web_locations' do
@@ -202,7 +370,30 @@ describe CloudModel::Workers::Services::NginxWorker do
       subject.write_config
     end
 
-    pending
+    it 'should render nginx.conf' do
+      expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/nginx/nginx.conf', '/etc/nginx/nginx.conf', 0600, guest: guest, model: model)
+      subject.write_config
+    end
+
+    it 'should render cloudmodel.conf' do
+      expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/nginx/sites-available/cloudmodel.conf', '/etc/nginx/sites-available/cloudmodel.conf', 0600, guest: guest, model: model)
+      subject.write_config
+    end
+
+    it 'should create www user' do
+      expect(subject).to receive(:chroot!).with(guest.deploy_path, "groupadd -f -r -g 1001 www && id -u www || useradd -c 'added by cloud_model for nginx' -d /var/www -s /bin/bash -r -g 1001 -u 1001 www", "Failed to add www user")
+      subject.write_config
+    end
+
+    it 'should call deploy_web_image' do
+      expect(subject).to receive(:deploy_web_image)
+      subject.write_config
+    end
+
+    it 'should call deploy_web_locations' do
+      expect(subject).to receive(:deploy_web_locations)
+      subject.write_config
+    end
   end
 
   describe '.service_name' do
@@ -218,6 +409,36 @@ describe CloudModel::Workers::Services::NginxWorker do
   end
 
   describe '.auto_start' do
-    pending
+    before do
+      allow(guest).to receive(:deploy_path).and_return('/path/to/install')
+      allow(host).to receive(:exec)
+      allow(subject).to receive(:mkdir_p)
+      allow(subject).to receive(:render_to_remote)
+    end
+
+    it 'should create overlay directory' do
+      expect(subject).to receive(:mkdir_p).with(subject.overlay_path)
+      subject.auto_start
+    end
+
+    it 'should render fix_perms.conf drop-in' do
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/guest/etc/systemd/system/nginx.service.d/fix_perms.conf', "#{subject.overlay_path}/fix_perms.conf", 644, guest: guest, model: model)
+      subject.auto_start
+    end
+
+    it 'should chown overlay path' do
+      expect(host).to receive(:exec).with("chown -R 100000:100000 #{subject.overlay_path}")
+      subject.auto_start
+    end
+
+    it 'should call super to add service to runlevel default' do
+      expect(host).to receive(:exec).with("ln -sf /lib/systemd/system/nginx.service /path/to/install/etc/systemd/system/multi-user.target.wants/")
+      subject.auto_start
+    end
+
+    it 'should write restart drop-in since auto_restart is true' do
+      expect(subject).to receive(:render_to_remote).with("/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{subject.overlay_path}/restart.conf", 644)
+      subject.auto_start
+    end
   end
 end

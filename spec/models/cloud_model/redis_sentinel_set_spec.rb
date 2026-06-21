@@ -83,6 +83,37 @@ describe CloudModel::RedisSentinelSet do
   end
 
   describe 'status' do
-    pending
+    let(:master_service) { double private_address: '10.42.0.1', redis_sentinel_port: 26379 }
+
+    before do
+      allow(subject).to receive(:master_service).and_return(master_service)
+    end
+
+    it 'should return redis info data with cleaned keys' do
+      redis = double 'redis'
+      allow(::Redis).to receive(:new).and_return(redis)
+      allow(redis).to receive(:info).and_return({'connected_clients' => '5', 'redis_version' => '7.0', 'redis_mode' => 'sentinel'})
+      allow(redis).to receive(:close)
+
+      result = subject.status
+      expect(result['connected_clients']).to eq '5'
+      expect(result).not_to have_key('redis_version')
+    end
+
+    it 'should return error on Redis::CannotConnectError' do
+      allow(::Redis).to receive(:new).and_raise(::Redis::CannotConnectError.new('Connection refused'))
+
+      result = subject.status
+      expect(result[:key]).to eq :not_reachable
+      expect(result[:severity]).to eq :critical
+    end
+
+    it 'should return warning on other exceptions' do
+      allow(::Redis).to receive(:new).and_raise(RuntimeError.new('timeout'))
+
+      result = subject.status
+      expect(result[:key]).to eq :not_reachable
+      expect(result[:severity]).to eq :warning
+    end
   end
 end

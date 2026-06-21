@@ -80,7 +80,12 @@ describe CloudModel::Services::Nginx do
       expect(subject.components_needed).to eq [:'ruby@2.5', :nginx, :xml, :imagemagick]
     end
 
-    it 'should require web app components'
+    it 'should require web app components' do
+      web_app = double 'web_app', needed_components: [:php]
+      location = double 'web_location', web_app: web_app
+      allow(subject).to receive(:web_locations).and_return([location])
+      expect(subject.components_needed).to include(:php)
+    end
   end
 
   describe 'used_ports' do
@@ -107,20 +112,57 @@ describe CloudModel::Services::Nginx do
     end
   end
 
+  let(:guest) { double CloudModel::Guest, private_address: '10.42.0.1' }
+  before { allow(subject).to receive(:guest).and_return(guest) }
+
   describe 'external_uri' do
-    pending
+    it 'should return http URI by default' do
+      expect(subject.external_uri).to eq 'http://10.42.0.1:80/'
+    end
+
+    it 'should return https URI when ssl supported' do
+      subject.ssl_supported = true
+      expect(subject.external_uri).to eq 'https://10.42.0.1:443/'
+    end
+
+    it 'should use custom ssl port' do
+      subject.ssl_supported = true
+      subject.ssl_port = 8443
+      expect(subject.external_uri).to eq 'https://10.42.0.1:8443/'
+    end
   end
 
   describe 'internal_uri' do
-    pending
+    it 'should return same as external_uri' do
+      expect(subject.internal_uri).to eq subject.external_uri
+    end
   end
 
   describe 'status_uri' do
-    pending
+    it 'should append /nginx_status to internal_uri' do
+      expect(subject.status_uri).to eq "#{subject.internal_uri}/nginx_status"
+    end
   end
 
   describe 'service_status' do
-    pending
+    it 'should return parsed nginx status on success' do
+      body = "Active connections: 42\nserver accepts handled requests\n 100 100 500\nReading: 1 Writing: 2 Waiting: 39\n"
+      response = double 'response', code: '200', body: body, http_version: '1.1'
+      allow(Net::HTTP).to receive(:start).and_yield(double('http').tap { |h| allow(h).to receive(:request).and_return(response) })
+
+      result = subject.service_status
+      expect(result['active']).to eq 42
+      expect(result['accepted']).to eq 100
+      expect(result['requests']).to eq 500
+    end
+
+    it 'should return error hash when connection fails' do
+      allow(Net::HTTP).to receive(:start).and_raise(Errno::ECONNREFUSED)
+
+      result = subject.service_status
+      expect(result[:key]).to eq :not_reachable
+      expect(result[:severity]).to eq :critical
+    end
   end
 
   describe 'allowed_deploy_mongodb_read_preferences' do
@@ -148,15 +190,31 @@ describe CloudModel::Services::Nginx do
   end
 
   describe '#redeployable_redeploy_web_image_states' do
-    pending
+    it 'should return finished, failed, and not_started' do
+      expect(CloudModel::Services::Nginx.redeployable_redeploy_web_image_states).to eq [:finished, :failed, :not_started]
+    end
   end
 
   describe 'redeployable?' do
-    pending
+    it 'should return true for not_started state' do
+      subject.redeploy_web_image_state = :not_started
+      expect(subject.redeployable?).to eq true
+    end
+
+    it 'should return false for running state' do
+      subject.redeploy_web_image_state = :running
+      expect(subject.redeployable?).to eq false
+    end
   end
 
   describe 'worker' do
-    pending
+    it 'should return NginxWorker instance' do
+      container = double 'container'
+      allow(guest).to receive(:current_lxd_container).and_return(container)
+      allow(CloudModel::Workers::Services::NginxWorker).to receive(:new).with(container, subject).and_return(double('worker'))
+
+      expect(subject.worker).to be_truthy
+    end
   end
 
   describe 'content_security_policy' do
@@ -197,10 +255,37 @@ describe CloudModel::Services::Nginx do
   end
 
   describe 'redeploy' do
-    pending
+    it 'should return false if not redeployable' do
+      subject.redeploy_web_image_state = :running
+      expect(subject.redeploy).to eq false
+    end
+
+    it 'should enqueue job when redeployable' do
+      subject.redeploy_web_image_state = :not_started
+      allow(subject).to receive(:update_attribute)
+      allow(subject).to receive(:id).and_return(BSON::ObjectId.new)
+      allow(guest).to receive(:id).and_return(BSON::ObjectId.new)
+      allow(CloudModel::Services::NginxJobs::RedeployJob).to receive(:perform_later)
+
+      subject.redeploy
+      expect(CloudModel::Services::NginxJobs::RedeployJob).to have_received(:perform_later)
+    end
   end
 
   describe 'redeploy!' do
-    pending
+    it 'should return false if not redeployable and not pending' do
+      subject.redeploy_web_image_state = :running
+      expect(subject.redeploy!).to eq false
+    end
+
+    it 'should call worker redeploy_web_image when redeployable' do
+      subject.redeploy_web_image_state = :not_started
+      worker = double 'worker'
+      allow(subject).to receive(:worker).and_return(worker)
+      allow(worker).to receive(:redeploy_web_image)
+
+      subject.redeploy!
+      expect(worker).to have_received(:redeploy_web_image)
+    end
   end
 end

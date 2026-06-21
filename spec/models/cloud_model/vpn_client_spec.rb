@@ -19,6 +19,15 @@ describe CloudModel::VpnClient do
   it { expect(subject).to validate_format_of(:address).not_to_allow("256.2.1.2") }
 
   describe 'config_tarball' do
-    pending
+    it 'should return a StringIO tar archive' do
+      subject.name = 'test-client'
+      controller = double 'controller'
+      allow(ActionController::Base).to receive(:new).and_return(controller)
+      allow(controller).to receive(:render_to_string).and_return('rendered content')
+      allow(CloudModel::Host).to receive(:each).and_yield(double(name: 'host1', tinc_public_key: 'key'))
+
+      result = subject.config_tarball
+      expect(result).to be_a StringIO
+    end
   end
 end

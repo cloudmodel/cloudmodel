@@ -31,16 +31,20 @@ describe CloudModel::WebApps::WordpressWebApp do
   end
 
   describe 'set_salt_keys' do
-    pending
+    it 'should generate all 8 salt keys' do
+      allow(subject).to receive(:generate_salt_key).and_return('salt_value')
 
-    # self.wp_auth_key = generate_salt_key
-    # self.wp_secure_auth_key = generate_salt_key
-    # self.wp_logged_in_key = generate_salt_key
-    # self.wp_nonce_key = generate_salt_key
-    # self.wp_auth_salt = generate_salt_key
-    # self.wp_secure_auth_salt = generate_salt_key
-    # self.wp_logged_in_salt = generate_salt_key
-    # self.wp_nonce_salt = generate_salt_key
+      subject.set_salt_keys
+
+      expect(subject.wp_auth_key).to eq 'salt_value'
+      expect(subject.wp_secure_auth_key).to eq 'salt_value'
+      expect(subject.wp_logged_in_key).to eq 'salt_value'
+      expect(subject.wp_nonce_key).to eq 'salt_value'
+      expect(subject.wp_auth_salt).to eq 'salt_value'
+      expect(subject.wp_secure_auth_salt).to eq 'salt_value'
+      expect(subject.wp_logged_in_salt).to eq 'salt_value'
+      expect(subject.wp_nonce_salt).to eq 'salt_value'
+    end
   end
 
   describe 'needed_components' do
@@ -78,16 +82,12 @@ describe CloudModel::WebApps::WordpressWebApp do
   end
 
   describe '#fetch_app_command' do
-    pending
-    # # Cache files?
-    # [
-    #   'mkdir -p /opt/web-app',
-    #   'cd /opt/web-app',
-    #   'wget https://wordpress.org/latest.tar.gz',
-    #   'tar xzf latest.tar.gz',
-    #   'rm latest.tar.gz',
-    #   'chown -R 100000:100000 /opt/web-app/wordpress'
-    # ] * ' && '
+    it 'should return shell commands to download and extract wordpress' do
+      cmd = CloudModel::WebApps::WordpressWebApp.fetch_app_command
+      expect(cmd).to include('wget https://wordpress.org/latest.tar.gz')
+      expect(cmd).to include('mkdir -p /opt/web-app')
+      expect(cmd).to include('tar xzf latest.tar.gz')
+    end
   end
 
   describe 'config_files_to_render' do

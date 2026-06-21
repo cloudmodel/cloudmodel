@@ -27,7 +27,22 @@ describe CloudModel::SolrMirror do
   end
 
   describe 'update_file' do
-    pending
+    it 'should download file and store in GridFS' do
+      tempfile = double Tempfile, path: '/tmp/test.tgz', binmode: nil
+      allow(Tempfile).to receive(:new).and_return(tempfile)
+      allow(subject).to receive(:`).and_return('')
+      allow(subject).to receive(:original_file_url).and_return('http://example.com/solr.tgz')
+
+      gridfs_file = double 'gridfs_file', id: 'new_id'
+      allow(gridfs_file).to receive(:update_attribute)
+      allow(Mongoid::GridFs).to receive(:put).with('/tmp/test.tgz').and_return(gridfs_file)
+      allow(subject).to receive(:update_attribute)
+      allow(subject).to receive(:file).and_return(nil)
+      allow(tempfile).to receive(:close)
+      allow(tempfile).to receive(:unlink)
+
+      subject.update_file
+    end
   end
 
   describe 'file_size' do

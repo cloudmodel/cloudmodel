@@ -311,7 +311,23 @@ describe CloudModel::LxdCustomVolume do
   end
 
   describe 'usage_bytes' do
-    pending
+    it 'should return used bytes from df monitoring data' do
+      subject.guest = guest
+      subject.name = 'test-vol'
+      subject.pool = 'default'
+      allow(guest).to receive(:monitoring_last_check_result).and_return({
+        'system' => {'df' => {:"guests/custom/test-vol" => {'used' => '1024'}}}
+      })
+
+      expect(subject.usage_bytes).to eq 1024 * 1024
+    end
+
+    it 'should return nil when no monitoring data' do
+      subject.guest = guest
+      allow(guest).to receive(:monitoring_last_check_result).and_return(nil)
+
+      expect(subject.usage_bytes).to eq nil
+    end
   end
 
   describe 'usage_percentage' do
@@ -346,11 +362,44 @@ describe CloudModel::LxdCustomVolume do
   end
 
   describe 'backup' do
-    pending
+    it 'should return false if has_backups is false' do
+      subject.has_backups = false
+      expect(subject.backup).to eq false
+    end
+
+    it 'should run rsync and create symlink on success' do
+      subject.has_backups = true
+      subject.guest = guest
+      allow(subject).to receive(:backup_directory).and_return('/backups/test')
+      allow(subject).to receive(:host_path).and_return('/var/lib/lxd/custom/vol/')
+      private_network = double list_ips: ['10.42.0.1']
+      allow(host).to receive(:private_network).and_return(private_network)
+      allow(CloudModel.config).to receive(:data_directory).and_return('/data')
+      allow(FileUtils).to receive(:mkdir_p)
+      allow(Rails.logger).to receive(:debug)
+      allow(subject).to receive(:`) { `true`; '' }
+      allow(File).to receive(:exist?).and_return(true)
+      allow(FileUtils).to receive(:rm_f)
+      allow(FileUtils).to receive(:ln_s)
+      allow(subject).to receive(:cleanup_backups)
+
+      expect(subject.backup).to eq true
+    end
   end
 
   describe 'restore' do
-    pending
+    it 'should run rsync restore command' do
+      subject.guest = guest
+      allow(subject).to receive(:backup_directory).and_return('/backups/test')
+      allow(subject).to receive(:host_path).and_return('/var/lib/lxd/custom/vol/')
+      private_network = double list_ips: ['10.42.0.1']
+      allow(host).to receive(:private_network).and_return(private_network)
+      allow(CloudModel.config).to receive(:data_directory).and_return('/data')
+      allow(Rails.logger).to receive(:debug)
+      allow(subject).to receive(:`) { `true`; '' }
+
+      expect(subject.restore).to eq true
+    end
   end
 
   describe 'set_volume_name' do

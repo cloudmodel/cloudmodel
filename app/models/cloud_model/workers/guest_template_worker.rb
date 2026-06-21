@@ -160,10 +160,6 @@ module CloudModel
         rescue Exception => e
           CloudModel.log_exception e
           template.update_attributes build_state: :failed, build_last_issue: "#{e}"
-          puts "#{e.class}: #{e.message}"
-          e.backtrace.each do |bt|
-            puts "\tfrom #{bt}"
-          end
           cleanup_chroot build_path
           raise "Failed to build core image!"
         end
@@ -238,10 +234,6 @@ module CloudModel
         rescue Exception => e
           CloudModel.log_exception e
           template.update_attributes build_state: :failed, build_last_issue: "#{e}"
-          puts "#{e.class}: #{e.message}"
-          e.backtrace.each do |bt|
-            puts "\tfrom #{bt}"
-          end
           cleanup_chroot build_path
           raise "Failed to build core image!"
         end

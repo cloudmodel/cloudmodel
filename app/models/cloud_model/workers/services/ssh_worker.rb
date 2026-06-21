@@ -25,7 +25,7 @@ module CloudModel
             begin
               @host.sftp.lstat! "#{ssh_host_key_source}/#{key_file}"
             rescue Net::SFTP::StatusException => e
-              puts "          Generate #{type} SSH key"
+              comment_sub_step "Generate #{type} SSH key"
               chroot! @guest.deploy_path, "ssh-keygen -t #{type} -f /etc/ssh/#{key_file.shellescape} -N ''", 'Failed to generate host keys'
               @host.exec! "cp -ra #{ssh_host_key_target.shellescape}/ssh/#{key_file}* #{ssh_host_key_source.shellescape} ", "Failed to copy new host keys to inst"
             end

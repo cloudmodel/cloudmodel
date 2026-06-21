@@ -12,7 +12,7 @@ module CloudModel
     # old key, and reloads `sshd` on each host.
     class KeysWorker < BaseWorker
       def initialize
-        @host = CloudModel::MockHost.new
+        @host = MockHost.new
         @hosts = CloudModel::Host.all
       end
 

@@ -70,10 +70,33 @@ describe CloudModel::Services::Mariadb do
   end
 
   describe 'backup' do
-    pending
+    before do
+      allow(subject).to receive(:guest).and_return double(private_address: '10.42.23.1')
+      allow(subject).to receive(:has_backups).and_return true
+      allow(subject).to receive(:backup_directory).and_return('/backups/test')
+      allow(FileUtils).to receive(:mkdir_p)
+      allow(Rails.logger).to receive(:debug)
+    end
+
+    it 'should return false if has_backups is false' do
+      allow(subject).to receive(:has_backups).and_return false
+      expect(subject.backup).to eq false
+    end
+
+    it 'should run mysqldump and return true on success' do
+      allow(subject).to receive(:`) { `true`; '' }
+      allow(File).to receive(:exist?).and_return(true)
+      allow(FileUtils).to receive(:rm_f)
+      allow(FileUtils).to receive(:ln_s)
+      allow(subject).to receive(:cleanup_backups)
+
+      expect(subject.backup).to eq true
+    end
   end
 
   describe 'restore' do
-    pending
+    it 'should be a no-op (not yet implemented)' do
+      expect(subject.restore).to eq nil
+    end
   end
 end

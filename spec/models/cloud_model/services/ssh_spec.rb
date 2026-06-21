@@ -20,7 +20,28 @@ describe CloudModel::Services::Ssh do
     end
   end
   
-  describe 'service_status' do 
-    pending
+  describe 'service_status' do
+    let(:guest) { double CloudModel::Guest, private_address: '10.42.0.1' }
+    before { allow(subject).to receive(:guest).and_return(guest) }
+
+    it 'should return ping time on success' do
+      tcp = double 'tcp'
+      allow(Net::Ping::TCP).to receive(:new).with('10.42.0.1', 22).and_return(tcp)
+      allow(tcp).to receive(:ping).and_return(true)
+
+      result = subject.service_status
+      expect(result).to have_key(:ping)
+      expect(result[:ping]).to be_a Float
+    end
+
+    it 'should return error hash on failure' do
+      tcp = double 'tcp'
+      allow(Net::Ping::TCP).to receive(:new).with('10.42.0.1', 22).and_return(tcp)
+      allow(tcp).to receive(:ping).and_return(false)
+
+      result = subject.service_status
+      expect(result[:key]).to eq :not_reachable
+      expect(result[:severity]).to eq :critical
+    end
   end
 end

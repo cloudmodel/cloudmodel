@@ -15,8 +15,18 @@ module CloudModel
   end
 
   def self.log_exception e
-    Rails.logger.error "CloudModel: uncaught #{e.class} exception while handling connection: #{e.message}"
-    Rails.logger.error "Stack trace:\n#{e.backtrace.map {|l| "  #{l}\n"}.join}"
+    message = "CloudModel: uncaught #{e.class} exception while handling connection: #{e.message}"
+    trace = "Stack trace:\n#{e.backtrace.to_a.map {|l| "  #{l}\n"}.join}"
+
+    Rails.logger.error message
+    Rails.logger.error trace
+
+    # Also surface the exception and backtrace on stderr so a human running a
+    # console, rake task, or production process sees what failed directly,
+    # not only buried in the log. Tests silence this via a global stub in
+    # spec_helper to keep spec output clean.
+    warn message
+    warn trace
   end
 
   def self.debian_names
