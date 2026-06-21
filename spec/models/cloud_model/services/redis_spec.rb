@@ -21,16 +21,77 @@ describe CloudModel::Services::Redis do
     end
   end
 
+  let(:guest) { double CloudModel::Guest, private_address: '10.42.0.1' }
+  before { allow(subject).to receive(:guest).and_return(guest) }
+
   describe 'service_status' do
-    pending
+    it 'should return redis info with cleaned keys' do
+      redis = double 'redis'
+      allow(::Redis).to receive(:new).and_return(redis)
+      allow(redis).to receive(:info).and_return({'connected_clients' => '5', 'redis_version' => '7.0', 'redis_mode' => 'standalone'})
+      allow(redis).to receive(:close)
+
+      result = subject.service_status
+      expect(result['connected_clients']).to eq '5'
+      expect(result).not_to have_key('redis_version')
+      expect(result).not_to have_key('redis_mode')
+    end
+
+    it 'should return critical error on CannotConnectError' do
+      redis = double 'redis'
+      allow(::Redis).to receive(:new).and_return(redis)
+      allow(redis).to receive(:info).and_raise(::Redis::CannotConnectError.new('Connection refused'))
+      allow(redis).to receive(:close)
+
+      result = subject.service_status
+      expect(result[:key]).to eq :not_reachable
+      expect(result[:severity]).to eq :critical
+    end
+
+    it 'should return warning on other exceptions' do
+      redis = double 'redis'
+      allow(::Redis).to receive(:new).and_return(redis)
+      allow(redis).to receive(:info).and_raise(RuntimeError.new('timeout'))
+      allow(redis).to receive(:close)
+
+      result = subject.service_status
+      expect(result[:key]).to eq :not_reachable
+      expect(result[:severity]).to eq :warning
+    end
   end
 
   describe 'redis_sentinel_master?' do
-    pending
+    it 'should return true if monitoring result role is master' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({'role' => 'master'})
+
+      expect(subject.redis_sentinel_master?).to eq true
+    end
+
+    it 'should check sentinel set when no monitoring data' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return(nil)
+      sentinel_set = double 'sentinel_set'
+      allow(subject).to receive(:redis_sentinel_set).and_return(sentinel_set)
+      allow(sentinel_set).to receive(:master_service).and_return(subject)
+
+      expect(subject.redis_sentinel_master?).to eq true
+    end
+
+    it 'should return false when no sentinel set and no monitoring data' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return(nil)
+      allow(subject).to receive(:redis_sentinel_set).and_return(nil)
+
+      expect(subject.redis_sentinel_master?).to eq false
+    end
   end
 
   describe 'redis_sentinel_slave?' do
-    pending
+    it 'should return inverse of redis_sentinel_master?' do
+      allow(subject).to receive(:redis_sentinel_master?).and_return(true)
+      expect(subject.redis_sentinel_slave?).to eq false
+
+      allow(subject).to receive(:redis_sentinel_master?).and_return(false)
+      expect(subject.redis_sentinel_slave?).to eq true
+    end
   end
 
   describe 'redis_sentinel_set_version' do

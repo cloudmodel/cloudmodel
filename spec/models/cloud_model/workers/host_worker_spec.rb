@@ -22,11 +22,21 @@ describe CloudModel::Workers::HostWorker do
   end
 
   describe 'root' do
-    pending
+    it 'should return /mnt/newroot' do
+      allow(subject).to receive(:root).and_call_original
+      expect(subject.root).to eq '/mnt/newroot'
+    end
   end
 
   describe 'config_firewall' do
-    pending
+    it 'should create a FirewallWorker and write scripts' do
+      allow(subject).to receive(:root).and_call_original
+      fw = double 'firewall_worker'
+      allow(CloudModel::Workers::FirewallWorker).to receive(:new).with(host).and_return(fw)
+      expect(fw).to receive(:write_scripts).with(root: '/mnt/newroot')
+
+      subject.config_firewall
+    end
   end
 
   describe 'config_fstab' do
@@ -41,7 +51,14 @@ describe CloudModel::Workers::HostWorker do
   end
 
   describe 'set_authorized_keys' do
-    pending
+    it 'should upload public key via sftp' do
+      sftp = double 'sftp'
+      allow(host).to receive(:sftp).and_return(sftp)
+      allow(CloudModel.config).to receive(:data_directory).and_return('/data')
+      expect(sftp).to receive(:upload!).with('/data/keys/id_rsa.pub', '/root/.ssh/authorized_keys')
+
+      subject.set_authorized_keys
+    end
   end
 
   describe 'boot_deploy_root' do
@@ -99,7 +116,14 @@ describe CloudModel::Workers::HostWorker do
   end
 
   describe 'update_tinc_host_files' do
-    pending
+    it 'should render tinc host files for all hosts' do
+      allow(CloudModel::Host).to receive(:each)
+      allow(CloudModel::VpnClient).to receive(:each)
+      allow(subject).to receive(:mkdir_p)
+      allow(subject).to receive(:render_to_remote)
+
+      subject.update_tinc_host_files(@root)
+    end
   end
 
   describe 'disk_partition_device' do
@@ -339,23 +363,67 @@ describe CloudModel::Workers::HostWorker do
   end
 
   describe 'ensure_cloud_filesystem' do
-    pending
+    it 'should mount /cloud if not mounted' do
+      allow(host).to receive(:mounted_at?).with('/cloud').and_return(false)
+      allow(subject).to receive(:mkdir_p).with('/cloud')
+      expect(host).to receive(:exec!).with('mount /dev/md1 /cloud', 'Failed to mount cloud filesystem')
+
+      subject.ensure_cloud_filesystem
+    end
+
+    it 'should skip if already mounted' do
+      allow(host).to receive(:mounted_at?).with('/cloud').and_return(true)
+      expect(host).not_to receive(:exec!).with('mount /dev/md1 /cloud', anything)
+
+      subject.ensure_cloud_filesystem
+    end
   end
 
   describe 'deploy_root_device' do
-    pending
+    it 'should return /dev/md2 when current root is not /dev/md2' do
+      allow(host).to receive(:exec).with('findmnt -n -o SOURCE /').and_return([true, '/dev/md3'])
+
+      expect(subject.deploy_root_device).to eq '/dev/md2'
+    end
+
+    it 'should return /dev/md3 when current root is /dev/md2' do
+      allow(host).to receive(:exec).with('findmnt -n -o SOURCE /').and_return([true, '/dev/md2'])
+
+      expect(subject.deploy_root_device).to eq '/dev/md3'
+    end
   end
 
   describe 'make_deploy_root' do
-    pending
+    it 'should create and mount filesystem' do
+      allow(subject).to receive(:deploy_root_device).and_return('/dev/md2')
+      allow(subject).to receive(:mkdir_p)
+
+      subject.make_deploy_root
+    end
   end
 
   describe 'use_last_deploy_root' do
-    pending
+    it 'should mount deploy root if not mounted' do
+      allow(host).to receive(:mounted_at?).with(@root).and_return(false)
+      allow(subject).to receive(:deploy_root_device).and_return('/dev/md2')
+      allow(subject).to receive(:mkdir_p)
+
+      subject.use_last_deploy_root
+    end
   end
 
   describe 'populate_deploy_root' do
-    pending
+    it 'should upload template and unpack' do
+      allow(subject).to receive(:ensure_cloud_filesystem)
+      template = double 'template', tarball: '/inst/template.tar'
+      allow(CloudModel::HostTemplate).to receive(:last_useable).and_return(template)
+      allow(subject).to receive(:upload_template)
+      allow(subject).to receive(:current_indent).and_return(2)
+      allow(subject).to receive(:current_counter_prefix).and_return('1.')
+      allow(subject).to receive(:mkdir_p)
+
+      subject.populate_deploy_root
+    end
   end
 
   describe 'render_guest_zpool_service' do
@@ -382,39 +450,109 @@ describe CloudModel::Workers::HostWorker do
   end
 
   describe 'config_deploy_root' do
-    pending
+    it 'should render config files to deploy root' do
+      allow(subject).to receive(:render_to_remote)
+      allow(subject).to receive(:comment_sub_step)
+      allow(subject).to receive(:mkdir_p)
+      allow(subject).to receive(:update_tinc_host_files)
+      allow(subject).to receive(:render_guest_zpool_service)
+      allow(subject).to receive(:config_firewall)
+      allow(subject).to receive(:config_fstab)
+      allow(subject).to receive(:local_exec)
+      allow(File).to receive(:exist?).and_return(true)
+      sftp = double 'sftp'
+      allow(host).to receive(:sftp).and_return(sftp)
+      allow(sftp).to receive(:upload!)
+      allow(host).to receive(:system_disks).and_return(['sda'])
+      subject.instance_variable_set(:@timestamp, Time.now)
+
+      subject.config_deploy_root
+    end
   end
 
   describe 'config_lxd' do
-    pending
+    it 'should init lxd and create network bridge' do
+      allow(host).to receive(:private_address).and_return('10.42.0.1')
+      allow(host).to receive(:private_network).and_return(double(subnet: 24))
+
+      subject.config_lxd
+    end
   end
 
   describe 'recover_lxd' do
-    pending
+    it 'should be defined' do
+      expect(subject).to respond_to(:recover_lxd)
+    end
   end
 
   describe 'update_tinc' do
-    pending
+    it 'should call Host.update_tinc_keys' do
+      allow(CloudModel::Host).to receive(:update_tinc_keys)
+
+      subject.update_tinc
+    end
   end
 
   describe 'make_keys' do
-    pending
+    it 'should create tinc key directory and render key' do
+      allow(subject).to receive(:mkdir_p)
+      allow(subject).to receive(:render_to_remote)
+
+      subject.make_keys
+    end
   end
 
   describe 'copy_keys' do
-    pending
+    it 'should copy tinc and ssh keys from old root' do
+      allow(subject).to receive(:mkdir_p)
+
+      subject.copy_keys
+    end
   end
 
   describe 'sync_inst_images' do
-    pending
+    it 'should sync images via host' do
+      allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
+      allow(host).to receive(:sync_inst_images)
+
+      subject.sync_inst_images
+    end
+
+    it 'should raise when skip_sync_images is set' do
+      allow(CloudModel.config).to receive(:skip_sync_images).and_return(true)
+
+      expect { subject.sync_inst_images }.to raise_error('skipped')
+    end
   end
 
   describe 'deploy' do
-    pending
+    it 'should return false if not pending' do
+      allow(host).to receive(:deploy_state).and_return(:finished)
+      expect(subject.deploy).to eq false
+    end
+
+    it 'should run deploy steps when pending' do
+      allow(host).to receive(:deploy_state).and_return(:pending)
+      allow(host).to receive(:update_attributes)
+      allow(subject).to receive(:run_steps)
+
+      expect { subject.deploy }.to output(/Finished/).to_stdout
+    end
   end
 
   describe 'redeploy' do
-    pending
+    it 'should return false if not pending' do
+      allow(host).to receive(:deploy_state).and_return(:finished)
+      expect(subject.redeploy).to eq false
+    end
+
+    it 'should run redeploy steps when pending' do
+      allow(host).to receive(:deploy_state).and_return(:pending)
+      allow(host).to receive(:update_attributes)
+      allow(subject).to receive(:run_steps)
+
+      expect { subject.redeploy }.to output(/Finished/).to_stdout
+    end
   end
 
 end

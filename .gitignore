@@ -1,6 +1,7 @@
 *.gem
 *.rbc
 .bundle
+.ruby-lsp
 .config
 coverage
 InstalledFiles

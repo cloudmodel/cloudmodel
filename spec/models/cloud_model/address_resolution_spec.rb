@@ -12,7 +12,28 @@ describe CloudModel::AddressResolution do
   it { expect(subject).to have_field(:ptr_active).of_type(Mongoid::Boolean).with_default_value_of true }
 
   describe '.for_subnet' do
-    pending
+    it 'should return resolutions for all IPv4 addresses in subnet' do
+      subnet = double CloudModel::Address, ip_version: 4
+      allow(CloudModel::Address).to receive(:from_str).with('10.42.0.0/28').and_return subnet
+      allow(subnet).to receive(:list_ips).with(include_network: true, include_gateway: true).and_return(['10.42.0.0', '10.42.0.1'])
+
+      resolution = double CloudModel::AddressResolution
+      expect(CloudModel::AddressResolution).to receive(:find_or_initialize_by).with(ip: '10.42.0.0').and_return(resolution)
+      expect(CloudModel::AddressResolution).to receive(:find_or_initialize_by).with(ip: '10.42.0.1').and_return(resolution)
+
+      result = CloudModel::AddressResolution.for_subnet('10.42.0.0/28')
+      expect(result.size).to eq 2
+    end
+
+    it 'should query by prefix for IPv6 subnets' do
+      subnet = double CloudModel::Address, ip_version: 6, ip: double(to_s: 'dead:beef::')
+      allow(CloudModel::Address).to receive(:from_str).with(subnet).and_return subnet
+
+      criteria = double 'criteria'
+      expect(CloudModel::AddressResolution).to receive(:where).with(ip: /^dead:beef::/).and_return(criteria)
+
+      CloudModel::AddressResolution.for_subnet(subnet)
+    end
   end
 
   describe '#address' do
@@ -35,11 +56,25 @@ describe CloudModel::AddressResolution do
   end
 
   describe '#alt_addresses' do
-    pending
+    it 'should return other resolutions with same name but different ip' do
+      subject.ip = '10.0.0.1'
+      subject.name = 'host.example.com'
+
+      criteria = double 'criteria'
+      expect(CloudModel::AddressResolution).to receive(:where).with(name: 'host.example.com', :ip.ne => '10.0.0.1').and_return(criteria)
+
+      expect(subject.alt_addresses).to eq criteria
+    end
   end
 
   describe '#alt_ips' do
-    pending
+    it 'should return ips of alt_addresses' do
+      alt1 = double CloudModel::AddressResolution, ip: '10.0.0.2'
+      alt2 = double CloudModel::AddressResolution, ip: '10.0.0.3'
+      allow(subject).to receive(:alt_addresses).and_return([alt1, alt2])
+
+      expect(subject.alt_ips).to eq ['10.0.0.2', '10.0.0.3']
+    end
   end
 
   describe 'ip validator' do

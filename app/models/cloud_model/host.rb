@@ -195,7 +195,7 @@ module CloudModel
     def email_hostname
       hostname = primary_address.hostname
 
-      if hostname == primary_address.ip.to_s or hostname !=~ /.*\..*/
+      if hostname == primary_address.ip.to_s or hostname !~ /.*\..*/
         hostname = "#{name}.#{CloudModel.config.email_domain || 'example.com'}"
       end
 

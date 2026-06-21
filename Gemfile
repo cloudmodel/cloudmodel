@@ -14,6 +14,10 @@ group :test do
   gem 'deep-cover', require: false
 end
 
+group :development do
+  gem 'ruby-lsp', require: false
+end
+
 group :development, :test do
   gem "listen"
   gem "pry"

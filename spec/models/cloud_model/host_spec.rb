@@ -294,7 +294,19 @@ describe CloudModel::Host do
   end
 
   describe '#external_address_resolutions' do
-    pending
+    it 'should return sorted address resolutions for all addresses' do
+      addr_v4 = double 'addr_v4', ip_version: 4
+      addr_v6 = double 'addr_v6', ip_version: 6
+      allow(subject).to receive(:addresses).and_return([addr_v4, addr_v6])
+
+      res_v4 = double 'res_v4', cidr: double(cmp: 0)
+      res_v6 = double 'res_v6', cidr: double(cmp: 0)
+
+      allow(CloudModel::AddressResolution).to receive(:for_subnet).with(addr_v4).and_return([res_v4])
+      allow(CloudModel::AddressResolution).to receive(:for_subnet).with(addr_v6).and_return([res_v6])
+
+      expect(subject.external_address_resolutions).to eq [res_v4, res_v6]
+    end
   end
 
   describe '#external_address_resolution_hash' do
@@ -381,7 +393,21 @@ describe CloudModel::Host do
   end
 
   describe 'email_hostname' do
-    pending
+    it 'should return hostname from primary address' do
+      primary = double 'primary_address', hostname: 'mail.example.com', ip: '192.168.1.1'
+      allow(subject).to receive(:primary_address).and_return(primary)
+
+      expect(subject.email_hostname).to eq 'mail.example.com'
+    end
+
+    it 'should use name with email domain when hostname equals IP' do
+      primary = double 'primary_address', hostname: '192.168.1.1', ip: '192.168.1.1'
+      allow(subject).to receive(:primary_address).and_return(primary)
+      subject.name = 'myhost'
+      allow(CloudModel.config).to receive(:email_domain).and_return('corp.example.com')
+
+      expect(subject.email_hostname).to eq 'myhost.corp.example.com'
+    end
   end
 
   describe 'name_with_stage' do
@@ -629,19 +655,69 @@ describe CloudModel::Host do
   end
 
   describe 'system_info' do
-    pending
+    it 'should parse check_mk_agent output on success' do
+      allow(Net::Ping::External).to receive_message_chain(:new, :ping).and_return(true)
+      allow(subject).to receive(:private_network).and_return(double(list_ips: ['10.42.0.1']))
+      allow(subject).to receive(:exec).with('check_mk_agent').and_return([true, "<<<mem>>>\nMemTotal: 1024\n"])
+      allow(subject).to receive(:exec).with('df -k -T').and_return([false, ''])
+
+      result = subject.system_info
+      expect(result).to be_a Hash
+    end
+
+    it 'should return error hash on failure' do
+      allow(Net::Ping::External).to receive_message_chain(:new, :ping).and_return(true)
+      allow(subject).to receive(:private_network).and_return(double(list_ips: ['10.42.0.1']))
+      allow(subject).to receive(:exec).with('check_mk_agent').and_return([false, 'Connection refused'])
+
+      result = subject.system_info
+      expect(result['error']).to eq 'Connection refused'
+    end
   end
 
   describe 'live_lxc_info' do
-    pending
+    it 'should parse YAML lxc list output' do
+      yaml_data = [{'name' => 'container1', 'status' => 'Running'}].to_yaml
+      allow(subject).to receive(:exec).with('lxc list --format yaml').and_return([true, yaml_data])
+
+      result = subject.live_lxc_info
+      expect(result).to eq({'container1' => {'status' => 'Running'}})
+    end
+
+    it 'should return empty hash on failure' do
+      allow(subject).to receive(:exec).with('lxc list --format yaml').and_return([false, 'error'])
+
+      expect(subject.live_lxc_info).to eq({})
+    end
   end
 
   describe 'memory_size' do
-    pending
+    it 'should return total memory in bytes from monitoring data' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {'mem' => {'mem_total' => '1048576'}}
+      })
+
+      expect(subject.memory_size).to eq 1048576 * 1024
+    end
+
+    it 'should return nil if no monitoring data' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return(nil)
+      expect(subject.memory_size).to eq nil
+    end
   end
 
   describe 'cpu_usage' do
-    pending
+    it 'should return cpu percentage from cgroup_cpu' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {'cgroup_cpu' => {'last_5_minutes_percentage' => 42.5}}
+      })
+      expect(subject.cpu_usage).to eq 42.5
+    end
+
+    it 'should return nil if no monitoring data' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return(nil)
+      expect(subject.cpu_usage).to eq nil
+    end
   end
 
   describe 'deployable?' do

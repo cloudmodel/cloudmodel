@@ -26,6 +26,10 @@ RSpec.configure do |config|
   config.before(:each) do
     Timecop.return
     Mongoid.purge!
+    # CloudModel.log_exception writes the backtrace to stderr so humans see
+    # failures in console/rake/production. Silence it here to keep spec output
+    # clean; specs that assert on it can `and_call_original`.
+    allow(CloudModel).to receive(:log_exception)
   end
   
   config.filter_run focus: true

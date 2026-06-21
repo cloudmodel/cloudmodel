@@ -373,7 +373,30 @@ describe CloudModel::LxdContainer do
 
 
   describe 'live_lxc_info' do
-    pending
+    it 'should parse YAML from lxc list and return container info' do
+      yaml_result = [{'name' => subject.name, 'status' => 'Running', 'config' => {}, 'expanded_config' => {}}].to_yaml
+      allow(subject).to receive(:lxc).with("list #{subject.name} --format yaml").and_return([true, yaml_result])
+      allow(CloudModel::LxdContainer).to receive(:_unroll_lxc_config_values).and_return({})
+
+      result = subject.live_lxc_info
+      expect(result['name']).to eq subject.name
+      expect(result['status']).to eq 'Running'
+    end
+
+    it 'should return Unknown status on failure' do
+      allow(subject).to receive(:lxc).and_return([false, ''])
+
+      result = subject.live_lxc_info
+      expect(result).to eq({'name' => subject.name, 'status' => 'Unknown'})
+    end
+
+    it 'should return Unknown status when container not found in YAML' do
+      yaml_result = [{'name' => 'other_container', 'status' => 'Running'}].to_yaml
+      allow(subject).to receive(:lxc).and_return([true, yaml_result])
+
+      result = subject.live_lxc_info
+      expect(result['status']).to eq 'Unknown'
+    end
   end
 
   describe 'lxc_info' do

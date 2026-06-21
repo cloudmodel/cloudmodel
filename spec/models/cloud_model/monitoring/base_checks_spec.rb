@@ -117,14 +117,131 @@ describe CloudModel::Monitoring::BaseChecks do
   end
 
   describe 'do_check' do
-    pending
+    let(:issue) { double 'ItemIssue', persisted?: false }
+    let(:issues) { double 'item_issues' }
+
+    before do
+      allow(check_subject).to receive(:item_issues).and_return issues
+      allow(issues).to receive(:find_or_initialize_by).and_return issue
+    end
+
+    it 'should return true and resolve issue when no checks are truthy' do
+      allow(issue).to receive(:resolved_at=)
+
+      expect do
+        expect(subject.do_check(:test_key, 'Test Check', {})).to eq true
+      end.to output(/OK/).to_stdout
+    end
+
+    it 'should save persisted issue when resolving' do
+      persisted_issue = double 'ItemIssue', persisted?: true
+      allow(issues).to receive(:find_or_initialize_by).and_return persisted_issue
+      allow(persisted_issue).to receive(:resolved_at=)
+      expect(persisted_issue).to receive(:save)
+
+      expect { subject.do_check :test_key, 'Test Check', {} }.to output(/OK/).to_stdout
+    end
+
+    it 'should not save non-persisted issue when resolving' do
+      allow(issue).to receive(:resolved_at=)
+      expect(issue).not_to receive(:save)
+
+      expect { subject.do_check :test_key, 'Test Check', {} }.to output(/OK/).to_stdout
+    end
+
+    it 'should return false and set severity when a check is truthy' do
+      allow(issue).to receive(:severity=)
+      allow(issue).to receive(:message=)
+      allow(issue).to receive(:value=)
+      allow(issue).to receive(:save)
+
+      expect do
+        expect(subject.do_check(:test_key, 'Test Check', {warning: true})).to eq false
+      end.to output(/WARNING/).to_stdout
+    end
+
+    it 'should set message and value from options' do
+      expect(issue).to receive(:severity=).with(:critical)
+      expect(issue).to receive(:message=).with('Something broke')
+      expect(issue).to receive(:value=).with('42')
+      expect(issue).to receive(:save)
+
+      expect do
+        subject.do_check :test_key, 'Test Check', {critical: true}, message: 'Something broke', value: '42'
+      end.to output(/CRITICAL/).to_stdout
+    end
+
+    it 'should use the first truthy severity' do
+      expect(issue).to receive(:severity=).with(:warning)
+      allow(issue).to receive(:message=)
+      allow(issue).to receive(:value=)
+      allow(issue).to receive(:save)
+
+      expect do
+        subject.do_check :test_key, 'Test Check', {warning: true, critical: false}
+      end.to output(/WARNING/).to_stdout
+    end
   end
 
   describe 'do_check_value' do
-    pending
+    before do
+      allow(subject).to receive(:do_check)
+    end
+
+    it 'should set check to true when value exceeds threshold' do
+      expect(subject).to receive(:do_check).with(:mem, 'Mem', {warning: true}, anything)
+      subject.do_check_value :mem, 90, {warning: 80}
+    end
+
+    it 'should set check to false when value is below threshold' do
+      expect(subject).to receive(:do_check).with(:mem, 'Mem', {warning: false}, anything)
+      subject.do_check_value :mem, 50, {warning: 80}
+    end
+
+    it 'should format float values with 2 decimal places' do
+      expect(subject).to receive(:do_check).with(:mem, anything, anything, hash_including(value: '75.30%'))
+      subject.do_check_value :mem, 75.3, {}, unit: '%'
+    end
+
+    it 'should build default message from name and value' do
+      expect(subject).to receive(:do_check).with(:mem, 'Mem', anything, hash_including(message: 'Mem is 75%'))
+      subject.do_check_value :mem, 75, {}, unit: '%'
+    end
+
+    it 'should use custom name when provided' do
+      expect(subject).to receive(:do_check).with(:mem, 'Memory', anything, anything)
+      subject.do_check_value :mem, 75, {}, name: 'Memory'
+    end
   end
 
-  describe 'do_check_errors_on' do
-    pending
+  describe 'do_check_for_errors_on' do
+    before do
+      allow(subject).to receive(:do_check)
+    end
+
+    it 'should call do_check with severity when result key matches an error case' do
+      result = {key: :service_down, severity: :critical, error: 'Service crashed'}
+      expect(subject).to receive(:do_check).with(:service_down, 'Service status', {critical: true}, message: 'Service crashed')
+      subject.do_check_for_errors_on result, {service_down: 'Service status'}
+    end
+
+    it 'should default severity to warning when not specified' do
+      result = {key: :service_down, error: 'Down'}
+      expect(subject).to receive(:do_check).with(:service_down, 'Service status', {warning: true}, message: 'Down')
+      subject.do_check_for_errors_on result, {service_down: 'Service status'}
+    end
+
+    it 'should call do_check with empty checks for non-matching error cases' do
+      result = {key: :service_down, error: 'Down'}
+      expect(subject).to receive(:do_check).with(:service_down, 'Service status', {warning: true}, message: 'Down')
+      expect(subject).to receive(:do_check).with(:config_error, 'Config', {})
+      subject.do_check_for_errors_on result, {service_down: 'Service status', config_error: 'Config'}
+    end
+
+    it 'should mark all as OK when result key matches none' do
+      result = {key: :other}
+      expect(subject).to receive(:do_check).with(:svc, 'Service', {})
+      subject.do_check_for_errors_on result, {svc: 'Service'}
+    end
   end
 end

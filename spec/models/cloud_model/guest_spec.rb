@@ -414,7 +414,17 @@ describe CloudModel::Guest do
     end
 
     context 'services' do
-      pending
+      it 'should copy services to new guest' do
+        host2 = Factory :host
+        subject.host = host
+        subject.name = 'test-guest'
+        subject.services.build(_type: 'CloudModel::Services::Ssh', port: 22)
+        allow(host2).to receive(:dhcp_private_address).and_return('10.42.0.2')
+        allow(host2).to receive(:dhcp_external_address).and_return(nil)
+
+        new_guest = subject.copy_to_host(host2)
+        expect(new_guest.services.size).to eq 1
+      end
     end
   end
 
@@ -780,11 +790,48 @@ describe CloudModel::Guest do
   end
 
   describe 'check_mk_agent' do
-    pending
+    it 'should return result from TCP connection on success' do
+      tcp = double 'tcp'
+      allow(Net::Ping::TCP).to receive(:new).with(subject.private_address, 6556).and_return(tcp)
+      allow(tcp).to receive(:ping).and_return(true)
+      socket = double 'socket'
+      allow(TCPSocket).to receive(:new).and_return(socket)
+      allow(socket).to receive(:gets).and_return("<<<check_mk>>>\n", nil)
+      allow(socket).to receive(:close)
+
+      success, result = subject.check_mk_agent
+      expect(success).to eq true
+      expect(result).to include '<<<check_mk>>>'
+    end
+
+    it 'should return false on connection refused' do
+      tcp = double 'tcp'
+      allow(Net::Ping::TCP).to receive(:new).and_return(tcp)
+      allow(tcp).to receive(:ping).and_return(false)
+
+      success, result = subject.check_mk_agent
+      expect(success).to eq false
+    end
   end
 
   describe 'system_info' do
-    pending
+    it 'should parse check_mk_agent output on success' do
+      allow(subject).to receive(:current_lxd_container).and_return(double('container'))
+      allow(Net::Ping::External).to receive_message_chain(:new, :ping).and_return(true)
+      allow(subject).to receive(:check_mk_agent).and_return([true, "<<<mem>>>\nMemTotal: 1024\n"])
+
+      result = subject.system_info
+      expect(result).to be_a Hash
+    end
+
+    it 'should return error hash on failure' do
+      allow(subject).to receive(:current_lxd_container).and_return(double('container'))
+      allow(Net::Ping::External).to receive_message_chain(:new, :ping).and_return(true)
+      allow(subject).to receive(:check_mk_agent).and_return([false, 'Connection refused'])
+
+      result = subject.system_info
+      expect(result['error']).to eq 'Connection refused'
+    end
   end
 
   describe 'mem_usage' do
@@ -910,7 +957,17 @@ describe CloudModel::Guest do
   end
 
   describe 'cpu_usage' do
-    pending
+    it 'should return cpu percentage from cgroup_cpu monitoring data' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return({
+        'system' => {'cgroup_cpu' => {'last_5_minutes_percentage' => 42.5}}
+      })
+      expect(subject.cpu_usage).to eq 42.5
+    end
+
+    it 'should return nil if no monitoring data' do
+      allow(subject).to receive(:monitoring_last_check_result).and_return(nil)
+      expect(subject.cpu_usage).to eq nil
+    end
   end
 
   describe 'apply_memory_size' do
@@ -1225,26 +1282,102 @@ describe CloudModel::Guest do
   end
 
   describe 'fix_lxd_custom_volumes' do
-    pending
+    it 'should create and attach volumes that do not exist' do
+      volume = double 'volume', volume_exists?: false, name: 'test-vol',
+                       host_path: '/var/lib/lxd/custom/test-vol/', mount_point: 'var/data',
+                       to_s: 'test-vol'
+      allow(subject).to receive(:lxd_custom_volumes).and_return([volume])
+      allow(subject).to receive(:stop)
+      allow(subject).to receive(:start).and_return([true, ''])
+      allow(subject).to receive(:host_root_path).and_return('/var/lib/lxd/containers/test/')
+      container = double 'container', name: 'test-container'
+      allow(container).to receive(:lxc)
+      allow(subject).to receive(:current_lxd_container).and_return(container)
+      allow(subject).to receive(:name).and_return('test')
+      allow(subject).to receive(:host).and_return(host)
+      allow(host).to receive(:exec)
+      allow(volume).to receive(:create_volume!)
+
+      expect { subject.fix_lxd_custom_volumes }.to output(/Finding/).to_stdout
+    end
   end
 
   describe 'backup' do
-    pending
+    it 'should call backup on services with has_backups' do
+      service = double 'service', has_backups: true, _type: 'TestService'
+      allow(service).to receive(:backup).and_return(true)
+      services = double 'services'
+      allow(services).to receive(:where).with(has_backups: true).and_return([service])
+      allow(subject).to receive(:services).and_return(services)
+      allow(Rails.logger).to receive(:debug)
+
+      expect(subject.backup).to eq true
+    end
+
+    it 'should return false if any service backup fails' do
+      service = double 'service', has_backups: true
+      allow(service).to receive(:backup).and_return(false)
+      allow(service).to receive(:_type).and_return('TestService')
+      services = double 'services'
+      allow(services).to receive(:where).with(has_backups: true).and_return([service])
+      allow(subject).to receive(:services).and_return(services)
+      allow(Rails.logger).to receive(:debug)
+
+      expect(subject.backup).to eq false
+    end
   end
 
   describe 'restore' do
-    pending
+    # no restore method defined on Guest
   end
 
   describe 'generate_mac_address' do
-    pending
+    it 'should generate a unique mac address' do
+      subject.host = host
+      allow(host).to receive(:mac_address_prefix).and_return('AB:CD')
+      guests = double 'guests'
+      allow(host).to receive(:guests).and_return(guests)
+      allow(guests).to receive(:where).and_return(double(count: 0))
+
+      subject.generate_mac_address
+      expect(subject.mac_address).to match(/^00:16:3e:AB:CD:/)
+    end
   end
 
   describe 'set_dhcp_private_address' do
-    pending
+    it 'should set private address from host if blank' do
+      subject.host = host
+      subject.private_address = nil
+      allow(host).to receive(:dhcp_private_address).and_return('10.42.0.5')
+
+      subject.send(:set_dhcp_private_address)
+      expect(subject.private_address).to eq '10.42.0.5'
+    end
+
+    it 'should not override existing private address' do
+      subject.host = host
+      subject.private_address = '10.42.0.3'
+
+      subject.send(:set_dhcp_private_address)
+      expect(subject.private_address).to eq '10.42.0.3'
+    end
   end
 
   describe 'set_mac_address' do
-    pending
+    it 'should call generate_mac_address if mac_address is blank' do
+      subject.mac_address = nil
+      allow(subject).to receive(:generate_mac_address)
+
+      subject.send(:set_mac_address)
+      expect(subject).to have_received(:generate_mac_address)
+    end
+
+    it 'should not call generate_mac_address if mac_address is set' do
+      subject.mac_address = '00:16:3e:AB:CD:01'
+      allow(subject).to receive(:generate_mac_address)
+
+      subject.send(:set_mac_address)
+      expect(subject).not_to have_received(:generate_mac_address)
+    end
   end
 end

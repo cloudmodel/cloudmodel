@@ -9,7 +9,33 @@ describe CloudModel::Monitoring::MongodbReplicationSetChecks do
   it { expect(subject).to be_a CloudModel::Monitoring::BaseChecks }
 
   describe '.check' do
-    pending
+    it 'should check each active initiated replication set' do
+      set1 = double CloudModel::MongodbReplicationSet, initiated?: true, active?: true
+      allow(CloudModel::MongodbReplicationSet).to receive(:scoped).and_return([set1])
+      checks_instance = double 'checks', check: true
+      allow(CloudModel::Monitoring::MongodbReplicationSetChecks).to receive(:new).with(set1).and_return(checks_instance)
+      allow(CloudModel::Monitoring::BaseChecks).to receive(:handle_cloudmodel_monitoring_exception).and_yield
+
+      CloudModel::Monitoring::MongodbReplicationSetChecks.check
+    end
+
+    it 'should skip non-initiated sets' do
+      set1 = double CloudModel::MongodbReplicationSet, initiated?: false, active?: true
+      allow(CloudModel::MongodbReplicationSet).to receive(:scoped).and_return([set1])
+      allow(CloudModel::Monitoring::BaseChecks).to receive(:handle_cloudmodel_monitoring_exception).and_yield
+
+      expect(CloudModel::Monitoring::MongodbReplicationSetChecks).not_to receive(:new)
+      CloudModel::Monitoring::MongodbReplicationSetChecks.check
+    end
+
+    it 'should skip inactive sets' do
+      set1 = double CloudModel::MongodbReplicationSet, initiated?: true, active?: false
+      allow(CloudModel::MongodbReplicationSet).to receive(:scoped).and_return([set1])
+      allow(CloudModel::Monitoring::BaseChecks).to receive(:handle_cloudmodel_monitoring_exception).and_yield
+
+      expect(CloudModel::Monitoring::MongodbReplicationSetChecks).not_to receive(:new)
+      CloudModel::Monitoring::MongodbReplicationSetChecks.check
+    end
   end
 
   describe 'acquire_data' do
