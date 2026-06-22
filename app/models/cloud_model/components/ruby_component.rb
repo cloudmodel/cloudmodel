@@ -3,7 +3,7 @@ module CloudModel
     # Component that installs the Ruby runtime into a guest template.
     class RubyComponent < BaseComponent
       # def requirements
-      #   [:imagemagick, :xml, :wkhtmltopdf]
+      #   [:imagemagick, :xml]
       # end
     end
   end
