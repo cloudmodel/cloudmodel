@@ -8,6 +8,71 @@ describe CloudModel::Monitoring::HostChecks do
 
   it { expect(subject).to be_a CloudModel::Monitoring::BaseChecks }
 
+  describe 'self.check' do
+    it 'should skip hosts that are booting or not_started' do
+      booting = double CloudModel::Host, name: 'booting', deploy_state: :booting
+      not_started = double CloudModel::Host, name: 'not_started', deploy_state: :not_started
+      allow(CloudModel::Host).to receive(:scoped).and_return [booting, not_started]
+
+      expect(CloudModel::Monitoring::HostChecks).not_to receive(:new)
+      expect(CloudModel::Monitoring::HostChecks).not_to receive(:handle_cloudmodel_monitoring_exception)
+
+      expect { CloudModel::Monitoring::HostChecks.check }.to output('').to_stdout
+    end
+
+    it 'should run host, guest, volume and service checks for active hosts' do
+      volume = double CloudModel::LxdCustomVolume
+      service = double CloudModel::Services::Base
+      guest = double CloudModel::Guest, lxd_custom_volumes: [volume], services: [service]
+      active_host = double CloudModel::Host, name: 'active', deploy_state: :running, guests: [guest]
+      allow(CloudModel::Host).to receive(:scoped).and_return [active_host]
+
+      host_checks = double 'HostChecks', check: true
+      guest_checks = double 'GuestChecks', check: true
+      volume_checks = double 'LxdCustomVolumeChecks', check: true
+      service_checks = double 'ServiceChecks', check: true
+
+      expect(CloudModel::Monitoring::HostChecks).to receive(:new).with(active_host).and_return host_checks
+      expect(CloudModel::Monitoring::GuestChecks).to receive(:new).with(guest).and_return guest_checks
+      expect(CloudModel::Monitoring::LxdCustomVolumeChecks).to receive(:new).with(volume).and_return volume_checks
+      expect(CloudModel::Monitoring::ServiceChecks).to receive(:new).with(service).and_return service_checks
+
+      # Run the work inline instead of spawning real threads/executors, so the
+      # stubbed mocks below are not touched from another thread (RSpec mocks are
+      # not thread-safe).
+      allow(Thread).to receive(:new) { |&blk| double('Thread', join: blk.call) }
+      allow(Rails.application.executor).to receive(:wrap).and_yield
+      allow(CloudModel::Monitoring::HostChecks).to receive(:handle_cloudmodel_monitoring_exception) do |*args, &blk|
+        blk.call
+      end
+
+      expect { CloudModel::Monitoring::HostChecks.check }.to output(/Threading/).to_stdout
+
+      expect(host_checks).to have_received(:check)
+      expect(guest_checks).to have_received(:check)
+      expect(volume_checks).to have_received(:check)
+      expect(service_checks).to have_received(:check)
+    end
+
+    it 'should skip guest sub-checks when the host check fails' do
+      guest = double CloudModel::Guest
+      active_host = double CloudModel::Host, name: 'active', deploy_state: :running, guests: [guest]
+      allow(CloudModel::Host).to receive(:scoped).and_return [active_host]
+
+      host_checks = double 'HostChecks', check: false
+      expect(CloudModel::Monitoring::HostChecks).to receive(:new).with(active_host).and_return host_checks
+      expect(CloudModel::Monitoring::GuestChecks).not_to receive(:new)
+
+      allow(Thread).to receive(:new) { |&blk| double('Thread', join: blk.call) }
+      allow(Rails.application.executor).to receive(:wrap).and_yield
+      allow(CloudModel::Monitoring::HostChecks).to receive(:handle_cloudmodel_monitoring_exception) do |*args, &blk|
+        blk.call
+      end
+
+      expect { CloudModel::Monitoring::HostChecks.check }.to output(/Done/).to_stdout
+    end
+  end
+
   describe 'line_prefix' do
     it 'should prefix host name before indention' do
       expect(subject.line_prefix).to eq '[testhost] '
@@ -127,6 +192,13 @@ describe CloudModel::Monitoring::HostChecks do
     it 'should do nothing when no zpool data' do
       allow(subject).to receive(:data).and_return({system: {}})
       expect(subject).not_to receive(:do_check_value)
+
+      subject.check_zpools
+    end
+
+    it 'should fall back to a zero usage with an empty message when there are no pools' do
+      allow(subject).to receive(:data).and_return({system: {'zpools' => {}}})
+      expect(subject).to receive(:do_check_value).with(:zpools_usage, 0, {critical: 90, warning: 75}, hash_including(unit: '%', message: ''))
 
       subject.check_zpools
     end
