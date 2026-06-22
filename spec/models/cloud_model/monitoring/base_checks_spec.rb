@@ -57,6 +57,17 @@ describe CloudModel::Monitoring::BaseChecks do
       check_subject.reload
       expect(check_subject.monitoring_last_check_result).to eq 'data' => 'some data'
     end
+
+    it 'should raise and print errors when update_attributes fails' do
+      allow(subject).to receive(:data).and_return 'data' => 'some data'
+      errors = double 'errors', as_json: {'name' => ['is invalid']}
+      allow(check_subject).to receive(:update_attributes).and_return false
+      allow(check_subject).to receive(:errors).and_return errors
+
+      expect do
+        expect { subject.store_data }.to raise_error('Failed to store monitoring data')
+      end.to output(/is invalid/).to_stdout
+    end
   end
 
   describe 'data' do
@@ -67,6 +78,15 @@ describe CloudModel::Monitoring::BaseChecks do
       expect do
         expect(subject.data).to eq 'data' => 'some data'
       end.to output("  * Acqire data ...\n    -> \e[32mOK\e[39m\n  * Store data ...\n    -> \e[32mOK\e[39m\n").to_stdout
+    end
+
+    it 'should print FAILED if store_data returns false' do
+      expect(subject).to receive(:acquire_data).and_return 'data' => 'some data'
+      expect(subject).to receive(:store_data).and_return false
+
+      expect do
+        expect(subject.data).to eq 'data' => 'some data'
+      end.to output("  * Acqire data ...\n    -> \e[32mOK\e[39m\n  * Store data ...\n    -> \e[33mFAILED\e[39m\n").to_stdout
     end
 
     it 'should acquire data as false and not store that on first run if acquire_data is nil' do
@@ -211,6 +231,120 @@ describe CloudModel::Monitoring::BaseChecks do
     it 'should use custom name when provided' do
       expect(subject).to receive(:do_check).with(:mem, 'Memory', anything, anything)
       subject.do_check_value :mem, 75, {}, name: 'Memory'
+    end
+  end
+
+  describe 'do_check_above_value' do
+    before do
+      allow(subject).to receive(:do_check)
+    end
+
+    it 'should set check to true when value is below threshold' do
+      expect(subject).to receive(:do_check).with(:disk_free, 'Disk free', {critical: true}, anything)
+      subject.do_check_above_value :disk_free, 5, {critical: 10}
+    end
+
+    it 'should set check to false when value is at or above threshold' do
+      expect(subject).to receive(:do_check).with(:disk_free, 'Disk free', {critical: false}, anything)
+      subject.do_check_above_value :disk_free, 20, {critical: 10}
+    end
+
+    it 'should format float values with 2 decimal places' do
+      expect(subject).to receive(:do_check).with(:disk_free, anything, anything, hash_including(value: '5.30%'))
+      subject.do_check_above_value :disk_free, 5.3, {}, unit: '%'
+    end
+
+    it 'should build default message from name and value' do
+      expect(subject).to receive(:do_check).with(:disk_free, 'Disk free', anything, hash_including(message: 'Disk free is 5%'))
+      subject.do_check_above_value :disk_free, 5, {}, unit: '%'
+    end
+
+    it 'should use custom name when provided' do
+      expect(subject).to receive(:do_check).with(:disk_free, 'Free space', anything, anything)
+      subject.do_check_above_value :disk_free, 5, {}, name: 'Free space'
+    end
+  end
+
+  describe 'self.handle_cloudmodel_monitoring_exception' do
+    let(:issue) { double 'ItemIssue', persisted?: false }
+
+    before do
+      allow(CloudModel::ItemIssue).to receive(:find_or_initialize_by).and_return issue
+    end
+
+    it 'should resolve the issue and return true when the block succeeds' do
+      allow(issue).to receive(:resolved_at=)
+
+      result = CloudModel::Monitoring::BaseChecks.handle_cloudmodel_monitoring_exception 'a subject', nil, 0 do
+        :ok
+      end
+
+      expect(result).to eq true
+    end
+
+    it 'should save a persisted issue when resolving' do
+      persisted_issue = double 'ItemIssue', persisted?: true
+      allow(CloudModel::ItemIssue).to receive(:find_or_initialize_by).and_return persisted_issue
+      allow(persisted_issue).to receive(:resolved_at=)
+      expect(persisted_issue).to receive(:save)
+
+      CloudModel::Monitoring::BaseChecks.handle_cloudmodel_monitoring_exception 'a subject', nil, 0 do
+        :ok
+      end
+    end
+
+    it 'should record the exception and return false when the block raises' do
+      expect(issue).to receive(:severity=).with(:warning)
+      expect(issue).to receive(:message=)
+      expect(issue).to receive(:value=).with('boom')
+      expect(issue).to receive(:save)
+
+      result = nil
+      expect do
+        result = CloudModel::Monitoring::BaseChecks.handle_cloudmodel_monitoring_exception 'a subject', nil, 2 do
+          raise 'boom'
+        end
+      end.to output(/crashed/).to_stdout
+
+      expect(result).to eq false
+    end
+
+    it 'should derive a per-symbol key and null out the subject when subject is a symbol' do
+      allow(issue).to receive(:resolved_at=)
+      expect(CloudModel::ItemIssue).to receive(:find_or_initialize_by).with(
+        key: :check_crashed_my_service, resolved_at: nil, subject: nil
+      ).and_return issue
+
+      CloudModel::Monitoring::BaseChecks.handle_cloudmodel_monitoring_exception :my_service, nil, 0 do
+        :ok
+      end
+    end
+
+    it 'should prefix output with a string host name on crash' do
+      allow(issue).to receive(:severity=)
+      allow(issue).to receive(:message=)
+      allow(issue).to receive(:value=)
+      allow(issue).to receive(:save)
+
+      expect do
+        CloudModel::Monitoring::BaseChecks.handle_cloudmodel_monitoring_exception 'subj', 'myhost', 0 do
+          raise 'boom'
+        end
+      end.to output(/\[myhost\] /).to_stdout
+    end
+
+    it 'should prefix output with the host object name on crash' do
+      allow(issue).to receive(:severity=)
+      allow(issue).to receive(:message=)
+      allow(issue).to receive(:value=)
+      allow(issue).to receive(:save)
+      host = double 'Host', name: 'objhost'
+
+      expect do
+        CloudModel::Monitoring::BaseChecks.handle_cloudmodel_monitoring_exception 'subj', host, 0 do
+          raise 'boom'
+        end
+      end.to output(/\[objhost\] /).to_stdout
     end
   end
 

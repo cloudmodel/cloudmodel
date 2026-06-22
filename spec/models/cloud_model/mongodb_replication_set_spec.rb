@@ -54,6 +54,12 @@ describe CloudModel::MongodbReplicationSet do
 
       expect(subject.feature_compatibility_version).to eq '4.2'
     end
+
+    it 'should return nil when db_command raises' do
+      allow(subject).to receive(:db_command).and_raise(RuntimeError.new('boom'))
+
+      expect(subject.feature_compatibility_version).to eq nil
+    end
   end
 
   describe 'init_rs_cmd' do
@@ -121,6 +127,21 @@ describe CloudModel::MongodbReplicationSet do
       allow(subject).to receive(:initiated?).and_return(false)
       expect(subject.client).to eq nil
     end
+
+    it 'should return nil when no operational services' do
+      allow(subject).to receive(:initiated?).and_return(true)
+      allow(subject).to receive(:operational_service_uris).and_return([])
+
+      expect(subject.client).to eq nil
+    end
+
+    it 'should return false when Mongo::Client raises' do
+      allow(subject).to receive(:initiated?).and_return(true)
+      allow(subject).to receive(:operational_service_uris).and_return(['10.42.0.1:27017'])
+      allow(Mongo::Client).to receive(:new).and_raise(StandardError.new('no connect'))
+
+      expect(subject.client).to eq false
+    end
   end
 
   describe 'db_command' do
@@ -138,6 +159,30 @@ describe CloudModel::MongodbReplicationSet do
     it 'should return nil when no client' do
       allow(subject).to receive(:client).and_return(nil)
       expect(subject.db_command(replSetGetStatus: true)).to eq nil
+    end
+
+    it 'should close client even on success' do
+      mongo_client = double 'mongo_client'
+      database = double 'database'
+      allow(subject).to receive(:client).and_return(mongo_client)
+      allow(mongo_client).to receive(:database).and_return(database)
+      allow(database).to receive(:command).and_return(double(documents: [{'ok' => 1}]))
+      expect(mongo_client).to receive(:close)
+
+      subject.db_command(replSetGetStatus: true)
+    end
+
+    it 'should return error document and close client when command raises' do
+      mongo_client = double 'mongo_client'
+      database = double 'database'
+      allow(subject).to receive(:client).and_return(mongo_client)
+      allow(mongo_client).to receive(:database).and_return(database)
+      allow(database).to receive(:command).and_raise(StandardError.new('cmd failed'))
+      expect(mongo_client).to receive(:close)
+
+      result = subject.db_command(replSetGetStatus: true)
+      expect(result.first['retval'][:error]).to match(/Can.t execute/)
+      expect(result.first['exception']).to match(/cmd failed/)
     end
   end
 
@@ -164,6 +209,44 @@ describe CloudModel::MongodbReplicationSet do
       success, _msg = subject.initiate
       expect(success).to eq true
     end
+
+    it 'should set initiated to true and run monitoring check on success' do
+      guest = double 'guest'
+      allow(subject).to receive(:guests).and_return([guest])
+      allow(subject).to receive(:init_rs_cmd).and_return('rs.initiate({})')
+      allow(guest).to receive(:exec).and_return([true, '"ok" : 1'])
+      check = double 'check'
+      expect(subject).to receive(:update_attribute).with(:initiated, true)
+      expect(CloudModel::Monitoring::MongodbReplicationSetChecks).to receive(:new).with(subject).and_return(check)
+      expect(check).to receive(:check)
+
+      success, _msg = subject.initiate
+      expect(success).to eq true
+    end
+
+    it 'should treat "ok : 0" output as failure and not set initiated' do
+      guest = double 'guest'
+      allow(subject).to receive(:guests).and_return([guest])
+      allow(subject).to receive(:init_rs_cmd).and_return('rs.initiate({})')
+      allow(guest).to receive(:exec).and_return([true, '{ "ok" : 0 }'])
+      allow(CloudModel::Monitoring::MongodbReplicationSetChecks).to receive_message_chain(:new, :check)
+      expect(subject).not_to receive(:update_attribute)
+
+      success, _msg = subject.initiate
+      expect(success).to eq false
+    end
+
+    it 'should return exec result unchanged when exec fails' do
+      guest = double 'guest'
+      allow(subject).to receive(:guests).and_return([guest])
+      allow(subject).to receive(:init_rs_cmd).and_return('rs.initiate({})')
+      allow(guest).to receive(:exec).and_return([false, 'ssh error'])
+      expect(subject).not_to receive(:update_attribute)
+
+      success, msg = subject.initiate
+      expect(success).to eq false
+      expect(msg).to eq 'ssh error'
+    end
   end
 
   describe 'status' do
@@ -178,6 +261,50 @@ describe CloudModel::MongodbReplicationSet do
       result = subject.status
       expect(result['members'].first['found']).to eq true
       expect(result['clusterTime']).to eq '2024-01-01'
+    end
+
+    it 'should add a not-found N/C member when service is not in db members' do
+      service = double 'service', server_uri: '10.42.0.9:27017'
+      allow(subject).to receive(:services).and_return([service])
+      allow(subject).to receive(:db_command).and_return([{
+        'members' => [{'name' => '10.42.0.1:27017', 'stateStr' => 'PRIMARY'}],
+        '$clusterTime' => '2024-01-01'
+      }])
+
+      result = subject.status
+      added = result['members'].find { |m| m['name'] == '10.42.0.9:27017' }
+      expect(added['found']).to eq false
+      expect(added['state']).to eq(-1)
+      expect(added['stateStr']).to eq 'N/C'
+      expect(added['service']).to eq service
+    end
+
+    it 'should default to empty data when db_command returns nil' do
+      allow(subject).to receive(:services).and_return([])
+      allow(subject).to receive(:db_command).and_return(nil)
+
+      result = subject.status
+      expect(result['members']).to eq []
+      expect(result['clusterTime']).to eq nil
+    end
+
+    it 'should replace service objects with ids when service_id_only set' do
+      host = double 'host'
+      allow(host).to receive(:id).and_return('host-id')
+      guest = double 'guest', host_id: 'host-id', id: 'guest-id'
+      service = double 'service', server_uri: '10.42.0.1:27017', guest: guest, id: 'service-id'
+      allow(subject).to receive(:services).and_return([service])
+      allow(subject).to receive(:db_command).and_return([{
+        'members' => [{'name' => '10.42.0.1:27017', 'stateStr' => 'PRIMARY'}],
+        '$clusterTime' => '2024-01-01'
+      }])
+
+      result = subject.status(service_id_only: true)
+      member = result['members'].first
+      expect(member['host_id']).to eq 'host-id'
+      expect(member['guest_id']).to eq 'guest-id'
+      expect(member['service_id']).to eq 'service-id'
+      expect(member).not_to have_key('service')
     end
   end
 
@@ -196,7 +323,16 @@ describe CloudModel::MongodbReplicationSet do
         'retval' => {error: 'fail'}, 'exception' => 'Error'
       }])
 
-      expect { subject.read_config }.to raise_error(RuntimeError)
+      expect { subject.read_config }.to raise_error(RuntimeError, /fail/)
+    end
+
+    it 'should raise when commitmentStatus is not committed' do
+      allow(subject).to receive(:db_command).and_return([{
+        'config' => {'_id' => 'test', 'version' => 1, 'members' => []},
+        'commitmentStatus' => false
+      }])
+
+      expect { subject.read_config }.to raise_error(RuntimeError, /not been committed/)
     end
   end
 
@@ -213,6 +349,75 @@ describe CloudModel::MongodbReplicationSet do
       allow(subject).to receive(:db_command).and_return([{'ok' => 1}])
 
       result = subject.reconfig
+      expect(result.first['ok']).to eq 1
+    end
+
+    it 'should add a new member for services not yet in config and bump version' do
+      service = double 'service', server_uri: '10.42.0.2:27017',
+                        mongodb_replication_priority: 30,
+                        mongodb_replication_arbiter_only: false,
+                        guest: double('guest')
+      allow(service).to receive(:to_s).and_return('mongo-svc')
+      allow(subject).to receive(:services).and_return([service])
+      allow(subject).to receive(:read_config).and_return({
+        'version' => 5,
+        'members' => [{'_id' => 0, 'host' => '10.42.0.1:27017', 'arbiterOnly' => false}]
+      })
+
+      expect(subject).to receive(:db_command) do |arg|
+        config = arg[:replSetReconfig]
+        expect(config['version']).to eq 6
+        new_member = config['members'].find { |m| m['host'] == '10.42.0.2:27017' }
+        expect(new_member['_id']).to eq 1
+        expect(new_member['priority']).to eq 30
+        [{'ok' => 1}]
+      end
+
+      subject.reconfig
+    end
+
+    it 'should initiate then re-read config when read_config first fails' do
+      service = double 'service', server_uri: '10.42.0.1:27017',
+                        mongodb_replication_priority: 50,
+                        mongodb_replication_arbiter_only: false
+      allow(subject).to receive(:services).and_return([service])
+      call = 0
+      allow(subject).to receive(:read_config) do
+        call += 1
+        raise(RuntimeError, 'no config') if call == 1
+        {'version' => 1, 'members' => [{'_id' => 0, 'host' => '10.42.0.1:27017', 'arbiterOnly' => false}]}
+      end
+      expect(subject).to receive(:initiate)
+      allow(subject).to receive(:db_command).and_return([{'ok' => 1}])
+
+      expect { subject.reconfig }.to output(/no config/).to_stdout
+    end
+
+    it 'should reconfig recursively when arbiter setting changed' do
+      service = double 'service', server_uri: '10.42.0.1:27017',
+                        mongodb_replication_priority: 50,
+                        mongodb_replication_arbiter_only: true,
+                        guest: double('guest')
+      allow(service).to receive(:to_s).and_return('mongo-svc')
+      allow(subject).to receive(:services).and_return([service])
+
+      # First read_config has the old arbiter setting (false) which differs from the
+      # service (true), so reconfig drops the member and recurses. On the recursion the
+      # config already reflects arbiterOnly true, so no further change and it terminates.
+      config_call = 0
+      allow(subject).to receive(:read_config) do
+        config_call += 1
+        if config_call == 1
+          {'version' => 1, 'members' => [{'_id' => 0, 'host' => '10.42.0.1:27017', 'arbiterOnly' => false}]}
+        else
+          {'version' => 2, 'members' => [{'_id' => 1, 'host' => '10.42.0.1:27017', 'arbiterOnly' => true}]}
+        end
+      end
+      allow(subject).to receive(:db_command).and_return([{'ok' => 1}])
+
+      result = nil
+      expect { result = subject.reconfig }.to output(/Reconfig again/).to_stdout
+      expect(subject).to have_received(:read_config).twice
       expect(result.first['ok']).to eq 1
     end
   end
@@ -233,6 +438,71 @@ describe CloudModel::MongodbReplicationSet do
     it 'should return false when no services' do
       allow(subject).to receive(:services).and_return([])
       expect { subject.update_feature_compatibility_version!('5.0') }.to output(/No services/).to_stdout
+    end
+
+    it 'should return false when already on requested feature level' do
+      allow(subject).to receive(:services).and_return([double('service')])
+      allow(subject).to receive(:feature_compatibility_version).and_return('5.0')
+
+      result = nil
+      expect { result = subject.update_feature_compatibility_version!('5.0') }.to output(/Already on requested/).to_stdout
+      expect(result).to eq false
+    end
+
+    it 'should refuse to downgrade' do
+      allow(subject).to receive(:services).and_return([double('service')])
+      allow(subject).to receive(:feature_compatibility_version).and_return('6.0')
+
+      result = nil
+      expect { result = subject.update_feature_compatibility_version!('5.0') }.to output(/can not downgrade/).to_stdout
+      expect(result).to eq false
+    end
+
+    it 'should upgrade one step, redeploy outdated services and set new FCV' do
+      guest = double 'guest', name: 'g1'
+      allow(guest).to receive(:host).and_return(double('host', name: 'h1'))
+      service = double 'service', name: 'mongo',
+                        guest: guest,
+                        service_status: {'version' => '5.0'},
+                        mongodb_version: '6.0'
+      allow(service).to receive(:update_attribute)
+      allow(guest).to receive(:redeploy!)
+      allow(subject).to receive(:services).and_return([service])
+      allow(subject).to receive(:feature_compatibility_version).and_return('5.0')
+      allow(subject).to receive(:sleep)
+      allow(subject).to receive(:db_command).and_return([{'ok' => 1}])
+
+      result = nil
+      expect {
+        result = subject.update_feature_compatibility_version!('6.0')
+      }.to output(/Set Feature Compatibility Version to 6.0/).to_stdout
+
+      expect(service).to have_received(:update_attribute).with(:mongodb_version, '6.0')
+      expect(guest).to have_received(:redeploy!).with(force: true, debug: nil)
+      expect(subject).to have_received(:db_command).with(setFeatureCompatibilityVersion: '6.0')
+      expect(result).to eq true
+    end
+
+    it 'should not redeploy when service version already matches target step' do
+      guest = double 'guest', name: 'g1'
+      allow(guest).to receive(:host).and_return(double('host', name: 'h1'))
+      service = double 'service', name: 'mongo',
+                        guest: guest,
+                        service_status: {'version' => '6.0'},
+                        mongodb_version: '6.0'
+      allow(service).to receive(:update_attribute)
+      allow(subject).to receive(:services).and_return([service])
+      allow(subject).to receive(:feature_compatibility_version).and_return('5.0')
+      allow(subject).to receive(:db_command).and_return([{'ok' => 1}])
+
+      expect(guest).not_to receive(:redeploy!)
+      expect(subject).not_to receive(:sleep)
+
+      result = nil
+      expect {
+        result = subject.update_feature_compatibility_version!('6.0')
+      }.to output(/Set Feature Compatibility Version to 6.0/).to_stdout
+      expect(result).to eq true
     end
   end
 end

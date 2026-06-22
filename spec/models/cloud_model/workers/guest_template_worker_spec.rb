@@ -288,6 +288,119 @@ describe CloudModel::Workers::GuestTemplateWorker do
       end
     end
 
+    describe 'fetch_core_template' do
+      before do
+        allow(host).to receive(:exec!)
+        allow(host).to receive(:sftp).and_return(double('sftp'))
+        allow(subject).to receive(:comment_sub_step)
+        allow(subject).to receive(:upload_template)
+        allow(core_template).to receive(:tarball).and_return('/cloud/templates/core.tar.gz')
+      end
+
+      context 'when core template is already present' do
+        before do
+          allow(template).to receive(:core_template).and_return(core_template)
+          allow(host.sftp).to receive(:stat!).and_return(true)
+        end
+
+        it 'should not upload the template if stat succeeds' do
+          expect(subject).not_to receive(:upload_template)
+          subject.fetch_core_template
+        end
+
+        it 'should unpack the core template tarball' do
+          expect(host).to receive(:exec!).with(
+            "cd #{subject.build_path} && tar xzpf /cloud/templates/core.tar.gz",
+            "Failed to unpack core template"
+          )
+          subject.fetch_core_template
+        end
+
+        it 'should refresh resolv.conf' do
+          expect(host).to receive(:exec!).with("rm #{subject.build_path}/etc/resolv.conf", "Failed to remove old resolve conf")
+          expect(host).to receive(:exec!).with("cp /etc/resolv.conf #{subject.build_path}/etc", "Failed to copy resolve conf")
+          subject.fetch_core_template
+        end
+      end
+
+      context 'when core template tarball is missing on host' do
+        before do
+          allow(template).to receive(:core_template).and_return(core_template)
+          allow(host.sftp).to receive(:stat!).and_raise(RuntimeError.new('no such file'))
+        end
+
+        it 'should upload the core template' do
+          expect(subject).to receive(:comment_sub_step).with("Downloading core template")
+          expect(subject).to receive(:upload_template).with(core_template)
+          subject.fetch_core_template
+        end
+      end
+
+      context 'when no core template exists yet' do
+        let(:new_core) { double CloudModel::GuestCoreTemplate, tarball: '/cloud/templates/new_core.tar.gz' }
+
+        before do
+          allow(template).to receive(:core_template).and_return(nil, new_core, new_core, new_core)
+          allow(template).to receive(:core_template=)
+          allow(template).to receive(:os_version).and_return('ubuntu-22.04')
+          allow(CloudModel::GuestCoreTemplate).to receive(:create!).and_return(new_core)
+          allow(new_core).to receive(:build!)
+          allow(host.sftp).to receive(:stat!).and_return(true)
+        end
+
+        it 'should create and build a new core template' do
+          expect(CloudModel::GuestCoreTemplate).to receive(:create!).with(arch: 'amd64', os_version: 'ubuntu-22.04').and_return(new_core)
+          expect(new_core).to receive(:build!).with(host)
+          subject.fetch_core_template
+        end
+      end
+    end
+
+    describe 'download_template' do
+      before do
+        allow(subject).to receive(:local_exec!)
+        allow(FileUtils).to receive(:mkdir_p)
+      end
+
+      it 'should skip when skip_sync_images is configured' do
+        allow(CloudModel.config).to receive(:skip_sync_images).and_return(true)
+        expect(subject).not_to receive(:local_exec!)
+        subject.download_template template
+      end
+
+      it 'should download tarball and metadata for a non-core template' do
+        allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
+        allow(CloudModel.config).to receive(:data_directory).and_return('/data')
+        allow(template).to receive(:tarball).and_return('/cloud/templates/tmpl.tar.gz')
+        # super (base download_template)
+        expect(subject).to receive(:local_exec!).with(/scp .*metadata\.tar\.gz/, "Failed to download archived metadata")
+        allow(subject).to receive(:local_exec!)
+        subject.download_template template
+      end
+    end
+
+    describe 'upload_template' do
+      before do
+        allow(subject).to receive(:local_exec!)
+        allow(subject).to receive(:mkdir_p)
+      end
+
+      it 'should skip when skip_sync_images is configured' do
+        allow(CloudModel.config).to receive(:skip_sync_images).and_return(true)
+        expect(subject).not_to receive(:local_exec!)
+        subject.upload_template template
+      end
+
+      it 'should upload tarball and metadata for a non-core template' do
+        allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
+        allow(CloudModel.config).to receive(:data_directory).and_return('/data')
+        allow(template).to receive(:tarball).and_return('/cloud/templates/tmpl.tar.gz')
+        expect(subject).to receive(:local_exec!).with(/scp .*metadata\.tar\.gz.*root@10\.0\.0\.1/, "Failed to upload built metadata")
+        allow(subject).to receive(:local_exec!)
+        subject.upload_template template
+      end
+    end
+
     describe 'build_template' do
       it 'should return false if template is not pending and force is not set' do
         allow(template).to receive(:build_state).and_return(:finished)
@@ -339,6 +452,111 @@ describe CloudModel::Workers::GuestTemplateWorker do
         expect(subject).to receive(:run_steps)
 
         subject.build_template(template, force: true)
+      end
+
+      it 'should print prepend_output when given' do
+        allow(template).to receive(:build_state).and_return(:pending)
+        allow(template).to receive(:update_attributes)
+        allow(subject).to receive(:mkdir_p)
+        allow(subject).to receive(:run_steps)
+
+        expect(subject).to receive(:puts).with('hello')
+
+        subject.build_template(template, prepend_output: 'hello')
+      end
+    end
+  end
+
+  context 'with a core template' do
+    let(:core_template) do
+      double CloudModel::GuestCoreTemplate,
+        id: 'core1',
+        os_version: 'ubuntu-22.04'
+    end
+
+    before do
+      allow(core_template).to receive(:is_a?).with(CloudModel::GuestCoreTemplate).and_return(true)
+      subject.instance_variable_set :@template, core_template
+    end
+
+    describe 'build_path' do
+      it 'should return the core build path' do
+        expect(subject.build_path).to eq '/cloud/build/core/core1'
+      end
+    end
+
+    describe 'build_core_template' do
+      before do
+        allow(subject).to receive(:os_version).and_return('ubuntu-22.04')
+        allow(subject).to receive(:download_path).and_return('/cloud/downloads')
+        allow(subject).to receive(:mkdir_p)
+        allow(subject).to receive(:run_steps)
+        allow(subject).to receive(:cleanup_chroot)
+        allow(core_template).to receive(:update_attributes)
+        allow(core_template).to receive(:update_attribute)
+      end
+
+      it 'should return false if not pending and force not set' do
+        allow(core_template).to receive(:build_state).and_return(:finished)
+        expect(subject.build_core_template(core_template)).to eq false
+      end
+
+      it 'should run build steps when pending' do
+        allow(core_template).to receive(:build_state).and_return(:pending)
+
+        expect(core_template).to receive(:update_attributes).with(build_state: :running, os_version: 'ubuntu-22.04')
+        expect(subject).to receive(:run_steps).with(:build, anything, {})
+        expect(core_template).to receive(:update_attributes).with(build_state: :finished, build_last_issue: "")
+
+        expect(subject.build_core_template(core_template)).to eq core_template
+      end
+
+      it 'should build when forced even if not pending' do
+        allow(core_template).to receive(:build_state).and_return(:finished)
+
+        expect(subject).to receive(:run_steps)
+        subject.build_core_template(core_template, force: true)
+      end
+
+      it 'should set build state to failed and clean up on error' do
+        allow(core_template).to receive(:build_state).and_return(:pending)
+        allow(subject).to receive(:run_steps).and_raise(RuntimeError.new("kaboom"))
+        allow(CloudModel).to receive(:log_exception)
+
+        expect(core_template).to receive(:update_attributes).with(build_state: :failed, build_last_issue: "kaboom")
+        expect(subject).to receive(:cleanup_chroot).with(subject.build_path)
+        expect { subject.build_core_template(core_template) }.to raise_error("Failed to build core image!")
+      end
+
+      it 'should print prepend_output when given' do
+        allow(core_template).to receive(:build_state).and_return(:pending)
+        expect(subject).to receive(:puts).with('starting')
+        subject.build_core_template(core_template, prepend_output: 'starting')
+      end
+    end
+
+    describe 'download_template for core template' do
+      it 'should only call super (no metadata transfer) for core templates' do
+        allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
+        allow(CloudModel.config).to receive(:data_directory).and_return('/data')
+        allow(core_template).to receive(:tarball).and_return('/cloud/templates/core.tar.gz')
+        allow(FileUtils).to receive(:mkdir_p)
+
+        # Only one local_exec! (from super), no metadata download
+        expect(subject).to receive(:local_exec!).once.with(/scp .*core\.tar\.gz/, "Failed to download archived template")
+        subject.download_template core_template
+      end
+    end
+
+    describe 'upload_template for core template' do
+      it 'should only call super (no metadata transfer) for core templates' do
+        allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
+        allow(CloudModel.config).to receive(:data_directory).and_return('/data')
+        allow(core_template).to receive(:tarball).and_return('/cloud/templates/core.tar.gz')
+        allow(subject).to receive(:mkdir_p)
+
+        expect(subject).to receive(:local_exec!).once.with(/scp .*core\.tar\.gz/, "Failed to upload built template")
+        subject.upload_template core_template
       end
     end
   end
