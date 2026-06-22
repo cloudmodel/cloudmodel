@@ -55,7 +55,27 @@ module CloudModel
         return true
       end
 
+      # Skip a dependency install when its lockfile is byte-identical to the
+      # last successful build. The marker file lives inside build_path, so a
+      # :clean build (which wipes build_path) naturally forces a fresh install.
+      def dependency_lock_unchanged?(lockfile, key)
+        marker = "#{@web_image.build_path}/.cloudmodel_#{key}.sha"
+        File.file?(lockfile) && File.file?(marker) &&
+          File.read(marker).strip == Digest::SHA256.file(lockfile).hexdigest
+      end
+
+      def store_dependency_lock(lockfile, key)
+        return unless File.file?(lockfile)
+        File.write "#{@web_image.build_path}/.cloudmodel_#{key}.sha", Digest::SHA256.file(lockfile).hexdigest
+      end
+
       def bundle_image
+        lockfile = "#{@web_image.build_path}/Gemfile.lock"
+        if dependency_lock_unchanged?(lockfile, 'gemfile') && File.directory?("#{@web_image.build_path}/bundle")
+          Rails.logger.debug "### Bundling: skipped, Gemfile.lock unchanged"
+          return true
+        end
+
         begin
           run_with_clean_env "Bundling", [
             "cd #{@web_image.build_path.shellescape}",
@@ -65,8 +85,6 @@ module CloudModel
             "#{CloudModel.config.bundle_command} install",
             "#{CloudModel.config.bundle_command} clean"
           ] * ' && '
-
-          #run_with_clean_env "Bundling", "cd #{@web_image.build_path.shellescape} && #{CloudModel.config.bundle_command} install --gemfile #{@web_image.build_path.shellescape}/Gemfile --path ./bundle --deployment --without development test"
         rescue CloudModel::ExecutionException => e
           CloudModel.log_exception e
           @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to build image.'
@@ -74,18 +92,24 @@ module CloudModel
           return false
         end
 
+        store_dependency_lock lockfile, 'gemfile'
         return true
       end
 
       def yarn_install
+        lockfile = "#{@web_image.build_path}/yarn.lock"
+        if dependency_lock_unchanged?(lockfile, 'yarn') && File.directory?("#{@web_image.build_path}/node_modules")
+          Rails.logger.debug "### Yarn install: skipped, yarn.lock unchanged"
+          return true
+        end
+
         begin
           run_with_clean_env "Yarn install", [
             "cd #{@web_image.build_path.shellescape}",
-            "npm install yarn",
+            # Install yarn only when it is not already available.
+            "command -v yarn >/dev/null 2>&1 || npm install yarn",
             # Full install (no --production): the Vite/Sass asset toolchain lives
-            # in devDependencies and is needed to build assets. node_modules is
-            # excluded from the packaged image (see PACKAGE_EXCLUDES), so this
-            # does not bloat the deployed artifact.
+            # in devDependencies and is needed to build assets.
             "yarn install --non-interactive --no-bin-links --modules-folder #{@web_image.build_path.shellescape}/node_modules"
           ] * ' && '
         rescue CloudModel::ExecutionException => e
@@ -94,21 +118,8 @@ module CloudModel
           FileUtils.rm_rf @web_image.build_gem_home
           return false
         end
-        return true
-      end
 
-      # Strip devDependency build tooling (vite, sass, …) from node_modules once
-      # assets are built, keeping runtime dependencies (e.g. puppeteer for PDF
-      # rendering). Non-fatal: a failed prune only means a slightly larger image.
-      def prune_node_modules
-        begin
-          run_with_clean_env "Pruning node modules", [
-            "cd #{@web_image.build_path.shellescape}",
-            "yarn install --production --non-interactive --no-bin-links --modules-folder #{@web_image.build_path.shellescape}/node_modules"
-          ] * ' && '
-        rescue CloudModel::ExecutionException => e
-          CloudModel.log_exception e
-        end
+        store_dependency_lock lockfile, 'yarn'
         return true
       end
 
@@ -134,17 +145,19 @@ module CloudModel
       # apply regardless of the host shell; the old --exclude={...} brace form
       # silently did nothing under dash, Ubuntu's /bin/sh).
       PACKAGE_EXCLUDES = [
-        # VCS, dev and runtime-state files
+        # VCS, dev and runtime-state files. NOTE: .bundle is NOT excluded — it
+        # holds .bundle/config (BUNDLE_PATH ./bundle, deployment mode), without
+        # which `bundle exec` on the host can't find the vendored gems.
         './.git', './.gitignore', './.rspec', './.gitkeep',
-        './tmp', './log', './db/*.sqlite3', './.bundle',
+        './tmp', './log', './db/*.sqlite3',
         './spec', './test', './features', './doc',
         # editor / OS / tooling leftovers
         './.playwright-mcp', '*.dSYM',
         # python annotation scripts
         '__pycache__', '*.pyc', '*/.venv',
-        # NOTE: node_modules is intentionally NOT excluded here — some apps need
-        # it at runtime (e.g. puppeteer for PDF rendering). devDependency build
-        # tooling is instead pruned after the asset build (see prune_node_modules).
+        # NOTE: node_modules is intentionally NOT excluded — some apps need it at
+        # runtime (e.g. puppeteer for PDF rendering) and the Vite/Sass build
+        # tooling must stay between incremental builds so assets can be rebuilt.
         # vendored / archived gems and local search index
         './vendor/cache', './solr', './gems/*.zip',
         # native extension build artifacts (Rust/cargo, C)
@@ -203,10 +216,6 @@ module CloudModel
             unless build_assets
               return false
             end
-          end
-
-          if File.file? "#{@web_image.build_path.shellescape}/package.json"
-            prune_node_modules
           end
 
           @web_image.update_attributes build_state: :packaging
