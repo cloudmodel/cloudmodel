@@ -82,13 +82,32 @@ module CloudModel
           run_with_clean_env "Yarn install", [
             "cd #{@web_image.build_path.shellescape}",
             "npm install yarn",
-            "yarn install --production --non-interactive --no-bin-links --modules-folder #{@web_image.build_path.shellescape}/node_modules"
+            # Full install (no --production): the Vite/Sass asset toolchain lives
+            # in devDependencies and is needed to build assets. node_modules is
+            # excluded from the packaged image (see PACKAGE_EXCLUDES), so this
+            # does not bloat the deployed artifact.
+            "yarn install --non-interactive --no-bin-links --modules-folder #{@web_image.build_path.shellescape}/node_modules"
           ] * ' && '
         rescue CloudModel::ExecutionException => e
           CloudModel.log_exception e
           @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to install yarn packages.'
           FileUtils.rm_rf @web_image.build_gem_home
           return false
+        end
+        return true
+      end
+
+      # Strip devDependency build tooling (vite, sass, …) from node_modules once
+      # assets are built, keeping runtime dependencies (e.g. puppeteer for PDF
+      # rendering). Non-fatal: a failed prune only means a slightly larger image.
+      def prune_node_modules
+        begin
+          run_with_clean_env "Pruning node modules", [
+            "cd #{@web_image.build_path.shellescape}",
+            "yarn install --production --non-interactive --no-bin-links --modules-folder #{@web_image.build_path.shellescape}/node_modules"
+          ] * ' && '
+        rescue CloudModel::ExecutionException => e
+          CloudModel.log_exception e
         end
         return true
       end
@@ -108,13 +127,44 @@ module CloudModel
         return true
       end
 
+      # Files and build artifacts that must never end up in the deployed image.
+      # Deliberately curated (NOT derived from .gitignore) so build output we DO
+      # serve at runtime — public/vite, public/assets — stays in the package.
+      # Patterns are matched by GNU tar via --exclude-from (a plain file, so they
+      # apply regardless of the host shell; the old --exclude={...} brace form
+      # silently did nothing under dash, Ubuntu's /bin/sh).
+      PACKAGE_EXCLUDES = [
+        # VCS, dev and runtime-state files
+        './.git', './.gitignore', './.rspec', './.gitkeep',
+        './tmp', './log', './db/*.sqlite3', './.bundle',
+        './spec', './test', './features', './doc',
+        # editor / OS / tooling leftovers
+        './.playwright-mcp', '*.dSYM',
+        # python annotation scripts
+        '__pycache__', '*.pyc', '*/.venv',
+        # NOTE: node_modules is intentionally NOT excluded here — some apps need
+        # it at runtime (e.g. puppeteer for PDF rendering). devDependency build
+        # tooling is instead pruned after the asset build (see prune_node_modules).
+        # vendored / archived gems and local search index
+        './vendor/cache', './solr', './gems/*.zip',
+        # native extension build artifacts (Rust/cargo, C)
+        '*/ext/*/target', '*/ext/*/Makefile', '*/ext/*/mkmf.log', '*/ext/*/*.o', 'gem_make.out',
+        # bundled gem cache & docs (version-agnostic; build-host ruby may differ from image)
+        './bundle/ruby/*/cache', './bundle/ruby/*/doc'
+      ].freeze
+
       def package_build
+        exclude_file = "#{@web_image.build_path}-package.excludes"
+        File.write exclude_file, PACKAGE_EXCLUDES.join("\n") + "\n"
+
         begin
-          run_within_build_env "Packaging", "/bin/tar -cpjf #{@web_image.build_path.shellescape}-building.tar.bz2 --directory #{@web_image.build_path.shellescape} --exclude={'.git','./.gitignore','./tmp/**/*','./log/**/*','./spec','./features','.rspec','.gitkeep','./bundle/#{Bundler.ruby_scope}/cache','.bundle/#{Bundler.ruby_scope}/doc'} ."
+          run_within_build_env "Packaging", "/bin/tar -cpjf #{@web_image.build_path.shellescape}-building.tar.bz2 --directory #{@web_image.build_path.shellescape} --exclude-from=#{exclude_file.shellescape} ."
         rescue CloudModel::ExecutionException => e
           CloudModel.log_exception e
           @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to package image.'
           return false
+        ensure
+          File.delete exclude_file if File.exist? exclude_file
         end
         FileUtils.mv "#{@web_image.build_path}-building.tar.bz2", "#{@web_image.build_path}.tar.bz2"
 
@@ -153,6 +203,10 @@ module CloudModel
             unless build_assets
               return false
             end
+          end
+
+          if File.file? "#{@web_image.build_path.shellescape}/package.json"
+            prune_node_modules
           end
 
           @web_image.update_attributes build_state: :packaging
