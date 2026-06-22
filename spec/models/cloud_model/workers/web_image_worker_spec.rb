@@ -104,9 +104,10 @@ describe CloudModel::Workers::WebImageWorker do
   end
 
   describe 'yarn_install' do
-    it 'should install yarn packages' do
+    it 'should install all yarn packages (incl. dev build tooling, not --production)' do
       allow(subject).to receive(:run_with_clean_env)
-      expect(subject).to receive(:run_with_clean_env).with("Yarn install", /yarn install --production/)
+      # full install (no --production): Vite/Sass build deps are needed to build assets
+      expect(subject).to receive(:run_with_clean_env).with("Yarn install", /yarn install --non-interactive --no-bin-links/)
       expect(subject.yarn_install).to eq true
     end
 
@@ -140,12 +141,42 @@ describe CloudModel::Workers::WebImageWorker do
     end
   end
 
+  describe 'prune_node_modules' do
+    it 'should reinstall with --production to strip dev build tooling' do
+      allow(subject).to receive(:run_with_clean_env)
+      expect(subject).to receive(:run_with_clean_env).with("Pruning node modules", /yarn install --production/)
+      expect(subject.prune_node_modules).to eq true
+    end
+
+    it 'should be non-fatal when pruning fails' do
+      allow(subject).to receive(:run_with_clean_env).and_raise(CloudModel::ExecutionException.new('cmd', 'fail', ''))
+      allow(CloudModel).to receive(:log_exception)
+      expect(subject.prune_node_modules).to eq true
+    end
+  end
+
   describe 'package_build' do
-    it 'should create a tar.bz2 package' do
+    before do
+      # the worker writes a tar --exclude-from list into a sibling file
+      allow(File).to receive(:write)
+      allow(File).to receive(:delete)
+    end
+
+    it 'should create a tar.bz2 package using an --exclude-from list' do
       allow(subject).to receive(:run_within_build_env)
       allow(FileUtils).to receive(:mv)
-      expect(subject).to receive(:run_within_build_env).with("Packaging", /tar -cpjf/)
+      expect(subject).to receive(:run_within_build_env).with("Packaging", /tar -cpjf .*--exclude-from=\S*web42-package\.excludes /)
       expect(subject.package_build).to eq true
+    end
+
+    it 'should write the curated exclude list (rust target excluded, node_modules kept)' do
+      allow(subject).to receive(:run_within_build_env)
+      allow(FileUtils).to receive(:mv)
+      expect(File).to receive(:write).with(
+        '/tmp/web_build/web42-package.excludes',
+        satisfy { |c| c.include?('*/ext/*/target') and c.include?('./.git') and c.include?('./doc') and !c.include?('node_modules') }
+      )
+      subject.package_build
     end
 
     it 'should return false on failure' do
@@ -215,6 +246,7 @@ describe CloudModel::Workers::WebImageWorker do
       expect(subject).to receive(:bundle_image).and_return(true)
       expect(subject).to receive(:yarn_install).and_return(true)
       expect(subject).to receive(:build_assets).and_return(true)
+      expect(subject).to receive(:prune_node_modules).and_return(true)
       expect(subject.build).to eq true
     end
 
