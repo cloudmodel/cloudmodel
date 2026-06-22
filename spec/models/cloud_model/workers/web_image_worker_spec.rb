@@ -176,19 +176,28 @@ describe CloudModel::Workers::WebImageWorker do
       allow(File).to receive(:delete)
     end
 
-    it 'should create a tar.bz2 package using an --exclude-from list' do
+    it 'should create a tar.bz2 package with anchored excludes from a list file' do
       allow(subject).to receive(:run_within_build_env)
       allow(FileUtils).to receive(:mv)
-      expect(subject).to receive(:run_within_build_env).with("Packaging", /tar -cpjf .*--exclude-from=\S*web42-package\.excludes /)
+      expect(subject).to receive(:run_within_build_env).with(
+        "Packaging",
+        /tar -cpjf .*--anchored --no-wildcards-match-slash .*--exclude-from=\S*web42-package\.excludes /
+      )
       expect(subject.package_build).to eq true
     end
 
-    it 'should write the curated exclude list (rust target excluded, node_modules kept)' do
+    it 'should write anchored excludes (gem cache + rust target out, runtime code kept)' do
       allow(subject).to receive(:run_within_build_env)
       allow(FileUtils).to receive(:mv)
       expect(File).to receive(:write).with(
         '/tmp/web_build/web42-package.excludes',
-        satisfy { |c| c.include?('*/ext/*/target') and c.include?('./.git') and c.include?('./doc') and !c.include?('node_modules') }
+        satisfy do |c|
+          c.include?("./bundle/ruby/*/cache\n") and          # anchored gem cache, not active_support/cache
+          c.include?('./bundle/ruby/*/bundler/gems/*/ext/*/target') and
+          c.include?("./.git\n") and c.include?("./doc\n") and
+          !c.include?('node_modules') and !c.include?('.bundle/config') and
+          !c.match?(%r{^\*/ext}m)                             # no un-anchored ext globs
+        end
       )
       subject.package_build
     end
