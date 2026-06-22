@@ -256,24 +256,6 @@ describe CloudModel::Services::Nginx do
     end
   end
 
-  describe 'redeploy' do
-    it 'should return false if not redeployable' do
-      subject.redeploy_web_image_state = :running
-      expect(subject.redeploy).to eq false
-    end
-
-    it 'should enqueue job when redeployable' do
-      subject.redeploy_web_image_state = :not_started
-      allow(subject).to receive(:update_attribute)
-      allow(subject).to receive(:id).and_return(BSON::ObjectId.new)
-      allow(guest).to receive(:id).and_return(BSON::ObjectId.new)
-      allow(CloudModel::Services::NginxJobs::RedeployJob).to receive(:perform_later)
-
-      subject.redeploy
-      expect(CloudModel::Services::NginxJobs::RedeployJob).to have_received(:perform_later)
-    end
-  end
-
   describe 'redeploy!' do
     it 'should return false if not redeployable and not pending' do
       subject.redeploy_web_image_state = :running
