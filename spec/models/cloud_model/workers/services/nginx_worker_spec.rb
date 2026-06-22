@@ -21,14 +21,16 @@ describe CloudModel::Workers::Services::NginxWorker do
 
   describe '.unroll_web_image' do
     let(:sftp) {double 'Sftp'}
-    let(:web_image) {double 'WebImage', name: 'test-image', file: double('ImageFile', data: 'image_data'), has_mongodb?: false, has_redis?: false, master_key: nil}
+    let(:web_image) {double 'WebImage', name: 'test-image', id: 'wimg1', file_id: 'gridfs1', file: double('ImageFile', data: 'image_data'), has_mongodb?: false, has_redis?: false, master_key: nil}
+    let(:cache_file) { '/var/cache/cloud_model/web_images/wimg1-gridfs1.tar' }
 
     before do
       allow(model).to receive(:deploy_web_image).and_return(web_image)
       allow(sftp).to receive(:upload!)
       allow(sftp).to receive(:remove!)
       allow(host).to receive(:sftp).and_return(sftp)
-      allow(host).to receive(:exec)
+      # exec returns [success, stdout]; default to a cache miss (test -f false)
+      allow(host).to receive(:exec).and_return([false, ''])
       allow(host).to receive(:exec!)
     end
 
@@ -42,12 +44,25 @@ describe CloudModel::Workers::Services::NginxWorker do
       subject.unroll_web_image('/deploy/path')
     end
 
-    it 'should upload web image tarball' do
-      expect(sftp).to receive(:upload!).with(instance_of(StringIO), anything)
+    it 'should load from GridFS and upload to the host cache on a cache miss' do
+      expect(sftp).to receive(:upload!).with(instance_of(StringIO), cache_file)
       subject.unroll_web_image('/deploy/path')
     end
 
-    it 'should extract tarball to deploy path' do
+    it 'should evict older versions of the same image on a cache miss' do
+      expect(host).to receive(:exec).with('rm -f /var/cache/cloud_model/web_images/wimg1-*.tar')
+      subject.unroll_web_image('/deploy/path')
+    end
+
+    it 'should reuse the host cache without touching GridFS on a cache hit' do
+      allow(host).to receive(:exec).with("test -f #{cache_file.shellescape}").and_return([true, ''])
+      expect(web_image).not_to receive(:file)
+      expect(sftp).not_to receive(:upload!)
+      expect(host).to receive(:exec).with(%r{cd /deploy/path && tar xpf #{Regexp.escape(cache_file)}})
+      subject.unroll_web_image('/deploy/path')
+    end
+
+    it 'should extract the cached tarball to deploy path' do
       expect(host).to receive(:exec).with(%r{cd /deploy/path && tar xpf})
       subject.unroll_web_image('/deploy/path')
     end

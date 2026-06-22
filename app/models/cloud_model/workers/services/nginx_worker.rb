@@ -14,17 +14,44 @@ module CloudModel
       # `authorized_keys` for the `www` user.
       class NginxWorker < CloudModel::Workers::Services::BaseWorker
 
+        def web_image_cache_dir
+          "/var/cache/cloud_model/web_images"
+        end
+
+        # Tarball cached on the host, keyed by web image id + GridFS file id, so a
+        # rebuilt image (new file_id) misses the cache and is re-fetched.
+        def web_image_cache_file
+          image = @model.deploy_web_image
+          "#{web_image_cache_dir}/#{image.id}-#{image.file_id}.tar"
+        end
+
+        # Ensure the current web image tarball is present on the host, loading it
+        # from GridFS (and uploading it) only once per host and image version.
+        # Returns the on-host cache path.
+        def ensure_web_image_cached_on_host
+          image = @model.deploy_web_image
+          cache_file = web_image_cache_file
+
+          return cache_file if @host.exec("test -f #{cache_file.shellescape}")&.first
+
+          comment_sub_step "Cache WebImage #{image.name} on host"
+          mkdir_p web_image_cache_dir
+          # Keep only the current version of this image on the host.
+          @host.exec "rm -f #{web_image_cache_dir}/#{image.id}-*.tar"
+          io = StringIO.new(image.file.data)
+          @host.sftp.upload!(io, cache_file)
+
+          cache_file
+        end
+
         def unroll_web_image deploy_path
           return false unless @model.deploy_web_image
 
           mkdir_p deploy_path
 
           comment_sub_step "Unroll WebImage #{@model.deploy_web_image.name} to #{deploy_path}"
-          temp_file_name = "/tmp/temp-#{SecureRandom.uuid}.tar"
-          io = StringIO.new(@model.deploy_web_image.file.data)
-          @host.sftp.upload!(io, temp_file_name)
-          @host.exec "cd #{deploy_path} && tar xpf #{temp_file_name}"
-          @host.sftp.remove!(temp_file_name)
+          cache_file = ensure_web_image_cached_on_host
+          @host.exec "cd #{deploy_path} && tar xpf #{cache_file.shellescape}"
 
           mkdir_p "#{deploy_path}/config"
 
