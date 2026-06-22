@@ -93,6 +93,20 @@ describe CloudModel::Workers::WebImageWorker do
       expect(subject.bundle_image).to eq true
     end
 
+    it 'should skip bundling when Gemfile.lock is unchanged' do
+      lock   = '/tmp/web_build/web42/Gemfile.lock'
+      marker = '/tmp/web_build/web42/.cloudmodel_gemfile.sha'
+      allow(File).to receive(:file?).and_return(false)
+      allow(File).to receive(:file?).with(lock).and_return(true)
+      allow(File).to receive(:file?).with(marker).and_return(true)
+      allow(File).to receive(:read).with(marker).and_return("abc123\n")
+      allow(Digest::SHA256).to receive(:file).with(lock).and_return(double(hexdigest: 'abc123'))
+      allow(File).to receive(:directory?).with('/tmp/web_build/web42/bundle').and_return(true)
+
+      expect(subject).not_to receive(:run_with_clean_env)
+      expect(subject.bundle_image).to eq true
+    end
+
     it 'should return false on failure' do
       allow(subject).to receive(:run_with_clean_env).and_raise(CloudModel::ExecutionException.new('cmd', 'fail', ''))
       allow(CloudModel).to receive(:log_exception)
@@ -108,6 +122,20 @@ describe CloudModel::Workers::WebImageWorker do
       allow(subject).to receive(:run_with_clean_env)
       # full install (no --production): Vite/Sass build deps are needed to build assets
       expect(subject).to receive(:run_with_clean_env).with("Yarn install", /yarn install --non-interactive --no-bin-links/)
+      expect(subject.yarn_install).to eq true
+    end
+
+    it 'should skip yarn install when yarn.lock is unchanged' do
+      lock   = '/tmp/web_build/web42/yarn.lock'
+      marker = '/tmp/web_build/web42/.cloudmodel_yarn.sha'
+      allow(File).to receive(:file?).and_return(false)
+      allow(File).to receive(:file?).with(lock).and_return(true)
+      allow(File).to receive(:file?).with(marker).and_return(true)
+      allow(File).to receive(:read).with(marker).and_return("def456\n")
+      allow(Digest::SHA256).to receive(:file).with(lock).and_return(double(hexdigest: 'def456'))
+      allow(File).to receive(:directory?).with('/tmp/web_build/web42/node_modules').and_return(true)
+
+      expect(subject).not_to receive(:run_with_clean_env)
       expect(subject.yarn_install).to eq true
     end
 
@@ -138,20 +166,6 @@ describe CloudModel::Workers::WebImageWorker do
       allow(web_image).to receive(:update_attributes)
 
       expect(subject.build_assets).to eq false
-    end
-  end
-
-  describe 'prune_node_modules' do
-    it 'should reinstall with --production to strip dev build tooling' do
-      allow(subject).to receive(:run_with_clean_env)
-      expect(subject).to receive(:run_with_clean_env).with("Pruning node modules", /yarn install --production/)
-      expect(subject.prune_node_modules).to eq true
-    end
-
-    it 'should be non-fatal when pruning fails' do
-      allow(subject).to receive(:run_with_clean_env).and_raise(CloudModel::ExecutionException.new('cmd', 'fail', ''))
-      allow(CloudModel).to receive(:log_exception)
-      expect(subject.prune_node_modules).to eq true
     end
   end
 
@@ -246,7 +260,6 @@ describe CloudModel::Workers::WebImageWorker do
       expect(subject).to receive(:bundle_image).and_return(true)
       expect(subject).to receive(:yarn_install).and_return(true)
       expect(subject).to receive(:build_assets).and_return(true)
-      expect(subject).to receive(:prune_node_modules).and_return(true)
       expect(subject.build).to eq true
     end
 
