@@ -139,31 +139,27 @@ module CloudModel
       end
 
       # Files and build artifacts that must never end up in the deployed image.
+      # Applied via `tar --anchored --no-wildcards-match-slash --exclude-from`,
+      # so every pattern is anchored at the archive root and each `*` matches a
+      # SINGLE path component. This is essential: with GNU tar's defaults `*`
+      # also matches `/`, so e.g. ./bundle/ruby/*/cache would wrongly match
+      # active_support/**/cache and strip runtime code (cache/coder.rb), and the
+      # old --exclude={...} brace form did nothing at all under dash.
       # Deliberately curated (NOT derived from .gitignore) so build output we DO
       # serve at runtime — public/vite, public/assets — stays in the package.
-      # Patterns are matched by GNU tar via --exclude-from (a plain file, so they
-      # apply regardless of the host shell; the old --exclude={...} brace form
-      # silently did nothing under dash, Ubuntu's /bin/sh).
+      # NB: .bundle is kept (holds .bundle/config / deployment BUNDLE_PATH) and
+      # node_modules is kept (runtime puppeteer + Vite tooling for rebuilds).
       PACKAGE_EXCLUDES = [
-        # VCS, dev and runtime-state files. NOTE: .bundle is NOT excluded — it
-        # holds .bundle/config (BUNDLE_PATH ./bundle, deployment mode), without
-        # which `bundle exec` on the host can't find the vendored gems.
-        './.git', './.gitignore', './.rspec', './.gitkeep',
+        # app VCS / dev / runtime-state files (root level only)
+        './.git', './.gitignore', './.rspec',
         './tmp', './log', './db/*.sqlite3',
         './spec', './test', './features', './doc',
-        # editor / OS / tooling leftovers
-        './.playwright-mcp', '*.dSYM',
-        # python annotation scripts
-        '__pycache__', '*.pyc', '*/.venv',
-        # NOTE: node_modules is intentionally NOT excluded — some apps need it at
-        # runtime (e.g. puppeteer for PDF rendering) and the Vite/Sass build
-        # tooling must stay between incremental builds so assets can be rebuilt.
-        # vendored / archived gems and local search index
-        './vendor/cache', './solr', './gems/*.zip',
-        # native extension build artifacts (Rust/cargo, C)
-        '*/ext/*/target', '*/ext/*/Makefile', '*/ext/*/mkmf.log', '*/ext/*/*.o', 'gem_make.out',
-        # bundled gem cache & docs (version-agnostic; build-host ruby may differ from image)
-        './bundle/ruby/*/cache', './bundle/ruby/*/doc'
+        './.playwright-mcp', './vendor/cache', './solr', './gems/*.zip',
+        # bundled gem cache & docs (per ruby-abi dir)
+        './bundle/ruby/*/cache', './bundle/ruby/*/doc',
+        # Rust/cargo native-extension build scratch (the loadable .so stays)
+        './bundle/ruby/*/bundler/gems/*/ext/*/target',
+        './bundle/ruby/*/gems/*/ext/*/target'
       ].freeze
 
       def package_build
@@ -171,7 +167,7 @@ module CloudModel
         File.write exclude_file, PACKAGE_EXCLUDES.join("\n") + "\n"
 
         begin
-          run_within_build_env "Packaging", "/bin/tar -cpjf #{@web_image.build_path.shellescape}-building.tar.bz2 --directory #{@web_image.build_path.shellescape} --exclude-from=#{exclude_file.shellescape} ."
+          run_within_build_env "Packaging", "/bin/tar -cpjf #{@web_image.build_path.shellescape}-building.tar.bz2 --anchored --no-wildcards-match-slash --directory #{@web_image.build_path.shellescape} --exclude-from=#{exclude_file.shellescape} ."
         rescue CloudModel::ExecutionException => e
           CloudModel.log_exception e
           @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to package image.'
