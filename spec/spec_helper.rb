@@ -1,11 +1,54 @@
 # This file is copied to spec/ when you run 'rails generate rspec:install'
 ENV["RAILS_ENV"] ||= 'test'
 
-begin
-  require 'deep-cover'
-rescue LoadError
-  # deep-cover is optional — skip if not installed
+# Coverage (opt-in): COVERAGE=1 bundle exec rspec
+#
+# Uses Ruby's VM-level Coverage library so Zeitwerk's lazy autoloads are
+# captured (plain `deep-cover exec` misses them and reports 0%). deep-cover's
+# builtin_takeover makes line coverage stricter: a line counts as covered only
+# when *everything* on it ran. Must be required before any engine code loads.
+if ENV['COVERAGE']
+  begin
+    require 'deep_cover/builtin_takeover'
+  rescue LoadError
+    # deep-cover is optional — fall back to plain builtin Coverage
+  end
+  require 'coverage'
+  Coverage.start
+
+  at_exit do
+    root = File.expand_path('../..', __FILE__)
+    results = Coverage.result.select do |path, _|
+      (path.start_with?("#{root}/app/") || path.start_with?("#{root}/lib/")) &&
+        !path.include?('/spec/')
+    end
+
+    files = results.map do |path, lines|
+      relevant = lines.compact
+      covered  = relevant.count { |hits| hits > 0 }
+      total    = relevant.size
+      { path: path.sub("#{root}/", ''), covered: covered, total: total,
+        pct: total.zero? ? 100.0 : (covered.to_f / total * 100) }
+    end
+
+    total_lines   = files.sum { |f| f[:total] }
+    covered_lines = files.sum { |f| f[:covered] }
+    overall = total_lines.zero? ? 0.0 : (covered_lines.to_f / total_lines * 100)
+
+    worst = files.select { |f| f[:total] > 0 }.sort_by { |f| f[:pct] }.first(15)
+
+    puts "\n" + ('=' * 72)
+    puts format('Coverage: %.2f%% (%d/%d lines) across %d files',
+                overall, covered_lines, total_lines, files.size)
+    puts '-' * 72
+    puts 'Lowest-covered files:'
+    worst.each do |f|
+      puts format('  %6.2f%%  %4d/%-4d  %s', f[:pct], f[:covered], f[:total], f[:path])
+    end
+    puts '=' * 72
+  end
 end
+
 require "rails/mongoid"
 require File.expand_path("../dummy/config/environment", __FILE__)
 require 'rspec/rails'
