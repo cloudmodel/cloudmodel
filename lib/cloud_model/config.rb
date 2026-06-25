@@ -19,6 +19,7 @@ module CloudModel
     attr_writer :tinc_network, :tinc_client_name
 
     attr_writer :backup_hosts, :monitoring_notifiers
+    attr_writer :monitoring_sample_retention
     attr_accessor :issue_url
 
     attr_accessor :build_host_name
@@ -120,6 +121,21 @@ module CloudModel
 
     def monitoring_notifiers
       @monitoring_notifiers || []
+    end
+
+    # Round-robin retention window per monitoring sample resolution. Samples
+    # older than the window for their resolution are expired automatically by
+    # MongoDB (TTL index on CloudModel::MonitoringSample#expires_at).
+    #
+    # Defaults keep high-resolution data briefly and downsampled data for long
+    # time graphs. Override (whole hash) via the configure block.
+    # @return [Hash{Symbol=>ActiveSupport::Duration}]
+    def monitoring_sample_retention
+      @monitoring_sample_retention || {
+        raw: 2.days,
+        hour: 90.days,
+        day: 3.years
+      }
     end
   end
 end

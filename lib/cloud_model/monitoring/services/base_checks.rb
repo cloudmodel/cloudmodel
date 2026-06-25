@@ -14,6 +14,12 @@ module CloudModel
           "[#{@subject.guest.host.name}] #{super}"
         end
 
+        # Records every numeric counter the service status exposes (connections,
+        # requests, memory, cache hits, …) so they can be graphed over time.
+        def sample_metrics
+          flatten_numeric data
+        end
+
         def check
 
         end

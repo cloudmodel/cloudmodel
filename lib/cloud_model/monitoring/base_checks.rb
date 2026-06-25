@@ -27,6 +27,7 @@ module CloudModel
         attrs = {monitoring_last_check_at: Time.now, monitoring_last_check_result: data}
 
         if @subject.update_attributes attrs
+          record_sample
           true
         else
           #pp attrs
@@ -69,6 +70,44 @@ module CloudModel
 
       def line_prefix
         "#{' ' * (indent_size)}"
+      end
+
+      # Numeric metrics to record as a time-series sample for this check cycle.
+      # Override in subclasses to extract the values worth graphing. Returns an
+      # empty hash by default (no sample recorded).
+      # @return [Hash{String=>Numeric}]
+      def sample_metrics
+        {}
+      end
+
+      # Record a {CloudModel::MonitoringSample} from {#sample_metrics}. Failures
+      # are swallowed so a sampling problem never breaks monitoring itself.
+      def record_sample
+        metrics = sample_metrics
+        return if metrics.blank?
+
+        CloudModel::MonitoringSample.record! @subject, metrics, at: (@subject.monitoring_last_check_at || Time.now)
+      rescue => e
+        puts "#{line_prefix}  \e[33m! Failed to record monitoring sample: #{e.message}\e[39m"
+      end
+
+      # Flatten a nested data hash into a flat `"a.b.c" => Float` map, keeping
+      # only numeric (and boolean → 1.0/0.0) leaf values. Arrays are skipped.
+      # @return [Hash{String=>Float}]
+      def flatten_numeric obj, prefix = nil
+        result = {}
+        case obj
+        when Hash
+          obj.each do |k, v|
+            key = prefix ? "#{prefix}.#{k}" : k.to_s
+            result.merge! flatten_numeric(v, key)
+          end
+        when Integer, Float
+          result[prefix] = obj.to_f if prefix
+        when true, false
+          result[prefix] = (obj ? 1.0 : 0.0) if prefix
+        end
+        result
       end
 
       def do_check key, name, checks, options = {}

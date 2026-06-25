@@ -58,6 +58,15 @@ describe CloudModel::Monitoring::BaseChecks do
       expect(check_subject.monitoring_last_check_result).to eq 'data' => 'some data'
     end
 
+    it 'should record a monitoring sample after storing' do
+      check_subject = Factory :certificate
+      subject.instance_variable_set :@subject, check_subject
+      allow(subject).to receive(:data).and_return 'data' => 'some data'
+
+      expect(subject).to receive(:record_sample)
+      subject.store_data
+    end
+
     it 'should raise and print errors when update_attributes fails' do
       allow(subject).to receive(:data).and_return 'data' => 'some data'
       errors = double 'errors', as_json: {'name' => ['is invalid']}
@@ -133,6 +142,56 @@ describe CloudModel::Monitoring::BaseChecks do
       expect(subject.line_prefix).to eq '  '
       allow(subject).to receive(:indent_size).and_return 6
       expect(subject.line_prefix).to eq '      '
+    end
+  end
+
+  describe 'sample_metrics' do
+    it 'should be empty by default' do
+      expect(subject.sample_metrics).to eq({})
+    end
+  end
+
+  describe 'flatten_numeric' do
+    it 'should flatten nested numeric values into dotted keys' do
+      data = {a: 1, b: {c: 2.5, d: {e: 3}}}
+      expect(subject.flatten_numeric(data)).to eq 'a' => 1.0, 'b.c' => 2.5, 'b.d.e' => 3.0
+    end
+
+    it 'should map booleans to 1.0 / 0.0' do
+      expect(subject.flatten_numeric({up: true, down: false})).to eq 'up' => 1.0, 'down' => 0.0
+    end
+
+    it 'should skip strings and arrays' do
+      expect(subject.flatten_numeric({a: 'text', b: [1, 2], c: 4})).to eq 'c' => 4.0
+    end
+
+    it 'should return an empty hash for non-hash input' do
+      expect(subject.flatten_numeric(nil)).to eq({})
+      expect(subject.flatten_numeric(false)).to eq({})
+    end
+  end
+
+  describe 'record_sample' do
+    it 'should record the sample metrics for the subject' do
+      allow(subject).to receive(:sample_metrics).and_return 'cpu.load_1' => 1.5
+      allow(check_subject).to receive(:monitoring_last_check_at).and_return Time.now
+
+      expect(CloudModel::MonitoringSample).to receive(:record!).with(check_subject, {'cpu.load_1' => 1.5}, at: check_subject.monitoring_last_check_at)
+      subject.record_sample
+    end
+
+    it 'should do nothing when there are no metrics' do
+      allow(subject).to receive(:sample_metrics).and_return({})
+      expect(CloudModel::MonitoringSample).not_to receive(:record!)
+      subject.record_sample
+    end
+
+    it 'should swallow errors so sampling never breaks monitoring' do
+      allow(subject).to receive(:sample_metrics).and_return 'cpu.load_1' => 1.5
+      allow(check_subject).to receive(:monitoring_last_check_at).and_return Time.now
+      allow(CloudModel::MonitoringSample).to receive(:record!).and_raise 'boom'
+
+      expect { expect { subject.record_sample }.not_to raise_error }.to output(/Failed to record monitoring sample/).to_stdout
     end
   end
 

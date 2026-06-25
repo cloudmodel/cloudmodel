@@ -204,6 +204,33 @@ describe CloudModel::Monitoring::HostChecks do
     end
   end
 
+  describe 'sample_metrics' do
+    it 'should combine sysinfo metrics with zpool capacity and temperature sensors' do
+      allow(subject).to receive(:sysinfo_sample_metrics).and_return('cpu.load_1' => 0.5)
+      allow(subject).to receive(:data).and_return({system: {
+        'zpools' => {'tank' => {cap_percentage: '50'}, 'data' => {cap_percentage: '80'}},
+        'sensors' => {
+          'core0' => {'type' => 'temp', 'input' => 45.0},
+          'fan1' => {'type' => 'fan', 'input' => 1200.0}
+        }
+      }})
+
+      expect(subject.sample_metrics).to eq(
+        'cpu.load_1' => 0.5,
+        'zpool.tank.cap' => 50.0,
+        'zpool.data.cap' => 80.0,
+        'sensor.core0' => 45.0
+      )
+    end
+
+    it 'should just be the sysinfo metrics without zpool / sensor data' do
+      allow(subject).to receive(:sysinfo_sample_metrics).and_return('mem.usage' => 12.0)
+      allow(subject).to receive(:data).and_return({system: {}})
+
+      expect(subject.sample_metrics).to eq 'mem.usage' => 12.0
+    end
+  end
+
   describe 'check' do
     it 'should call check_system_info and check md, sensors, smart, zpools' do
       expect(subject).to receive(:check_system_info).and_return true

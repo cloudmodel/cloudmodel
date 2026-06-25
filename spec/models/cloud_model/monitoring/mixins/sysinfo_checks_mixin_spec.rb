@@ -160,6 +160,37 @@ describe CloudModel::Monitoring::Mixins::SysinfoChecksMixin do
     end
   end
 
+  describe 'sysinfo_sample_metrics' do
+    it 'should be empty without system data' do
+      allow(subject).to receive(:data).and_return({system: nil})
+      expect(subject.sysinfo_sample_metrics).to eq({})
+    end
+
+    it 'should extract cpu load and usage' do
+      allow(subject).to receive(:data).and_return({system: {
+        'cpu' => {'last_minute_load' => '0.4', 'last_5_minutes_load' => '0.5', 'last_15_minutes_load' => '0.6'},
+        'cgroup_cpu' => {'last_minute_percentage' => '42', 'last_5_minutes_percentage' => '30', 'last_15_minutes_percentage' => '20'}
+      }})
+      metrics = subject.sysinfo_sample_metrics
+      expect(metrics).to include('cpu.load_1' => 0.4, 'cpu.load_5' => 0.5, 'cpu.load_15' => 0.6)
+      expect(metrics).to include('cpu.usage_1' => 42.0, 'cpu.usage_5' => 30.0, 'cpu.usage_15' => 20.0)
+    end
+
+    it 'should compute memory usage percentage' do
+      allow(subject).to receive(:data).and_return({system: {'mem' => {'mem_total' => '1000', 'mem_available' => '250'}}})
+      expect(subject.sysinfo_sample_metrics).to eq 'mem.usage' => 75.0
+    end
+
+    it 'should compute per-mount disk usage and skip loop / zero-size devices' do
+      allow(subject).to receive(:data).and_return({system: {'df' => {
+        '/dev/sda1' => {'size' => '100', 'used' => '40', 'mountpoint' => '/'},
+        '/dev/loop0' => {'size' => '100', 'used' => '100', 'mountpoint' => '/snap'},
+        '/dev/sda9' => {'size' => '0', 'used' => '0', 'mountpoint' => '/empty'}
+      }}})
+      expect(subject.sysinfo_sample_metrics).to eq 'disk./.usage' => 40.0
+    end
+  end
+
   describe 'check_system_info' do
     it 'should run all sysinfo checks when system info is available' do
       allow(subject).to receive(:data).and_return({system: {'error' => ''}})

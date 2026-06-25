@@ -30,6 +30,13 @@ describe CloudModel::Monitoring::Services::BaseChecks do
     end
   end
 
+  describe 'sample_metrics' do
+    it 'should flatten the numeric values from the service status' do
+      allow(subject).to receive(:data).and_return('connections' => 12, 'memory' => {'used' => 2048}, 'version' => '7.2')
+      expect(subject.sample_metrics).to eq 'connections' => 12.0, 'memory.used' => 2048.0
+    end
+  end
+
   describe 'check' do
     it 'should be a placeholder' do
       expect(subject.check).to eq nil
