@@ -19,6 +19,10 @@ module CloudModel
         }
       end
 
+      def sample_metrics
+        sysinfo_sample_metrics
+      end
+
       def check
         case @subject.up_state
         when :started

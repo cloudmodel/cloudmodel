@@ -50,6 +50,30 @@ module CloudModel
         }
       end
 
+      def sample_metrics
+        metrics = sysinfo_sample_metrics
+
+        if sys_info = data[:system]
+          if sys_info['zpools']
+            sys_info['zpools'].each do |pool_name, pool_data|
+              if pool_data[:cap_percentage]
+                metrics["zpool.#{pool_name}.cap"] = pool_data[:cap_percentage].to_f
+              end
+            end
+          end
+
+          if sys_info['sensors']
+            sys_info['sensors'].each do |name, sensor|
+              if sensor['type'] == 'temp' and sensor['input']
+                metrics["sensor.#{name}"] = sensor['input'].to_f
+              end
+            end
+          end
+        end
+
+        metrics
+      end
+
       def check_md
         if sys_info = data[:system] and sys_info['md']
           failures = []

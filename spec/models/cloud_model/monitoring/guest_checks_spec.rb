@@ -30,6 +30,13 @@ describe CloudModel::Monitoring::GuestChecks do
     end
   end
 
+  describe 'sample_metrics' do
+    it 'should be the shared sysinfo metrics' do
+      allow(subject).to receive(:sysinfo_sample_metrics).and_return('cpu.load_1' => 0.7)
+      expect(subject.sample_metrics).to eq 'cpu.load_1' => 0.7
+    end
+  end
+
   describe 'check' do
     it 'should call check_system_info on started guest' do
       allow(guest).to receive(:up_state).and_return :started

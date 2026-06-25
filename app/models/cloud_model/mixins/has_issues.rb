@@ -37,6 +37,26 @@ module CloudModel
         [self]
       end
 
+      # All recorded {CloudModel::MonitoringSample}s for this record. Queried by
+      # polymorphic subject so it works for embedded subjects (services) too.
+      # @return [Mongoid::Criteria<CloudModel::MonitoringSample>]
+      def monitoring_samples
+        CloudModel::MonitoringSample.where(subject_type: self.class.name, subject_id: id)
+      end
+
+      # Time-series monitoring samples for graphing, ordered by time.
+      #
+      # @param resolution [String] one of `raw`, `hour`, `day`
+      # @param since [Time, nil] lower bound on sample time (inclusive)
+      # @param until_time [Time, nil] upper bound on sample time (inclusive)
+      # @return [Mongoid::Criteria<CloudModel::MonitoringSample>]
+      def monitoring_history resolution: 'raw', since: nil, until_time: nil
+        scope = monitoring_samples.where(resolution: resolution.to_s)
+        scope = scope.gte(ref_at: since) if since
+        scope = scope.lte(ref_at: until_time) if until_time
+        scope.asc(:ref_at)
+      end
+
       # Returns all {ItemIssue}s that reference this record anywhere in their
       # subject chain (not just issues where this record is the direct subject).
       # @return [Mongoid::Criteria<CloudModel::ItemIssue>]
