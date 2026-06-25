@@ -122,8 +122,6 @@ module CloudModel
 
     before_validation :generate_mac_address_prefix
 
-    index _id: 1
-
     def addresses=(value)
       self.addresses.clear
       value.each do |v|
