@@ -489,7 +489,11 @@ describe CloudModel::LxdCustomVolume do
       )
       allow(subject).to receive(:`) { `true`; '' }
 
-      expect(subject.restore).to eq true
+      expect(subject.restore(force: true)).to eq true
+    end
+
+    it 'refuses to restore without force' do
+      expect { subject.restore }.to raise_error(CloudModel::BackupError, /force: true/)
     end
   end
 

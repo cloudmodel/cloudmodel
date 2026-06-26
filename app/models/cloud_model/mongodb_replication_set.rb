@@ -403,9 +403,19 @@ module CloudModel
       end
     end
 
-    # Restore a dump back into the set (writes go to the primary via the set URI).
+    # Restore a dump back into the set (writes go to the primary via the set
+    # URI). `mongorestore --drop` drops each collection before reloading it,
+    # destroying current data, so this is guarded by `force:` to prevent an
+    # accidental console trigger.
     # @param timestamp [String] 'latest' or a 14-digit backup timestamp
-    def restore timestamp = 'latest'
+    # @param force [Boolean] must be true to acknowledge the destructive --drop
+    def restore timestamp = 'latest', force: false
+      unless force
+        raise CloudModel::BackupError,
+          "Refusing to restore replica set #{name}: `mongorestore --drop` " \
+          "destroys current collections. Pass force: true to proceed."
+      end
+
       source = "#{backup_directory}/#{timestamp}"
       return false unless File.exist? source
 

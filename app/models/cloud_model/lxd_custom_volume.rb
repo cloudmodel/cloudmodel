@@ -151,11 +151,14 @@ module CloudModel
     # resolve against the actual dataset list on the host.
     # @return [String, nil]
     def zfs_dataset
-      return @zfs_dataset if defined? @zfs_dataset
+      # Only memoize a resolved dataset: a transient `host.exec` failure must
+      # not pin nil for the object's lifetime, so retry until it resolves.
+      return @zfs_dataset if defined?(@zfs_dataset) && @zfs_dataset
       zfs_pool = pool == 'default' ? 'guests' : pool
       candidates = ["#{zfs_pool}/custom/default_#{name}", "#{zfs_pool}/custom/#{name}"]
       success, out = host.exec "zfs list -H -o name -t filesystem"
-      @zfs_dataset = success ? candidates.find { |c| out.split("\n").include?(c) } : nil
+      return nil unless success
+      @zfs_dataset = candidates.find { |c| out.split("\n").include?(c) }
     end
 
     # Backup snapshots present on the source dataset, newest first.
@@ -220,9 +223,18 @@ module CloudModel
 
     # Restore a snapshot back onto the source dataset by sending it from the
     # backup host. The volume must be detached / the container stopped, as
-    # `zfs receive -F` rolls the source dataset back.
+    # `zfs receive -F` rolls the source dataset back — destroying any data
+    # written since the snapshot. Guarded by `force:` so it cannot be triggered
+    # accidentally from a console.
     # @param timestamp [String] 'latest' or a 14-digit backup timestamp
-    def restore timestamp = 'latest'
+    # @param force [Boolean] must be true to acknowledge the destructive rollback
+    def restore timestamp = 'latest', force: false
+      unless force
+        raise CloudModel::BackupError,
+          "Refusing to restore volume #{name}: `zfs receive -F` rolls back the " \
+          "source dataset and destroys newer data. Pass force: true to proceed."
+      end
+
       source = zfs_dataset
       target = backup_target_dataset
       return false unless source and target
@@ -237,14 +249,24 @@ module CloudModel
       return false unless snapshot
 
       ssh = ssh_command
-      command = "#{ssh} root@#{backup_host.private_address} \"zfs send #{snapshot.shellescape}\" | " +
-                "#{ssh} root@#{host.private_address} \"zfs receive -F #{source.shellescape}\""
-      Rails.logger.debug command
-      Rails.logger.debug `#{command}`
-      $?.success?
+      run_pipeline "#{ssh} root@#{backup_host.private_address} \"zfs send #{snapshot.shellescape}\" | " +
+                   "#{ssh} root@#{host.private_address} \"zfs receive -F #{source.shellescape}\""
     end
 
     private
+
+    # Run a shell pipeline so that a failure in ANY stage is reported, not just
+    # the last one. Plain backticks expose only the exit status of the final
+    # command, so a `zfs send` that dies mid-stream could be masked by a
+    # `zfs receive` that still exits 0. `bash -c 'set -o pipefail; …'` makes the
+    # pipeline fail if any stage fails. The whole pipeline is shell-escaped into
+    # a single bash argument, so embedded quotes/escapes are preserved.
+    # @return [Boolean] whether every stage of the pipeline succeeded
+    def run_pipeline command
+      Rails.logger.debug command
+      Rails.logger.debug `bash -c #{"set -o pipefail; #{command}".shellescape}`
+      $?.success?
+    end
 
     # Take the source snapshot, quiescing the service whose data lives on this
     # volume first (if it asks to, e.g. MongoDB fsyncLock). The ZFS snapshot is
@@ -303,11 +325,8 @@ module CloudModel
       parent = target.rpartition('/').first
       backup_host.exec "zfs create -p #{parent.shellescape}" unless parent.empty?
 
-      command = "#{ssh} root@#{host.private_address} \"zfs send #{flags} #{snapshot.shellescape}\" | " +
-                "#{ssh} root@#{backup_host.private_address} \"zfs receive -F -u #{target.shellescape}\""
-      Rails.logger.debug command
-      Rails.logger.debug `#{command}`
-      $?.success?
+      run_pipeline "#{ssh} root@#{host.private_address} \"zfs send #{flags} #{snapshot.shellescape}\" | " +
+                   "#{ssh} root@#{backup_host.private_address} \"zfs receive -F -u #{target.shellescape}\""
     end
 
     # Destroy all backup snapshots on the source except `keep` (the new base).
