@@ -149,20 +149,24 @@ describe CloudModel::Services::Mongodb do
   end
 
   describe 'restore' do
+    it 'should refuse to restore without force: true' do
+      expect { subject.restore }.to raise_error(CloudModel::BackupError, /Pass force: true/)
+    end
+
     it 'should run mongorestore and return true on success' do
       allow(subject).to receive(:backup_directory).and_return('/backups/test')
       allow(File).to receive(:exist?).with('/backups/test/latest').and_return(true)
       allow(Rails.logger).to receive(:debug)
       allow(subject).to receive(:`) { `true`; '' }
 
-      expect(subject.restore).to eq true
+      expect(subject.restore(force: true)).to eq true
     end
 
     it 'should return false if backup directory does not exist' do
       allow(subject).to receive(:backup_directory).and_return('/backups/test')
       allow(File).to receive(:exist?).with('/backups/test/latest').and_return(false)
 
-      expect(subject.restore).to eq false
+      expect(subject.restore(force: true)).to eq false
     end
   end
 

@@ -192,9 +192,21 @@ module CloudModel
         end
       end
 
-      def restore timestamp='latest'
-        if File.exist? "#{backup_directory}/#{timestamp}"
-          command = "LC_ALL=C mongorestore --drop -h #{guest.private_address} --port #{port} #{backup_directory}/#{timestamp}"
+      # Restore a dump back into this standalone member. `mongorestore --drop`
+      # drops each collection before reloading it, destroying current data, so
+      # this is guarded by `force:` to prevent an accidental console trigger.
+      # @param timestamp [String] 'latest' or a 14-digit backup timestamp
+      # @param force [Boolean] must be true to acknowledge the destructive --drop
+      def restore timestamp='latest', force: false
+        unless force
+          raise CloudModel::BackupError,
+            "Refusing to restore mongodb #{name}: `mongorestore --drop` " \
+            "destroys current collections. Pass force: true to proceed."
+        end
+
+        source = "#{backup_directory}/#{timestamp}"
+        if File.exist? source
+          command = "LC_ALL=C mongorestore --drop -h #{guest.private_address.shellescape} --port #{port.to_i} #{source.shellescape}"
 
           Rails.logger.debug command
           Rails.logger.debug `#{command}`
