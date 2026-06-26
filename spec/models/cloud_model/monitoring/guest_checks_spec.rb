@@ -31,9 +31,13 @@ describe CloudModel::Monitoring::GuestChecks do
   end
 
   describe 'sample_metrics' do
-    it 'should be the shared sysinfo metrics' do
+    it 'should combine sysinfo metrics with custom volume usage' do
       allow(subject).to receive(:sysinfo_sample_metrics).and_return('cpu.load_1' => 0.7)
-      expect(subject.sample_metrics).to eq 'cpu.load_1' => 0.7
+      volume = double CloudModel::LxdCustomVolume, mount_point: 'data', usage_percentage: 42.0
+      empty_volume = double CloudModel::LxdCustomVolume, mount_point: 'cache', usage_percentage: nil
+      allow(guest).to receive(:lxd_custom_volumes).and_return [volume, empty_volume]
+
+      expect(subject.sample_metrics).to eq 'cpu.load_1' => 0.7, 'disk./data.usage' => 42.0
     end
   end
 

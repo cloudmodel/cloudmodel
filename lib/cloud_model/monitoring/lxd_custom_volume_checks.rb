@@ -17,6 +17,14 @@ module CloudModel
         do_check :existence, 'existence of volume', warning: not(@subject.volume_exists?)
       end
 
+      # Volume fill level (%). Uses the volume's own usage_percentage, which is
+      # derived from the parent guest's most recent df (the guest is checked
+      # just before its volumes, so it is fresh).
+      def sample_metrics
+        usage = @subject.usage_percentage
+        usage ? {'volume.usage' => usage} : {}
+      end
+
       def check
         data
         check_existence

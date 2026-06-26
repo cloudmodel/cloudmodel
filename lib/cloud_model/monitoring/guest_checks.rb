@@ -20,7 +20,18 @@ module CloudModel
       end
 
       def sample_metrics
-        sysinfo_sample_metrics
+        metrics = sysinfo_sample_metrics
+
+        # Add the guest's LXD custom volumes (their df size reflects the host
+        # pool, so use the volume's own usage; this also surfaces volumes that
+        # don't show up cleanly in df).
+        @subject.lxd_custom_volumes.each do |volume|
+          if usage = volume.usage_percentage
+            metrics["disk./#{volume.mount_point}.usage"] = usage
+          end
+        end
+
+        metrics
       end
 
       def check

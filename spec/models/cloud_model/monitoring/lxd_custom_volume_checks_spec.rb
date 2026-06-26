@@ -54,6 +54,18 @@ describe CloudModel::Monitoring::LxdCustomVolumeChecks do
     end
   end
 
+  describe 'sample_metrics' do
+    it 'should record the volume fill level' do
+      allow(volume).to receive(:usage_percentage).and_return 42.5
+      expect(subject.sample_metrics).to eq 'volume.usage' => 42.5
+    end
+
+    it 'should be empty when usage is unknown' do
+      allow(volume).to receive(:usage_percentage).and_return nil
+      expect(subject.sample_metrics).to eq({})
+    end
+  end
+
   describe 'check' do
     it 'should call existence check' do
       expect(subject).to receive(:data)
