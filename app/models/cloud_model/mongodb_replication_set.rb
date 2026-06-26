@@ -435,7 +435,7 @@ module CloudModel
     def run_replset_mongodump member, target
       host = member.guest.private_address
       port = member.port
-      base = "LC_ALL=C mongodump --gzip --readPreference=secondary -h #{host} --port #{port}"
+      base = "LC_ALL=C mongodump --gzip --readPreference=secondary -h #{host.shellescape} --port #{port.to_i}"
 
       prefixes = backup_exclude_collection_prefixes
       if prefixes.blank?
