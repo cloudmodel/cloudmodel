@@ -67,9 +67,10 @@ describe CloudModel::Monitoring::LxdCustomVolumeChecks do
   end
 
   describe 'check' do
-    it 'should call existence check' do
+    it 'should call existence and backup freshness checks' do
       expect(subject).to receive(:data)
       expect(subject).to receive(:check_existence)
+      expect(subject).to receive(:check_backup_freshness)
       subject.check
     end
   end

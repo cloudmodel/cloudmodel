@@ -858,4 +858,26 @@ describe CloudModel::Host do
       expect(subject.redeploy! force:true).to eq true
     end
   end
+
+  describe '.local' do
+    before { CloudModel::Host.remove_instance_variable(:@local) if CloudModel::Host.instance_variable_defined?(:@local) }
+    after  { CloudModel::Host.remove_instance_variable(:@local) if CloudModel::Host.instance_variable_defined?(:@local) }
+
+    it 'resolves the host of the guest whose private address is a local IP' do
+      addr = double ipv4?: true, ip_address: '10.44.3.5'
+      allow(Socket).to receive(:ip_address_list).and_return [addr]
+      guest = double 'guest', host: subject
+      allow(CloudModel::Guest).to receive(:where).and_return(double(first: guest))
+
+      expect(CloudModel::Host.local).to eq subject
+    end
+
+    it 'is nil when no guest matches a local IP' do
+      addr = double ipv4?: true, ip_address: '10.44.3.5'
+      allow(Socket).to receive(:ip_address_list).and_return [addr]
+      allow(CloudModel::Guest).to receive(:where).and_return(double(first: nil))
+
+      expect(CloudModel::Host.local).to be_nil
+    end
+  end
 end

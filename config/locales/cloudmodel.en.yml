@@ -598,6 +598,7 @@ en:
     general:
       no_check: "%{value} does not exist"
       check_crashed: "Check crashed - %{value}"
+      backup_freshness: "No recent successful backup (last: %{value})"
     sysinfo: &sysinfo_issues
       sys_info_available: Unable to access system information
       cpu_minute_usage: CPU usage in the last minute of %{value}

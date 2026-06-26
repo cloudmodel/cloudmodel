@@ -15,6 +15,19 @@ describe CloudModel::WebImage do
   it { expect(subject).to have_field(:has_mongodb).of_type(Mongoid::Boolean).with_default_value_of false }
   it { expect(subject).to have_field(:has_redis).of_type(Mongoid::Boolean).with_default_value_of false }
   it { expect(subject).to have_field(:additional_components).of_type(Array).with_default_value_of [] }
+  it { expect(subject).to have_field(:mongodb_backup_exclude_collection_prefixes).of_type(Array).with_default_value_of [] }
+
+  describe 'mongodb_backup_exclude_collection_prefixes=' do
+    it 'splits a whitespace/comma separated string into an array' do
+      subject.mongodb_backup_exclude_collection_prefixes = 'fs, search_journal  index_collection'
+      expect(subject.mongodb_backup_exclude_collection_prefixes).to eq %w(fs search_journal index_collection)
+    end
+
+    it 'accepts an array and drops blanks' do
+      subject.mongodb_backup_exclude_collection_prefixes = ['fs', '', ' search_journal ']
+      expect(subject.mongodb_backup_exclude_collection_prefixes).to eq %w(fs search_journal)
+    end
+  end
 
   it { expect(subject).to have_enum(:build_state).with_values(
     0x00 => :pending,

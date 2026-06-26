@@ -35,6 +35,47 @@ describe CloudModel::Mixins::BackupTools do
     end
   end
   
+  describe 'last_backup_at' do
+    it 'should return the time of the backup the latest symlink points to' do
+      expect(File).to receive(:symlink?).with('/var/backups/my_item/latest').and_return true
+      expect(File).to receive(:exist?).with('/var/backups/my_item/latest').and_return true
+      expect(File).to receive(:readlink).with('/var/backups/my_item/latest').and_return '/var/backups/my_item/20200403133742'
+
+      expect(subject.last_backup_at).to eq Time.strptime('20200403133742', '%Y%m%d%H%M%S')
+    end
+
+    it 'should return nil when there is no latest symlink' do
+      allow(File).to receive(:symlink?).and_return false
+
+      expect(subject.last_backup_at).to be_nil
+    end
+
+    it 'should return nil for a dangling latest symlink (target removed = fail)' do
+      allow(File).to receive(:symlink?).and_return true
+      allow(File).to receive(:exist?).and_return false
+
+      expect(subject.last_backup_at).to be_nil
+    end
+
+    it 'should not be fooled by a newer incomplete backup the symlink does not point to' do
+      # A crashed run can leave a newer timestamp dir behind; latest still
+      # points at the last good one.
+      allow(File).to receive(:symlink?).and_return true
+      allow(File).to receive(:exist?).and_return true
+      allow(File).to receive(:readlink).and_return '/var/backups/my_item/20161224204217'
+
+      expect(subject.last_backup_at).to eq Time.strptime('20161224204217', '%Y%m%d%H%M%S')
+    end
+
+    it 'should return nil when the latest link target is not a valid timestamp' do
+      allow(File).to receive(:symlink?).and_return true
+      allow(File).to receive(:exist?).and_return true
+      allow(File).to receive(:readlink).and_return '/var/backups/my_item/broken'
+
+      expect(subject.last_backup_at).to be_nil
+    end
+  end
+
   describe 'list_disposable_backups' do
     it "should keep last 3 backups" do
       keep_backups = [

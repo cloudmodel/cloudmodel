@@ -13,6 +13,7 @@ module CloudModel
     include Mongoid::Document
     include Mongoid::Timestamps
     include CloudModel::Mixins::HasIssues
+    include CloudModel::Mixins::BackupTools
     prepend CloudModel::Mixins::SmartToString
 
     # @!attribute [rw] name
@@ -26,6 +27,27 @@ module CloudModel
     # @!attribute [rw] active
     #   @return [Boolean, nil] whether the replica set is currently considered active
     field :active, type: Boolean
+
+    # @!attribute [rw] has_backups
+    #   @return [Boolean] back this replica set up once (via mongodump against a
+    #     secondary) instead of per member
+    field :has_backups, type: Boolean, default: false
+
+    # @!attribute [rw] web_image
+    #   @return [CloudModel::WebImage, nil] the app using this set; its
+    #     `mongodb_backup_exclude_collection_prefixes` are skipped in backups
+    belongs_to :web_image, class_name: "CloudModel::WebImage", optional: true
+
+    # @!attribute [rw] mongodb_backup_exclude_collection_prefixes
+    #   @return [Array<String>] collection-name prefixes to skip in this set's
+    #     mongodump backup, in addition to those from the associated WebImage
+    field :mongodb_backup_exclude_collection_prefixes, type: Array, default: []
+
+    # Accept a whitespace/comma-separated string from forms as well as an array.
+    def mongodb_backup_exclude_collection_prefixes=(value)
+      value = value.split(/[\s,]+/) if value.is_a?(String)
+      super(Array(value).map { |v| v.to_s.strip }.reject(&:blank?))
+    end
 
     # @return [Mongoid::Criteria<CloudModel::Guest>] guests running a member service
     def guests
@@ -309,6 +331,131 @@ module CloudModel
         update_feature_compatibility_version! version, options
       end
       true
+    end
+
+    # Backup
+    #
+    # Logical, selective backup of the whole replica set with a SINGLE
+    # `mongodump` (run from the admin instance against a secondary member, not
+    # per member). Collections whose names start with a prefix listed in the
+    # associated {WebImage}'s `mongodb_backup_exclude_collection_prefixes` are
+    # skipped — the exclude list is read from the WebImage record here (the
+    # WebImage does not run on the mongo host, so the admin forwards it to the
+    # dump). Stored under {#backup_directory}; retention via BackupTools.
+
+    def self.backup_all
+      where(has_backups: true).to_a.each do |set|
+        begin
+          set.backup
+        rescue => e
+          puts "Backup of replication set #{set.name} failed: #{e.message}"
+          if defined?(ExceptionNotifier)
+            ExceptionNotifier.notify_exception e, data: {replication_set: set.name, id: set.id.to_s}
+          end
+        end
+      end
+    end
+
+    def backup_directory
+      "#{CloudModel.config.backup_directory}/mongodb_replication_sets/#{id}"
+    end
+
+    # A non-arbiter secondary to dump from (falls back to any non-arbiter member).
+    # @return [CloudModel::Services::Mongodb, nil]
+    def backup_member
+      members = services.reject(&:mongodb_replication_arbiter_only)
+      members.find { |s| s.mongodb_replication_set_master? == false } || members.first
+    end
+
+    # Effective collection-name prefixes to exclude. When a WebImage is set its
+    # list takes over (the app owns the list); otherwise the set's own list is
+    # used.
+    # @return [Array<String>]
+    def backup_exclude_collection_prefixes
+      if web_image
+        web_image.mongodb_backup_exclude_collection_prefixes || []
+      else
+        mongodb_backup_exclude_collection_prefixes
+      end
+    end
+
+    def backup
+      return false unless has_backups
+
+      member = backup_member
+      unless member
+        Rails.logger.error "ReplSet backup: no usable member for #{name}"
+        return false
+      end
+
+      timestamp = Time.now.strftime "%Y%m%d%H%M%S"
+      target = "#{backup_directory}/#{timestamp}"
+      FileUtils.mkdir_p backup_directory
+
+      if run_replset_mongodump member, target
+        FileUtils.rm_f "#{backup_directory}/latest"
+        FileUtils.ln_s target, "#{backup_directory}/latest"
+        cleanup_backups
+        true
+      else
+        FileUtils.rm_rf target
+        false
+      end
+    end
+
+    # Restore a dump back into the set (writes go to the primary via the set URI).
+    # @param timestamp [String] 'latest' or a 14-digit backup timestamp
+    def restore timestamp = 'latest'
+      source = "#{backup_directory}/#{timestamp}"
+      return false unless File.exist? source
+
+      uri = "mongodb://#{service_uris * ','}/?replicaSet=#{name}"
+      command = "LC_ALL=C mongorestore --drop --uri #{uri.shellescape} #{source.shellescape}"
+      Rails.logger.debug command
+      Rails.logger.debug `#{command}`
+      $?.success?
+    end
+
+    private
+
+    # Run a single mongodump against `member` (a secondary). When the WebImage
+    # configures collection-prefix exclusions, dump each database separately
+    # (mongodump's exclusion flags require --db); otherwise dump the whole node.
+    # @return [Boolean]
+    def run_replset_mongodump member, target
+      host = member.guest.private_address
+      port = member.port
+      base = "LC_ALL=C mongodump --gzip --readPreference=secondary -h #{host} --port #{port}"
+
+      prefixes = backup_exclude_collection_prefixes
+      if prefixes.blank?
+        return run_command "#{base} -o #{target.shellescape}"
+      end
+
+      exclude = prefixes.map { |p| "--excludeCollectionsWithPrefix=#{p.shellescape}" }.join(' ')
+      dbs = backup_databases host, port
+      return false if dbs.blank?
+      dbs.all? do |db|
+        run_command "#{base} --db #{db.shellescape} #{exclude} -o #{target.shellescape}"
+      end
+    end
+
+    # Names of the non-system databases on the dump member.
+    # @return [Array<String>]
+    def backup_databases host, port
+      client = Mongo::Client.new(
+        ["#{host}:#{port}"],
+        connect_timeout: 5, server_selection_timeout: 5, connect: :direct
+      )
+      client.database_names - %w(admin config local)
+    ensure
+      client&.close
+    end
+
+    def run_command command
+      Rails.logger.debug command
+      Rails.logger.debug `#{command}`
+      $?.success?
     end
 
   end

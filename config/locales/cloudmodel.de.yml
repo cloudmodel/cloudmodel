@@ -601,6 +601,7 @@ de:
     general:
       no_check: "%{value} existiert nicht"
       check_crashed: "Absturz bei Prüfung - %{value}"
+      backup_freshness: "Kein aktuelles erfolgreiches Backup (zuletzt: %{value})"
     sysinfo: &sysinfo_issues
       sys_info_available: Kann die Systeminformationen nicht zugreifen
       cpu_minute_usage: Prozessorauslastung in der letzten Minute von %{value}
