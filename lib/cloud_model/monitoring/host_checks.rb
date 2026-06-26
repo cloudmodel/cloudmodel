@@ -69,9 +69,30 @@ module CloudModel
               end
             end
           end
+
+          if sys_info['smart']
+            sys_info['smart'].each do |dev, values|
+              if temp = smart_temperature(values)
+                metrics["smart.#{dev}.temp"] = temp
+              end
+            end
+          end
         end
 
         metrics
+      end
+
+      # Representative disk temperature (°C) from a SMART entry, mirroring the
+      # precedence used in the host view. Returns nil when no usable reading.
+      def smart_temperature values
+        temp = if values['temperature_sensor_1'] and values['temperature_sensor_2']
+          [values['temperature_sensor_1'].to_f, values['temperature_sensor_2'].to_f].max
+        elsif values['temperature']
+          values['temperature'].to_f
+        elsif values['temperature_celsius']
+          values['temperature_celsius'].to_f
+        end
+        temp if temp and temp > 0
       end
 
       def check_md

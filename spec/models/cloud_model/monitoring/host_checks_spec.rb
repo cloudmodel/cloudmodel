@@ -205,13 +205,17 @@ describe CloudModel::Monitoring::HostChecks do
   end
 
   describe 'sample_metrics' do
-    it 'should combine sysinfo metrics with zpool capacity and temperature sensors' do
+    it 'should combine sysinfo metrics with zpool capacity, temperature sensors and SMART temps' do
       allow(subject).to receive(:sysinfo_sample_metrics).and_return('cpu.load_1' => 0.5)
       allow(subject).to receive(:data).and_return({system: {
         'zpools' => {'tank' => {cap_percentage: '50'}, 'data' => {cap_percentage: '80'}},
         'sensors' => {
           'core0' => {'type' => 'temp', 'input' => 45.0},
           'fan1' => {'type' => 'fan', 'input' => 1200.0}
+        },
+        'smart' => {
+          'sda' => {'temperature_celsius' => '38'},
+          'sdb' => {'temperature_sensor_1' => '40', 'temperature_sensor_2' => '43'}
         }
       }})
 
@@ -219,15 +223,33 @@ describe CloudModel::Monitoring::HostChecks do
         'cpu.load_1' => 0.5,
         'zpool.tank.cap' => 50.0,
         'zpool.data.cap' => 80.0,
-        'sensor.core0' => 45.0
+        'sensor.core0' => 45.0,
+        'smart.sda.temp' => 38.0,
+        'smart.sdb.temp' => 43.0
       )
     end
 
-    it 'should just be the sysinfo metrics without zpool / sensor data' do
+    it 'should just be the sysinfo metrics without zpool / sensor / smart data' do
       allow(subject).to receive(:sysinfo_sample_metrics).and_return('mem.usage' => 12.0)
       allow(subject).to receive(:data).and_return({system: {}})
 
       expect(subject.sample_metrics).to eq 'mem.usage' => 12.0
+    end
+  end
+
+  describe 'smart_temperature' do
+    it 'should take the max of the two sensors when both present' do
+      expect(subject.smart_temperature('temperature_sensor_1' => '40', 'temperature_sensor_2' => '43')).to eq 43.0
+    end
+
+    it 'should fall back to temperature then temperature_celsius' do
+      expect(subject.smart_temperature('temperature' => '41')).to eq 41.0
+      expect(subject.smart_temperature('temperature_celsius' => '38')).to eq 38.0
+    end
+
+    it 'should return nil without a usable reading' do
+      expect(subject.smart_temperature({})).to be_nil
+      expect(subject.smart_temperature('temperature' => '0')).to be_nil
     end
   end
 
