@@ -51,7 +51,7 @@ module CloudModel
         return false unless has_backups
         timestamp = Time.now.strftime "%Y%m%d%H%M%S"
         FileUtils.mkdir_p "#{backup_directory}/#{timestamp}"
-        command = "LC_ALL=C mysqldump -h #{guest.private_address} -P #{port} -u backup --all-databases --all-tablespaces > #{backup_directory}/#{timestamp}/dump.sql"
+        command = "LC_ALL=C mysqldump -h #{guest.private_address.shellescape} -P #{port.to_i} -u backup --all-databases --all-tablespaces > #{backup_directory}/#{timestamp}/dump.sql"
 
         Rails.logger.debug command
         Rails.logger.debug `#{command}`
