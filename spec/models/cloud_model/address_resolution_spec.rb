@@ -30,7 +30,7 @@ describe CloudModel::AddressResolution do
       allow(CloudModel::Address).to receive(:from_str).with(subnet).and_return subnet
 
       criteria = double 'criteria'
-      expect(CloudModel::AddressResolution).to receive(:where).with(ip: /^dead:beef::/).and_return(criteria)
+      expect(CloudModel::AddressResolution).to receive(:where).with(ip: /\Adead:beef::/).and_return(criteria)
 
       CloudModel::AddressResolution.for_subnet(subnet)
     end
