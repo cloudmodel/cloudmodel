@@ -212,7 +212,7 @@ module CloudModel
       # require --db); otherwise dump the whole node.
       # @return [Boolean]
       def run_mongodump target
-        base = "LC_ALL=C mongodump --gzip -h #{guest.private_address} --port #{port}"
+        base = "LC_ALL=C mongodump --gzip -h #{guest.private_address.shellescape} --port #{port.to_i}"
 
         prefixes = mongodb_backup_exclude_collection_prefixes
         if prefixes.blank?
