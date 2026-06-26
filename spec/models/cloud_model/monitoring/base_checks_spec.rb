@@ -453,16 +453,44 @@ describe CloudModel::Monitoring::BaseChecks do
       expect(subject.check_backup_freshness).to eq true
     end
 
-    it 'should skip when backups are disabled' do
+    it 'should resolve any open issue when backups are disabled' do
       allow(backupable).to receive(:has_backups).and_return false
-      expect(subject).not_to receive(:do_check)
-      expect(subject.check_backup_freshness).to eq true
+      expect(subject).to receive(:do_check).with(:backup_freshness, 'no backup requested', {})
+      subject.check_backup_freshness
     end
 
-    it 'should skip when the owning guest is not running' do
+    it 'should resolve any open issue when the owning guest is not running' do
       allow(guest).to receive(:up_state).and_return :stopped
-      expect(subject).not_to receive(:do_check)
-      expect(subject.check_backup_freshness).to eq true
+      expect(subject).to receive(:do_check).with(:backup_freshness, 'no backup requested', {})
+      subject.check_backup_freshness
+    end
+
+    it 'should resolve any open issue for replica-set members (handled at the set level)' do
+      allow(backupable).to receive(:mongodb_replication_set).and_return(double('rs'))
+      expect(subject).to receive(:do_check).with(:backup_freshness, 'no backup requested', {})
+      subject.check_backup_freshness
+    end
+
+    it 'should not alert during the grace period after enabling backups' do
+      allow(backupable).to receive(:last_backup_at).and_return nil
+      allow(backupable).to receive(:backups_enabled_at).and_return Time.now - 2.hours
+      expect(subject).to receive(:do_check).with(
+        :backup_freshness, 'recent backup exists',
+        {critical: false, warning: false},
+        hash_including(value: 'never')
+      )
+      subject.check_backup_freshness
+    end
+
+    it 'should escalate when still no backup long after enabling' do
+      allow(backupable).to receive(:last_backup_at).and_return nil
+      allow(backupable).to receive(:backups_enabled_at).and_return Time.now - 4.days
+      expect(subject).to receive(:do_check).with(
+        :backup_freshness, 'recent backup exists',
+        {critical: true, warning: true},
+        anything
+      )
+      subject.check_backup_freshness
     end
 
     it 'should report critical when no backup exists' do

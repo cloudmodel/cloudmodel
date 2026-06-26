@@ -11,8 +11,33 @@ describe CloudModel::LxdCustomVolume do
   it { expect(subject).to have_field(:mount_point).of_type(String) }
   it { expect(subject).to have_field(:writeable).of_type(Mongoid::Boolean).with_default_value_of true }
   it { expect(subject).to have_field(:has_backups).of_type(Mongoid::Boolean).with_default_value_of false }
+  it { expect(subject).to have_field(:backups_enabled_at).of_type(Time) }
 
   it { expect(subject).to be_embedded_in(:guest).of_type CloudModel::Guest }
+
+  describe 'track_backups_enabled_at' do
+    it 'stamps backups_enabled_at when backups get enabled' do
+      allow(subject).to receive(:has_backups_changed?).and_return true
+      allow(subject).to receive(:has_backups?).and_return true
+      subject.send :track_backups_enabled_at
+      expect(subject.backups_enabled_at).to be_within(5).of(Time.now)
+    end
+
+    it 'clears backups_enabled_at when backups get disabled' do
+      subject.backups_enabled_at = Time.now
+      allow(subject).to receive(:has_backups_changed?).and_return true
+      allow(subject).to receive(:has_backups?).and_return false
+      subject.send :track_backups_enabled_at
+      expect(subject.backups_enabled_at).to be_nil
+    end
+
+    it 'leaves backups_enabled_at unchanged when has_backups did not change' do
+      subject.backups_enabled_at = nil
+      allow(subject).to receive(:has_backups_changed?).and_return false
+      subject.send :track_backups_enabled_at
+      expect(subject.backups_enabled_at).to be_nil
+    end
+  end
 
   it { expect(subject).to validate_presence_of(:mount_point) }
   it { expect(subject).to validate_uniqueness_of(:mount_point).scoped_to(:guest) }

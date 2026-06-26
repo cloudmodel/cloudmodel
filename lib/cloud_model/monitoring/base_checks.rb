@@ -110,36 +110,54 @@ module CloudModel
         result
       end
 
-      # Alert when a backupable subject (a service or volume with
+      # Alert when a backupable subject (a service, volume or replica set with
       # `has_backups`) has no recent successful backup.
       #
-      # Reads the newest snapshot via {Mixins::BackupTools#last_backup_at} and
-      # raises an {ItemIssue} when it is missing or older than the thresholds.
-      # Backups run daily, so the defaults flag a missed day as a warning and
-      # three missed days as critical. Skipped entirely unless backups are
-      # enabled and the owning guest is actually running — a stopped or
-      # undeployed guest is not expected to produce fresh backups.
+      # Reads the newest backup via {#last_backup_at} and raises an {ItemIssue}
+      # when it is missing or older than the thresholds. Backups run daily, so
+      # the defaults flag a missed day as a warning and three missed days as
+      # critical.
+      #
+      # Skipped when: backups are not enabled; the owning guest is not running
+      # (a stopped/undeployed guest is not expected to back up); or the subject
+      # is a replica-set member (backups are handled and monitored at the set
+      # level). When no backup exists yet, the age is measured from
+      # `backups_enabled_at` so freshly enabled backups get a grace period until
+      # the first scheduled run instead of alerting immediately.
       #
       # @param key [Symbol] issue key
       # @param warning [ActiveSupport::Duration] age at which to warn
       # @param critical [ActiveSupport::Duration] age at which to escalate
       # @return [Boolean] true if the backup is fresh (or check skipped)
       def check_backup_freshness key: :backup_freshness, warning: 36.hours, critical: 3.days
-        return true unless @subject.respond_to?(:has_backups) and @subject.has_backups
+        return true unless @subject.respond_to? :has_backups
 
         guest = @subject.try(:guest)
-        return true if guest.respond_to?(:up_state) and guest.up_state != :started
+
+        # No backup is expected when backups are disabled, the subject is a
+        # replica-set member (handled at the set level), or the guest is not
+        # running. In all these cases resolve any open issue (a bare return
+        # would leave stale "no backup" issues open forever).
+        no_backup_expected =
+          !@subject.has_backups ||
+          (@subject.respond_to?(:mongodb_replication_set) and @subject.mongodb_replication_set) ||
+          (guest.respond_to?(:up_state) and guest.up_state != :started)
+
+        return do_check(key, 'no backup requested', {}) if no_backup_expected
 
         last = @subject.last_backup_at
-        age  = last && (Time.now - last)
+        # Reference for "how old": the last backup, or — until the first one runs
+        # — when backups were enabled (grace period before the nightly job).
+        reference = last || @subject.try(:backups_enabled_at)
+        age = reference && (Time.now - reference)
 
         do_check key, 'recent backup exists', {
-          critical: last.nil? || age > critical.to_i,
-          warning:  !last.nil? && age > warning.to_i
+          critical: age.nil? || age > critical.to_i,
+          warning:  !age.nil? && age > warning.to_i
         },
           message: last ?
             "Last successful backup #{last.strftime('%Y-%m-%d %H:%M')} (#{(age / 3600).floor}h ago)" :
-            'No successful backup found',
+            (reference ? "No successful backup yet (enabled #{(age / 3600).floor}h ago)" : 'No successful backup found'),
           value: last ? last.strftime('%Y-%m-%d %H:%M') : 'never'
       end
 

@@ -171,6 +171,7 @@ describe CloudModel::Services::Mongodb do
   end
 
   it { expect(subject).to have_field(:mongodb_backup_exclude_collection_prefixes).of_type(Array).with_default_value_of [] }
+  it { expect(subject).to have_field(:backups_enabled_at).of_type(Time) }
 
   describe 'mongodb_backup_exclude_collection_prefixes=' do
     it 'splits a whitespace/comma separated string into an array' do
