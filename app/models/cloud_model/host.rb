@@ -286,7 +286,7 @@ module CloudModel
       end
 
       # TODO: make work with initial root pw
-      command = "rsync -avz -e 'ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' #{CloudModel.config.data_directory.shellescape}/cloud/ root@#{ssh_address}:/cloud"
+      command = "rsync -avz -e 'ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' #{CloudModel.config.data_directory.shellescape}/cloud/ root@#{ssh_address.to_s.shellescape}:/cloud"
       Rails.logger.debug command
       `#{command}`
     end
@@ -370,9 +370,10 @@ module CloudModel
       if boot_fs_mounted? root
         return true
       else
-        success, data = exec "mkdir -p #{root}/boot && mount /dev/md0 #{root}/boot"
+        boot = "#{root}/boot".shellescape
+        success, data = exec "mkdir -p #{boot} && mount /dev/md0 #{boot}"
         unless success
-          success, data = exec "mount /dev/md/rescue:0 #{root}/boot"
+          success, data = exec "mount /dev/md/rescue:0 #{boot}"
         end
 
         return success
@@ -380,7 +381,7 @@ module CloudModel
     end
 
     def unmount_boot_fs root=''
-      success, data = exec "umount #{root}/boot"
+      success, data = exec "umount #{"#{root}/boot".shellescape}"
 
       return success
     end

@@ -37,7 +37,7 @@ module CloudModel
 
       def service_status
         begin
-          result = `SCRIPT_NAME=/fpm_status SCRIPT_FILENAME=/fpm_status QUERY_STRING=full\\&json REQUEST_METHOD=GET cgi-fcgi -bind -connect #{guest.private_address}:#{port}`
+          result = `SCRIPT_NAME=/fpm_status SCRIPT_FILENAME=/fpm_status QUERY_STRING=full\\&json REQUEST_METHOD=GET cgi-fcgi -bind -connect #{guest.private_address.shellescape}:#{port.to_i}`
         rescue Exception => e
           return {key: :not_reachable, error: "Failed to get fcgi status\n#{e.class}\n\n#{e.to_s}", severity: :critical}
         end

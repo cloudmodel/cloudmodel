@@ -51,7 +51,7 @@ module CloudModel
         end
         resolutions
       else
-        where(ip: /^#{subnet.ip.to_s}/)
+        where(ip: /\A#{Regexp.escape(subnet.ip.to_s)}/)
       end
     end
 
