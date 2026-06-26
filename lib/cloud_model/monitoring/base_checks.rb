@@ -110,6 +110,39 @@ module CloudModel
         result
       end
 
+      # Alert when a backupable subject (a service or volume with
+      # `has_backups`) has no recent successful backup.
+      #
+      # Reads the newest snapshot via {Mixins::BackupTools#last_backup_at} and
+      # raises an {ItemIssue} when it is missing or older than the thresholds.
+      # Backups run daily, so the defaults flag a missed day as a warning and
+      # three missed days as critical. Skipped entirely unless backups are
+      # enabled and the owning guest is actually running — a stopped or
+      # undeployed guest is not expected to produce fresh backups.
+      #
+      # @param key [Symbol] issue key
+      # @param warning [ActiveSupport::Duration] age at which to warn
+      # @param critical [ActiveSupport::Duration] age at which to escalate
+      # @return [Boolean] true if the backup is fresh (or check skipped)
+      def check_backup_freshness key: :backup_freshness, warning: 36.hours, critical: 3.days
+        return true unless @subject.respond_to?(:has_backups) and @subject.has_backups
+
+        guest = @subject.try(:guest)
+        return true if guest.respond_to?(:up_state) and guest.up_state != :started
+
+        last = @subject.last_backup_at
+        age  = last && (Time.now - last)
+
+        do_check key, 'recent backup exists', {
+          critical: last.nil? || age > critical.to_i,
+          warning:  !last.nil? && age > warning.to_i
+        },
+          message: last ?
+            "Last successful backup #{last.strftime('%Y-%m-%d %H:%M')} (#{(age / 3600).floor}h ago)" :
+            'No successful backup found',
+          value: last ? last.strftime('%Y-%m-%d %H:%M') : 'never'
+      end
+
       def do_check key, name, checks, options = {}
         issue = @subject.item_issues.find_or_initialize_by key: key, resolved_at: nil
         puts "#{line_prefix}  * Check #{name}... "

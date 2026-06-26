@@ -1302,6 +1302,32 @@ describe CloudModel::Guest do
     end
   end
 
+  describe '.backup_all' do
+    it 'should back up every guest' do
+      g1 = double 'guest', name: 'g1'
+      g2 = double 'guest', name: 'g2'
+      expect(g1).to receive(:backup)
+      expect(g2).to receive(:backup)
+      allow(CloudModel::Guest).to receive(:all).and_return([g1, g2])
+
+      CloudModel::Guest.backup_all
+    end
+
+    it 'should notify via ExceptionNotifier and continue when a guest backup fails' do
+      boom = CloudModel::BackupError.new 'nope'
+      g1 = double 'guest', name: 'g1', id: 'id1'
+      g2 = double 'guest', name: 'g2'
+      allow(g1).to receive(:backup).and_raise(boom)
+      expect(g2).to receive(:backup)
+      allow(CloudModel::Guest).to receive(:all).and_return([g1, g2])
+
+      stub_const 'ExceptionNotifier', double('ExceptionNotifier')
+      expect(ExceptionNotifier).to receive(:notify_exception).with(boom, data: {guest: 'g1', guest_id: 'id1'})
+
+      expect { CloudModel::Guest.backup_all }.to output(/Backup of Guest g1 failed/).to_stdout
+    end
+  end
+
   describe 'backup' do
     it 'should call backup on services with has_backups' do
       service = double 'service', has_backups: true, _type: 'TestService'
@@ -1314,16 +1340,37 @@ describe CloudModel::Guest do
       expect(subject.backup).to eq true
     end
 
-    it 'should return false if any service backup fails' do
-      service = double 'service', has_backups: true
+    it 'should raise a BackupError if any service backup fails' do
+      service = double 'service', has_backups: true, _type: 'TestService'
       allow(service).to receive(:backup).and_return(false)
-      allow(service).to receive(:_type).and_return('TestService')
       services = double 'services'
       allow(services).to receive(:where).with(has_backups: true).and_return([service])
       allow(subject).to receive(:services).and_return(services)
       allow(Rails.logger).to receive(:debug)
 
-      expect(subject.backup).to eq false
+      expect { subject.backup }.to raise_error(CloudModel::BackupError, /TestService/)
+    end
+
+    it 'should call backup on lxd custom volumes with has_backups' do
+      volume = double 'volume', has_backups: true, mount_point: '/data'
+      volumes = double 'volumes'
+      allow(volumes).to receive(:where).with(has_backups: true).and_return([volume])
+      allow(subject).to receive(:lxd_custom_volumes).and_return(volumes)
+      allow(Rails.logger).to receive(:debug)
+
+      expect(volume).to receive(:backup).and_return(true)
+      expect(subject.backup).to eq true
+    end
+
+    it 'should raise a BackupError if any volume backup fails' do
+      volume = double 'volume', has_backups: true, mount_point: '/data'
+      allow(volume).to receive(:backup).and_return(false)
+      volumes = double 'volumes'
+      allow(volumes).to receive(:where).with(has_backups: true).and_return([volume])
+      allow(subject).to receive(:lxd_custom_volumes).and_return(volumes)
+      allow(Rails.logger).to receive(:debug)
+
+      expect { subject.backup }.to raise_error(CloudModel::BackupError, %r{/data})
     end
   end
 

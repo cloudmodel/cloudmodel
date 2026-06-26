@@ -56,6 +56,19 @@ module CloudModel
     #   @return [Array<Symbol>] extra component symbols required beyond the guest's defaults
     field :additional_components, type: Array, default: []
 
+    # @!attribute [rw] mongodb_backup_exclude_collection_prefixes
+    #   @return [Array<String>] collection-name prefixes this app's transient
+    #     data uses (e.g. GridFS bucket `fs`, `tantivy_journal`,
+    #     `term_recognizer_index`); excluded from MongoDB replica-set backups.
+    #     Passed to the associated {MongodbReplicationSet}.
+    field :mongodb_backup_exclude_collection_prefixes, type: Array, default: []
+
+    # Accept a whitespace/comma-separated string from forms as well as an array.
+    def mongodb_backup_exclude_collection_prefixes=(value)
+      value = value.split(/[\s,]+/) if value.is_a?(String)
+      super(Array(value).map { |v| v.to_s.strip }.reject(&:blank?))
+    end
+
     enum_field :build_state, {
       0x00 => :pending,
       0x01 => :running,

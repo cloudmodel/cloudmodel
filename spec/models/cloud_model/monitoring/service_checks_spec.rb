@@ -44,8 +44,19 @@ describe CloudModel::Monitoring::ServiceChecks do
       allow(CloudModel::Monitoring::Services::NginxChecks).to receive(:new).and_return(service_check)
       allow(service_check).to receive(:check).and_return true
       allow(subject).to receive(:do_check)
+      allow(subject).to receive(:check_backup_freshness)
 
       expect(subject.check).to eq true
+    end
+
+    it 'should also run the backup freshness check' do
+      allow(service).to receive(:class).and_return(CloudModel::Services::Nginx)
+      service_check = double 'service_check', check: true
+      allow(CloudModel::Monitoring::Services::NginxChecks).to receive(:new).and_return(service_check)
+      allow(subject).to receive(:do_check)
+
+      expect(subject).to receive(:check_backup_freshness)
+      subject.check
     end
 
     it 'should report info issue when check class does not exist' do

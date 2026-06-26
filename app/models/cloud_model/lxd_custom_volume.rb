@@ -123,50 +123,212 @@ module CloudModel
     end
 
     # Backup
+    #
+    # Physical, incremental, pull-based ZFS backup orchestrated from the admin
+    # instance: an atomic `zfs snapshot` is taken on the guest's host and
+    # `zfs send` (incremental against the previous snapshot) is piped over SSH
+    # into a `zfs receive` on the pool of the host THIS instance runs on
+    # ({CloudModel::Host.local}). The target dataset is derived from
+    # {CloudModel.config.backup_directory} (no extra config). The atomic
+    # snapshot is crash-consistent, so a running service (e.g. MongoDB with
+    # journaling on the same dataset) is safe to snapshot — unlike the previous
+    # rsync of live files. ZFS manages the incremental chain and retention
+    # natively (old snapshots pruned with `zfs destroy`), so there are no stream
+    # files and no need for periodic full backups.
+
+    # Prefix for the ZFS snapshots this backup creates.
+    ZFS_BACKUP_SNAPSHOT_PREFIX = 'coreon-bkp-'
+
+    # Number of received snapshots to keep on the backup host.
+    ZFS_BACKUP_KEEP = 30
 
     def backup_directory
       "#{CloudModel.config.backup_directory}/#{host.id}/#{guest.id}/volumes/#{id}"
     end
 
+    # Host-side ZFS dataset backing this volume. LXD prefixes the project name
+    # ("default_") on custom-volume datasets; older volumes may not have it, so
+    # resolve against the actual dataset list on the host.
+    # @return [String, nil]
+    def zfs_dataset
+      return @zfs_dataset if defined? @zfs_dataset
+      zfs_pool = pool == 'default' ? 'guests' : pool
+      candidates = ["#{zfs_pool}/custom/default_#{name}", "#{zfs_pool}/custom/#{name}"]
+      success, out = host.exec "zfs list -H -o name -t filesystem"
+      @zfs_dataset = success ? candidates.find { |c| out.split("\n").include?(c) } : nil
+    end
+
+    # Backup snapshots present on the source dataset, newest first.
+    # @return [Array<String>] full snapshot names (`dataset@coreon-bkp-<ts>`)
+    def zfs_backup_snapshots
+      return [] unless dataset = zfs_dataset
+      success, out = host.exec "zfs list -H -o name -t snapshot -r #{dataset.shellescape}"
+      return [] unless success
+      out.split("\n").select { |s| s.start_with? "#{dataset}@#{ZFS_BACKUP_SNAPSHOT_PREFIX}" }.sort.reverse
+    end
+
+    # Time of the most recent successful backup (the newest snapshot kept on the
+    # source as the next incremental base). Overrides the symlink-based
+    # BackupTools#last_backup_at, which does not apply to ZFS backups.
+    # @return [Time, nil]
+    def last_backup_at
+      snapshot = zfs_backup_snapshots.first
+      return nil unless snapshot
+      ts = snapshot.split("@#{ZFS_BACKUP_SNAPSHOT_PREFIX}").last
+      return nil unless ts =~ /\A[0-9]{14}\z/
+      Time.strptime(ts, "%Y%m%d%H%M%S")
+    rescue ArgumentError
+      nil
+    end
+
     def backup
       return false unless has_backups
-      timestamp = Time.now.strftime "%Y%m%d%H%M%S"
-      FileUtils.mkdir_p backup_directory
-      command = "rsync -avz " +
-        "-e 'ssh -o StrictHostKeyChecking=no -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' " +
-        "--partial --link-dest=#{backup_directory.shellescape}/latest " +
-        "root@#{host.private_network.list_ips.first}:#{host_path.shellescape}/ " +
-        "#{backup_directory.shellescape}/#{timestamp}"
 
-      Rails.logger.debug command
-      Rails.logger.debug `#{command}`
-
-      if $?.success? and File.exist? "#{backup_directory}/#{timestamp}"
-        FileUtils.rm_f "#{backup_directory}/latest"
-        FileUtils.ln_s "#{backup_directory}/#{timestamp}", "#{backup_directory}/latest"
-        cleanup_backups
-
-        return true
-      else
-        FileUtils.rm_rf "#{backup_directory}/#{timestamp}"
+      source = zfs_dataset
+      unless source
+        Rails.logger.error "ZFS backup: no source dataset found for volume #{name}"
         return false
       end
 
+      target = backup_target_dataset
+      unless target
+        Rails.logger.error "ZFS backup: cannot resolve backup target dataset for volume #{name}"
+        return false
+      end
+
+      timestamp = Time.now.strftime "%Y%m%d%H%M%S"
+      base = zfs_backup_snapshots.first # newest existing -> incremental base
+      snapshot = "#{source}@#{ZFS_BACKUP_SNAPSHOT_PREFIX}#{timestamp}"
+
+      # 1. atomic, crash-consistent snapshot on the source host (quiescing the
+      #    owning service first, if it asks to — e.g. MongoDB fsyncLock)
+      unless take_consistent_snapshot snapshot
+        Rails.logger.error "ZFS backup: failed to snapshot #{snapshot}"
+        return false
+      end
+
+      # 2. pull the (incremental) stream and receive it into the backup host
+      if send_to_backup_host snapshot, base, target
+        prune_source_snapshots keep: snapshot # keep newest as next -i base
+        prune_target_snapshots target         # native, chain-safe retention
+        true
+      else
+        host.exec "zfs destroy #{snapshot.shellescape}" # failed transfer -> drop snapshot
+        false
+      end
     end
 
-    def restore timestamp='latest'
-      command = "rsync -avz " +
-        "-e 'ssh -o StrictHostKeyChecking=no -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' "+
-        "--delete " +
-        "#{backup_directory.shellescape}/#{timestamp}/ "+
-        "root@#{host.private_network.list_ips.first}:#{host_path.shellescape}"
+    # Restore a snapshot back onto the source dataset by sending it from the
+    # backup host. The volume must be detached / the container stopped, as
+    # `zfs receive -F` rolls the source dataset back.
+    # @param timestamp [String] 'latest' or a 14-digit backup timestamp
+    def restore timestamp = 'latest'
+      source = zfs_dataset
+      target = backup_target_dataset
+      return false unless source and target
 
+      snapshot = if timestamp == 'latest'
+        success, out = backup_host.exec "zfs list -H -o name -t snapshot -r #{target.shellescape}"
+        return false unless success
+        out.split("\n").select { |s| s.include? "@#{ZFS_BACKUP_SNAPSHOT_PREFIX}" }.sort.last
+      else
+        "#{target}@#{ZFS_BACKUP_SNAPSHOT_PREFIX}#{timestamp}"
+      end
+      return false unless snapshot
+
+      ssh = ssh_command
+      command = "#{ssh} root@#{backup_host.private_address} \"zfs send #{snapshot.shellescape}\" | " +
+                "#{ssh} root@#{host.private_address} \"zfs receive -F #{source.shellescape}\""
       Rails.logger.debug command
       Rails.logger.debug `#{command}`
       $?.success?
     end
 
     private
+
+    # Take the source snapshot, quiescing the service whose data lives on this
+    # volume first (if it asks to, e.g. MongoDB fsyncLock). The ZFS snapshot is
+    # already crash-consistent; this is extra safety for a checkpoint-clean image.
+    # @return [Boolean] whether the snapshot succeeded
+    def take_consistent_snapshot snapshot
+      take = -> { host.exec("zfs snapshot #{snapshot.shellescape}")[0] }
+      if service = backed_service
+        service.with_backup_consistency { take.call }
+      else
+        take.call
+      end
+    end
+
+    # The service on this guest whose data lives on this volume (matched by
+    # mount point), if any — used to quiesce it around the snapshot.
+    # @return [CloudModel::Services::Base, nil]
+    def backed_service
+      guest.services.detect { |service| service.backup_data_mount_point == mount_point }
+    end
+
+    # The host this cloudmodel instance runs on (the local ZFS receive target).
+    def backup_host
+      CloudModel::Host.local
+    end
+
+    # ZFS dataset that backs the local {CloudModel.config.backup_directory},
+    # derived from its mount (inside the container the data volume's mount source
+    # is the ZFS dataset name). Returns nil if it is not on ZFS.
+    # @return [String, nil]
+    def backup_root_dataset
+      dir = CloudModel.config.backup_directory
+      source = `df --output=source #{dir.shellescape} 2>/dev/null`.lines.last.to_s.strip
+      return nil if source.empty? || source.start_with?('/')
+      source
+    end
+
+    # Per-volume target dataset on the backup host, or nil if unresolvable.
+    def backup_target_dataset
+      root = backup_root_dataset
+      return nil unless root and backup_host
+      "#{root}/zfs_backups/#{host.id}/#{guest.id}/#{id}"
+    end
+
+    def ssh_command
+      "ssh -o StrictHostKeyChecking=no -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa"
+    end
+
+    # Pull the (incremental) stream from the source host and `zfs receive` it
+    # into the backup host's pool (left unmounted with `-u`). Ensures the parent
+    # dataset exists first.
+    # @return [Boolean] whether the transfer succeeded
+    def send_to_backup_host snapshot, base, target
+      ssh = ssh_command
+      flags = base ? "-i #{base.shellescape}" : ""
+      parent = target.rpartition('/').first
+      backup_host.exec "zfs create -p #{parent.shellescape}" unless parent.empty?
+
+      command = "#{ssh} root@#{host.private_address} \"zfs send #{flags} #{snapshot.shellescape}\" | " +
+                "#{ssh} root@#{backup_host.private_address} \"zfs receive -F -u #{target.shellescape}\""
+      Rails.logger.debug command
+      Rails.logger.debug `#{command}`
+      $?.success?
+    end
+
+    # Destroy all backup snapshots on the source except `keep` (the new base).
+    def prune_source_snapshots keep:
+      zfs_backup_snapshots.each do |snapshot|
+        next if snapshot == keep
+        host.exec "zfs destroy #{snapshot.shellescape}"
+      end
+    end
+
+    # Keep the most recent {ZFS_BACKUP_KEEP} snapshots on the backup host,
+    # destroy older ones. Chain-safe: the newest (next `-i` base) is retained.
+    def prune_target_snapshots target
+      success, out = backup_host.exec "zfs list -H -o name -t snapshot -r #{target.shellescape}"
+      return unless success
+      snapshots = out.split("\n").select { |s| s.include? "@#{ZFS_BACKUP_SNAPSHOT_PREFIX}" }.sort # oldest first
+      (snapshots[0...-ZFS_BACKUP_KEEP] || []).each do |snapshot|
+        backup_host.exec "zfs destroy #{snapshot.shellescape}"
+      end
+    end
+
     def set_volume_name
       self.name = "#{guest.name}-#{mount_point.gsub("/", "-")}"
     end

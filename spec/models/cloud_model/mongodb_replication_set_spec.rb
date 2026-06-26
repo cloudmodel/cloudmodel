@@ -505,4 +505,103 @@ describe CloudModel::MongodbReplicationSet do
       expect(result).to eq true
     end
   end
+
+  it { expect(subject).to have_field(:has_backups).of_type(Mongoid::Boolean).with_default_value_of false }
+  it { expect(subject).to have_field(:mongodb_backup_exclude_collection_prefixes).of_type(Array).with_default_value_of [] }
+  it { expect(subject).to belong_to(:web_image).of_type(CloudModel::WebImage).with_optional }
+
+  describe 'mongodb_backup_exclude_collection_prefixes=' do
+    it 'splits a whitespace/comma separated string into an array' do
+      subject.mongodb_backup_exclude_collection_prefixes = 'fs, audit'
+      expect(subject.mongodb_backup_exclude_collection_prefixes).to eq %w(fs audit)
+    end
+  end
+
+  describe 'backup_directory' do
+    it 'should be namespaced per replica set' do
+      allow(CloudModel.config).to receive(:backup_directory).and_return '/var/backups'
+      expect(subject.backup_directory).to eq "/var/backups/mongodb_replication_sets/#{subject.id}"
+    end
+  end
+
+  describe 'backup_member' do
+    it 'should pick a non-arbiter secondary' do
+      primary   = double 'primary',   mongodb_replication_arbiter_only: false, mongodb_replication_set_master?: true
+      secondary = double 'secondary', mongodb_replication_arbiter_only: false, mongodb_replication_set_master?: false
+      arbiter   = double 'arbiter',   mongodb_replication_arbiter_only: true,  mongodb_replication_set_master?: false
+      allow(subject).to receive(:services).and_return([primary, arbiter, secondary])
+
+      expect(subject.backup_member).to eq secondary
+    end
+  end
+
+  describe 'backup_exclude_collection_prefixes' do
+    it 'uses the web image prefixes when a web image is set' do
+      subject.mongodb_backup_exclude_collection_prefixes = %w(own)
+      subject.web_image = CloudModel::WebImage.new(mongodb_backup_exclude_collection_prefixes: %w(fs tantivy_journal))
+      expect(subject.backup_exclude_collection_prefixes).to eq %w(fs tantivy_journal)
+    end
+
+    it 'uses its own prefixes when no web image is set' do
+      subject.mongodb_backup_exclude_collection_prefixes = %w(own audit)
+      expect(subject.backup_exclude_collection_prefixes).to eq %w(own audit)
+    end
+
+    it 'is empty without own prefixes or a web image' do
+      expect(subject.backup_exclude_collection_prefixes).to eq []
+    end
+  end
+
+  describe 'backup' do
+    let(:guest) { double 'guest', private_address: '10.0.0.5' }
+    let(:member) { double 'member', guest: guest, port: 27017, mongodb_replication_arbiter_only: false, mongodb_replication_set_master?: false }
+
+    before do
+      subject.has_backups = true
+      allow(subject).to receive(:backup_directory).and_return('/backups/rs')
+      allow(subject).to receive(:services).and_return([member])
+      allow(FileUtils).to receive(:mkdir_p)
+      allow(FileUtils).to receive(:rm_f)
+      allow(FileUtils).to receive(:rm_rf)
+      allow(FileUtils).to receive(:ln_s)
+      allow(subject).to receive(:cleanup_backups)
+      allow(Rails.logger).to receive(:debug)
+      allow(Rails.logger).to receive(:error)
+      allow(subject).to receive(:`) { `true`; '' }
+    end
+
+    it 'should return false unless has_backups' do
+      subject.has_backups = false
+      expect(subject.backup).to eq false
+    end
+
+    it 'should run a single full mongodump against the secondary and symlink latest' do
+      allow(subject).to receive(:backup_exclude_collection_prefixes).and_return([])
+      expect(subject).to receive(:`).with(/mongodump --gzip --readPreference=secondary -h 10.0.0.5 --port 27017 -o \/backups\/rs\/[0-9]{14}/) { `true`; '' }
+      expect(FileUtils).to receive(:ln_s)
+
+      expect(subject.backup).to eq true
+    end
+
+    it 'should dump each database with exclusion flags when configured' do
+      allow(subject).to receive(:backup_exclude_collection_prefixes).and_return(%w(fs tantivy_journal))
+      allow(subject).to receive(:backup_databases).and_return(%w(core_graph_production))
+      expect(subject).to receive(:`).with(/--db core_graph_production .*--excludeCollectionsWithPrefix=fs --excludeCollectionsWithPrefix=tantivy_journal/) { `true`; '' }
+
+      expect(subject.backup).to eq true
+    end
+  end
+
+  describe '.backup_all' do
+    it 'should back up each set with backups and notify on failure' do
+      good = double 'good', name: 'good'
+      bad  = double 'bad',  name: 'bad', id: 'id1'
+      expect(good).to receive(:backup)
+      allow(bad).to receive(:backup).and_raise('boom')
+      rel = double 'rel', to_a: [good, bad]
+      allow(CloudModel::MongodbReplicationSet).to receive(:where).with(has_backups: true).and_return(rel)
+
+      expect { CloudModel::MongodbReplicationSet.backup_all }.to output(/Backup of replication set bad failed/).to_stdout
+    end
+  end
 end

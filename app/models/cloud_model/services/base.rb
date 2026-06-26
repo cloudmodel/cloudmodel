@@ -147,6 +147,21 @@ module CloudModel
         false
       end
 
+      # Mount point (without leading slash, matching {LxdCustomVolume#mount_point})
+      # of the volume holding this service's data, or nil if it has no dedicated
+      # data volume. Used to pair a volume backup with the service to quiesce.
+      # @return [String, nil]
+      def backup_data_mount_point
+        nil
+      end
+
+      # Run a block while the service is in a backup-consistent state. DB
+      # services override this to flush/lock around a filesystem snapshot of
+      # their data volume. Default: no-op (just yields).
+      def with_backup_consistency
+        yield
+      end
+
       # Setter that prevents enabling backups when {#backupable?} is false.
       # @param state [Boolean]
       def has_backups=(state)

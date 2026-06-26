@@ -28,6 +28,7 @@ module CloudModel
       def check
         data
         check_existence
+        check_backup_freshness
       end
     end
   end

@@ -132,6 +132,11 @@ describe CloudModel::Services::Mongodb do
       expect(subject.backup).to eq false
     end
 
+    it 'should not back up per member when the replica set handles backups' do
+      allow(subject).to receive(:mongodb_replication_set).and_return(double('rs', has_backups: true))
+      expect(subject.backup).to eq false
+    end
+
     it 'should run mongodump and return true on success' do
       allow(subject).to receive(:`) { `true`; '' }
       allow(File).to receive(:exist?).and_return(true)
@@ -158,6 +163,77 @@ describe CloudModel::Services::Mongodb do
       allow(File).to receive(:exist?).with('/backups/test/latest').and_return(false)
 
       expect(subject.restore).to eq false
+    end
+  end
+
+  it { expect(subject).to have_field(:mongodb_backup_exclude_collection_prefixes).of_type(Array).with_default_value_of [] }
+
+  describe 'mongodb_backup_exclude_collection_prefixes=' do
+    it 'splits a whitespace/comma separated string into an array' do
+      subject.mongodb_backup_exclude_collection_prefixes = 'fs, tantivy_journal'
+      expect(subject.mongodb_backup_exclude_collection_prefixes).to eq %w(fs tantivy_journal)
+    end
+  end
+
+  describe 'has_backups (replica set delegation)' do
+    it 'delegates the getter to the replica set for members' do
+      rs = double 'rs', has_backups: true
+      allow(subject).to receive(:mongodb_replication_set).and_return(rs)
+      expect(subject.has_backups).to eq true
+    end
+
+    it 'enables the set (and stays false itself) when set on a member' do
+      rs = CloudModel::MongodbReplicationSet.new
+      allow(rs).to receive(:persisted?).and_return(true)
+      allow(rs).to receive(:save)
+      allow(subject).to receive(:mongodb_replication_set).and_return(rs)
+
+      subject.has_backups = true
+
+      expect(rs.has_backups).to eq true
+      expect(subject[:has_backups]).to eq false
+    end
+
+    it 'stores normally for standalone members' do
+      allow(subject).to receive(:mongodb_replication_set).and_return(nil)
+      subject.has_backups = true
+      expect(subject[:has_backups]).to eq true
+    end
+  end
+
+  describe 'standalone backup with excludes' do
+    before do
+      allow(subject).to receive(:has_backups).and_return true
+      allow(subject).to receive(:mongodb_replication_set).and_return(nil)
+      allow(subject).to receive(:backup_directory).and_return('/backups/test')
+      allow(subject).to receive(:guest).and_return(double('guest', private_address: '10.0.0.5'))
+      allow(subject).to receive(:port).and_return(27017)
+      allow(FileUtils).to receive(:mkdir_p)
+      allow(FileUtils).to receive(:rm_f)
+      allow(FileUtils).to receive(:rm_rf)
+      allow(FileUtils).to receive(:ln_s)
+      allow(subject).to receive(:cleanup_backups)
+      allow(File).to receive(:exist?).and_return(true)
+      allow(Rails.logger).to receive(:debug)
+      allow(subject).to receive(:`) { `true`; '' }
+    end
+
+    it 'does not back up per member when in a replica set' do
+      allow(subject).to receive(:mongodb_replication_set).and_return(double('rs'))
+      expect(subject.backup).to eq false
+    end
+
+    it 'runs a plain mongodump without excludes' do
+      allow(subject).to receive(:mongodb_backup_exclude_collection_prefixes).and_return([])
+      expect(subject).to receive(:`).with(/mongodump --gzip -h 10.0.0.5 --port 27017 -o \/backups\/test\/[0-9]{14}/) { `true`; '' }
+      expect(subject.backup).to eq true
+    end
+
+    it 'dumps each database with exclusion flags when configured' do
+      allow(subject).to receive(:mongodb_backup_exclude_collection_prefixes).and_return(%w(fs tantivy_journal))
+      allow(subject).to receive(:backup_databases).and_return(%w(core_graph_production))
+      expect(subject).to receive(:`).with(/--db core_graph_production .*--excludeCollectionsWithPrefix=fs --excludeCollectionsWithPrefix=tantivy_journal/) { `true`; '' }
+      expect(subject.backup).to eq true
     end
   end
 end

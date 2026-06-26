@@ -361,44 +361,157 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
+  describe 'zfs_dataset' do
+    before do
+      subject.guest = guest
+      subject.name = 'some_guest-var-data'
+      subject.pool = 'default'
+    end
+
+    it 'should resolve the default_-prefixed custom volume dataset' do
+      allow(host).to receive(:exec).with('zfs list -H -o name -t filesystem').and_return(
+        [true, "guests\nguests/custom/default_some_guest-var-data\nguests/containers/x\n"]
+      )
+      expect(subject.zfs_dataset).to eq 'guests/custom/default_some_guest-var-data'
+    end
+
+    it 'should fall back to the unprefixed dataset name' do
+      allow(host).to receive(:exec).with('zfs list -H -o name -t filesystem').and_return(
+        [true, "guests/custom/some_guest-var-data\n"]
+      )
+      expect(subject.zfs_dataset).to eq 'guests/custom/some_guest-var-data'
+    end
+
+    it 'should be nil when no matching dataset exists' do
+      allow(host).to receive(:exec).with('zfs list -H -o name -t filesystem').and_return([true, "guests/other\n"])
+      expect(subject.zfs_dataset).to be_nil
+    end
+  end
+
+  describe 'last_backup_at' do
+    let(:dataset) { 'guests/custom/default_some_guest-var-data' }
+
+    before do
+      subject.guest = guest
+      allow(subject).to receive(:zfs_dataset).and_return(dataset)
+    end
+
+    it 'should return the time of the newest backup snapshot' do
+      allow(subject).to receive(:zfs_backup_snapshots).and_return(["#{dataset}@coreon-bkp-20200403133742"])
+      expect(subject.last_backup_at).to eq Time.strptime('20200403133742', '%Y%m%d%H%M%S')
+    end
+
+    it 'should be nil when there are no backup snapshots' do
+      allow(subject).to receive(:zfs_backup_snapshots).and_return([])
+      expect(subject.last_backup_at).to be_nil
+    end
+  end
+
   describe 'backup' do
+    let(:dataset) { 'guests/custom/default_some_guest-var-data' }
+    let(:backup_host) { double 'backup_host', private_address: '10.42.0.9' }
+
+    before do
+      subject.has_backups = true
+      subject.guest = guest
+      allow(subject).to receive(:zfs_dataset).and_return(dataset)
+      allow(subject).to receive(:backup_root_dataset).and_return('data/admin-backups')
+      allow(CloudModel::Host).to receive(:local).and_return(backup_host)
+      allow(backup_host).to receive(:exec).and_return([true, ''])
+      allow(host).to receive(:private_address).and_return('10.42.0.1')
+      allow(CloudModel.config).to receive(:data_directory).and_return('/data')
+      allow(Rails.logger).to receive(:debug)
+      allow(Rails.logger).to receive(:error)
+      allow(subject).to receive(:`) { `true`; '' } # the send | receive pipe
+    end
+
     it 'should return false if has_backups is false' do
       subject.has_backups = false
       expect(subject.backup).to eq false
     end
 
-    it 'should run rsync and create symlink on success' do
-      subject.has_backups = true
-      subject.guest = guest
-      allow(subject).to receive(:backup_directory).and_return('/backups/test')
-      allow(subject).to receive(:host_path).and_return('/var/lib/lxd/custom/vol/')
-      private_network = double list_ips: ['10.42.0.1']
-      allow(host).to receive(:private_network).and_return(private_network)
-      allow(CloudModel.config).to receive(:data_directory).and_return('/data')
-      allow(FileUtils).to receive(:mkdir_p)
-      allow(Rails.logger).to receive(:debug)
-      allow(subject).to receive(:`) { `true`; '' }
-      allow(File).to receive(:exist?).and_return(true)
-      allow(FileUtils).to receive(:rm_f)
-      allow(FileUtils).to receive(:ln_s)
-      allow(subject).to receive(:cleanup_backups)
+    it 'should return false when no source dataset can be resolved' do
+      allow(subject).to receive(:zfs_dataset).and_return(nil)
+      expect(subject.backup).to eq false
+    end
+
+    it 'should return false when the backup target cannot be resolved' do
+      allow(subject).to receive(:backup_root_dataset).and_return(nil)
+      expect(subject.backup).to eq false
+    end
+
+    it 'should snapshot, send full and prune on first run' do
+      allow(subject).to receive(:zfs_backup_snapshots).and_return([]) # no base -> full send
+      expect(host).to receive(:exec).with(/\Azfs snapshot #{dataset}@coreon-bkp-[0-9]{14}\z/).and_return([true, ''])
+      expect(subject).to receive(:send_to_backup_host).with(/#{dataset}@coreon-bkp-/, nil, %r{\Adata/admin-backups/zfs_backups/}).and_return(true)
+      allow(subject).to receive(:prune_source_snapshots)
+      allow(subject).to receive(:prune_target_snapshots)
 
       expect(subject.backup).to eq true
+    end
+
+    it 'should send incrementally against the newest existing snapshot' do
+      base = "#{dataset}@coreon-bkp-20240101000000"
+      allow(subject).to receive(:zfs_backup_snapshots).and_return([base])
+      allow(host).to receive(:exec).and_return([true, ''])
+      expect(subject).to receive(:send_to_backup_host).with(anything, base, anything).and_return(true)
+      allow(subject).to receive(:prune_source_snapshots)
+      allow(subject).to receive(:prune_target_snapshots)
+
+      expect(subject.backup).to eq true
+    end
+
+    it 'should destroy the snapshot and return false when the transfer fails' do
+      allow(subject).to receive(:zfs_backup_snapshots).and_return([])
+      allow(host).to receive(:exec).and_return([true, ''])
+      allow(subject).to receive(:send_to_backup_host).and_return(false)
+
+      expect(host).to receive(:exec).with(/\Azfs destroy /).and_return([true, ''])
+      expect(subject.backup).to eq false
     end
   end
 
   describe 'restore' do
-    it 'should run rsync restore command' do
+    let(:dataset) { 'guests/custom/default_some_guest-var-data' }
+    let(:backup_host) { double 'backup_host', private_address: '10.42.0.9' }
+    let(:target) { 'data/admin-backups/zfs_backups/h/g/v' }
+
+    it 'should send the latest snapshot from the backup host onto the source' do
       subject.guest = guest
-      allow(subject).to receive(:backup_directory).and_return('/backups/test')
-      allow(subject).to receive(:host_path).and_return('/var/lib/lxd/custom/vol/')
-      private_network = double list_ips: ['10.42.0.1']
-      allow(host).to receive(:private_network).and_return(private_network)
+      allow(subject).to receive(:zfs_dataset).and_return(dataset)
+      allow(subject).to receive(:backup_target_dataset).and_return(target)
+      allow(subject).to receive(:backup_host).and_return(backup_host)
+      allow(host).to receive(:private_address).and_return('10.42.0.1')
       allow(CloudModel.config).to receive(:data_directory).and_return('/data')
       allow(Rails.logger).to receive(:debug)
+      allow(backup_host).to receive(:exec).with(/zfs list .*-t snapshot/).and_return(
+        [true, "#{target}@coreon-bkp-20240101000000\n#{target}@coreon-bkp-20240102000000\n"]
+      )
       allow(subject).to receive(:`) { `true`; '' }
 
       expect(subject.restore).to eq true
+    end
+  end
+
+  describe 'take_consistent_snapshot' do
+    it 'wraps the snapshot in the owning service backup consistency' do
+      subject.guest = guest
+      subject.mount_point = 'var/lib/mongodb'
+      svc = double 'mongo', backup_data_mount_point: 'var/lib/mongodb'
+      allow(guest).to receive(:services).and_return([svc])
+      allow(host).to receive(:exec).with(/zfs snapshot/).and_return([true, ''])
+
+      expect(svc).to receive(:with_backup_consistency).and_yield.and_return(true)
+      expect(subject.send(:take_consistent_snapshot, 'ds@snap')).to eq true
+    end
+
+    it 'snapshots directly when no service owns the volume' do
+      subject.guest = guest
+      subject.mount_point = 'var/data'
+      allow(guest).to receive(:services).and_return([])
+      expect(host).to receive(:exec).with(/zfs snapshot/).and_return([true, ''])
+
+      expect(subject.send(:take_consistent_snapshot, 'ds@snap')).to eq true
     end
   end
 

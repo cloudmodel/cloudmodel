@@ -618,18 +618,47 @@ module CloudModel
       end
     end
 
+    # Back up every guest, isolating failures so one broken guest doesn't stop
+    # the rest. Each failure is logged and, when ExceptionNotification is
+    # available (i.e. in core-admin), reported via ExceptionNotifier so backup
+    # breakage stops being silent. Run from the daily backup timer.
+    def self.backup_all
+      all.to_a.each do |guest|
+        begin
+          guest.backup
+        rescue => e
+          puts "Backup of Guest #{guest.name} failed: #{e.message}"
+          if defined?(ExceptionNotifier)
+            ExceptionNotifier.notify_exception e, data: {guest: guest.name, guest_id: guest.id.to_s}
+          end
+        end
+      end
+    end
+
+    # Back up all of this guest's services and volumes that have backups
+    # enabled. Raises {CloudModel::BackupError} naming every item that failed,
+    # so the failure surfaces instead of being swallowed.
+    # @return [true] when all backups succeeded
     def backup
-      success = true
+      failed = []
 
-      # guest_volumes.where(has_backups: true).each do |volume|
-      #   Rails.logger.debug "V #{volume.mount_point}: #{success &&= volume.backup}"
-      # end
-
-      services.where(has_backups: true).each do |service|
-        Rails.logger.debug "S #{service._type}: #{success &&= service.backup}"
+      lxd_custom_volumes.where(has_backups: true).each do |volume|
+        ok = volume.backup
+        Rails.logger.debug "V #{volume.mount_point}: #{ok}"
+        failed << "volume #{volume.mount_point}" unless ok
       end
 
-      success
+      services.where(has_backups: true).each do |service|
+        ok = service.backup
+        Rails.logger.debug "S #{service._type}: #{ok}"
+        failed << "service #{service._type}" unless ok
+      end
+
+      if failed.any?
+        raise CloudModel::BackupError, "Backup failed for #{name}: #{failed * ', '}"
+      end
+
+      true
     end
 
     def generate_mac_address

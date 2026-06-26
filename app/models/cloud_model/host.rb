@@ -215,6 +215,17 @@ module CloudModel
       end
     end
 
+    # The host THIS cloudmodel instance runs on, resolved by matching a local
+    # IP to a guest's private address (the app runs inside a guest container).
+    # Used as the local ZFS receive target for pull backups. Memoized.
+    # @return [CloudModel::Host, nil]
+    def self.local
+      return @local if defined? @local
+      require 'socket'
+      ips = Socket.ip_address_list.select(&:ipv4?).map(&:ip_address)
+      @local = CloudModel::Guest.where(:private_address.in => ips).first&.host
+    end
+
     def tinc_private_key
       require 'openssl'
       key = OpenSSL::PKey::RSA.new(2048)

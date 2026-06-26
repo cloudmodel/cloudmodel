@@ -1,11 +1,24 @@
 namespace :cloudmodel do
   desc "Backup marked services and volumes"
   task :backup => [:environment] do
-    CloudModel::Guest.all.to_a.each do |guest|
-      begin
-        guest.backup
-      rescue
-        puts "Backup of Guest #{guest.name} failed"
+    CloudModel::Guest.backup_all
+    CloudModel::MongodbReplicationSet.backup_all
+  end
+
+  namespace :migrate do
+    desc "Move per-member MongoDB backup flags onto their replica set"
+    task :mongodb_replset_backups => [:environment] do
+      CloudModel::MongodbReplicationSet.all.each do |rs|
+        # Read the raw stored flag (the getter now delegates to the set).
+        members = rs.services.select { |service| service[:has_backups] }
+        next if members.empty?
+
+        rs.update_attribute :has_backups, true
+        members.each do |service|
+          service[:has_backups] = false # bypass the setter (would touch the set)
+          service.save validate: false
+          puts "Moved backup flag of #{service.name} to replica set #{rs.name}"
+        end
       end
     end
   end
@@ -117,13 +130,8 @@ namespace :cloudmodel do
     # bash -c 'cd /var/www/rails/current && RAILS_ENV=production /usr/local/bin/bundle exec rake cloudmodel:guest:backup_all'
     desc "Backup all guest"
     task :backup_all => [:environment] do
-      CloudModel::Guest.all.to_a.each do |guest|
-        begin
-          guest.backup
-        rescue
-          puts "Backup of Guest #{guest.name} failed"
-        end
-      end
+      CloudModel::Guest.backup_all
+      CloudModel::MongodbReplicationSet.backup_all
     end
 
     desc "Build guest image"

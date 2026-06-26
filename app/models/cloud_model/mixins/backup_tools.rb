@@ -1,3 +1,5 @@
+require 'time' # for Time.strptime
+
 module CloudModel
   module Mixins
     # Provides backup rotation helpers for models that store timestamped backup
@@ -23,6 +25,32 @@ module CloudModel
         rescue Errno::ENOENT # No backup dir exists or is empty
           return []
         end
+      end
+
+      # Time of the most recent *successful* backup, or nil if none exists.
+      #
+      # Resolved via the `latest` symlink rather than the newest entry in
+      # {#list_backups}: the symlink is only re-pointed once a `backup` run has
+      # fully succeeded, whereas a run that crashes mid-dump (OOM, timeout,
+      # kill) can leave a newer but incomplete timestamp directory behind. The
+      # symlink is therefore the only reliable marker of success.
+      #
+      # A dangling `latest` (the target snapshot was removed, e.g. by retention
+      # while no fresh backup replaced it) counts as a failure and returns nil
+      # so monitoring flags it — `File.exist?` follows the link, so it is false
+      # when the target is gone.
+      # @return [Time, nil]
+      def last_backup_at
+        link = "#{backup_directory}/latest"
+        return nil unless File.symlink? link # no successful backup yet
+        return nil unless File.exist? link   # dangling latest => fail
+
+        timestamp = File.basename File.readlink(link)
+        return nil unless timestamp =~ /\A[0-9]{14}\z/
+
+        Time.strptime(timestamp, "%Y%m%d%H%M%S")
+      rescue ArgumentError, SystemCallError # Unparsable timestamp / unreadable link
+        nil
       end
     
       # Returns backup timestamps that fall outside the retention policy and can

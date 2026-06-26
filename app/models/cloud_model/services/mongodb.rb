@@ -27,7 +27,40 @@ module CloudModel
       #   @return [CloudModel::MongodbReplicationSet, nil] the replica set this node belongs to
       belongs_to :mongodb_replication_set, class_name: "CloudModel::MongodbReplicationSet", optional: true
 
+      # @!attribute [rw] mongodb_backup_exclude_collection_prefixes
+      #   @return [Array<String>] collection-name prefixes to skip in the
+      #     per-service mongodump backup (standalone members only; replica sets
+      #     take their excludes from the associated WebImage)
+      field :mongodb_backup_exclude_collection_prefixes, type: Array, default: []
+
+      # Accept a whitespace/comma-separated string from forms as well as an array.
+      def mongodb_backup_exclude_collection_prefixes=(value)
+        value = value.split(/[\s,]+/) if value.is_a?(String)
+        super(Array(value).map { |v| v.to_s.strip }.reject(&:blank?))
+      end
+
       validates :mongodb_replication_priority, inclusion: {in: 0..100}
+
+      # Replica-set members are backed up ONCE at the set level, so enabling
+      # backups on a member toggles the set instead; the member stores/reports
+      # false. Standalone members back up per service via mongodump.
+      def has_backups
+        if mongodb_replication_set
+          !!mongodb_replication_set.has_backups
+        else
+          super
+        end
+      end
+
+      def has_backups=(state)
+        if rs = mongodb_replication_set
+          self[:has_backups] = false
+          rs.has_backups = state
+          rs.save if rs.persisted? && rs.changed?
+        else
+          super
+        end
+      end
 
       def kind
         :mongodb
@@ -113,24 +146,49 @@ module CloudModel
         true
       end
 
+      # MongoDB's data (and journal) live here; this is the dataset that the ZFS
+      # volume backup snapshots, so it pairs this service with that volume.
+      def backup_data_mount_point
+        'var/lib/mongodb'
+      end
+
+      # Flush and lock writes around a filesystem snapshot, then unlock. The
+      # atomic ZFS snapshot is already crash-consistent (journal on the same
+      # dataset); this is belt-and-suspenders to get a checkpoint-clean image.
+      # The lock is held only for the (near-instant) snapshot. Best run against
+      # a secondary.
+      def with_backup_consistency
+        client = Mongo::Client.new(
+          [server_uri], connect_timeout: 5, server_selection_timeout: 5, connect: :direct
+        )
+        client.use(:admin).database.command(fsync: 1, lock: true)
+        begin
+          yield
+        ensure
+          client.use(:admin).database.command(fsyncUnlock: 1)
+        end
+      ensure
+        client&.close
+      end
+
       def backup
         return false unless has_backups
+        # Replica-set members are dumped once at the set level, not per member.
+        return false if mongodb_replication_set
+
         timestamp = Time.now.strftime "%Y%m%d%H%M%S"
+        target = "#{backup_directory}/#{timestamp}"
         FileUtils.mkdir_p backup_directory
-        command = "LC_ALL=C mongodump --gzip -h #{guest.private_address} --port #{port} -o #{backup_directory}/#{timestamp}"
 
-        Rails.logger.debug command
-        Rails.logger.debug `#{command}`
-
-        if $?.success? and File.exist? "#{backup_directory}/#{timestamp}"
+        if run_mongodump target
           FileUtils.rm_f "#{backup_directory}/latest"
-          FileUtils.ln_s "#{backup_directory}/#{timestamp}", "#{backup_directory}/latest"
+          FileUtils.ln_s target, "#{backup_directory}/latest"
           cleanup_backups
 
-          return true
+          true
         else
-          FileUtils.rm_rf "#{backup_directory}/#{timestamp}"
-          return false
+          FileUtils.rm_rf target
+          false
         end
       end
 
@@ -145,6 +203,45 @@ module CloudModel
         else
           return false
         end
+      end
+
+      private
+
+      # Run mongodump for this (standalone) member. With configured exclusion
+      # prefixes, dump each database separately (mongodump's exclusion flags
+      # require --db); otherwise dump the whole node.
+      # @return [Boolean]
+      def run_mongodump target
+        base = "LC_ALL=C mongodump --gzip -h #{guest.private_address} --port #{port}"
+
+        prefixes = mongodb_backup_exclude_collection_prefixes
+        if prefixes.blank?
+          return run_command "#{base} -o #{target.shellescape}"
+        end
+
+        exclude = prefixes.map { |p| "--excludeCollectionsWithPrefix=#{p.shellescape}" }.join(' ')
+        dbs = backup_databases
+        return false if dbs.blank?
+        dbs.all? do |db|
+          run_command "#{base} --db #{db.shellescape} #{exclude} -o #{target.shellescape}"
+        end
+      end
+
+      # Names of the non-system databases on this member.
+      # @return [Array<String>]
+      def backup_databases
+        client = Mongo::Client.new(
+          [server_uri], connect_timeout: 5, server_selection_timeout: 5, connect: :direct
+        )
+        client.database_names - %w(admin config local)
+      ensure
+        client&.close
+      end
+
+      def run_command command
+        Rails.logger.debug command
+        Rails.logger.debug `#{command}`
+        $?.success?
       end
     end
   end

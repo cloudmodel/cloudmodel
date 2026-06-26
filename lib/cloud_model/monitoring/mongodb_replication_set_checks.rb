@@ -38,6 +38,8 @@ module CloudModel
 
           do_check :member_health, 'Members Health', {critical: not(majority_healthy), warning: not(all_healthy)}, message: message
 
+          check_backup_freshness
+
           return (data['ok'] == 1.0 and all_healthy)
         end
       end

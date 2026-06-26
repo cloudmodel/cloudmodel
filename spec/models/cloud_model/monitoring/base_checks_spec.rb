@@ -437,4 +437,72 @@ describe CloudModel::Monitoring::BaseChecks do
       subject.do_check_for_errors_on result, {svc: 'Service'}
     end
   end
+
+  describe 'check_backup_freshness' do
+    let(:guest) { double 'Guest', up_state: :started }
+    let(:backupable) { double 'Backupable', has_backups: true, guest: guest, last_backup_at: nil }
+
+    before do
+      subject.instance_variable_set :@subject, backupable
+      allow(subject).to receive(:do_check)
+    end
+
+    it 'should skip subjects that are not backupable' do
+      subject.instance_variable_set :@subject, double('Plain')
+      expect(subject).not_to receive(:do_check)
+      expect(subject.check_backup_freshness).to eq true
+    end
+
+    it 'should skip when backups are disabled' do
+      allow(backupable).to receive(:has_backups).and_return false
+      expect(subject).not_to receive(:do_check)
+      expect(subject.check_backup_freshness).to eq true
+    end
+
+    it 'should skip when the owning guest is not running' do
+      allow(guest).to receive(:up_state).and_return :stopped
+      expect(subject).not_to receive(:do_check)
+      expect(subject.check_backup_freshness).to eq true
+    end
+
+    it 'should report critical when no backup exists' do
+      allow(backupable).to receive(:last_backup_at).and_return nil
+      expect(subject).to receive(:do_check).with(
+        :backup_freshness, 'recent backup exists',
+        {critical: true, warning: false},
+        hash_including(value: 'never')
+      )
+      subject.check_backup_freshness
+    end
+
+    it 'should report warning when the last backup is stale' do
+      allow(backupable).to receive(:last_backup_at).and_return Time.now - 40.hours
+      expect(subject).to receive(:do_check).with(
+        :backup_freshness, 'recent backup exists',
+        {critical: false, warning: true},
+        anything
+      )
+      subject.check_backup_freshness
+    end
+
+    it 'should report critical when the last backup is very old' do
+      allow(backupable).to receive(:last_backup_at).and_return Time.now - 4.days
+      expect(subject).to receive(:do_check).with(
+        :backup_freshness, 'recent backup exists',
+        {critical: true, warning: true},
+        anything
+      )
+      subject.check_backup_freshness
+    end
+
+    it 'should be OK when the last backup is fresh' do
+      allow(backupable).to receive(:last_backup_at).and_return Time.now - 2.hours
+      expect(subject).to receive(:do_check).with(
+        :backup_freshness, 'recent backup exists',
+        {critical: false, warning: false},
+        anything
+      )
+      subject.check_backup_freshness
+    end
+  end
 end
