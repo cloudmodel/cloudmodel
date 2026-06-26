@@ -592,6 +592,12 @@ describe CloudModel::MongodbReplicationSet do
     end
   end
 
+  describe 'restore' do
+    it 'refuses to restore without force' do
+      expect { subject.restore }.to raise_error(CloudModel::BackupError, /force: true/)
+    end
+  end
+
   describe '.backup_all' do
     it 'should back up each set with backups and notify on failure' do
       good = double 'good', name: 'good'

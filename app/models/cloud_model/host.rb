@@ -220,7 +220,9 @@ module CloudModel
     # Used as the local ZFS receive target for pull backups. Memoized.
     # @return [CloudModel::Host, nil]
     def self.local
-      return @local if defined? @local
+      # Only memoize a resolved host: caching nil (e.g. DB not yet reachable on
+      # first call) would pin the failure for the whole process lifetime.
+      return @local if defined?(@local) && @local
       require 'socket'
       ips = Socket.ip_address_list.select(&:ipv4?).map(&:ip_address)
       @local = CloudModel::Guest.where(:private_address.in => ips).first&.host

@@ -418,7 +418,7 @@ describe CloudModel::Guest do
         host2 = Factory :host
         subject.host = host
         subject.name = 'test-guest'
-        subject.services.build(_type: 'CloudModel::Services::Ssh', port: 22)
+        subject.services.build({port: 22}, CloudModel::Services::Ssh)
         allow(host2).to receive(:dhcp_private_address).and_return('10.42.0.2')
         allow(host2).to receive(:dhcp_external_address).and_return(nil)
 
