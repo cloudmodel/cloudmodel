@@ -14,6 +14,7 @@ module CloudModel
     include Mongoid::Timestamps
     include CloudModel::Mixins::HasIssues
     include CloudModel::Mixins::BackupTools
+    include CloudModel::Mixins::Backupable
     prepend CloudModel::Mixins::SmartToString
 
     # @!attribute [rw] name

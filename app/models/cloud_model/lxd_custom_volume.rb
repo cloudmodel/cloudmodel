@@ -13,6 +13,7 @@ module CloudModel
     include Mongoid::Timestamps
     include CloudModel::Mixins::AcceptSizeStrings
     include CloudModel::Mixins::HasIssues
+    include CloudModel::Mixins::Backupable
     prepend CloudModel::Mixins::SmartToString
 
     embedded_in :guest, class_name: "CloudModel::Guest"

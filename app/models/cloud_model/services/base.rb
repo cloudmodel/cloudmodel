@@ -15,6 +15,7 @@ module CloudModel
       include Mongoid::Document
       include Mongoid::Timestamps
       include CloudModel::Mixins::BackupTools
+      include CloudModel::Mixins::Backupable
       include CloudModel::Mixins::HasIssues
 
       # @!attribute [rw] name

@@ -507,6 +507,7 @@ describe CloudModel::MongodbReplicationSet do
   end
 
   it { expect(subject).to have_field(:has_backups).of_type(Mongoid::Boolean).with_default_value_of false }
+  it { expect(subject).to have_field(:backups_enabled_at).of_type(Time) }
   it { expect(subject).to have_field(:mongodb_backup_exclude_collection_prefixes).of_type(Array).with_default_value_of [] }
   it { expect(subject).to belong_to(:web_image).of_type(CloudModel::WebImage).with_optional }
 
