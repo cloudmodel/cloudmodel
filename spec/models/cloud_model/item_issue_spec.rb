@@ -262,15 +262,22 @@ describe CloudModel::ItemIssue do
       expect(subject.title).to eq "Some Title"
     end
 
-    it 'should use I18n version of title for key if no title is set, but a key' do
+    it 'should fall back to the humanized key when no translation exists' do
       subject.key = :something
-      expect(subject.title).to eq "Translation missing: en.issues.something"
+      expect(subject.title).to eq "Something"
     end
 
-    it 'should use I18n version of title for subject key if no title is set, but a key and subject' do
-      subject.key = :something
+    it 'should humanize dynamic per-device keys instead of showing a missing translation' do
+      subject.key = :net_eth0_rx_errs
       subject.subject = CloudModel::Host.new
-      expect(subject.title).to eq "Translation missing: en.issues.cloud_model/host.something"
+      expect(subject.title).to eq "Net eth0 rx errs"
+    end
+
+    it 'should use the subject-scoped translation when one exists' do
+      subject.key = :swap_usage
+      subject.value = "81.01%"
+      subject.subject = CloudModel::Host.new
+      expect(subject.title).to eq "Swap usage of 81.01%"
     end
 
     it 'should be blank if not key or title is set' do
