@@ -280,6 +280,13 @@ module CloudModel
 
         config_firewall
 
+        comment_sub_step 'update check_mk agent plugins'
+
+        # Refresh the monitoring plugin set in the new root: the host template
+        # may be older than the current plugin set, and a deploy must not
+        # silently downgrade monitoring.
+        deploy_check_mk_plugins root
+
         comment_sub_step 'config lxd bridge network'
 
         render_to_remote "/cloud_model/host/etc/default/lxd-bridge", "#{root}/etc/default/lxd-bridge", host: @host

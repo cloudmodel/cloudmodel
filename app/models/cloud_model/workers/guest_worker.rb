@@ -141,6 +141,17 @@ module CloudModel
         host.exec! "rm -f #{guest.deploy_path}/usr/sbin/policy-rc.d", "Failed to remove policy-rc.d"
       end
 
+      # Refresh the monitoring plugin set in the container's rootfs: the guest
+      # template may be older than the current plugin set, and a (re)deploy
+      # must not silently downgrade monitoring. Ownership is shifted to the
+      # unprivileged container's root (same pattern as the certificates).
+      def update_check_mk_plugins
+        render_check_mk_guest_plugins guest.deploy_path
+
+        host.exec! "chown -R 100000:100000 #{guest.deploy_path.shellescape}/usr/lib/check_mk_agent #{guest.deploy_path.shellescape}/usr/sbin/cgroup_load_writer",
+          'Failed to chown check_mk agent plugins'
+      end
+
       def config_guest_certificates
         guest.guest_certificates.each do |cert|
           unless cert.path_to_crt.blank?
@@ -212,6 +223,7 @@ module CloudModel
           ['Ensure LXD custom volumes', :ensure_lxd_custom_volumes, no_skip: true],
           ['Config LXD container', :config_lxd_container],
           ['Config guest services', :config_services],
+          ['Update check_mk agent plugins', :update_check_mk_plugins],
           ['Config guest certificates', :config_guest_certificates],
           ['Config network', :config_network],
           ['Config firewall', :config_firewall],

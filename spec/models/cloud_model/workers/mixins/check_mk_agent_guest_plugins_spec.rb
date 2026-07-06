@@ -40,6 +40,16 @@ describe CloudModel::Workers::Mixins::CheckMkAgentGuestPlugins do
         )
       end
     end
+
+    it 'keeps the cgroup_load_writer in sync with the plugin set' do
+      allow(worker).to receive(:mkdir_p)
+
+      worker.render_check_mk_guest_plugins '/cloud/build/guest/1'
+
+      expect(worker).to have_received(:render_to_remote).with(
+        '/cloud_model/support/usr/sbin/cgroup_load_writer', '/cloud/build/guest/1/usr/sbin/cgroup_load_writer', 0755
+      )
+    end
   end
 
   describe '#deploy_check_mk_plugins (live)' do
