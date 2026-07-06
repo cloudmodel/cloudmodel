@@ -23,6 +23,18 @@ namespace :cloudmodel do
     end
   end
 
+  namespace :cleanup do
+    desc "Remove obsolete template tarballs (admin data dir + all hosts) and stale /cloud/build dirs. Dry run unless CONFIRM=1; keeps the newest KEEP (default 2) finished templates per type/arch plus everything referenced by deployed containers."
+    task :templates => [:environment] do
+      cleanup = CloudModel::TemplateCleanup.new keep_per_type: ENV.fetch('KEEP', 2)
+      dry_run = ENV['CONFIRM'] != '1'
+
+      puts "Keeping newest #{cleanup.keep_per_type} finished template(s) per type/arch + all container-referenced ones."
+      cleanup.cleanup! dry_run: dry_run
+      puts dry_run ? "\nDry run — nothing deleted. Re-run with CONFIRM=1 to delete." : "\nDone."
+    end
+  end
+
   namespace :host do
     task :load_host do
       @host_worker = CloudModel::Workers::HostWorker.new CloudModel::Host.find(ENV['HOST_ID'])
