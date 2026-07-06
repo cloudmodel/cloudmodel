@@ -23,7 +23,11 @@ module CloudModel
     def title
       result = super
       if result.blank? and key
-        I18n.t "issues.#{subject_type.try :underscore}.#{key}", value: value, default: :"issues.general.#{key}"
+        # Last fallback humanizes the key: per-device issue keys are dynamic
+        # (net_eth0_rx_errs, disk_sda_await, ...) and can't be enumerated in
+        # the locale files — better a readable key than "translation missing".
+        I18n.t "issues.#{subject_type.try :underscore}.#{key}", value: value,
+          default: [:"issues.general.#{key}", key.to_s.humanize]
       else
         result
       end

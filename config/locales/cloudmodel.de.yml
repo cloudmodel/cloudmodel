@@ -609,12 +609,35 @@ de:
       cpu_15_minutes_usage: Prozessorauslastung in den letzten 15 Minuten von %{value}
       mem_usage: Speicherverbrauch von %{value}
       disks_usage: Plattennutzung bis zu %{value}
+      swap_usage: Swap-Auslastung von %{value}
+      load_per_core: Last pro Kern (15 Min.) von %{value}
+      inodes_usage: Inode-Nutzung bis zu %{value}
+      systemd_failed: "%{value} fehlgeschlagene systemd-Unit(s)"
+      readonly_fs: Dateisystem nur lesbar (read-only) eingehängt
+      cgroup_pids: PID-Limit zu %{value} ausgeschöpft
+      cgroup_oom: OOM-Kills im Container (%{value})
     cloud_model/host:
       <<: *sysinfo_issues
       mdtools: RAID hat Probleme
       sensors: Sensoren melden kritische Werte
       smart: SMART meldet Probleme
+      smart_trending: SMART-Verschleißindikatoren erhöht (Platte prüfen/tauschen)
       zpools_usage: ZPOOL-Nutzung bis zu %{value}
+      zpools_health: ZFS-Pool nicht gesund (nicht ONLINE)
+      conntrack_usage: Conntrack-Tabelle zu %{value} gefüllt
+      conntrack_insert_failed: Conntrack-Tabelle voll — Verbindungen gehen verloren (%{value})
+      conntrack_drop: Conntrack verwirft Pakete (%{value})
+      net_links_down: Netzwerk-Link ausgefallen
+      ntp_sync: Systemuhr nicht NTP-synchronisiert
+      ntp_offset: Uhrzeitabweichung von %{value}
+      kernel_oom: Out-of-Memory-Kills im Kernel-Log (%{value})
+      kernel_mce: Hardware-/Machine-Check-Fehler im Kernel-Log (%{value})
+      kernel_io_error: Block-I/O-Fehler im Kernel-Log (%{value})
+      kernel_fs_error: Dateisystemfehler im Kernel-Log (%{value})
+      reboot_required: Neustart erforderlich (z.B. nach Kernel-Update)
+      security_updates: "%{value} ausstehende Sicherheitsupdates"
+      ecc_uncorrectable: Nicht korrigierbare ECC-Speicherfehler (%{value})
+      ecc_corrected: Korrigierte ECC-Speicherfehler (%{value})
     cloud_model/guest:
       <<: *sysinfo_issues
       sys_boot_failed: Neustart benötigt %{value} und ist noch nicht beendet
@@ -663,3 +686,4 @@ de:
     cloud_model/mongodb_replication_set:
       set_health: MongoDB Replikationset ist nicht gesund
       member_health: Mitglied des MongoDB Replikationsets ist nicht gesund
+      replication_lag: Replikationsverzögerung von %{value}

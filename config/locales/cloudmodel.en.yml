@@ -606,12 +606,35 @@ en:
       cpu_15_minutes_usage: CPU usage in the last 15 minutes of %{value}
       mem_usage: Memory usage of %{value}
       disks_usage: Disk usage up to %{value}
+      swap_usage: Swap usage of %{value}
+      load_per_core: Load per core (15 min) of %{value}
+      inodes_usage: Inode usage up to %{value}
+      systemd_failed: "%{value} failed systemd unit(s)"
+      readonly_fs: Filesystem mounted read-only
+      cgroup_pids: PID limit %{value} exhausted
+      cgroup_oom: In-container OOM kills (%{value})
     cloud_model/host:
       <<: *sysinfo_issues
       mdtools: RAID has issues
       sensors: Sensors reported critial values
       smart: SMART reports issues
+      smart_trending: SMART wear indicators raised (check/replace disk)
       zpools_usage: ZPOOL usage up to %{value}
+      zpools_health: ZFS pool not healthy (not ONLINE)
+      conntrack_usage: Conntrack table %{value} full
+      conntrack_insert_failed: Conntrack table full — connections are being lost (%{value})
+      conntrack_drop: Conntrack dropping packets (%{value})
+      net_links_down: Network link down
+      ntp_sync: System clock not NTP-synchronised
+      ntp_offset: Clock offset of %{value}
+      kernel_oom: Out-of-memory kills in the kernel log (%{value})
+      kernel_mce: Hardware / machine-check errors in the kernel log (%{value})
+      kernel_io_error: Block I/O errors in the kernel log (%{value})
+      kernel_fs_error: Filesystem errors in the kernel log (%{value})
+      reboot_required: Reboot required (e.g. after a kernel update)
+      security_updates: "%{value} pending security updates"
+      ecc_uncorrectable: Uncorrectable ECC memory errors (%{value})
+      ecc_corrected: Corrected ECC memory errors (%{value})
     cloud_model/guest:
       <<: *sysinfo_issues
       sys_boot_failed: Booting for %{value} and still not up
@@ -659,3 +682,4 @@ en:
     cloud_model/mongodb_replication_set:
       set_health: MongoDB Replication Set is not healthy
       member_health: Member of MongoDB Replication Set not healthy
+      replication_lag: Replication lag of %{value}
