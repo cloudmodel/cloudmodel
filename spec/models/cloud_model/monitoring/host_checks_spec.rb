@@ -246,23 +246,47 @@ describe CloudModel::Monitoring::HostChecks do
   end
 
   describe 'check_smart_trending' do
-    it 'should warn when reallocated sectors are present' do
-      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'reallocated_sector_ct' => '5'}}}})
-      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: true}, hash_including(message: 'sda reallocated_sector_ct=5'))
+    it 'should warn when a cumulative wear counter increases' do
+      subject.instance_variable_set :@prev_system, {'smart' => {'sda' => {'reallocated_sector_ct' => '12'}}}
+      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'reallocated_sector_ct' => '16'}}}})
+      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: true}, hash_including(message: 'sda reallocated_sector_ct increased 12 → 16'))
 
       subject.check_smart_trending
     end
 
-    it 'should be ok when all wear indicators are zero' do
-      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'reallocated_sector_ct' => '0', 'current_pending_sector' => '0'}}}})
+    it 'should stay quiet for a stable non-zero counter' do
+      subject.instance_variable_set :@prev_system, {'smart' => {'sda' => {'reallocated_sector_ct' => '16'}}}
+      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'reallocated_sector_ct' => '16'}}}})
       expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: false}, anything)
 
       subject.check_smart_trending
     end
 
-    it 'should warn on NVMe media errors and depleted spare' do
+    it 'should stay quiet on the first cycle without previous data' do
+      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'reallocated_sector_ct' => '16'}}}})
+      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: false}, anything)
+
+      subject.check_smart_trending
+    end
+
+    it 'should not warn when a counter drops (replaced disk)' do
+      subject.instance_variable_set :@prev_system, {'smart' => {'sda' => {'reallocated_sector_ct' => '16'}}}
+      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'reallocated_sector_ct' => '0'}}}})
+      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: false}, anything)
+
+      subject.check_smart_trending
+    end
+
+    it 'should warn while sectors are pending, regardless of trend' do
+      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'current_pending_sector' => '2'}}}})
+      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: true}, hash_including(message: 'sda current_pending_sector=2'))
+
+      subject.check_smart_trending
+    end
+
+    it 'should warn on depleted NVMe spare as an acute state' do
       allow(subject).to receive(:data).and_return({system: {'smart' => {
-        'nvme0' => {'media_and_data_integrity_errors' => '3', 'available_spare' => '5', 'available_spare_threshold' => '10', 'percentage_used' => '80'}
+        'nvme0' => {'available_spare' => '5', 'available_spare_threshold' => '10', 'percentage_used' => '80'}
       }}})
       expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: true}, hash_including(:message))
 
