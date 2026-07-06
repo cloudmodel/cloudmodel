@@ -120,6 +120,18 @@ module CloudModel
             @model.guest.exec! "/bin/rm -f #{@model.www_root}/current", "Failed to remove old current"
             @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"
             @model.guest.exec! "/bin/touch #{@model.www_root}/current/tmp/restart.txt", "Failed to restart service"
+
+            # The touch alone is unreliable: the running Passenger app group
+            # resolved the current symlink at startup and watches restart.txt
+            # in the OLD target dir — the old code keeps serving. Restart the
+            # app explicitly; fall back to an nginx restart (short blip, but
+            # deterministic) when passenger-config is not available.
+            comment_sub_step "Restart web application"
+            web_image.try :append_to_build_log, "Restarting app on #{@guest.name}…\n"
+            success, _out = @model.guest.exec "/usr/local/rvm/bin/rvm default do passenger-config restart-app #{@model.www_root.shellescape} --ignore-app-not-running"
+            unless success
+              @model.guest.exec! "/bin/systemctl restart nginx", "Failed to restart nginx"
+            end
             if @model.delayed_jobs_supported
               @model.delayed_jobs_queues.each do |q|
                 # Stop delayed job if used
