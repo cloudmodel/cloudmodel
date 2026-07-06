@@ -64,6 +64,10 @@ namespace :cloudmodel do
         CloudModel::Host.all.reject { |host| [:booting, :not_started].include? host.deploy_state }
       end
 
+      if hosts.empty?
+        abort "No hosts found in #{Rails.env} database — forgot RAILS_ENV=production?"
+      end
+
       failures = 0
       hosts.each do |host|
         print "#{host.name}: "
@@ -170,6 +174,10 @@ namespace :cloudmodel do
       else
         # Only running containers have a reachable agent.
         CloudModel::Guest.all.select { |guest| guest.up_state == :started }
+      end
+
+      if guests.empty?
+        abort "No running guests found in #{Rails.env} database — forgot RAILS_ENV=production?"
       end
 
       failures = 0
