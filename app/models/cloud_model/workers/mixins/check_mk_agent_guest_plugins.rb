@@ -26,8 +26,12 @@ module CloudModel
 
         PLUGINS_DIR = '/usr/lib/check_mk_agent/plugins'.freeze
 
-        # Build-time: render the guest plugins into a chroot (base_path), used
-        # while building the guest image.
+        # Render the guest plugins into a rootfs under base_path — the build
+        # chroot while building the guest image, or a container's mounted
+        # rootfs during guest deploy (so deploying from an older template
+        # doesn't silently downgrade monitoring). Also keeps the cgroup
+        # CPU-usage history writer in sync (its systemd units come from the
+        # image build).
         def render_check_mk_guest_plugins base_path
           plugins_dir = "#{base_path}#{PLUGINS_DIR}"
 
@@ -39,6 +43,8 @@ module CloudModel
             mkdir_p "#{plugins_dir}/#{cache_seconds}"
             render_to_remote "#{TEMPLATE_DIR}/#{plugin}", "#{plugins_dir}/#{cache_seconds}/#{plugin}", 0755
           end
+
+          render_to_remote '/cloud_model/support/usr/sbin/cgroup_load_writer', "#{base_path}/usr/sbin/cgroup_load_writer", 0755
         end
 
         # Live: push the guest plugins into the running LXD container via

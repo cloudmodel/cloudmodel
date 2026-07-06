@@ -51,17 +51,17 @@ describe CloudModel::Workers::Mixins::CheckMkAgentPlugins do
       )
     end
 
-    it 'refreshes the cgroup_load_writer on a live push but not on a build' do
+    it 'keeps the cgroup_load_writer in sync on a live push' do
       worker.deploy_check_mk_plugins ''
       expect(worker).to have_received(:render_to_remote).with(
         '/cloud_model/support/usr/sbin/cgroup_load_writer', '/usr/sbin/cgroup_load_writer', 0755
       )
     end
 
-    it 'does not touch the cgroup_load_writer during a build render' do
+    it 'keeps the cgroup_load_writer in sync in a build/deploy root' do
       worker.deploy_check_mk_plugins '/cloud/build/host/1'
-      expect(worker).not_to have_received(:render_to_remote).with(
-        '/cloud_model/support/usr/sbin/cgroup_load_writer', anything, anything
+      expect(worker).to have_received(:render_to_remote).with(
+        '/cloud_model/support/usr/sbin/cgroup_load_writer', '/cloud/build/host/1/usr/sbin/cgroup_load_writer', 0755
       )
     end
   end

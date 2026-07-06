@@ -42,14 +42,11 @@ module CloudModel
             render_to_remote "#{TEMPLATE_DIR}/#{plugin}", "#{plugins_dir}/#{cache_seconds}/#{plugin}", 0755
           end
 
-          # On a live push (base_path == '') also refresh the cgroup CPU-usage
-          # history writer that feeds the cgroup_cpu plugin — otherwise an
-          # updated cgroup_cpu has no matching history to compute percentages
-          # from. At build time the writer (and its systemd timer) are deployed
-          # by install_check_mk_agent instead.
-          if base_path.to_s.empty?
-            render_to_remote '/cloud_model/support/usr/sbin/cgroup_load_writer', '/usr/sbin/cgroup_load_writer', 0755
-          end
+          # The cgroup CPU-usage history writer feeds the cgroup_cpu plugin —
+          # keep it in sync with the plugin set everywhere (image build, host
+          # deploy from an older template, live push). Its systemd service/
+          # timer units come from the image build and are not touched here.
+          render_to_remote '/cloud_model/support/usr/sbin/cgroup_load_writer', "#{base_path}/usr/sbin/cgroup_load_writer", 0755
         end
       end
     end
