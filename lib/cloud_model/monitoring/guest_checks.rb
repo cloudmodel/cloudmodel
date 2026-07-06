@@ -35,6 +35,15 @@ module CloudModel
       end
 
       def check
+        # Snapshot the previous cycle's parsed system data + timestamp before
+        # #check_system_info acquires fresh data and overwrites them; needed to
+        # turn the cumulative cgroup_limits counters into rates (see
+        # #counter_rate / #check_cgroup_limits). The stored result wraps the
+        # sections in a 'system' level (string key after the MongoDB round-trip).
+        prev = @subject.monitoring_last_check_result
+        @prev_system = prev && (prev['system'] || prev[:system])
+        @prev_at = @subject.monitoring_last_check_at
+
         case @subject.up_state
         when :started
           # Resolve boot issue once the guest is running

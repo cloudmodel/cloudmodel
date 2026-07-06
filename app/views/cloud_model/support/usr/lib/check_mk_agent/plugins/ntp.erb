@@ -1,0 +1,10 @@
+#!/bin/bash
+# Time synchronisation status. Matters for TLS and TOTP 2FA (the auth service).
+echo "<<<ntp>>>"
+if command -v timedatectl >/dev/null 2>&1; then
+  timedatectl show -p NTP -p NTPSynchronized 2>/dev/null | sed 's/=/ /'
+fi
+if command -v chronyc >/dev/null 2>&1; then
+  offset=$(chronyc tracking 2>/dev/null | sed -n 's/^Last offset *: *\([-0-9.]*\).*/\1/p')
+  [ -n "$offset" ] && echo "offset $offset"
+fi

@@ -1,0 +1,19 @@
+#!/bin/bash
+# Counts of critical kernel-log signatures currently in the dmesg ring buffer.
+# HostChecks turns these cumulative-ish counts into a per-cycle rate and alerts
+# on any increase (OOM kills, machine-check/hardware errors, block-I/O errors,
+# filesystem corruption / read-only remounts) — otherwise silent failures.
+# Prefer journald (persistent across the boot; not a wrapping ring buffer, so
+# counts stay monotonic) and fall back to dmesg where journald is unavailable.
+log=""
+if command -v journalctl >/dev/null 2>&1; then
+  log=$(journalctl -k -b --no-pager 2>/dev/null)
+fi
+[ -z "$log" ] && log=$(dmesg 2>/dev/null)
+[ -z "$log" ] && exit 0
+
+echo "<<<kernel_log>>>"
+echo "oom $(printf '%s\n' "$log" | grep -icE 'out of memory|oom-kill|killed process')"
+echo "mce $(printf '%s\n' "$log" | grep -icE 'machine check|mce:|hardware error')"
+echo "io_error $(printf '%s\n' "$log" | grep -icE 'i/o error|blk_update_request.*error')"
+echo "fs_error $(printf '%s\n' "$log" | grep -icE 'ext4-fs error|xfs.*(error|corrupt)|btrfs.*(error|corrupt)|remounting filesystem read-only')"

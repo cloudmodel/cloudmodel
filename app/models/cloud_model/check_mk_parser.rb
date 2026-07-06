@@ -75,7 +75,9 @@ module CloudModel
     #
     # Each `<<<section>>>` header starts a new context. Supported sections:
     # `check_mk`, `mem`, `df`/`df_v2`, `mounts`, `cpu`, `md`, `smart`,
-    # `zpools`, `sensors`, `systemd`, `systemd_units`, `lxd`, `cgroup_cpu`.
+    # `zpools`, `sensors`, `systemd`, `systemd_units`, `lxd`, `cgroup_cpu`,
+    # `nf_conntrack`, `net_dev`, `ntp`, `kernel_log`, `diskstats`, `updates`,
+    # `edac`, `cgroup_limits`, plus `df_inodes` (derived from the df inodes block).
     #
     # @param result [String] raw check_mk_agent output
     # @return [Hash] structured data keyed by section name
@@ -88,8 +90,12 @@ module CloudModel
       sensor_result = nil
       lxd_yaml = ''
       _df_block = true
+      _df_inodes = false
       _in_systemd_units_block = "unknown"
       _systemd_unit = ''
+      _nfct_stat = false
+      _nfct_header = nil
+      _netdev_link = false
 
       result.lines.each do |line|
         if line[0..2] == '<<<'
@@ -115,9 +121,20 @@ module CloudModel
           end
 
           context = line.gsub(/^<<</, '').gsub(/>>>\n$/, '')
+          # Async/cached plugins are tagged `<<<section:cached(ts,age)>>>`.
+          # Strip that annotation so cached sections parse like normal ones.
+          context = context.sub(/:cached\([^)]*\)/, '')
           unless context =~ /:/
             hash[context] ||= {}
           end
+
+          # Reset per-section sub-block state so a truncated or repeated
+          # section can't bleed its mode into the next one.
+          _df_block = true
+          _df_inodes = false
+          _nfct_stat = false
+          _nfct_header = nil
+          _netdev_link = false
         else # some data
           if hash[context]
             case context
@@ -132,10 +149,14 @@ module CloudModel
                 key = "tmpfs#{parts[-1]}"
               end
 
-              if ["[df_inodes_start]", "[df_lsblk_start]"].include? key
+              if key == "[df_inodes_start]"
+                _df_block = false
+                _df_inodes = true
+              elsif key == "[df_lsblk_start]"
                 _df_block = false
               elsif ["[df_inodes_end]", "[df_lsblk_end]"].include? key
                 _df_block = true
+                _df_inodes = false
 
               elsif _df_block
                 hash[context][key] ||= {}
@@ -145,6 +166,18 @@ module CloudModel
                 hash[context][key]['used'] = parts.pop
                 hash[context][key]['size'] = parts.pop
                 hash[context][key]['type'] = parts.pop
+              elsif _df_inodes
+                # Same column layout as df, but the numbers are inode counts.
+                # Stored separately so check_inodes_usage can flag inode
+                # exhaustion (disk "full" while bytes are still free).
+                hash['df_inodes'] ||= {}
+                hash['df_inodes'][key] ||= {}
+                hash['df_inodes'][key]['mountpoint'] = parts.pop
+                hash['df_inodes'][key]['usage'] = parts.pop
+                hash['df_inodes'][key]['available'] = parts.pop
+                hash['df_inodes'][key]['used'] = parts.pop
+                hash['df_inodes'][key]['size'] = parts.pop
+                hash['df_inodes'][key]['type'] = parts.pop
               end
             when 'mounts'
               parts = line.strip.split(' ')
@@ -283,6 +316,75 @@ module CloudModel
               hash[context][unit]['active'] = parts.shift
               hash[context][unit]['sub'] = parts.shift
               hash[context][unit]['description'] = parts * ' '
+            when 'nf_conntrack'
+              s = line.strip
+              if s == '[stat]'
+                _nfct_stat = true
+              elsif _nfct_stat
+                # Per-CPU cumulative counters from /proc/net/stat/nf_conntrack,
+                # summed by column name (mirrors node_exporter's
+                # nf_conntrack_stat_* metrics). Values are hex.
+                cols = s.split(/\s+/)
+                if _nfct_header.nil?
+                  _nfct_header = cols
+                else
+                  _nfct_header.each_with_index do |name, i|
+                    # `entries` is the global table size repeated per CPU, not summable.
+                    next if name == 'entries' or cols[i].nil?
+                    hash[context][name] = hash[context][name].to_i + cols[i].to_i(16)
+                  end
+                end
+              else
+                key, value = s.split(' ')
+                hash[context][key] = value if key
+              end
+            when 'net_dev'
+              if line.strip == '[link]'
+                _netdev_link = true
+              elsif _netdev_link
+                # `iface operstate speed` from /sys/class/net — merged into the
+                # interface's counter hash so checks can flag down links.
+                name, operstate, speed = line.strip.split(/\s+/)
+                if name
+                  hash[context][name] ||= {}
+                  hash[context][name]['operstate'] = operstate
+                  hash[context][name]['speed'] = speed
+                end
+              elsif line =~ /\|/ or not line =~ /:/
+                # skip the two /proc/net/dev header lines
+              else
+                # data lines: `iface: rx_bytes rx_packets rx_errs rx_drop ...
+                # tx_...`. The name field is fixed width, so a huge byte count
+                # can touch the colon — split on ':' first, then whitespace.
+                name, rest = line.split(':', 2)
+                vals = rest.strip.split(/\s+/)
+                keys = %w(rx_bytes rx_packets rx_errs rx_drop rx_fifo rx_frame
+                          rx_compressed rx_multicast tx_bytes tx_packets tx_errs
+                          tx_drop tx_fifo tx_colls tx_carrier tx_compressed)
+                name = name.strip
+                hash[context][name] ||= {}
+                keys.each_with_index { |k, i| hash[context][name][k] = vals[i] if vals[i] }
+              end
+            when 'ntp', 'kernel_log', 'updates', 'edac', 'cgroup_limits'
+              key, value = line.strip.split(' ', 2)
+              hash[context][key] = value if key
+            when 'diskstats'
+              # /proc/diskstats: major minor name reads reads_merged
+              # sectors_read ms_reading writes writes_merged sectors_written
+              # ms_writing ios_in_progress ms_doing_io weighted_ms_doing_io
+              parts = line.strip.split(/\s+/)
+              if parts.size >= 14
+                name = parts[2]
+                hash[context][name] = {
+                  'reads' => parts[3],
+                  'sectors_read' => parts[5],
+                  'ms_reading' => parts[6],
+                  'writes' => parts[7],
+                  'sectors_written' => parts[9],
+                  'ms_writing' => parts[10],
+                  'ms_doing_io' => parts[12]
+                }
+              end
             when 'lxd'
               lxd_yaml << line
             when "systemd_units"

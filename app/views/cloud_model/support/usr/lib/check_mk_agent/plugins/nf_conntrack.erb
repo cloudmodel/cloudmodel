@@ -1,0 +1,21 @@
+#!/bin/bash
+# Connection tracking (netfilter) monitoring.
+#
+# Emits the current table utilisation (count/max) plus the raw per-CPU
+# cumulative counters from /proc/net/stat/nf_conntrack. The counters are
+# summed and turned into per-second rates in CloudModel::CheckMkParser /
+# HostChecks, so this plugin stays stateless and portable (no awk/gawk).
+count_file=/proc/sys/net/netfilter/nf_conntrack_count
+max_file=/proc/sys/net/netfilter/nf_conntrack_max
+stat_file=/proc/net/stat/nf_conntrack
+
+[ -r "$count_file" ] && [ -r "$max_file" ] || exit 0
+
+echo "<<<nf_conntrack>>>"
+echo "count $(cat "$count_file")"
+echo "max $(cat "$max_file")"
+
+if [ -r "$stat_file" ]; then
+  echo "[stat]"
+  cat "$stat_file"
+fi

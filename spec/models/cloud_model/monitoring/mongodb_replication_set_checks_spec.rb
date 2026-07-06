@@ -86,4 +86,25 @@ describe CloudModel::Monitoring::MongodbReplicationSetChecks do
     end
 
   end
+
+  describe 'check_replication_lag' do
+    it 'should alert on the furthest secondary lag behind the primary' do
+      t = Time.now
+      allow(subject).to receive(:data).and_return(members: [
+        {'stateStr' => 'PRIMARY', 'optimeDate' => t},
+        {'stateStr' => 'SECONDARY', 'optimeDate' => t - 5},
+        {'stateStr' => 'SECONDARY', 'optimeDate' => t - 30}
+      ])
+      expect(subject).to receive(:do_check_value).with(:replication_lag, 30.0, {critical: 60, warning: 10}, hash_including(unit: 's'))
+
+      subject.check_replication_lag
+    end
+
+    it 'should do nothing without optime data' do
+      allow(subject).to receive(:data).and_return(members: [{'stateStr' => 'PRIMARY'}])
+      expect(subject).not_to receive(:do_check_value)
+
+      subject.check_replication_lag
+    end
+  end
 end

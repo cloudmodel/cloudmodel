@@ -1,0 +1,30 @@
+#!/bin/bash
+# Per-container cgroup limit signals that are invisible in plain usage/load:
+#   - memory pressure (usage hitting the cgroup memory limit)
+#   - in-container OOM kills (cgroup v2)
+#   - PID/thread exhaustion (pids.current vs pids.max)
+#   - CPU throttling (hitting the CPU quota and stalling)
+# Handles both cgroup v1 (Ubuntu 18.04) and cgroup v2 (Ubuntu 22.04,
+# Debian 12/13). HostChecks/GuestChecks turn the cumulative counters into rates.
+echo "<<<cgroup_limits>>>"
+
+if [ -e /sys/fs/cgroup/cgroup.controllers ]; then
+  # cgroup v2 (unified hierarchy)
+  base=/sys/fs/cgroup
+
+  if [ -r "$base/memory.events" ]; then
+    # "max" = times usage hit memory.max; "oom_kill" = processes OOM-killed
+    awk '/^max /{print "mem_hits "$2} /^oom_kill /{print "oom_kills "$2}' "$base/memory.events"
+  fi
+  [ -r "$base/pids.current" ] && echo "pids_current $(cat "$base/pids.current")"
+  [ -r "$base/pids.max" ]     && echo "pids_max $(cat "$base/pids.max")"
+  [ -r "$base/cpu.stat" ] && awk '/^nr_throttled /{print "cpu_nr_throttled "$2}' "$base/cpu.stat"
+else
+  # cgroup v1
+  [ -r /sys/fs/cgroup/memory/memory.failcnt ] && echo "mem_hits $(cat /sys/fs/cgroup/memory/memory.failcnt)"
+  # v1 has no reliable per-cgroup oom_kill counter — in-container OOM kills on
+  # v1 guests are still caught by the host's kernel_log (dmesg) check.
+  [ -r /sys/fs/cgroup/pids/pids.current ] && echo "pids_current $(cat /sys/fs/cgroup/pids/pids.current)"
+  [ -r /sys/fs/cgroup/pids/pids.max ]     && echo "pids_max $(cat /sys/fs/cgroup/pids/pids.max)"
+  [ -r /sys/fs/cgroup/cpu/cpu.stat ] && awk '/^nr_throttled /{print "cpu_nr_throttled "$2}' /sys/fs/cgroup/cpu/cpu.stat
+fi

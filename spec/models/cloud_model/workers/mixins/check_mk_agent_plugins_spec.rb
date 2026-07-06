@@ -1,0 +1,68 @@
+# encoding: UTF-8
+
+require 'spec_helper'
+
+describe CloudModel::Workers::Mixins::CheckMkAgentPlugins do
+  # Exercise the mixin through a minimal worker including it.
+  let(:worker) do
+    klass = Class.new(CloudModel::Workers::BaseWorker) do
+      include CloudModel::Workers::Mixins::CheckMkAgentPlugins
+    end
+    klass.new(double('host'))
+  end
+
+  before do
+    allow(worker).to receive(:mkdir_p)
+    allow(worker).to receive(:render_to_remote)
+  end
+
+  describe '#deploy_check_mk_plugins' do
+    it 'renders every flat plugin to the live plugins dir with mode 0755' do
+      worker.deploy_check_mk_plugins
+
+      expect(worker).to have_received(:mkdir_p).with('/usr/lib/check_mk_agent/plugins')
+      described_class::PLUGINS.each do |plugin|
+        expect(worker).to have_received(:render_to_remote).with(
+          "/cloud_model/support/usr/lib/check_mk_agent/plugins/#{plugin}",
+          "/usr/lib/check_mk_agent/plugins/#{plugin}",
+          0755
+        )
+      end
+    end
+
+    it 'renders cached plugins into their numbered cache subdir' do
+      worker.deploy_check_mk_plugins
+
+      described_class::CACHED_PLUGINS.each do |cache_seconds, plugin|
+        expect(worker).to have_received(:mkdir_p).with("/usr/lib/check_mk_agent/plugins/#{cache_seconds}")
+        expect(worker).to have_received(:render_to_remote).with(
+          "/cloud_model/support/usr/lib/check_mk_agent/plugins/#{plugin}",
+          "/usr/lib/check_mk_agent/plugins/#{cache_seconds}/#{plugin}",
+          0755
+        )
+      end
+    end
+
+    it 'prefixes a build chroot path when given one' do
+      worker.deploy_check_mk_plugins '/cloud/build/host/1'
+
+      expect(worker).to have_received(:render_to_remote).with(
+        anything, '/cloud/build/host/1/usr/lib/check_mk_agent/plugins/nf_conntrack', 0755
+      )
+    end
+
+    it 'refreshes the cgroup_load_writer on a live push but not on a build' do
+      worker.deploy_check_mk_plugins ''
+      expect(worker).to have_received(:render_to_remote).with(
+        '/cloud_model/support/usr/sbin/cgroup_load_writer', '/usr/sbin/cgroup_load_writer', 0755
+      )
+    end
+
+    it 'does not touch the cgroup_load_writer during a build render' do
+      worker.deploy_check_mk_plugins '/cloud/build/host/1'
+      expect(worker).not_to have_received(:render_to_remote).with(
+        '/cloud_model/support/usr/sbin/cgroup_load_writer', anything, anything
+      )
+    end
+  end
+end
