@@ -365,7 +365,7 @@ describe CloudModel::Monitoring::HostChecks do
           'fan1' => {'type' => 'fan', 'input' => 1200.0}
         },
         'smart' => {
-          'sda' => {'temperature_celsius' => '38'},
+          'sda' => {'temperature_celsius' => '38', 'reallocated_sector_ct' => '16'},
           'sdb' => {'temperature_sensor_1' => '40', 'temperature_sensor_2' => '43'}
         }
       }})
@@ -376,6 +376,7 @@ describe CloudModel::Monitoring::HostChecks do
         'zpool.data.cap' => 80.0,
         'sensor.core0' => 45.0,
         'smart.sda.temp' => 38.0,
+        'smart.sda.reallocated_sector_ct' => 16.0,
         'smart.sdb.temp' => 43.0
       )
     end

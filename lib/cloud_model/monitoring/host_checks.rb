@@ -95,6 +95,13 @@ module CloudModel
               if temp = smart_temperature(values)
                 metrics["smart.#{dev}.temp"] = temp
               end
+
+              # Wear indicators as time series — the trend (are the 16
+              # reallocated sectors growing?) is what makes a smart_trending
+              # issue actionable.
+              SMART_WEAR_METRICS.each do |attr|
+                metrics["smart.#{dev}.#{attr}"] = values[attr].to_f if values[attr]
+              end
             end
           end
         end
@@ -189,6 +196,12 @@ module CloudModel
 
       # Whole disks (not partitions) for I/O latency/throughput monitoring.
       DISKSTATS_WHOLE = /\A(sd[a-z]+|nvme\d+n\d+|vd[a-z]+|xvd[a-z]+)\z/
+
+      # SMART wear attributes recorded as time series (ATA + NVMe) — the same
+      # ones check_smart_trending alerts on.
+      SMART_WEAR_METRICS = %w(reallocated_sector_ct current_pending_sector
+                              offline_uncorrectable reported_uncorrect
+                              media_and_data_integrity_errors percentage_used).freeze
 
       # Per-second rates of the cumulative conntrack counters. Rates — not the
       # raw cumulative counters — are what we alert and graph on, mirroring
