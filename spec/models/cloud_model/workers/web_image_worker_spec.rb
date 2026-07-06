@@ -26,7 +26,7 @@ describe CloudModel::Workers::WebImageWorker do
     end
 
     it 'should pull latest changes when directory exists' do
-      expect(subject).to receive(:run_with_clean_env).with("Pulling", /git checkout.*git pull/)
+      expect(subject).to receive(:run_with_clean_env).with("Pulling", /git fetch.*git checkout -f.*git reset --hard/m)
       subject.checkout_git
     end
 
@@ -226,7 +226,7 @@ describe CloudModel::Workers::WebImageWorker do
       file = double 'GridFsFile', id: 'file123'
       allow(Mongoid::GridFs).to receive(:put).and_return(file)
 
-      expect(web_image).to receive(:update_attributes).with(build_state: :running, build_last_issue: nil)
+      expect(web_image).to receive(:update_attributes).with(build_state: :running, build_last_issue: nil, build_log: '')
       expect(web_image).to receive(:update_attributes).with(build_state: :finished)
       expect(subject.build).to eq true
     end
@@ -361,14 +361,26 @@ describe CloudModel::Workers::WebImageWorker do
       allow(Rails.logger).to receive(:error)
     end
 
+    before do
+      allow(subject).to receive(:append_build_log)
+    end
+
     it 'should return command output on success' do
-      allow(subject).to receive(:`) { `true`; "all good\n" }
-      expect(subject.run_step('Testing', 'echo hi')).to eq "all good\n"
+      expect(subject.run_step('Testing', 'echo all good')).to eq "all good\n"
     end
 
     it 'should raise ExecutionException on non-zero exit' do
-      allow(subject).to receive(:`) { `false`; "" }
-      expect { subject.run_step('Testing', 'badcmd') }.to raise_error(CloudModel::ExecutionException)
+      expect { subject.run_step('Testing', 'exit 3') }.to raise_error(CloudModel::ExecutionException)
+    end
+
+    it 'should stream step header and output into the build log' do
+      logged = +''
+      allow(subject).to receive(:append_build_log) { |text| logged << text }
+
+      subject.run_step 'Testing', 'echo streamed line'
+
+      expect(logged).to include '$ Testing'
+      expect(logged).to include "streamed line\n"
     end
   end
 

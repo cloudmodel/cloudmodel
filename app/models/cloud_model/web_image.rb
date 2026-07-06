@@ -84,6 +84,11 @@ module CloudModel
 
     field :build_last_issue, type: String
 
+    # @!attribute [rw] build_log
+    #   @return [String] streamed output of the current/last build (reset at
+    #     build start, appended live by the worker; capped in size)
+    field :build_log, type: String
+
     enum_field :redeploy_state, {
       0x00 => :pending,
       0x01 => :running,

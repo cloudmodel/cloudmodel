@@ -33,9 +33,16 @@ module CloudModel
           end
         end
 
+        # The build dir is a disposable workspace: earlier builds may have
+        # rewritten tracked files (yarn/bundler touch their lockfiles), which
+        # makes a plain pull refuse to fast-forward. Discard local changes and
+        # hard-reset to the remote branch head. Deliberately no `git clean`:
+        # untracked build caches (node_modules etc.) must survive for the
+        # lockfile-based install skip.
         git_script = "cd #{@web_image.build_path.shellescape} && "
-        git_script += "git checkout #{@web_image.git_branch.shellescape} &&"
-        git_script += "git pull"
+        git_script += "git fetch && "
+        git_script += "git checkout -f #{@web_image.git_branch.shellescape} && "
+        git_script += "git reset --hard origin/#{@web_image.git_branch.shellescape}"
 
         begin
           run_with_clean_env "Pulling", git_script
@@ -182,7 +189,7 @@ module CloudModel
 
       def build options = {}
         return false unless @web_image.build_state == :pending or options[:force]
-        @web_image.update_attributes build_state: :running, build_last_issue: nil
+        @web_image.update_attributes build_state: :running, build_last_issue: nil, build_log: ''
 
         if options[:clean]
           FileUtils.rm_rf @web_image.build_path
@@ -304,12 +311,51 @@ module CloudModel
         end
       end
 
+      # Max size of the stored build log; beyond that appends are dropped with
+      # a single truncation marker (protects the Mongo document size).
+      BUILD_LOG_LIMIT = 512 * 1024
+
+      # Appends streamed output to the web image, making the build log
+      # readable live on the admin page while the build runs.
+      def append_build_log text
+        return if text.empty?
+
+        log = @web_image.build_log.to_s
+        if log.bytesize > BUILD_LOG_LIMIT
+          return if log.end_with? "[log truncated]\n"
+          text = "…\n[log truncated]\n"
+        end
+
+        @web_image.update_attribute :build_log, log + text
+      end
+
       def run_step step, command
         Rails.logger.debug "### #{step}: #{command}"
         command = "PATH=/bin:#{ENV["PATH"].shellescape} #{command}"
-        #puts command
-        c_out = `#{command}`
+        append_build_log "\n$ #{step}\n"
+
+        # Stream stdout line by line and flush it into the build log about once
+        # a second, so long steps (bundle install, asset builds) are readable
+        # live instead of appearing as one blob at the end. stderr handling is
+        # unchanged (worker console), as is the returned/raised output.
+        c_out = +''
+        pending = +''
+        last_flush = Time.now
+        IO.popen(command) do |io|
+          io.each_line do |line|
+            c_out << line
+            pending << line
+            if Time.now - last_flush >= 1
+              append_build_log pending
+              pending = +''
+              last_flush = Time.now
+            end
+          end
+        end
+        append_build_log pending unless pending.empty?
+
         unless $?.success?
+          append_build_log "FAILED: #{step} (#{$?})\n"
           Rails.logger.error "Error running command:\n  #{command}\n  #{$?}\n#{c_out.lines.map{|l| "    #{l}"} * ""}\n#----"
           Rails.logger.error $?
 
