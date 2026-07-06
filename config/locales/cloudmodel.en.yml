@@ -594,6 +594,18 @@ en:
         rake_timer_on_boot: Execution on Boot
         rake_timer_on_boot_sec: Seconds before executing at Boot
 
+  monitoring_messages:
+    smart:
+      grown: "Drive %{disk} has a growing number of %{what} (%{from} → %{to})"
+      pending: "Drive %{disk} has %{count} currently unreadable sectors"
+      endurance: "Drive %{disk} has used up its rated write endurance (%{value}% used)"
+      spare: "Drive %{disk}: NVMe spare capacity almost depleted (%{value} < threshold %{threshold})"
+      attributes:
+        reallocated_sector_ct: reallocated (remapped) sectors
+        offline_uncorrectable: uncorrectable sectors
+        reported_uncorrect: reported uncorrectable read errors
+        media_and_data_integrity_errors: media/data integrity errors
+
   issues:
     general:
       no_check: "%{value} does not exist"

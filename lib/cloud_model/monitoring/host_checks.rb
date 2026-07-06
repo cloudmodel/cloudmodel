@@ -109,6 +109,17 @@ module CloudModel
         metrics
       end
 
+      # Human identification of a physical disk for alert messages:
+      # "sda (Samsung SSD 860, S/N 234552)" — with whatever of model (ATA/NVMe)
+      # and serial number SMART reported.
+      def smart_disk_label dev, values
+        model  = [values['device_model'], values['model_number']].find { |m| m and m != '-' }
+        serial = values['serial_number'] if values['serial_number'] and values['serial_number'] != '-'
+
+        details = [model, serial && "S/N #{serial}"].compact
+        details.empty? ? dev : "#{dev} (#{details * ', '})"
+      end
+
       # Representative disk temperature (°C) from a SMART entry, mirroring the
       # precedence used in the host view. Returns nil when no usable reading.
       def smart_temperature values
@@ -350,24 +361,32 @@ module CloudModel
 
           smart.each do |dev, v|
             prev = prev_smart[dev] || {}
+            disk = smart_disk_label dev, v
 
             SMART_CUMULATIVE_ATTRIBUTES.each do |attr|
               next unless v[attr] and prev[attr]
               cur = v[attr].to_i
               # A drop means a replaced disk / reset counter — not deterioration.
-              problems << "#{dev} #{attr} increased #{prev[attr].to_i} → #{cur}" if cur > prev[attr].to_i
+              if cur > prev[attr].to_i
+                problems << I18n.t('monitoring_messages.smart.grown', disk: disk,
+                  what: I18n.t("monitoring_messages.smart.attributes.#{attr}"),
+                  from: prev[attr].to_i, to: cur)
+              end
             end
 
             # Acute states: actively unreadable sectors and NVMe end-of-life.
             if v['current_pending_sector'] and v['current_pending_sector'].to_i > 0
-              problems << "#{dev} current_pending_sector=#{v['current_pending_sector']}"
+              problems << I18n.t('monitoring_messages.smart.pending', disk: disk,
+                count: v['current_pending_sector'].to_i)
             end
             if v['percentage_used'] and v['percentage_used'].to_i >= 100
-              problems << "#{dev} percentage_used=#{v['percentage_used']} (endurance exceeded)"
+              problems << I18n.t('monitoring_messages.smart.endurance', disk: disk,
+                value: v['percentage_used'].to_i)
             end
             if v['available_spare'] and v['available_spare_threshold'] and
                v['available_spare'].to_i < v['available_spare_threshold'].to_i
-              problems << "#{dev} available_spare=#{v['available_spare']} < threshold #{v['available_spare_threshold']}"
+              problems << I18n.t('monitoring_messages.smart.spare', disk: disk,
+                value: v['available_spare'], threshold: v['available_spare_threshold'])
             end
           end
 
