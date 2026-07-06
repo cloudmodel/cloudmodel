@@ -332,21 +332,35 @@ module CloudModel
         end
       end
 
-      # SMART pass/fail flips only at the very end of a disk's life. These
-      # attributes rise well before that — a growing reallocated/pending sector
-      # count is the early warning to replace the disk.
+      # Cumulative SMART wear counters: alert only when they INCREASE — a disk
+      # can run for years with a stable historic count, and a permanently open
+      # issue would just train everyone to ignore it. The absolute values are
+      # visible on the host page and in the smart_health chart.
+      SMART_CUMULATIVE_ATTRIBUTES = %w(reallocated_sector_ct offline_uncorrectable
+                                       reported_uncorrect media_and_data_integrity_errors).freeze
+
+      # SMART pass/fail flips only at the very end of a disk's life. Alert on
+      # deterioration (growing cumulative wear counters vs the previous cycle)
+      # and on acutely bad states (pending sectors, depleted NVMe spare,
+      # exceeded endurance) — not on stable historic counts.
       def check_smart_trending
         if sys_info = data[:system] and smart = sys_info['smart']
+          prev_smart = (@prev_system && @prev_system['smart']) || {}
           problems = []
+
           smart.each do |dev, v|
-            # ATA/SATA wear attributes: any non-zero value is an early warning.
-            %w(reallocated_sector_ct current_pending_sector offline_uncorrectable reported_uncorrect).each do |attr|
-              problems << "#{dev} #{attr}=#{v[attr]}" if v[attr] and v[attr].to_i > 0
+            prev = prev_smart[dev] || {}
+
+            SMART_CUMULATIVE_ATTRIBUTES.each do |attr|
+              next unless v[attr] and prev[attr]
+              cur = v[attr].to_i
+              # A drop means a replaced disk / reset counter — not deterioration.
+              problems << "#{dev} #{attr} increased #{prev[attr].to_i} → #{cur}" if cur > prev[attr].to_i
             end
 
-            # NVMe health (different attribute set than ATA).
-            if v['media_and_data_integrity_errors'] and v['media_and_data_integrity_errors'].to_i > 0
-              problems << "#{dev} media_and_data_integrity_errors=#{v['media_and_data_integrity_errors']}"
+            # Acute states: actively unreadable sectors and NVMe end-of-life.
+            if v['current_pending_sector'] and v['current_pending_sector'].to_i > 0
+              problems << "#{dev} current_pending_sector=#{v['current_pending_sector']}"
             end
             if v['percentage_used'] and v['percentage_used'].to_i >= 100
               problems << "#{dev} percentage_used=#{v['percentage_used']} (endurance exceeded)"
