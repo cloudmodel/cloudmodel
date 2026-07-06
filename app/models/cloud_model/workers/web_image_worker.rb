@@ -334,14 +334,15 @@ module CloudModel
         command = "PATH=/bin:#{ENV["PATH"].shellescape} #{command}"
         append_build_log "\n$ #{step}\n"
 
-        # Stream stdout line by line and flush it into the build log about once
-        # a second, so long steps (bundle install, asset builds) are readable
-        # live instead of appearing as one blob at the end. stderr handling is
-        # unchanged (worker console), as is the returned/raised output.
+        # Stream stdout+stderr line by line and flush into the build log about
+        # once a second, so long steps (bundle install, asset builds) are
+        # readable live instead of appearing as one blob at the end. stderr is
+        # merged deliberately: build tools (vite, yarn, bundler) write their
+        # actual output — including the errors — to stderr.
         c_out = +''
         pending = +''
         last_flush = Time.now
-        IO.popen(command) do |io|
+        IO.popen(command, err: [:child, :out]) do |io|
           io.each_line do |line|
             c_out << line
             pending << line

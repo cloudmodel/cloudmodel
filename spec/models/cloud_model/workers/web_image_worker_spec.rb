@@ -373,6 +373,10 @@ describe CloudModel::Workers::WebImageWorker do
       expect { subject.run_step('Testing', 'exit 3') }.to raise_error(CloudModel::ExecutionException)
     end
 
+    it 'should capture stderr as well — build tools log errors there' do
+      expect(subject.run_step('Testing', 'echo from stderr 1>&2')).to eq "from stderr\n"
+    end
+
     it 'should stream step header and output into the build log' do
       logged = +''
       allow(subject).to receive(:append_build_log) { |text| logged << text }
