@@ -94,7 +94,7 @@ module CloudModel
         def redeploy_web_image options={}
           return false unless options[:force] or (@model.deploy_web_image and @model.redeploy_web_image_state == :pending)
 
-          @model.update_attributes redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil
+          @model.update_attributes redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'unroll'
           web_image = @model.deploy_web_image
           web_image.try :append_to_build_log, "Deploying to #{@guest.name} (#{@guest.host.name})…\n"
 
@@ -108,15 +108,18 @@ module CloudModel
             mkdir_p deploy_path
             unroll_web_image deploy_path
 
+            @model.update_attribute :redeploy_web_image_step, 'transfer'
             comment_sub_step "Copy unrolled data to guest"
             @host.exec! "cd #{unroll_path} && tar c . | lxc exec #{@model.guest.current_lxd_container.name.shellescape} -- /bin/tar x -C / --no-same-owner", "Failed to transfer files"
 
             comment_sub_step "Remove unrolled data from hosts /tmp"
             @host.exec "rm -rf #{unroll_path}"
 
+            @model.update_attribute :redeploy_web_image_step, 'permissions'
             comment_sub_step "Align owner of guest data"
             @model.guest.exec! "/bin/chown -R www:www #{@model.www_root}/#{deploy_id}", "Failed to set user to www "
 
+            @model.update_attribute :redeploy_web_image_step, 'activate'
             @model.guest.exec! "/bin/rm -f #{@model.www_root}/current", "Failed to remove old current"
             @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"
             @model.guest.exec! "/bin/touch #{@model.www_root}/current/tmp/restart.txt", "Failed to restart service"
@@ -126,6 +129,7 @@ module CloudModel
             # in the OLD target dir — the old code keeps serving. Restart the
             # app explicitly; fall back to an nginx restart (short blip, but
             # deterministic) when passenger-config is not available.
+            @model.update_attribute :redeploy_web_image_step, 'restart'
             comment_sub_step "Restart web application"
             web_image.try :append_to_build_log, "Restarting app on #{@guest.name}…\n"
             success, _out = @model.guest.exec "/usr/local/rvm/bin/rvm default do passenger-config restart-app #{@model.www_root.shellescape} --ignore-app-not-running"
@@ -151,7 +155,7 @@ module CloudModel
             return false
           end
           web_image.try :append_to_build_log, "#{@guest.name} done\n"
-          @model.update_attributes redeploy_web_image_state: :finished
+          @model.update_attributes redeploy_web_image_state: :finished, redeploy_web_image_step: 'done'
         end
 
         def deploy_web_locations
