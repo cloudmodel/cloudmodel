@@ -272,6 +272,12 @@ module CloudModel
             when 'zpools'
               zp = line.split("\t").map(&:strip)
 
+              # 11 columns = default `zpool list` output of ZFS >= 0.8, which
+              # inserted CKPOINT after FREE (an old plugin without a pinned
+              # column list on a newer host). Drop it so health/cap stay
+              # aligned; the pinned plugin always emits 10 columns.
+              zp.delete_at 4 if zp.size >= 11
+
               hash[context][zp[0]] = {
                 size: zp[1],
                 alloc: zp[2],
