@@ -42,6 +42,10 @@ module CloudModel
     field :expires_at, type: Time
 
     index subject_type: 1, subject_id: 1, resolution: 1, ref_at: 1
+    # Rollup scans by resolution + time only (no subject prefix), which the
+    # compound index above cannot serve — without this index every rollup was
+    # a full collection scan over large documents.
+    index resolution: 1, ref_at: 1
     index({ expires_at: 1 }, { expire_after_seconds: 0 })
 
     # Record a raw sample for the given subject.
@@ -88,7 +92,10 @@ module CloudModel
       since = Time.now - recompute
 
       groups = Hash.new { |h, k| h[k] = [] }
-      where(resolution: from).gte(ref_at: since).each do |sample|
+      # Project to the fields we aggregate — the documents carry large metrics
+      # hashes and this loop streams the whole recompute window every cycle.
+      where(resolution: from).gte(ref_at: since)
+        .only(:subject_type, :subject_id, :ref_at, :metrics).each do |sample|
         bucket = bucket_time sample.ref_at, interval
         groups[[sample.subject_type, sample.subject_id, bucket]] << sample.metrics
       end
