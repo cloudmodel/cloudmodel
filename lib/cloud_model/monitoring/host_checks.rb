@@ -109,6 +109,27 @@ module CloudModel
         metrics
       end
 
+      # One situational line per affected drive for the alert message: the key
+      # SMART counters plus the state of every RAID array the drive is a member
+      # of — the picture needed to decide between scrub and replacement without
+      # logging in first.
+      def smart_context_line dev, values, md
+        counters = (SMART_CUMULATIVE_ATTRIBUTES + %w(current_pending_sector))
+          .select { |attr| values[attr] }
+          .map { |attr| "#{attr}=#{values[attr]}" }
+
+        line = "#{dev}: #{counters * ', '}"
+
+        if md and md['devs']
+          arrays = md['devs'].select { |_name, d| d['disks'].to_a.any? { |disk| disk.to_s.start_with? dev } }
+          unless arrays.empty?
+            line += " — RAID: " + (arrays.map { |name, d| [name, d['status'], d['disks_status']].compact * ' ' } * ', ')
+          end
+        end
+
+        line
+      end
+
       # Human identification of a physical disk for alert messages:
       # "sda (Samsung SSD 860, S/N 234552)" — with whatever of model (ATA/NVMe)
       # and serial number SMART reported.
@@ -358,10 +379,12 @@ module CloudModel
         if sys_info = data[:system] and smart = sys_info['smart']
           prev_smart = (@prev_system && @prev_system['smart']) || {}
           problems = []
+          affected = []
 
           smart.each do |dev, v|
             prev = prev_smart[dev] || {}
             disk = smart_disk_label dev, v
+            problems_before = problems.size
 
             SMART_CUMULATIVE_ATTRIBUTES.each do |attr|
               next unless v[attr] and prev[attr]
@@ -388,6 +411,15 @@ module CloudModel
               problems << I18n.t('monitoring_messages.smart.spare', disk: disk,
                 value: v['available_spare'], threshold: v['available_spare_threshold'])
             end
+
+            affected << dev if problems.size > problems_before
+          end
+
+          # Append the situational picture for every affected drive, so the
+          # scrub-or-replace decision can be made from the alert itself.
+          unless affected.empty?
+            context = affected.sort.map { |dev| smart_context_line dev, smart[dev], sys_info['md'] }
+            problems += [''] + context
           end
 
           do_check :smart_trending, 'SMART wear indicators', {
