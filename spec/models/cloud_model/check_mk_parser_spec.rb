@@ -201,6 +201,129 @@ describe CloudModel::CheckMkParser do
       end
     end
 
+    describe 'nf_conntrack section' do
+      it 'should parse count and max' do
+        result = CloudModel::CheckMkParser.parse "<<<nf_conntrack>>>\ncount 12345\nmax 262144\n"
+        expect(result['nf_conntrack']['count']).to eq '12345'
+        expect(result['nf_conntrack']['max']).to eq '262144'
+      end
+
+      it 'should sum per-CPU hex stat counters by column name' do
+        input = "<<<nf_conntrack>>>\ncount 10\nmax 100\n[stat]\n" \
+                "entries found invalid insert_failed drop early_drop search_restart\n" \
+                "0000000a 00000000 00000000 00000002 00000001 00000000 00000000\n" \
+                "0000000a 00000000 00000000 00000003 00000000 00000000 00000000\n"
+        result = CloudModel::CheckMkParser.parse input
+        # insert_failed = 0x2 + 0x3 = 5, drop = 0x1 + 0x0 = 1
+        expect(result['nf_conntrack']['insert_failed']).to eq 5
+        expect(result['nf_conntrack']['drop']).to eq 1
+        # `entries` is the global size repeated per CPU and must not be summed
+        expect(result['nf_conntrack']['entries']).to be_nil
+        expect(result['nf_conntrack']['count']).to eq '10'
+      end
+    end
+
+    describe 'net_dev section' do
+      it 'should parse per-interface counters and skip header lines' do
+        input = "<<<net_dev>>>\n" \
+                "Inter-|   Receive                                                |  Transmit\n" \
+                " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n" \
+                "    lo:  158 2 0 0 0 0 0 0  158 2 0 0 0 0 0 0\n" \
+                "  eth0: 1000 10 1 2 0 0 0 0  2000 20 3 4 0 0 0 0\n"
+        result = CloudModel::CheckMkParser.parse input
+        expect(result['net_dev']['Inter-|   Receive']).to be_nil
+        expect(result['net_dev']['eth0']['rx_bytes']).to eq '1000'
+        expect(result['net_dev']['eth0']['rx_packets']).to eq '10'
+        expect(result['net_dev']['eth0']['rx_errs']).to eq '1'
+        expect(result['net_dev']['eth0']['rx_drop']).to eq '2'
+        expect(result['net_dev']['eth0']['tx_bytes']).to eq '2000'
+        expect(result['net_dev']['eth0']['tx_errs']).to eq '3'
+        expect(result['net_dev']['lo']['rx_bytes']).to eq '158'
+      end
+
+      it 'should handle a byte count that touches the colon-less name field' do
+        # When rx_bytes is huge the name and value run together after the colon
+        input = "<<<net_dev>>>\n" \
+                "  eth0:12345678901 100 0 0 0 0 0 0 500 50 0 0 0 0 0 0\n"
+        result = CloudModel::CheckMkParser.parse input
+        expect(result['net_dev']['eth0']['rx_bytes']).to eq '12345678901'
+        expect(result['net_dev']['eth0']['rx_packets']).to eq '100'
+      end
+    end
+
+    describe 'net_dev link block' do
+      it 'should merge operstate and speed into the interface' do
+        input = "<<<net_dev>>>\n" \
+                "  eth0: 1000 10 0 0 0 0 0 0 2000 20 0 0 0 0 0 0\n" \
+                "[link]\n" \
+                "eth0 up 1000\n" \
+                "lxdbr0 down unknown\n"
+        result = CloudModel::CheckMkParser.parse input
+        expect(result['net_dev']['eth0']['operstate']).to eq 'up'
+        expect(result['net_dev']['eth0']['speed']).to eq '1000'
+        expect(result['net_dev']['eth0']['rx_bytes']).to eq '1000'
+        expect(result['net_dev']['lxdbr0']['operstate']).to eq 'down'
+      end
+    end
+
+    describe 'df inodes block' do
+      it 'should store inode counts separately from df bytes' do
+        input = "<<<df>>>\n" \
+                "/dev/sda1 ext4 100000 50000 45000 53% /\n" \
+                "[df_inodes_start]\n" \
+                "/dev/sda1 ext4 1000 900 100 90% /\n" \
+                "[df_inodes_end]\n"
+        result = CloudModel::CheckMkParser.parse input
+        expect(result['df']['/dev/sda1']['used']).to eq '50000'
+        expect(result['df_inodes']['/dev/sda1']['used']).to eq '900'
+        expect(result['df_inodes']['/dev/sda1']['size']).to eq '1000'
+        expect(result['df_inodes']['/dev/sda1']['mountpoint']).to eq '/'
+      end
+    end
+
+    it 'should parse ntp section' do
+      result = CloudModel::CheckMkParser.parse "<<<ntp>>>\nNTP yes\nNTPSynchronized yes\noffset -0.000123\n"
+      expect(result['ntp']['NTPSynchronized']).to eq 'yes'
+      expect(result['ntp']['offset']).to eq '-0.000123'
+    end
+
+    it 'should parse kernel_log section' do
+      result = CloudModel::CheckMkParser.parse "<<<kernel_log>>>\noom 2\nmce 0\nio_error 1\nfs_error 0\n"
+      expect(result['kernel_log']['oom']).to eq '2'
+      expect(result['kernel_log']['fs_error']).to eq '0'
+    end
+
+    it 'should parse updates section' do
+      result = CloudModel::CheckMkParser.parse "<<<updates>>>\nreboot_required 1\nupdates 5\nsecurity_updates 3\n"
+      expect(result['updates']['reboot_required']).to eq '1'
+      expect(result['updates']['security_updates']).to eq '3'
+    end
+
+    it 'should parse edac section' do
+      result = CloudModel::CheckMkParser.parse "<<<edac>>>\nce_count 4\nue_count 0\n"
+      expect(result['edac']['ce_count']).to eq '4'
+      expect(result['edac']['ue_count']).to eq '0'
+    end
+
+    it 'should parse cgroup_limits section' do
+      result = CloudModel::CheckMkParser.parse "<<<cgroup_limits>>>\nmem_hits 12\noom_kills 0\npids_current 40\npids_max 200\ncpu_nr_throttled 5\n"
+      expect(result['cgroup_limits']['mem_hits']).to eq '12'
+      expect(result['cgroup_limits']['pids_current']).to eq '40'
+      expect(result['cgroup_limits']['pids_max']).to eq '200'
+      expect(result['cgroup_limits']['cpu_nr_throttled']).to eq '5'
+    end
+
+    it 'should parse diskstats section for whole disks' do
+      input = "<<<diskstats>>>\n" \
+              "   8       0 sda 1000 0 20000 500 2000 0 40000 800 0 300 1300\n" \
+              "   8       1 sda1 10 0 20 5 20 0 40 8 0 3 13\n"
+      result = CloudModel::CheckMkParser.parse input
+      expect(result['diskstats']['sda']['sectors_read']).to eq '20000'
+      expect(result['diskstats']['sda']['ms_reading']).to eq '500'
+      expect(result['diskstats']['sda']['writes']).to eq '2000'
+      expect(result['diskstats']['sda1']['reads']).to eq '10'
+    end
+
     it 'should parse systemd section' do
       input = "<<<systemd>>>\nssh.service loaded active running OpenSSH server daemon\n"
       result = CloudModel::CheckMkParser.parse input
@@ -276,6 +399,14 @@ describe CloudModel::CheckMkParser do
       result = CloudModel::CheckMkParser.parse input
       expect(result['plugin']['data_sep0']).to eq "raw payload\n"
     end
+
+    it 'should parse a cached async section like a normal one' do
+      # Async/cached plugins tag the header with :cached(ts,age); it must not
+      # prevent normal per-section parsing.
+      result = CloudModel::CheckMkParser.parse "<<<updates:cached(1700000000,3600)>>>\nreboot_required 1\nsecurity_updates 2\n"
+      expect(result['updates']['reboot_required']).to eq '1'
+      expect(result['updates']['security_updates']).to eq '2'
+    end
   end
 
   describe '.parse_cgroup_cpu' do
@@ -325,6 +456,19 @@ describe CloudModel::CheckMkParser do
       result = CloudModel::CheckMkParser.parse input
       expect(result['cgroup_cpu']['cpus']).to eq '2'
       expect(result['cgroup_cpu']).to have_key 'last_minute_percentage'
+    end
+
+    it 'should compute cgroup cpu from a single total value (cgroup v2)' do
+      # cgroup v2 emits one aggregate usage value (ns) instead of a per-CPU
+      # array; total/wall/cpus still yields the correct overall percentage.
+      base_ts = 100_000_000_000
+      old_ts  = base_ts - 30_000_000_000
+      input = "<<<cpu>>>\n0.5 1.0 1.5 1/200 12345 2\n" \
+              "<<<cgroup_cpu>>>\n#{base_ts} 400\n#{old_ts} 200\n"
+      result = CloudModel::CheckMkParser.parse input
+      expect(result['cgroup_cpu']['cpus']).to eq '2'
+      expect(result['cgroup_cpu']['last_minute_percentage']).to be_a Numeric
+      expect(result['cgroup_cpu']['last_minute_percentage_by_cpus'].size).to eq 1
     end
 
     it 'should derive cpu from lxc_container_cpu when cpu section absent' do

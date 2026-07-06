@@ -1,0 +1,19 @@
+#!/bin/bash
+# Network interface statistics.
+#
+# Emits the raw /proc/net/dev table (cumulative per-interface rx/tx byte,
+# packet, error and drop counters) plus a [link] block with each interface's
+# operational state and negotiated speed. CloudModel::CheckMkParser parses it
+# and HostChecks turns the counters into per-second rates, so this plugin stays
+# stateless and portable.
+echo "<<<net_dev>>>"
+cat /proc/net/dev
+
+echo "[link]"
+for dev in /sys/class/net/*; do
+  name=${dev##*/}
+  [ "$name" = lo ] && continue
+  operstate=$(cat "$dev/operstate" 2>/dev/null)
+  speed=$(cat "$dev/speed" 2>/dev/null)
+  echo "$name ${operstate:-unknown} ${speed:-unknown}"
+done

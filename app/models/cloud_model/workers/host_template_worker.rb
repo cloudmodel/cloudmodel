@@ -7,6 +7,8 @@ module CloudModel
     # and grub, then tarballs the result for use when provisioning bare-metal
     # or virtual hosts.
     class HostTemplateWorker < TemplateWorker
+      include CloudModel::Workers::Mixins::CheckMkAgentPlugins
+
       def build_path
         if @options[:build_path]
            @options[:build_path]
@@ -88,10 +90,7 @@ module CloudModel
 
         chroot! build_path, "curl -s https://raw.githubusercontent.com/Checkmk/checkmk/2.2.0/agents/check_mk_agent.linux >/usr/bin/check_mk_agent && chmod 755 /usr/bin/check_mk_agent", "Failed to install CheckMKAgent"
 
-        mkdir_p "#{build_path}/usr/lib/check_mk_agent/plugins/"
-        %w(cgroup_cpu zfs lxd sensors smart systemd).each do |plugin|
-          render_to_remote "/cloud_model/support/usr/lib/check_mk_agent/plugins/#{plugin}", "#{build_path}/usr/lib/check_mk_agent/plugins/#{plugin}", 0755
-        end
+        deploy_check_mk_plugins build_path
 
         render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk@.service", "#{build_path}/etc/systemd/system/check_mk@.service"
         render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk.socket", "#{build_path}/etc/systemd/system/check_mk.socket"

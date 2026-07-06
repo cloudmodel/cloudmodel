@@ -12,6 +12,7 @@ module CloudModel
     # setup, and grub boot configuration. Also provides {#update_tinc_host_files}
     # for refreshing VPN host entries without a full redeploy.
     class HostWorker < BaseWorker
+      include CloudModel::Workers::Mixins::CheckMkAgentPlugins
 
       def host
         @host

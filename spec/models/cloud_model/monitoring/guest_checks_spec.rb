@@ -42,6 +42,11 @@ describe CloudModel::Monitoring::GuestChecks do
   end
 
   describe 'check' do
+    before do
+      allow(guest).to receive(:monitoring_last_check_result).and_return nil
+      allow(guest).to receive(:monitoring_last_check_at).and_return nil
+    end
+
     it 'should call check_system_info on started guest' do
       allow(guest).to receive(:up_state).and_return :started
       issues = []

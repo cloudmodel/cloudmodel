@@ -1,30 +1,39 @@
 #!/bin/bash
+# Emits the cgroup's cumulative CPU usage (nanoseconds) plus a recent history
+# from /var/cache/cgroup_load, so CheckMkParser can compute CPU usage
+# percentages over the 1/5/15-minute windows.
+#
+# cgroup v1 (Ubuntu 18.04) exposes per-CPU nanoseconds in cpuacct.usage_percpu.
+# cgroup v2 (Ubuntu 22.04, Debian 12/13) exposes only a single total in
+# cpu.stat (usage_usec, microseconds) — converted to nanoseconds so both feed
+# the same parser math (total-usage / wall-time / cpus either way).
+read_cpu_usage() {
+  if [ -r /sys/fs/cgroup/cpu/cpuacct.usage_percpu ]; then
+    cat /sys/fs/cgroup/cpu/cpuacct.usage_percpu
+  elif [ -r /sys/fs/cgroup/cpuacct/cpuacct.usage_percpu ]; then
+    cat /sys/fs/cgroup/cpuacct/cpuacct.usage_percpu
+  elif [ -r /sys/fs/cgroup/cpu.stat ]; then
+    u=$(awk '/^usage_usec /{print $2}' /sys/fs/cgroup/cpu.stat)
+    [ -n "$u" ] && echo $(( u * 1000 ))
+  fi
+}
 
-now_ts=`date +%s%N`
-if test -f "/sys/fs/cgroup/cpu/cpuacct.usage_percpu"; then
-  # Ubuntu 18.04
-  now_cau=`cat /sys/fs/cgroup/cpu/cpuacct.usage_percpu`
-else
-  # Debian 12
-  now_cau=`cat /sys/fs/cgroup/cpuacct.usage_percpu`
-fi
-IFS=" "
-set $now_cau
+now_ts=$(date +%s%N)
+now_cau=$(read_cpu_usage)
+[ -z "$now_cau" ] && exit 0
+set -- $now_cau
 now_c1=$1
 
 echo "<<<cgroup_cpu>>>"
 echo "$now_ts $now_cau"
 
-ls -tr /var/cache/cgroup_load | while read ts
+ls -tr /var/cache/cgroup_load 2>/dev/null | while read ts
 do
-  cau=`cat "/var/cache/cgroup_load/$ts"`
-  IFS=" " # use "local IFS=-" inside the function
-  set $cau
+  cau=$(cat "/var/cache/cgroup_load/$ts")
+  set -- $cau
   c1=$1
 
   age=$(expr $now_ts - $ts)
-  usage=$(expr $now_c1 - $c1)
-
   age_s=$(expr $age / 1000000000)
 
   if [ "$age_s" -lt "960" ] && [ "$c1" -le "$now_c1" ] # 15 min + 1 min overlap

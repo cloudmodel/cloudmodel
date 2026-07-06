@@ -1,0 +1,5 @@
+#!/bin/bash
+# Raw /proc/diskstats (cumulative per-device I/O counters). HostChecks derives
+# per-second throughput/IOPS and average I/O latency (await) for whole disks.
+echo "<<<diskstats>>>"
+cat /proc/diskstats

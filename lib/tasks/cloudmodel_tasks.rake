@@ -42,6 +42,31 @@ namespace :cloudmodel do
     task :update_tinc_host_files => [:environment, :load_host] do
       @host_worker.update_tinc_host_files
     end
+
+    desc "Push check_mk agent plugins to live hosts over SSH (no image rebuild/redeploy). Set HOST_ID=<id> to target a single host."
+    task :deploy_check_mk_plugins => [:environment] do
+      hosts = if ENV['HOST_ID'].present?
+        [CloudModel::Host.find(ENV['HOST_ID'])]
+      else
+        # Skip hosts that aren't up yet — they have no reachable agent.
+        CloudModel::Host.all.reject { |host| [:booting, :not_started].include? host.deploy_state }
+      end
+
+      failures = 0
+      hosts.each do |host|
+        print "#{host.name}: "
+        begin
+          CloudModel::Workers::HostWorker.new(host).deploy_check_mk_plugins
+          puts "\e[32mOK\e[39m"
+        rescue => e
+          failures += 1
+          puts "\e[31mFAILED\e[39m (#{e.class}: #{e.message})"
+        end
+      end
+
+      puts "\nDeployed check_mk plugins to #{hosts.size - failures}/#{hosts.size} host(s)."
+      abort "#{failures} host(s) failed" if failures > 0
+    end
   end
 
   # namespace :host_template do
@@ -124,6 +149,31 @@ namespace :cloudmodel do
     desc "Backup guest"
     task :backup => [:environment, :load_guest] do
       @guest_worker.guest.backup
+    end
+
+    desc "Push check_mk agent plugins into live guest containers via lxc file push (no image rebuild/redeploy). Set GUEST_ID=<id> to target a single guest."
+    task :deploy_check_mk_plugins => [:environment] do
+      guests = if ENV['GUEST_ID'].present?
+        [CloudModel::Guest.find(ENV['GUEST_ID'])]
+      else
+        # Only running containers have a reachable agent.
+        CloudModel::Guest.all.select { |guest| guest.up_state == :started }
+      end
+
+      failures = 0
+      guests.each do |guest|
+        print "#{guest.name} @ #{guest.host.name}: "
+        begin
+          CloudModel::Workers::GuestWorker.new(guest).deploy_check_mk_plugins
+          puts "\e[32mOK\e[39m"
+        rescue => e
+          failures += 1
+          puts "\e[31mFAILED\e[39m (#{e.class}: #{e.message})"
+        end
+      end
+
+      puts "\nDeployed check_mk plugins to #{guests.size - failures}/#{guests.size} guest(s)."
+      abort "#{failures} guest(s) failed" if failures > 0
     end
 
     # Perfect for call by crontab

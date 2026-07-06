@@ -1,0 +1,18 @@
+#!/bin/bash
+# ECC memory error counters via EDAC (hardware pre-failure warning). Emits
+# nothing on systems without EDAC exposed. HostChecks alerts on uncorrectable
+# (UE) errors and on a rising corrected (CE) error rate.
+ce=0
+ue=0
+found=0
+for mc in /sys/devices/system/edac/mc/mc*; do
+  [ -r "$mc/ce_count" ] && [ -r "$mc/ue_count" ] || continue
+  found=1
+  ce=$(( ce + $(cat "$mc/ce_count") ))
+  ue=$(( ue + $(cat "$mc/ue_count") ))
+done
+if [ "$found" = 1 ]; then
+  echo "<<<edac>>>"
+  echo "ce_count $ce"
+  echo "ue_count $ue"
+fi

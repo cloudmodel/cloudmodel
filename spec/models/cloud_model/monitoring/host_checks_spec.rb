@@ -204,6 +204,132 @@ describe CloudModel::Monitoring::HostChecks do
     end
   end
 
+  describe 'check_zpool_health' do
+    it 'should alert critical when a pool is not ONLINE' do
+      allow(subject).to receive(:data).and_return({system: {'zpools' => {'tank' => {health: 'ONLINE'}, 'data' => {health: 'DEGRADED'}}}})
+      expect(subject).to receive(:do_check).with(:zpools_health, 'ZFS pool health', {critical: true}, hash_including(message: 'data: DEGRADED'))
+
+      subject.check_zpool_health
+    end
+
+    it 'should be ok when all pools are ONLINE' do
+      allow(subject).to receive(:data).and_return({system: {'zpools' => {'tank' => {health: 'ONLINE'}}}})
+      expect(subject).to receive(:do_check).with(:zpools_health, anything, {critical: false}, anything)
+
+      subject.check_zpool_health
+    end
+  end
+
+  describe 'check_smart_trending' do
+    it 'should warn when reallocated sectors are present' do
+      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'reallocated_sector_ct' => '5'}}}})
+      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: true}, hash_including(message: 'sda reallocated_sector_ct=5'))
+
+      subject.check_smart_trending
+    end
+
+    it 'should be ok when all wear indicators are zero' do
+      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'reallocated_sector_ct' => '0', 'current_pending_sector' => '0'}}}})
+      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: false}, anything)
+
+      subject.check_smart_trending
+    end
+
+    it 'should warn on NVMe media errors and depleted spare' do
+      allow(subject).to receive(:data).and_return({system: {'smart' => {
+        'nvme0' => {'media_and_data_integrity_errors' => '3', 'available_spare' => '5', 'available_spare_threshold' => '10', 'percentage_used' => '80'}
+      }}})
+      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: true}, hash_including(:message))
+
+      subject.check_smart_trending
+    end
+  end
+
+  describe 'check_ntp' do
+    it 'should warn when the clock is not synchronised' do
+      allow(subject).to receive(:data).and_return({system: {'ntp' => {'NTPSynchronized' => 'no'}}})
+      expect(subject).to receive(:do_check).with(:ntp_sync, anything, {warning: true}, hash_including(value: 'no'))
+
+      subject.check_ntp
+    end
+
+    it 'should alert on a large absolute clock offset' do
+      allow(subject).to receive(:data).and_return({system: {'ntp' => {'NTPSynchronized' => 'yes', 'offset' => '-2.5'}}})
+      allow(subject).to receive(:do_check)
+      expect(subject).to receive(:do_check_value).with(:ntp_offset, 2.5, {critical: 1.0, warning: 0.5}, hash_including(unit: 's'))
+
+      subject.check_ntp
+    end
+  end
+
+  describe 'check_net_links' do
+    it 'should alert on a downed physical link that carried traffic, ignoring spare and virtual ones' do
+      allow(subject).to receive(:data).and_return({system: {'net_dev' => {
+        'eth0' => {'operstate' => 'up',   'rx_bytes' => '1000', 'tx_bytes' => '1000'},
+        'eth1' => {'operstate' => 'down', 'rx_bytes' => '5000', 'tx_bytes' => '0'},    # was in use
+        'eth2' => {'operstate' => 'down', 'rx_bytes' => '0',    'tx_bytes' => '0'},    # unused spare NIC
+        'veth1' => {'operstate' => 'down', 'rx_bytes' => '9999', 'tx_bytes' => '9999'} # virtual
+      }}})
+      expect(subject).to receive(:do_check).with(:net_links_down, anything, {critical: true}, hash_including(message: 'eth1'))
+
+      subject.check_net_links
+    end
+  end
+
+  describe 'check_updates' do
+    it 'should raise a task for a pending reboot and security updates' do
+      allow(subject).to receive(:data).and_return({system: {'updates' => {'reboot_required' => '1', 'security_updates' => '3'}}})
+      expect(subject).to receive(:do_check).with(:reboot_required, anything, {task: true}, anything)
+      expect(subject).to receive(:do_check).with(:security_updates, anything, {task: true}, hash_including(value: '3'))
+
+      subject.check_updates
+    end
+  end
+
+  describe 'check_edac' do
+    it 'should alert critical on uncorrectable ECC errors' do
+      allow(subject).to receive(:data).and_return({system: {'edac' => {'ue_count' => '1', 'ce_count' => '0'}}})
+      expect(subject).to receive(:do_check).with(:ecc_uncorrectable, anything, {critical: true}, hash_including(value: '1'))
+
+      subject.check_edac
+    end
+  end
+
+  describe 'check_kernel_log' do
+    it 'should alert when an error signature increased since the previous cycle' do
+      now = Time.now
+      allow(host).to receive(:monitoring_last_check_at).and_return now
+      subject.instance_variable_set :@prev_at, now - 60
+      subject.instance_variable_set :@prev_system, {'kernel_log' => {'oom' => '0', 'mce' => '0', 'io_error' => '0', 'fs_error' => '0'}}
+      allow(subject).to receive(:data).and_return({system: {'kernel_log' => {'oom' => '2', 'mce' => '0', 'io_error' => '0', 'fs_error' => '0'}}})
+
+      expect(subject).to receive(:do_check).with(:kernel_oom, anything, {warning: true}, anything)
+      allow(subject).to receive(:do_check).with(:kernel_mce, anything, {critical: false}, anything)
+      allow(subject).to receive(:do_check).with(:kernel_fs_error, anything, {critical: false}, anything)
+      allow(subject).to receive(:do_check).with(:kernel_io_error, anything, {warning: false}, anything)
+
+      subject.check_kernel_log
+    end
+  end
+
+  describe 'check_diskstats' do
+    it 'should alert on high average I/O latency (await)' do
+      now = Time.now
+      allow(host).to receive(:monitoring_last_check_at).and_return now
+      subject.instance_variable_set :@prev_at, now - 10
+      subject.instance_variable_set :@prev_system, {'diskstats' => {'sda' => {
+        'reads' => '0', 'writes' => '0', 'sectors_read' => '0', 'sectors_written' => '0', 'ms_reading' => '0', 'ms_writing' => '0'
+      }}}
+      allow(subject).to receive(:data).and_return({system: {'diskstats' => {'sda' => {
+        'reads' => '100', 'writes' => '0', 'sectors_read' => '1000', 'sectors_written' => '0', 'ms_reading' => '20000', 'ms_writing' => '0'
+      }}}})
+      # 100 reads / 10s = 10 IOPS; 20000ms / 10s = 2000 ms/s; await = 2000/10 = 200ms
+      expect(subject).to receive(:do_check_value).with(:disk_sda_await, be_within(0.1).of(200.0), {critical: 500, warning: 100}, hash_including(unit: 'ms'))
+
+      subject.check_diskstats
+    end
+  end
+
   describe 'sample_metrics' do
     it 'should combine sysinfo metrics with zpool capacity, temperature sensors and SMART temps' do
       allow(subject).to receive(:sysinfo_sample_metrics).and_return('cpu.load_1' => 0.5)
@@ -254,13 +380,19 @@ describe CloudModel::Monitoring::HostChecks do
   end
 
   describe 'check' do
-    it 'should call check_system_info and check md, sensors, smart, zpools' do
+    before do
+      allow(host).to receive(:monitoring_last_check_result).and_return nil
+      allow(host).to receive(:monitoring_last_check_at).and_return nil
+    end
+
+    it 'should call check_system_info and the individual host checks' do
       expect(subject).to receive(:check_system_info).and_return true
 
-      expect(subject).to receive(:check_md).and_return true
-      expect(subject).to receive(:check_sensors).and_return true
-      expect(subject).to receive(:check_smart).and_return true
-      expect(subject).to receive(:check_zpools).and_return true
+      %i(check_md check_sensors check_smart check_smart_trending check_zpools
+         check_zpool_health check_conntrack check_net_dev check_net_links
+         check_ntp check_kernel_log check_diskstats check_updates check_edac).each do |m|
+        expect(subject).to receive(m)
+      end
 
       expect(subject.check).to eq true
     end
@@ -273,6 +405,19 @@ describe CloudModel::Monitoring::HostChecks do
       expect(subject).not_to receive(:check_smart)
 
       expect(subject.check).to eq false
+    end
+
+    it 'should unwrap the system level of the stored previous result for rate calculations' do
+      # monitoring_last_check_result stores the whole data hash — sections live
+      # under a 'system' key (string after the MongoDB round-trip). The rate
+      # helpers read sections directly from @prev_system, so the snapshot must
+      # unwrap that level or every cycle would look like the first one.
+      allow(host).to receive(:monitoring_last_check_result).and_return('system' => {'nf_conntrack' => {'drop' => '5'}})
+      allow(subject).to receive(:check_system_info).and_return false
+
+      subject.check
+
+      expect(subject.instance_variable_get(:@prev_system)).to eq('nf_conntrack' => {'drop' => '5'})
     end
   end
 end

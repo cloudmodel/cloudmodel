@@ -1,0 +1,18 @@
+#!/bin/bash
+# Pending reboot and outstanding security updates (maintenance hygiene).
+echo "<<<updates>>>"
+if [ -f /var/run/reboot-required ]; then
+  echo "reboot_required 1"
+else
+  echo "reboot_required 0"
+fi
+if [ -x /usr/lib/update-notifier/apt-check ]; then
+  # apt-check prints "updates;security_updates" on stderr
+  counts=$(/usr/lib/update-notifier/apt-check 2>&1)
+  case "$counts" in
+    *\;*)
+      echo "updates ${counts%;*}"
+      echo "security_updates ${counts#*;}"
+      ;;
+  esac
+fi

@@ -191,6 +191,105 @@ describe CloudModel::Monitoring::Mixins::SysinfoChecksMixin do
     end
   end
 
+  describe 'check_swap_usage' do
+    it 'should do nothing when no swap is configured' do
+      allow(subject).to receive(:data).and_return({system: {'mem' => {'swap_total' => '0', 'swap_free' => '0'}}})
+      expect(subject).not_to receive(:do_check_value)
+
+      subject.check_swap_usage
+    end
+
+    it 'should check swap usage' do
+      allow(subject).to receive(:data).and_return({system: {'mem' => {'swap_total' => '1000', 'swap_free' => '250'}}})
+      expect(subject).to receive(:do_check_value).with(:swap_usage, 75.0, {critical: 90, warning: 75}, hash_including(unit: '%'))
+
+      subject.check_swap_usage
+    end
+  end
+
+  describe 'check_load' do
+    it 'should check the 15m load normalised per core' do
+      allow(subject).to receive(:data).and_return({system: {'cpu' => {'last_15_minutes_load' => '8.0', 'cpus' => '4'}}})
+      expect(subject).to receive(:do_check_value).with(:load_per_core, 2.0, {critical: 4.0, warning: 2.0}, hash_including(:message))
+
+      subject.check_load
+    end
+
+    it 'should do nothing without cpu count' do
+      allow(subject).to receive(:data).and_return({system: {'cpu' => {'cpus' => '0'}}})
+      expect(subject).not_to receive(:do_check_value)
+
+      subject.check_load
+    end
+  end
+
+  describe 'check_inodes_usage' do
+    it 'should flag the highest inode usage across mounts' do
+      allow(subject).to receive(:data).and_return({system: {'df_inodes' => {
+        '/dev/sda1' => {'size' => '1000', 'used' => '900', 'mountpoint' => '/'},
+        '/dev/sdb1' => {'size' => '1000', 'used' => '100', 'mountpoint' => '/data'}
+      }}})
+      expect(subject).to receive(:do_check_value).with(:inodes_usage, 90.0, {critical: 90, warning: 80}, hash_including(unit: '%'))
+
+      subject.check_inodes_usage
+    end
+  end
+
+  describe 'check_systemd_units' do
+    it 'should warn when a unit has failed' do
+      allow(subject).to receive(:data).and_return({system: {'systemd' => {
+        'ssh.service' => {'active' => 'active', 'sub' => 'running'},
+        'broken.service' => {'active' => 'failed', 'sub' => 'failed'}
+      }}})
+      expect(subject).to receive(:do_check).with(:systemd_failed, anything, {warning: true}, hash_including(message: 'broken.service'))
+
+      subject.check_systemd_units
+    end
+  end
+
+  describe 'check_readonly_fs' do
+    it 'should alert critical on a writable filesystem mounted read-only' do
+      allow(subject).to receive(:data).and_return({system: {'mounts' => {
+        '/dev/sda1' => {'mountpoint' => '/', 'format' => 'ext4', 'params' => 'ro,relatime'},
+        '/dev/sda2' => {'mountpoint' => '/home', 'format' => 'ext4', 'params' => 'rw,relatime'},
+        'squash' => {'mountpoint' => '/snap', 'format' => 'squashfs', 'params' => 'ro'}
+      }}})
+      expect(subject).to receive(:do_check).with(:readonly_fs, anything, {critical: true}, hash_including(message: '/ (ext4)'))
+
+      subject.check_readonly_fs
+    end
+  end
+
+  describe 'check_cgroup_limits' do
+    it 'should alert on PID usage ratio' do
+      allow(subject).to receive(:data).and_return({system: {'cgroup_limits' => {'pids_current' => '180', 'pids_max' => '200'}}})
+      expect(subject).to receive(:do_check_value).with(:cgroup_pids, 90.0, {critical: 90, warning: 80}, hash_including(unit: '%'))
+
+      subject.check_cgroup_limits
+    end
+
+    it 'should skip PID check when pids_max is unlimited' do
+      allow(subject).to receive(:data).and_return({system: {'cgroup_limits' => {'pids_current' => '180', 'pids_max' => 'max'}}})
+      expect(subject).not_to receive(:do_check_value)
+
+      subject.check_cgroup_limits
+    end
+
+    it 'should warn on in-container OOM kills but only graph memory/CPU pressure' do
+      now = Time.now
+      allow(host).to receive(:monitoring_last_check_at).and_return now
+      subject.instance_variable_set :@prev_at, now - 60
+      subject.instance_variable_set :@prev_system, {'cgroup_limits' => {'mem_hits' => '0', 'cpu_nr_throttled' => '0', 'oom_kills' => '0'}}
+      allow(subject).to receive(:data).and_return({system: {'cgroup_limits' => {'mem_hits' => '30', 'cpu_nr_throttled' => '6', 'oom_kills' => '2'}}})
+
+      expect(subject).to receive(:do_check).with(:cgroup_oom, anything, {warning: true}, anything)
+      expect(subject).not_to receive(:do_check).with(:cgroup_mem_pressure, anything, anything, anything)
+      expect(subject).not_to receive(:do_check).with(:cgroup_cpu_throttled, anything, anything, anything)
+
+      subject.check_cgroup_limits
+    end
+  end
+
   describe 'check_system_info' do
     it 'should run all sysinfo checks when system info is available' do
       allow(subject).to receive(:data).and_return({system: {'error' => ''}})
@@ -200,7 +299,13 @@ describe CloudModel::Monitoring::Mixins::SysinfoChecksMixin do
 
       expect(subject).to receive(:check_cpu_usage)
       expect(subject).to receive(:check_mem_usage)
+      expect(subject).to receive(:check_swap_usage)
+      expect(subject).to receive(:check_load)
       expect(subject).to receive(:check_disks_usage)
+      expect(subject).to receive(:check_inodes_usage)
+      expect(subject).to receive(:check_systemd_units)
+      expect(subject).to receive(:check_readonly_fs)
+      expect(subject).to receive(:check_cgroup_limits)
 
       expect(subject.check_system_info).to eq true
     end
