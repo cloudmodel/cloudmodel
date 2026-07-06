@@ -597,6 +597,18 @@ de:
         rake_timer_on_boot: Ausführen beim Start
         rake_timer_on_boot_sec: Sekunden bevor Ausführung beim Start
 
+  monitoring_messages:
+    smart:
+      grown: "Platte %{disk} hat eine wachsende Zahl %{what} (%{from} → %{to})"
+      pending: "Platte %{disk} hat %{count} aktuell nicht lesbare Sektoren"
+      endurance: "Platte %{disk} hat ihre spezifizierte Schreiblast aufgebraucht (%{value}% genutzt)"
+      spare: "Platte %{disk}: NVMe-Reservekapazität fast aufgebraucht (%{value} < Schwelle %{threshold})"
+      attributes:
+        reallocated_sector_ct: ausgelagerter defekter Sektoren
+        offline_uncorrectable: nicht korrigierbarer Sektoren
+        reported_uncorrect: gemeldeter unkorrigierbarer Lesefehler
+        media_and_data_integrity_errors: Medien-/Datenintegritätsfehler
+
   issues:
     general:
       no_check: "%{value} existiert nicht"

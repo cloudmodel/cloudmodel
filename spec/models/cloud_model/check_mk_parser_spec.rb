@@ -160,10 +160,10 @@ describe CloudModel::CheckMkParser do
       it 'should parse device blocks and attributes' do
         input = "<<<smart>>>\n" \
                 "[/dev/sda]\n" \
-                "Device Model: Samsung SSD 860\n" \
+                "Device Model: Commodore 1541\n" \
                 "Reallocated_Sector_Ct: 0 some extra\n"
         result = CloudModel::CheckMkParser.parse input
-        expect(result['smart']['sda']['device_model']).to eq 'Samsung'
+        expect(result['smart']['sda']['device_model']).to eq 'Commodore 1541'
         expect(result['smart']['sda']['reallocated_sector_ct']).to eq '0'
       end
 

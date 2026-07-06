@@ -267,7 +267,15 @@ module CloudModel
                 k,v = line.split(':').map(&:strip)
                 k = k.underscore.gsub(/\W/, '_')
 
-                hash[context][dev][k] = v ? v.split(' ').first : '-'
+                hash[context][dev][k] = if v.nil?
+                  '-'
+                elsif %w(device_model model_number model_family).include? k
+                  # Keep full model names ("Samsung SSD 860") — used to label
+                  # the physical disk in wear alerts.
+                  v
+                else
+                  v.split(' ').first
+                end
               end
             when 'zpools'
               zp = line.split("\t").map(&:strip)

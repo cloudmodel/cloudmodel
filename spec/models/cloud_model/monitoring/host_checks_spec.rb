@@ -246,10 +246,13 @@ describe CloudModel::Monitoring::HostChecks do
   end
 
   describe 'check_smart_trending' do
-    it 'should warn when a cumulative wear counter increases' do
+    it 'should warn with a human message when a cumulative wear counter increases' do
       subject.instance_variable_set :@prev_system, {'smart' => {'sda' => {'reallocated_sector_ct' => '12'}}}
-      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'reallocated_sector_ct' => '16'}}}})
-      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: true}, hash_including(message: 'sda reallocated_sector_ct increased 12 → 16'))
+      allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {
+        'reallocated_sector_ct' => '16', 'device_model' => 'Commodore 1541', 'serial_number' => '234552'
+      }}}})
+      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: true},
+        hash_including(message: 'Drive sda (Commodore 1541, S/N 234552) has a growing number of reallocated (remapped) sectors (12 → 16)'))
 
       subject.check_smart_trending
     end
@@ -279,7 +282,8 @@ describe CloudModel::Monitoring::HostChecks do
 
     it 'should warn while sectors are pending, regardless of trend' do
       allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'current_pending_sector' => '2'}}}})
-      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: true}, hash_including(message: 'sda current_pending_sector=2'))
+      expect(subject).to receive(:do_check).with(:smart_trending, anything, {warning: true},
+        hash_including(message: 'Drive sda has 2 currently unreadable sectors'))
 
       subject.check_smart_trending
     end
