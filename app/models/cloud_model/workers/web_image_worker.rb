@@ -247,6 +247,7 @@ module CloudModel
           return false
         end
         @web_image.update_attributes redeploy_state: :running, redeploy_last_issue: nil
+        @web_image.append_to_build_log "\n$ Rollout\n"
         puts "Redeploy WebImage #{@web_image.name}"
         begin
           services = @web_image.services
@@ -264,6 +265,7 @@ module CloudModel
           @web_image.update_attributes redeploy_state: :failed, redeploy_last_issue: "#{e}"
           return false
         end
+        @web_image.append_to_build_log "Rollout finished\n"
         @web_image.update_attributes redeploy_state: :finished
       end
 
@@ -311,22 +313,10 @@ module CloudModel
         end
       end
 
-      # Max size of the stored build log; beyond that appends are dropped with
-      # a single truncation marker (protects the Mongo document size).
-      BUILD_LOG_LIMIT = 512 * 1024
-
       # Appends streamed output to the web image, making the build log
       # readable live on the admin page while the build runs.
       def append_build_log text
-        return if text.empty?
-
-        log = @web_image.build_log.to_s
-        if log.bytesize > BUILD_LOG_LIMIT
-          return if log.end_with? "[log truncated]\n"
-          text = "…\n[log truncated]\n"
-        end
-
-        @web_image.update_attribute :build_log, log + text
+        @web_image.append_to_build_log text
       end
 
       def run_step step, command

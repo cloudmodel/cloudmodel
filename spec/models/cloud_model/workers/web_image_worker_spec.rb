@@ -320,6 +320,7 @@ describe CloudModel::Workers::WebImageWorker do
       allow(service_a).to receive(:update_attributes)
       allow(service_a).to receive(:redeploy!)
       allow(service_b).to receive(:redeploy!)
+      allow(web_image).to receive(:append_to_build_log)
     end
 
     it 'should refuse when not pending and not forced' do

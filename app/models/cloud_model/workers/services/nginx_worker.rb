@@ -95,6 +95,8 @@ module CloudModel
           return false unless options[:force] or (@model.deploy_web_image and @model.redeploy_web_image_state == :pending)
 
           @model.update_attributes redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil
+          web_image = @model.deploy_web_image
+          web_image.try :append_to_build_log, "Deploying to #{@guest.name} (#{@guest.host.name})…\n"
 
           comment_sub_step "Deploy to #{@guest.name}: #{@model.name}"
           begin
@@ -132,9 +134,11 @@ module CloudModel
             end
           rescue Exception => e
             CloudModel.log_exception e
+            web_image.try :append_to_build_log, "FAILED: #{@guest.name}: #{e}\n"
             @model.update_attributes redeploy_web_image_state: :failed, redeploy_web_image_last_issue: "#{e}"
             return false
           end
+          web_image.try :append_to_build_log, "#{@guest.name} done\n"
           @model.update_attributes redeploy_web_image_state: :finished
         end
 
