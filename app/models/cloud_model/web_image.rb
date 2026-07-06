@@ -111,6 +111,27 @@ module CloudModel
 
     used_in_guests_as 'services.deploy_web_image_id'
 
+    # Max stored build/rollout log size; beyond it appends are dropped with a
+    # single truncation marker (protects the Mongo document size).
+    BUILD_LOG_LIMIT = 512 * 1024
+
+    # Appends streamed output to the build/rollout log — one console for the
+    # whole rebuild & redeploy flow, readable live on the admin page. Called
+    # from the build worker (command output) and the service workers (rollout
+    # steps).
+    def append_to_build_log text
+      text = text.to_s
+      return if text.empty?
+
+      log = build_log.to_s
+      if log.bytesize > BUILD_LOG_LIMIT
+        return if log.end_with? "[log truncated]\n"
+        text = "…\n[log truncated]\n"
+      end
+
+      update_attribute :build_log, log + text
+    end
+
     def services
       services = []
       used_in_guests.each do |guest|
