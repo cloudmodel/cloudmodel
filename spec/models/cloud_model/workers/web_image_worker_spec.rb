@@ -99,7 +99,7 @@ describe CloudModel::Workers::WebImageWorker do
       allow(File).to receive(:file?).and_return(false)
       allow(File).to receive(:file?).with(lock).and_return(true)
       allow(File).to receive(:file?).with(marker).and_return(true)
-      allow(File).to receive(:read).with(marker).and_return("abc123\n")
+      allow(File).to receive(:read).with(marker).and_return("abc123:#{described_class::DEPENDENCY_INSTALL_FINGERPRINT}\n")
       allow(Digest::SHA256).to receive(:file).with(lock).and_return(double(hexdigest: 'abc123'))
       allow(File).to receive(:directory?).with('/tmp/web_build/web42/bundle').and_return(true)
 
@@ -121,7 +121,7 @@ describe CloudModel::Workers::WebImageWorker do
     it 'should install all yarn packages (incl. dev build tooling, not --production)' do
       allow(subject).to receive(:run_with_clean_env)
       # full install (no --production): Vite/Sass build deps are needed to build assets
-      expect(subject).to receive(:run_with_clean_env).with("Yarn install", /yarn install --non-interactive --no-bin-links/)
+      expect(subject).to receive(:run_with_clean_env).with("Yarn install", /yarn install --non-interactive(?! --no-bin-links)/)
       expect(subject.yarn_install).to eq true
     end
 
@@ -131,7 +131,7 @@ describe CloudModel::Workers::WebImageWorker do
       allow(File).to receive(:file?).and_return(false)
       allow(File).to receive(:file?).with(lock).and_return(true)
       allow(File).to receive(:file?).with(marker).and_return(true)
-      allow(File).to receive(:read).with(marker).and_return("def456\n")
+      allow(File).to receive(:read).with(marker).and_return("def456:#{described_class::DEPENDENCY_INSTALL_FINGERPRINT}\n")
       allow(Digest::SHA256).to receive(:file).with(lock).and_return(double(hexdigest: 'def456'))
       allow(File).to receive(:directory?).with('/tmp/web_build/web42/node_modules').and_return(true)
 

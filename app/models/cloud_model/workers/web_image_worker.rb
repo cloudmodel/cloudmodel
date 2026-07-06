@@ -65,15 +65,24 @@ module CloudModel
       # Skip a dependency install when its lockfile is byte-identical to the
       # last successful build. The marker file lives inside build_path, so a
       # :clean build (which wipes build_path) naturally forces a fresh install.
+      # Fingerprint of how dependencies get installed — changing install flags
+      # must invalidate the skip marker, or existing build dirs would keep a
+      # node_modules laid out by the old flags (e.g. without bin links).
+      DEPENDENCY_INSTALL_FINGERPRINT = 'v2-bin-links'
+
+      def dependency_lock_digest(lockfile)
+        "#{Digest::SHA256.file(lockfile).hexdigest}:#{DEPENDENCY_INSTALL_FINGERPRINT}"
+      end
+
       def dependency_lock_unchanged?(lockfile, key)
         marker = "#{@web_image.build_path}/.cloudmodel_#{key}.sha"
         File.file?(lockfile) && File.file?(marker) &&
-          File.read(marker).strip == Digest::SHA256.file(lockfile).hexdigest
+          File.read(marker).strip == dependency_lock_digest(lockfile)
       end
 
       def store_dependency_lock(lockfile, key)
         return unless File.file?(lockfile)
-        File.write "#{@web_image.build_path}/.cloudmodel_#{key}.sha", Digest::SHA256.file(lockfile).hexdigest
+        File.write "#{@web_image.build_path}/.cloudmodel_#{key}.sha", dependency_lock_digest(lockfile)
       end
 
       def bundle_image
@@ -116,8 +125,9 @@ module CloudModel
             # Install yarn only when it is not already available.
             "command -v yarn >/dev/null 2>&1 || npm install yarn",
             # Full install (no --production): the Vite/Sass asset toolchain lives
-            # in devDependencies and is needed to build assets.
-            "yarn install --non-interactive --no-bin-links --modules-folder #{@web_image.build_path.shellescape}/node_modules"
+            # in devDependencies and is needed to build assets. Bin links are
+            # required — `yarn run vite` resolves via node_modules/.bin.
+            "yarn install --non-interactive"
           ] * ' && '
         rescue CloudModel::ExecutionException => e
           CloudModel.log_exception e
