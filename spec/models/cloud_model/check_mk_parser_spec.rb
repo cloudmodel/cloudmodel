@@ -46,6 +46,15 @@ describe CloudModel::CheckMkParser do
       expect(result['zpools']['tank'][:cap_percentage]).to eq '50%'
     end
 
+    it 'should parse zpools with the 11-column CKPOINT layout of ZFS >= 0.8' do
+      # Old plugin without a pinned column list on a newer host: CKPOINT ('-')
+      # is inserted after FREE and must not shift health onto the dedup column.
+      result = CloudModel::CheckMkParser.parse "<<<zpools>>>\nguests\t10G\t3G\t7G\t-\t-\t10\t28\t1.00\tONLINE\t-\n"
+      expect(result['zpools']['guests'][:health]).to eq 'ONLINE'
+      expect(result['zpools']['guests'][:cap_percentage]).to eq '28'
+      expect(result['zpools']['guests'][:dedup]).to eq '1.00'
+    end
+
     it 'should parse multiple sections' do
       input = "<<<check_mk>>>\nVersion: 2.2.0\n<<<mem>>>\nMemTotal: 8192 kB\n"
       result = CloudModel::CheckMkParser.parse input

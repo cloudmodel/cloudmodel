@@ -1,3 +1,6 @@
 #!/bin/bash
+# Pin the column list explicitly: the default `zpool list` output gained a
+# CKPOINT column in ZFS 0.8, which silently shifted all positional parsing
+# (health ended up on the dedup column). This list works on ZFS 0.7+.
 echo "<<<zpools>>>"
-/sbin/zpool list -p -H
+/sbin/zpool list -p -H -o name,size,alloc,free,expandsz,frag,cap,dedup,health,altroot
