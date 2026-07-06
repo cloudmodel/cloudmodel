@@ -66,6 +66,11 @@ module CloudModel
       }, default: :not_started
       field :redeploy_web_image_last_issue, type: String
 
+      # Current step of a running web image rollout on this service
+      # (unroll/transfer/permissions/activate/restart/done) — drives the
+      # per-instance progress bar on the WebImage page.
+      field :redeploy_web_image_step, type: String
+
       # MongoDB config for web image
       field :deploy_mongodb_host, type: String
       field :deploy_mongodb_port, type: Integer, default: 27017

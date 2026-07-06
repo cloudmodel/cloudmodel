@@ -124,6 +124,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       allow(model).to receive(:deploy_web_image).and_return(web_image)
       allow(model).to receive(:www_root).and_return('/var/www')
       allow(subject).to receive(:make_deploy_web_image_id).and_return('20240315103045')
+      allow(model).to receive(:update_attribute)
       allow(subject).to receive(:unroll_web_image)
       allow(host).to receive(:exec!)
     end
@@ -153,6 +154,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       allow(model).to receive(:deploy_web_image).and_return(web_image)
       allow(model).to receive(:redeploy_web_image_state).and_return(:pending)
       allow(model).to receive(:update_attributes)
+      allow(model).to receive(:update_attribute)
       allow(model).to receive(:www_root).and_return('/var/www')
       allow(model).to receive(:id).and_return('abc123')
       allow(model).to receive(:name).and_return('test-service')
@@ -175,12 +177,12 @@ describe CloudModel::Workers::Services::NginxWorker do
 
     it 'should proceed if forced even when state is not pending' do
       allow(model).to receive(:redeploy_web_image_state).and_return(:finished)
-      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil)
+      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'unroll')
       subject.redeploy_web_image(force: true)
     end
 
     it 'should set state to running' do
-      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil)
+      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'unroll')
       subject.redeploy_web_image
     end
 
@@ -206,7 +208,7 @@ describe CloudModel::Workers::Services::NginxWorker do
     end
 
     it 'should set state to finished on success' do
-      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :finished)
+      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :finished, redeploy_web_image_step: 'done')
       subject.redeploy_web_image
     end
 
