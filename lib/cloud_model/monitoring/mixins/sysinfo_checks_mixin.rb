@@ -222,7 +222,7 @@ module CloudModel
         # has 100+ container rootfs mounts, all mirroring the pool usage —
         # they'd drown the disk chart). Alerting (check_disks_usage) is not
         # affected by this filter.
-        SAMPLE_MOUNT_IGNORE = %r{\A/(dev|run|sys|proc)(/|\z)|\A/var/lib/lxd/storage-pools/|\A/var/snap/lxd/common/}
+        SAMPLE_MOUNT_IGNORE = %r{\A/(dev|run|sys|proc|snap)(/|\z)|\A/var/lib/lxd/storage-pools/|\A/var/snap/lxd/common/}
 
         # Numeric metrics shared by hosts and guests, derived from the parsed
         # check_mk `system` section: CPU load & usage, memory usage and per-mount
