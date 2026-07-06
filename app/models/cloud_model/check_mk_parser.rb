@@ -142,7 +142,11 @@ module CloudModel
               parts = line.strip.split(':')
               key = parts.shift.underscore
               hash[context][key] = (parts * ':').strip
-            when 'df', 'df_v2'
+            when 'df', 'df_v2', 'df_check_mk'
+              # df_check_mk is the stock agent's df section, renamed by
+              # Host#system_info / Guest#system_info in favour of an appended
+              # plain `df -k -T`. Parse it anyway: it is the only section
+              # carrying the [df_inodes] block (→ hash['df_inodes']).
               parts = line.strip.split(' ')
               key = parts.shift
               if key == "tmpfs"

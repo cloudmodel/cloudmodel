@@ -204,6 +204,31 @@ describe CloudModel::Monitoring::HostChecks do
     end
   end
 
+  describe 'persist_cpu_count' do
+    it 'should store the probed core count on the host record' do
+      allow(subject).to receive(:data).and_return({system: {'cpu' => {'cpus' => '12'}}})
+      allow(host).to receive(:[]).with(:cpu_count).and_return(-1)
+      expect(host).to receive(:update_attribute).with(:cpu_count, 12)
+
+      subject.persist_cpu_count
+    end
+
+    it 'should not write when the stored count is already current' do
+      allow(subject).to receive(:data).and_return({system: {'cpu' => {'cpus' => '12'}}})
+      allow(host).to receive(:[]).with(:cpu_count).and_return(12)
+      expect(host).not_to receive(:update_attribute)
+
+      subject.persist_cpu_count
+    end
+
+    it 'should do nothing without a usable cpu count' do
+      allow(subject).to receive(:data).and_return({system: {'cpu' => {}}})
+      expect(host).not_to receive(:update_attribute)
+
+      subject.persist_cpu_count
+    end
+  end
+
   describe 'check_zpool_health' do
     it 'should alert critical when a pool is not ONLINE' do
       allow(subject).to receive(:data).and_return({system: {'zpools' => {'tank' => {health: 'ONLINE'}, 'data' => {health: 'DEGRADED'}}}})
@@ -388,8 +413,8 @@ describe CloudModel::Monitoring::HostChecks do
     it 'should call check_system_info and the individual host checks' do
       expect(subject).to receive(:check_system_info).and_return true
 
-      %i(check_md check_sensors check_smart check_smart_trending check_zpools
-         check_zpool_health check_conntrack check_net_dev check_net_links
+      %i(persist_cpu_count check_md check_sensors check_smart check_smart_trending
+         check_zpools check_zpool_health check_conntrack check_net_dev check_net_links
          check_ntp check_kernel_log check_diskstats check_updates check_edac).each do |m|
         expect(subject).to receive(m)
       end
