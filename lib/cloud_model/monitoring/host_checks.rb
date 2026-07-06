@@ -488,6 +488,18 @@ module CloudModel
         end
       end
 
+      # Cache the core count (from the agent's cpu section) on the host record
+      # so list views can show it without an SSH round-trip. The smart getter
+      # on Host#cpu_count probes lazily but never saves; reading the raw field
+      # here avoids triggering that probe.
+      def persist_cpu_count
+        cpu = data[:system] && data[:system]['cpu']
+        cpus = cpu && cpu['cpus'].to_i
+        return unless cpus and cpus > 0
+
+        @subject.update_attribute :cpu_count, cpus if @subject[:cpu_count] != cpus
+      end
+
       def check
         # Snapshot the previous cycle's parsed system data + timestamp before
         # #check_system_info acquires fresh data and overwrites them; needed to
@@ -499,6 +511,7 @@ module CloudModel
         @prev_at = @subject.monitoring_last_check_at
 
         if check_system_info
+          persist_cpu_count
           check_md
           check_sensors
           check_smart

@@ -260,6 +260,22 @@ describe CloudModel::Monitoring::Mixins::SysinfoChecksMixin do
     end
   end
 
+  describe 'sysinfo_sample_metrics mount filter' do
+    it 'should skip virtual filesystems and LXD container mounts in disk samples' do
+      allow(subject).to receive(:data).and_return({system: {'df' => {
+        '/dev/sda1' => {'mountpoint' => '/', 'size' => '1000', 'used' => '500'},
+        'zpool1' => {'mountpoint' => '/var/lib/lxd/storage-pools/default/containers/web01-1', 'size' => '1000', 'used' => '500'},
+        'tmpfs/run' => {'mountpoint' => '/run', 'size' => '1000', 'used' => '500'},
+        'tmpfs/sys' => {'mountpoint' => '/sys/fs/cgroup', 'size' => '1000', 'used' => '500'},
+        'snap' => {'mountpoint' => '/var/snap/lxd/common/ns', 'size' => '1000', 'used' => '500'},
+        '/dev/sdb1' => {'mountpoint' => '/cloud', 'size' => '1000', 'used' => '500'}
+      }}})
+
+      metrics = subject.sysinfo_sample_metrics
+      expect(metrics.keys.select { |k| k.start_with?('disk.') }.sort).to eq ['disk./.usage', 'disk./cloud.usage']
+    end
+  end
+
   describe 'check_cgroup_limits' do
     it 'should alert on PID usage ratio' do
       allow(subject).to receive(:data).and_return({system: {'cgroup_limits' => {'pids_current' => '180', 'pids_max' => '200'}}})

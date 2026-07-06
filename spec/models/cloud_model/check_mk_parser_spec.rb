@@ -266,6 +266,23 @@ describe CloudModel::CheckMkParser do
       end
     end
 
+    describe 'df_check_mk section (renamed stock df)' do
+      it 'should populate df_inodes from the renamed section' do
+        input = "<<<df_check_mk>>>\n" \
+                "/dev/sda1 ext4 100000 50000 45000 53% /\n" \
+                "[df_inodes_start]\n" \
+                "/dev/sda1 ext4 1000 900 100 90% /\n" \
+                "[df_inodes_end]\n" \
+                "<<<df>>>\n" \
+                "/dev/sda1 ext4 100000 50000 45000 53% /\n"
+        result = CloudModel::CheckMkParser.parse input
+        expect(result['df_inodes']['/dev/sda1']['used']).to eq '900'
+        expect(result['df_inodes']['/dev/sda1']['mountpoint']).to eq '/'
+        # the appended plain df section stays the canonical byte usage
+        expect(result['df']['/dev/sda1']['used']).to eq '50000'
+      end
+    end
+
     describe 'df inodes block' do
       it 'should store inode counts separately from df bytes' do
         input = "<<<df>>>\n" \

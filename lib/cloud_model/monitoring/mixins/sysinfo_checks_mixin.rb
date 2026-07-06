@@ -217,6 +217,13 @@ module CloudModel
           end
         end
 
+        # Mountpoints excluded from the per-mount disk/inode sample series:
+        # virtual filesystems and LXD container/snap internals (a host easily
+        # has 100+ container rootfs mounts, all mirroring the pool usage —
+        # they'd drown the disk chart). Alerting (check_disks_usage) is not
+        # affected by this filter.
+        SAMPLE_MOUNT_IGNORE = %r{\A/(dev|run|sys|proc)(/|\z)|\A/var/lib/lxd/storage-pools/|\A/var/snap/lxd/common/}
+
         # Numeric metrics shared by hosts and guests, derived from the parsed
         # check_mk `system` section: CPU load & usage, memory usage and per-mount
         # disk usage. Used to build time-series samples for graphing.
@@ -257,6 +264,7 @@ module CloudModel
           if sys_info['df_inodes']
             sys_info['df_inodes'].each do |mount, df|
               next if mount =~ /^\/dev\/loop.?/
+              next if df['mountpoint'] and df['mountpoint'] =~ SAMPLE_MOUNT_IGNORE
               size = df['size'].to_i
               next if size == 0
               metrics["inode.#{df['mountpoint'] || mount}.usage"] = 100.0 * df['used'].to_i / size
@@ -278,6 +286,7 @@ module CloudModel
           if sys_info['df']
             sys_info['df'].each do |mount, df|
               next if mount =~ /^\/dev\/loop.?/
+              next if df['mountpoint'] and df['mountpoint'] =~ SAMPLE_MOUNT_IGNORE
               size = df['size'].to_i
               next if size == 0
               metrics["disk.#{df['mountpoint'] || mount}.usage"] = 100.0 * df['used'].to_i / size
