@@ -574,6 +574,8 @@ describe CloudModel::LxdCustomVolume do
       allow(CloudModel.config).to receive(:data_directory).and_return('/data')
       allow(backup_host).to receive(:exec).with(/\Azfs create -p /).and_return([true, ''])
       allow(Rails.logger).to receive(:info)
+      allow(subject).to receive(:send_size_estimate).and_return(nil)
+      allow(subject).to receive(:start_transfer_monitor).and_return(double('monitor', kill: nil))
     end
 
     it 'destroys a stale target with dead snapshots before a full send' do
@@ -599,6 +601,53 @@ describe CloudModel::LxdCustomVolume do
       expect(subject).to receive(:run_pipeline).with(/zfs send -i ds@base ds@snap/).and_return(true)
 
       expect(subject.send(:send_to_backup_host, 'ds@snap', 'ds@base', target)).to eq true
+    end
+
+    it 'announces the estimated stream size and stops the monitor after a full send' do
+      allow(backup_host).to receive(:exec).with(/\Azfs list /).and_return([false, ''])
+      allow(subject).to receive(:send_size_estimate).and_return(42 * 1024 * 1024)
+      monitor = double 'monitor'
+      expect(subject).to receive(:start_transfer_monitor).with(target, 42 * 1024 * 1024).and_return(monitor)
+      expect(monitor).to receive(:kill)
+      allow(subject).to receive(:run_pipeline).and_return(true)
+
+      expect {
+        subject.send(:send_to_backup_host, 'ds@snap', nil, target)
+      }.to output(/stream size ~42 MB/).to_stdout
+    end
+  end
+
+  describe 'send_size_estimate' do
+    before { subject.guest = guest }
+
+    it 'parses the size line of a dry-run send' do
+      expect(host).to receive(:exec).with('zfs send -nP  ds@snap 2>&1')
+        .and_return([true, "full\tds@snap\t123456789\nsize\t123456789\n"])
+
+      expect(subject.send(:send_size_estimate, 'ds@snap', nil)).to eq 123456789
+    end
+
+    it 'passes the incremental base and returns nil when the estimate fails' do
+      expect(host).to receive(:exec).with('zfs send -nP -i ds@base ds@snap 2>&1').and_return([false, 'boom'])
+
+      expect(subject.send(:send_size_estimate, 'ds@snap', 'ds@base')).to eq nil
+    end
+  end
+
+  describe 'start_transfer_monitor' do
+    it 'periodically reports received bytes against the estimate' do
+      subject.guest = guest
+      subject.mount_point = 'var/data'
+      backup_host = double 'backup_host'
+      allow(CloudModel::Host).to receive(:local).and_return(backup_host)
+      allow(backup_host).to receive(:exec).with(/\Azfs get -Hp -o value used /).and_return([true, "#{512 * 1024 * 1024}\n"])
+      allow(CloudModel).to receive(:backup_log)
+
+      monitor = subject.send :start_transfer_monitor, 'data/bk/t', 1024 * 1024 * 1024, interval: 0.01
+      sleep 0.1
+      monitor.kill
+
+      expect(CloudModel).to have_received(:backup_log).with(/512 MB received of ~1 GB \(50%\)/).at_least(:once)
     end
   end
 
