@@ -17,15 +17,24 @@ end
 
 namespace :cloudmodel do
   desc "Backup marked services and volumes, then clean up obsolete backups. " \
-       "GUEST=name[,name] and/or SET=name[,name] back up only those subjects " \
-       "(partial runs skip the cleanup); SKIP_CLEANUP=1 skips it on full runs."
+       "GUESTS=0 / SETS=0 disable a whole category (e.g. SETS=0 = all guests + cleanup, no replica sets). " \
+       "GUEST=name[,name] / SET=name[,name] back up only those subjects. " \
+       "CLEANUP=0|1 forces the trailing cleanup off/on (default: on, except for name-filtered runs)."
   task :backup => [:environment] do
     guest_names = ENV['GUEST']&.split(',')
     set_names = ENV['SET']&.split(',')
-    partial = guest_names || set_names
+    # Naming a subject implies its category; naming ONLY the other category's
+    # subjects skips this one. GUESTS=0 / SETS=0 always win.
+    run_guests = ENV['GUESTS'] != '0' && !(set_names && !guest_names)
+    run_sets = ENV['SETS'] != '0' && !(guest_names && !set_names)
+    cleanup = if ENV['CLEANUP']
+      ENV['CLEANUP'] == '1'
+    else
+      guest_names.nil? && set_names.nil?
+    end
 
     with_backup_run_lock do
-      if guest_names || !set_names
+      if run_guests
         guests = CloudModel::Guest.all
         if guest_names
           guests = guests.where :name.in => guest_names
@@ -34,7 +43,7 @@ namespace :cloudmodel do
         CloudModel::Guest.backup_all guests
       end
 
-      if set_names || !guest_names
+      if run_sets
         sets = CloudModel::MongodbReplicationSet.where has_backups: true
         if set_names
           sets = sets.where :name.in => set_names
@@ -43,7 +52,7 @@ namespace :cloudmodel do
         CloudModel::MongodbReplicationSet.backup_all sets
       end
 
-      CloudModel::BackupCleanup.run_after_backup unless partial || ENV['SKIP_CLEANUP'] == '1'
+      CloudModel::BackupCleanup.run_after_backup if cleanup
     end
   end
 
