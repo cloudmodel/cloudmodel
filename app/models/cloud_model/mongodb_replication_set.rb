@@ -14,6 +14,10 @@ module CloudModel
     include Mongoid::Timestamps
     include CloudModel::Mixins::HasIssues
     include CloudModel::Mixins::BackupTools
+
+    # Written by record_successful_backup — DB-based backup freshness, see
+    # BackupTools#last_backup_at.
+    field :last_successful_backup_at, type: Time
     include CloudModel::Mixins::Backupable
     prepend CloudModel::Mixins::SmartToString
 
@@ -345,7 +349,7 @@ module CloudModel
     # dump). Stored under {#backup_directory}; retention via BackupTools.
 
     def self.backup_all
-      where(has_backups: true).to_a.each do |set|
+      CloudModel.parallel_each(where(has_backups: true).to_a) do |set|
         begin
           set.backup
         rescue => e
@@ -396,6 +400,7 @@ module CloudModel
       if run_replset_mongodump member, target
         FileUtils.rm_f "#{backup_directory}/latest"
         FileUtils.ln_s target, "#{backup_directory}/latest"
+        record_successful_backup
         cleanup_backups
         true
       else

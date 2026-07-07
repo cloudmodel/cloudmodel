@@ -27,9 +27,26 @@ module CloudModel
         end
       end
 
+      # Records a successful backup in the database, so freshness monitoring
+      # works from ANY machine — the filesystem symlink is only visible on the
+      # host that stores the backups, and a second monitoring runner without
+      # local backups would otherwise flag "no backup" forever.
+      def record_successful_backup
+        return unless respond_to? :last_successful_backup_at
+        update_attribute :last_successful_backup_at, Time.now
+      rescue => e
+        # The stamp only serves remote monitoring runners — a bookkeeping
+        # problem must never fail a backup that actually succeeded.
+        Rails.logger.warn "Could not record backup timestamp: #{e.message}"
+      end
+
       # Time of the most recent *successful* backup, or nil if none exists.
       #
-      # Resolved via the `latest` symlink rather than the newest entry in
+      # Prefers the database timestamp (written by {#record_successful_backup},
+      # visible to every monitoring runner); falls back to the local `latest`
+      # symlink for backups made before that field existed.
+      #
+      # Symlink semantics: resolved via `latest` rather than the newest entry in
       # {#list_backups}: the symlink is only re-pointed once a `backup` run has
       # fully succeeded, whereas a run that crashes mid-dump (OOM, timeout,
       # kill) can leave a newer but incomplete timestamp directory behind. The
@@ -41,6 +58,26 @@ module CloudModel
       # when the target is gone.
       # @return [Time, nil]
       def last_backup_at
+        fs = filesystem_last_backup_at
+        return fs if fs
+
+        if File.directory? backup_directory
+          # This machine stores (or stored) backups for the subject — the
+          # filesystem is authoritative here. No valid `latest` means the
+          # backups are gone or never completed: alert, regardless of a
+          # possibly fresher DB stamp (catches deleted backups).
+          nil
+        else
+          # Machine without local backups (e.g. a second monitoring runner):
+          # trust the DB stamp written by record_successful_backup.
+          respond_to?(:last_successful_backup_at) ? last_successful_backup_at : nil
+        end
+      end
+
+      # The `latest`-symlink based local check (see above for the
+      # symlink-over-listing rationale).
+      # @return [Time, nil]
+      def filesystem_last_backup_at
         link = "#{backup_directory}/latest"
         return nil unless File.symlink? link # no successful backup yet
         return nil unless File.exist? link   # dangling latest => fail

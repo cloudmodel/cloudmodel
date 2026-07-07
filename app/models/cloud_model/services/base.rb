@@ -15,6 +15,10 @@ module CloudModel
       include Mongoid::Document
       include Mongoid::Timestamps
       include CloudModel::Mixins::BackupTools
+
+      # Written by record_successful_backup — DB-based backup freshness, see
+      # BackupTools#last_backup_at.
+      field :last_successful_backup_at, type: Time
       include CloudModel::Mixins::Backupable
       include CloudModel::Mixins::HasIssues
 
