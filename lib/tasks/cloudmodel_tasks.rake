@@ -17,7 +17,7 @@ end
 
 namespace :cloudmodel do
   desc "Backup marked services and volumes, then clean up obsolete backups. " \
-       "One switch per category: GUESTS / SETS — unset = all, 0 = skip, name[,name] = only those " \
+       "One switch per category: GUESTS / MONGO_SETS — unset = all, 0 = skip, name[,name] = only those " \
        "(naming only one category skips the other, e.g. GUESTS=hub06). " \
        "CLEANUP=0|1 forces the trailing cleanup off/on (default: on, except for name-filtered runs)."
   task :backup => [:environment] do
@@ -30,7 +30,7 @@ namespace :cloudmodel do
       end
     end
     guests_param = parse.call ENV['GUESTS']
-    sets_param = parse.call ENV['SETS']
+    sets_param = parse.call ENV['MONGO_SETS']
 
     # Naming subjects in only one category implies skipping the other.
     sets_param ||= :off if guests_param.is_a? Array
