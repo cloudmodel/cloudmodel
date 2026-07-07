@@ -41,15 +41,28 @@ module CloudModel
     items
   end
 
+  # The BackupRun of the currently executing backup rake task, when any —
+  # backup_log mirrors its lines into it for the admin live console.
+  # Process-global on purpose: all backup worker threads feed the same run.
+  def self.current_backup_run
+    @current_backup_run
+  end
+
+  def self.current_backup_run= run
+    @current_backup_run = run
+  end
+
   # Progress line for backup runs: printed to stdout (visible in the rake
-  # console and cron mail) and mirrored to the Rails log. Prefixed with the
-  # current thread's backup label (guest / replica set name), so interleaved
-  # lines of parallel backups stay attributable.
+  # console and cron mail), mirrored to the Rails log and — during a tracked
+  # run — into the BackupRun's live log. Prefixed with the current thread's
+  # backup label (guest / replica set name), so interleaved lines of parallel
+  # backups stay attributable.
   def self.backup_log message
     label = Thread.current[:cloud_model_backup_label]
     line = label ? "[#{label}] #{message}" : message
     $stdout.puts line
     $stdout.flush
+    current_backup_run&.append_log "#{line}\n"
     Rails.logger.info line
   end
 
