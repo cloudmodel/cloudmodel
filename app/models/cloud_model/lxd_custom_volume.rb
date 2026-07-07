@@ -375,11 +375,12 @@ module CloudModel
       estimate = send_size_estimate snapshot, base
       CloudModel.backup_log "volume #{mount_point}: stream size ~#{human_size estimate}" if estimate
 
-      # Full sends can run for hours; report the received amount once a minute
-      # (the target starts empty there, so its `used` tracks the transfer —
-      # for incrementals it would not, they are short and end with the
-      # receive -v summary anyway).
-      monitor = base ? nil : start_transfer_monitor(target, estimate)
+      # Transfers can run for hours; report the received amount once a minute,
+      # measured as the growth of the target's `used` over its pre-transfer
+      # baseline (incremental receives land in a hidden %recv child that
+      # counts into `used`). Short transfers finish before the first tick and
+      # just get the receive -v summary.
+      monitor = start_transfer_monitor(target, estimate)
       begin
         run_pipeline "#{ssh} root@#{host.private_address} \"zfs send #{flags} #{snapshot.shellescape}\" | " +
                      "#{ssh} root@#{backup_host.private_address} \"zfs receive -v -F -u #{target.shellescape}\""
@@ -397,23 +398,28 @@ module CloudModel
       out[/^size\s+([0-9]+)/, 1]&.to_i
     end
 
-    # Background reporter for a running full send: logs the target's `used`
-    # (and % of the estimate) every +interval+ seconds until killed.
+    # Background reporter for a running send: logs the growth of the target's
+    # `used` over its pre-transfer baseline (and % of the estimate) every
+    # +interval+ seconds until killed.
     # @return [Thread]
     def start_transfer_monitor target, estimate, interval: 60
       label = Thread.current[:cloud_model_backup_label]
       Thread.new do
         # Own host instance — SSH connections are not shared across threads.
         backup_host = CloudModel::Host.local
+        read_used = -> do
+          success, out = backup_host.exec "zfs get -Hp -o value used #{target.shellescape}"
+          success ? out.strip.to_i : nil
+        end
+        baseline = read_used.call || 0 # missing dataset (full send) -> 0
         loop do
           sleep interval
           begin
-            success, out = backup_host.exec "zfs get -Hp -o value used #{target.shellescape}"
-            next unless success
-            used = out.strip.to_i
-            message = "volume #{mount_point}: #{human_size used} received"
+            next unless used = read_used.call
+            received = [used - baseline, 0].max
+            message = "volume #{mount_point}: #{human_size received} received"
             if estimate && estimate > 0
-              message += " of ~#{human_size estimate} (#{(used * 100.0 / estimate).round}%)"
+              message += " of ~#{human_size estimate} (#{(received * 100.0 / estimate).round}%)"
             end
             CloudModel.with_backup_label(label) { CloudModel.backup_log message }
           rescue

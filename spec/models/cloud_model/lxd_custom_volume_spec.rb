@@ -635,12 +635,14 @@ describe CloudModel::LxdCustomVolume do
   end
 
   describe 'start_transfer_monitor' do
-    it 'periodically reports received bytes against the estimate' do
+    it 'periodically reports received bytes over the pre-transfer baseline' do
       subject.guest = guest
       subject.mount_point = 'var/data'
       backup_host = double 'backup_host'
       allow(CloudModel::Host).to receive(:local).and_return(backup_host)
-      allow(backup_host).to receive(:exec).with(/\Azfs get -Hp -o value used /).and_return([true, "#{512 * 1024 * 1024}\n"])
+      # first call = baseline (existing data before an incremental), then growth
+      allow(backup_host).to receive(:exec).with(/\Azfs get -Hp -o value used /)
+        .and_return([true, "#{2 * 1024 * 1024 * 1024}\n"], [true, "#{2 * 1024 * 1024 * 1024 + 512 * 1024 * 1024}\n"])
       allow(CloudModel).to receive(:backup_log)
 
       monitor = subject.send :start_transfer_monitor, 'data/bk/t', 1024 * 1024 * 1024, interval: 0.01
