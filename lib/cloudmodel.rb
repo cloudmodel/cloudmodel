@@ -41,6 +41,39 @@ module CloudModel
     items
   end
 
+  # Progress line for backup runs: printed to stdout (visible in the rake
+  # console and cron mail) and mirrored to the Rails log. Prefixed with the
+  # current thread's backup label (guest / replica set name), so interleaved
+  # lines of parallel backups stay attributable.
+  def self.backup_log message
+    label = Thread.current[:cloud_model_backup_label]
+    line = label ? "[#{label}] #{message}" : message
+    $stdout.puts line
+    $stdout.flush
+    Rails.logger.info line
+  end
+
+  # Tag all {backup_log} output of the current thread with +label+ while the
+  # block runs — one label per parallel_each worker item.
+  def self.with_backup_label label
+    previous = Thread.current[:cloud_model_backup_label]
+    Thread.current[:cloud_model_backup_label] = label
+    yield
+  ensure
+    Thread.current[:cloud_model_backup_label] = previous
+  end
+
+  # Run a shell command, streaming its combined stdout+stderr line by line
+  # through {backup_log} (mongodump & co. report progress on stderr).
+  # @return [Boolean] whether the command succeeded
+  def self.backup_exec command
+    Rails.logger.debug command
+    IO.popen(command, err: [:child, :out]) do |io|
+      io.each_line { |line| backup_log line.chomp }
+    end
+    $?.success?
+  end
+
   def self.log_exception e
     message = "CloudModel: uncaught #{e.class} exception while handling connection: #{e.message}"
     trace = "Stack trace:\n#{e.backtrace.to_a.map {|l| "  #{l}\n"}.join}"

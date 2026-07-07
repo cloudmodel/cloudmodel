@@ -138,7 +138,7 @@ describe CloudModel::Services::Mongodb do
     end
 
     it 'should run mongodump and return true on success' do
-      allow(subject).to receive(:`) { `true`; '' }
+      allow(CloudModel).to receive(:backup_exec).and_return(true)
       allow(File).to receive(:exist?).and_return(true)
       allow(FileUtils).to receive(:rm_f)
       allow(FileUtils).to receive(:ln_s)
@@ -220,7 +220,7 @@ describe CloudModel::Services::Mongodb do
       allow(subject).to receive(:cleanup_backups)
       allow(File).to receive(:exist?).and_return(true)
       allow(Rails.logger).to receive(:debug)
-      allow(subject).to receive(:`) { `true`; '' }
+      allow(CloudModel).to receive(:backup_exec).and_return(true)
     end
 
     it 'does not back up per member when in a replica set' do
@@ -230,14 +230,14 @@ describe CloudModel::Services::Mongodb do
 
     it 'runs a plain mongodump without excludes' do
       allow(subject).to receive(:mongodb_backup_exclude_collection_prefixes).and_return([])
-      expect(subject).to receive(:`).with(/mongodump --gzip -h 10.0.0.5 --port 27017 -o \/backups\/test\/[0-9]{14}/) { `true`; '' }
+      expect(CloudModel).to receive(:backup_exec).with(/mongodump --gzip -h 10.0.0.5 --port 27017 -o \/backups\/test\/[0-9]{14}/).and_return(true)
       expect(subject.backup).to eq true
     end
 
     it 'dumps each database with exclusion flags when configured' do
       allow(subject).to receive(:mongodb_backup_exclude_collection_prefixes).and_return(%w(fs search_journal))
       allow(subject).to receive(:backup_databases).and_return(%w(app_production))
-      expect(subject).to receive(:`).with(/--db app_production .*--excludeCollectionsWithPrefix=fs --excludeCollectionsWithPrefix=search_journal/) { `true`; '' }
+      expect(CloudModel).to receive(:backup_exec).with(/--db app_production .*--excludeCollectionsWithPrefix=fs --excludeCollectionsWithPrefix=search_journal/).and_return(true)
       expect(subject.backup).to eq true
     end
   end

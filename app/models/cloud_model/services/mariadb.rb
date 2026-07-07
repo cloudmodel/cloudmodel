@@ -60,10 +60,12 @@ module CloudModel
         success = $?.success?
 
         if !success && output.match?(/access denied/i) && ensure_backup_user
+          CloudModel.backup_log "mariadb: backup user was missing — created it, retrying dump"
           output = `#{command}`
           success = $?.success?
         end
         Rails.logger.debug output
+        CloudModel.backup_log "mysqldump failed: #{output.strip.lines.last.to_s.strip}" unless success
 
         if success and File.exist? "#{backup_directory}/#{timestamp}/dump.sql"
           FileUtils.rm_f "#{backup_directory}/latest"

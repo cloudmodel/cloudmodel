@@ -538,13 +538,25 @@ describe CloudModel::LxdCustomVolume do
       allow(backup_host).to receive(:exec).with(/zfs list .*-t snapshot/).and_return(
         [true, "#{target}@cm-bkp-20240101000000\n#{target}@cm-bkp-20240102000000\n"]
       )
-      allow(subject).to receive(:`) { `true`; '' }
+      expect(subject).to receive(:run_pipeline).with(/zfs send .*cm-bkp-20240102000000.*zfs receive/).and_return(true)
 
       expect(subject.restore(force: true)).to eq true
     end
 
     it 'refuses to restore without force' do
       expect { subject.restore }.to raise_error(CloudModel::BackupError, /force: true/)
+    end
+  end
+
+  describe 'run_pipeline' do
+    it 'streams output through backup_log and returns success' do
+      expect {
+        expect(subject.send(:run_pipeline, 'echo hi')).to eq true
+      }.to output("hi\n").to_stdout
+    end
+
+    it 'fails when any stage of the pipeline fails (pipefail)' do
+      expect(subject.send(:run_pipeline, 'false | cat')).to eq false
     end
   end
 

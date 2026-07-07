@@ -554,7 +554,7 @@ describe CloudModel::MongodbReplicationSet do
   end
 
   describe 'backup' do
-    let(:guest) { double 'guest', private_address: '10.0.0.5' }
+    let(:guest) { double 'guest', name: 'db-guest', private_address: '10.0.0.5' }
     let(:member) { double 'member', guest: guest, port: 27017, mongodb_replication_arbiter_only: false, mongodb_replication_set_master?: false }
 
     before do
@@ -568,7 +568,8 @@ describe CloudModel::MongodbReplicationSet do
       allow(subject).to receive(:cleanup_backups)
       allow(Rails.logger).to receive(:debug)
       allow(Rails.logger).to receive(:error)
-      allow(subject).to receive(:`) { `true`; '' }
+      allow(CloudModel).to receive(:backup_log)
+      allow(CloudModel).to receive(:backup_exec).and_return(true)
     end
 
     it 'should return false unless has_backups' do
@@ -578,7 +579,7 @@ describe CloudModel::MongodbReplicationSet do
 
     it 'should run a single full mongodump against the secondary and symlink latest' do
       allow(subject).to receive(:backup_exclude_collection_prefixes).and_return([])
-      expect(subject).to receive(:`).with(/mongodump --gzip --readPreference=secondary -h 10.0.0.5 --port 27017 -o \/backups\/rs\/[0-9]{14}/) { `true`; '' }
+      expect(CloudModel).to receive(:backup_exec).with(/mongodump --gzip --readPreference=secondary -h 10.0.0.5 --port 27017 -o \/backups\/rs\/[0-9]{14}/).and_return(true)
       expect(FileUtils).to receive(:ln_s)
 
       expect(subject.backup).to eq true
@@ -587,7 +588,7 @@ describe CloudModel::MongodbReplicationSet do
     it 'should dump each database with exclusion flags when configured' do
       allow(subject).to receive(:backup_exclude_collection_prefixes).and_return(%w(fs search_journal))
       allow(subject).to receive(:backup_databases).and_return(%w(app_production))
-      expect(subject).to receive(:`).with(/--db app_production .*--excludeCollectionsWithPrefix=fs --excludeCollectionsWithPrefix=search_journal/) { `true`; '' }
+      expect(CloudModel).to receive(:backup_exec).with(/--db app_production .*--excludeCollectionsWithPrefix=fs --excludeCollectionsWithPrefix=search_journal/).and_return(true)
 
       expect(subject.backup).to eq true
     end
@@ -608,7 +609,7 @@ describe CloudModel::MongodbReplicationSet do
       rel = double 'rel', to_a: [good, bad]
       allow(CloudModel::MongodbReplicationSet).to receive(:where).with(has_backups: true).and_return(rel)
 
-      expect { CloudModel::MongodbReplicationSet.backup_all }.to output(/Backup of replication set bad failed/).to_stdout
+      expect { CloudModel::MongodbReplicationSet.backup_all }.to output(/\[bad\] replica set backup FAILED: boom/).to_stdout
     end
   end
 end

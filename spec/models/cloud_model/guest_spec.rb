@@ -1324,7 +1324,7 @@ describe CloudModel::Guest do
       stub_const 'ExceptionNotifier', double('ExceptionNotifier')
       expect(ExceptionNotifier).to receive(:notify_exception).with(boom, data: {guest: 'g1', guest_id: 'id1'})
 
-      expect { CloudModel::Guest.backup_all }.to output(/Backup of Guest g1 failed/).to_stdout
+      expect { CloudModel::Guest.backup_all }.to output(/\[g1\] guest backup FAILED: nope/).to_stdout
     end
   end
 

@@ -252,9 +252,7 @@ module CloudModel
       end
 
       def run_command command
-        Rails.logger.debug command
-        Rails.logger.debug `#{command}`
-        $?.success?
+        CloudModel.backup_exec command
       end
     end
   end

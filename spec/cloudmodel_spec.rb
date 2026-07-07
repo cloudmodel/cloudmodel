@@ -29,6 +29,39 @@ describe CloudModel do
   describe '#log_exception' do
   end
 
+  describe '.backup_log' do
+    it 'prefixes output with the current thread backup label' do
+      expect {
+        CloudModel.with_backup_label('my db') { CloudModel.backup_log 'dump started' }
+      }.to output("[my db] dump started\n").to_stdout
+    end
+
+    it 'prints unprefixed without a label' do
+      expect { CloudModel.backup_log 'hello' }.to output("hello\n").to_stdout
+    end
+
+    it 'restores the previous label after the block' do
+      CloudModel.with_backup_label('outer') do
+        CloudModel.with_backup_label('inner') {}
+        expect { CloudModel.backup_log 'back' }.to output("[outer] back\n").to_stdout
+      end
+    end
+  end
+
+  describe '.backup_exec' do
+    it 'streams stdout and stderr through backup_log and returns success' do
+      expect {
+        CloudModel.with_backup_label('rs0') do
+          expect(CloudModel.backup_exec('echo out; echo err >&2')).to eq true
+        end
+      }.to output(/^\[rs0\] out$/).to_stdout
+    end
+
+    it 'returns false when the command fails' do
+      expect(CloudModel.backup_exec('exit 1')).to eq false
+    end
+  end
+
   describe '.parallel_each' do
     it 'runs the block for every item' do
       seen = Queue.new
