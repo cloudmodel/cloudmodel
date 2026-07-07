@@ -143,6 +143,12 @@ module CloudModel
     # Number of received snapshots to keep on the backup host.
     ZFS_BACKUP_KEEP = 30
 
+    # Number of backup snapshots to keep on the SOURCE. More than one buys a
+    # chain buffer: an aborted transfer can cost the newest base, but an older
+    # snapshot still shared with the target avoids a full resend. Costs only
+    # the copy-on-write delta between the kept snapshots on the live volume.
+    ZFS_SOURCE_BACKUP_KEEP = 3
+
     def backup_directory
       "#{CloudModel.config.backup_directory}/#{host.id}/#{guest.id}/volumes/#{id}"
     end
@@ -424,9 +430,11 @@ module CloudModel
       ActiveSupport::NumberHelper.number_to_human_size bytes
     end
 
-    # Destroy all backup snapshots on the source except `keep` (the new base).
+    # Keep the newest {ZFS_SOURCE_BACKUP_KEEP} backup snapshots on the source
+    # (the fresh `keep` base plus fallback bases for broken chains), destroy
+    # the rest.
     def prune_source_snapshots keep:
-      zfs_backup_snapshots.each do |snapshot|
+      zfs_backup_snapshots.drop(ZFS_SOURCE_BACKUP_KEEP).each do |snapshot|
         next if snapshot == keep
         host.exec "zfs destroy #{snapshot.shellescape}"
       end

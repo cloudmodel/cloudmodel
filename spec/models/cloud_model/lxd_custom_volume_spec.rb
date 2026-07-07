@@ -651,6 +651,30 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
+  describe 'prune_source_snapshots' do
+    it 'keeps the newest ZFS_SOURCE_BACKUP_KEEP snapshots as chain buffer and destroys older ones' do
+      subject.guest = guest
+      snaps = %w(20240105 20240104 20240103 20240102 20240101).map { |d| "ds@cm-bkp-#{d}000000" }
+      allow(subject).to receive(:zfs_backup_snapshots).and_return(snaps)
+
+      expect(host).to receive(:exec).with("zfs destroy #{snaps[3]}").and_return([true, ''])
+      expect(host).to receive(:exec).with("zfs destroy #{snaps[4]}").and_return([true, ''])
+
+      subject.send :prune_source_snapshots, keep: snaps.first
+    end
+
+    it 'never destroys the fresh base even in odd orderings' do
+      subject.guest = guest
+      fresh = 'ds@cm-bkp-20240105000000'
+      snaps = %w(20240104 20240103 20240102).map { |d| "ds@cm-bkp-#{d}000000" } + [fresh]
+      allow(subject).to receive(:zfs_backup_snapshots).and_return(snaps)
+
+      expect(host).not_to receive(:exec).with("zfs destroy #{fresh}")
+
+      subject.send :prune_source_snapshots, keep: fresh
+    end
+  end
+
   describe 'run_pipeline' do
     it 'streams output through backup_log and returns success' do
       expect {
