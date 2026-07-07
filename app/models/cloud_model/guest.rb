@@ -623,7 +623,7 @@ module CloudModel
     # available (i.e. in core-admin), reported via ExceptionNotifier so backup
     # breakage stops being silent. Run from the daily backup timer.
     def self.backup_all
-      all.to_a.each do |guest|
+      CloudModel.parallel_each(all.to_a) do |guest|
         begin
           guest.backup
         rescue => e

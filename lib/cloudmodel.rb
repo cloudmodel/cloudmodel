@@ -14,6 +14,33 @@ module CloudModel
     config.configure(&block)
   end
 
+  # Run +block+ for each item, up to +concurrency+ at a time, and wait for all.
+  # Used to overlap backups (which mostly wait on mongodump / zfs send). Falls
+  # back to a plain sequential each for concurrency <= 1 or a single item.
+  # @return the items
+  def self.parallel_each(items, concurrency: config.backup_concurrency, &block)
+    items = items.to_a
+    return items.each(&block) if concurrency.to_i <= 1 || items.size <= 1
+
+    queue = Queue.new
+    items.each { |item| queue << item }
+
+    [concurrency.to_i, items.size].min.times.map do
+      Thread.new do
+        loop do
+          item = begin
+            queue.pop(true)
+          rescue ThreadError
+            break
+          end
+          block.call item
+        end
+      end
+    end.each(&:join)
+
+    items
+  end
+
   def self.log_exception e
     message = "CloudModel: uncaught #{e.class} exception while handling connection: #{e.message}"
     trace = "Stack trace:\n#{e.backtrace.to_a.map {|l| "  #{l}\n"}.join}"
