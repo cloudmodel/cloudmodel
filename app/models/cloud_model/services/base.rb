@@ -176,7 +176,7 @@ module CloudModel
 
       # @return [String] filesystem path where backups for this service are stored
       def backup_directory
-        "#{CloudModel.config.backup_directory}/#{guest.host.id}/#{guest.id}/services/#{id}"
+        "#{CloudModel.config.backup_directory}/#{guest.host_id}/#{guest.id}/services/#{id}"
       end
 
       # Perform a backup. Raises unless overridden by a backupable subclass.

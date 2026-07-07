@@ -33,6 +33,13 @@ namespace :cloudmodel do
       cleanup.cleanup! dry_run: dry_run
       puts dry_run ? "\nDry run — nothing deleted. Re-run with CONFIRM=1 to delete." : "\nDone."
     end
+
+    desc "Remove dump backups of deleted guests/services/replica sets, apply retention to disabled/failing subjects, drop dangling latest links and empty dirs. Dry run unless CONFIRM=1."
+    task :backups => [:environment] do
+      dry_run = ENV['CONFIRM'] != '1'
+      CloudModel::BackupCleanup.new.cleanup! dry_run: dry_run
+      puts dry_run ? "\nDry run — nothing deleted. Re-run with CONFIRM=1 to delete." : "\nDone."
+    end
   end
 
   namespace :host do

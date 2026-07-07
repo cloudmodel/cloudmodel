@@ -190,7 +190,7 @@ describe CloudModel::Services::Base do
   describe 'backup_directory' do
     it 'should return path to backups on backup system' do
       host = double CloudModel::Host, id: BSON::ObjectId.new
-      guest = double CloudModel::Guest, id: BSON::ObjectId.new, host: host
+      guest = double CloudModel::Guest, id: BSON::ObjectId.new, host_id: host.id
       allow(subject).to receive(:guest).and_return guest
 
       allow(CloudModel.config).to receive(:backup_directory).and_return '/var/cloudmodel_backups'
