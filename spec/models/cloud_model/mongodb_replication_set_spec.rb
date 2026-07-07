@@ -611,5 +611,13 @@ describe CloudModel::MongodbReplicationSet do
 
       expect { CloudModel::MongodbReplicationSet.backup_all }.to output(/\[bad\] replica set backup FAILED: boom/).to_stdout
     end
+
+    it 'should back up only the passed subset when given' do
+      only = double 'only', name: 'only'
+      expect(only).to receive(:backup).and_return(true)
+      expect(CloudModel::MongodbReplicationSet).not_to receive(:where)
+
+      expect { CloudModel::MongodbReplicationSet.backup_all [only] }.to output(/\[only\] replica set backup finished/).to_stdout
+    end
   end
 end

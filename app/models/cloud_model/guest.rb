@@ -618,12 +618,14 @@ module CloudModel
       end
     end
 
-    # Back up every guest, isolating failures so one broken guest doesn't stop
-    # the rest. Each failure is logged and, when ExceptionNotification is
-    # available (i.e. in core-admin), reported via ExceptionNotifier so backup
-    # breakage stops being silent. Run from the daily backup timer.
-    def self.backup_all
-      CloudModel.parallel_each(all.to_a) do |guest|
+    # Back up every guest (or a passed subset), isolating failures so one
+    # broken guest doesn't stop the rest. Each failure is logged and, when
+    # ExceptionNotification is available (i.e. in core-admin), reported via
+    # ExceptionNotifier so backup breakage stops being silent. Run from the
+    # daily backup timer.
+    # @param guests [Enumerable<CloudModel::Guest>] subjects (default: all)
+    def self.backup_all guests = all
+      CloudModel.parallel_each(guests.to_a) do |guest|
         CloudModel.with_backup_label guest.name do
           begin
             guest.backup
