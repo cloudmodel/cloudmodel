@@ -653,6 +653,28 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
+  describe 'delete_target_backup' do
+    let(:backup_host) { double 'backup_host', private_address: '10.42.0.9' }
+
+    before do
+      subject.guest = guest
+      allow(subject).to receive(:backup_host).and_return(backup_host)
+      allow(subject).to receive(:backup_target_dataset).and_return('data/bk/zfs_backups/h/g/v')
+    end
+
+    it 'destroys the named snapshot on the backup host' do
+      expect(backup_host).to receive(:exec)
+        .with('zfs destroy data/bk/zfs_backups/h/g/v@cm-bkp-20240101000000')
+        .and_return([true, ''])
+
+      expect(subject.delete_target_backup('20240101000000')).to eq true
+    end
+
+    it 'rejects invalid timestamps' do
+      expect { subject.delete_target_backup('foo; rm -rf /') }.to raise_error ArgumentError
+    end
+  end
+
   describe '.backup_target_snapshots' do
     it 'groups received snapshots by volume id from one listing' do
       backup_host = double 'backup_host'

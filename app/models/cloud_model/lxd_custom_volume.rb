@@ -231,6 +231,23 @@ module CloudModel
       end
     end
 
+    # Destroy one received backup snapshot on the backup host. Deleting the
+    # NEWEST one degrades the incremental chain (the next run has to fall
+    # back to an older common base or a full resend) — callers should only
+    # offer older snapshots.
+    # @param timestamp [String] 14-digit backup timestamp
+    # @return [Boolean] whether the snapshot was destroyed
+    def delete_target_backup timestamp
+      unless timestamp.to_s =~ /\A[0-9]{14}\z/
+        raise ArgumentError, "invalid backup timestamp #{timestamp.inspect}"
+      end
+      target = backup_target_dataset
+      return false unless target
+
+      success, _out = backup_host.exec "zfs destroy #{"#{target}@#{ZFS_BACKUP_SNAPSHOT_PREFIX}#{timestamp}".shellescape}"
+      success
+    end
+
     # Restore a snapshot back onto the source dataset by sending it from the
     # backup host. The volume must be detached / the container stopped, as
     # `zfs receive -F` rolls the source dataset back — destroying any data
