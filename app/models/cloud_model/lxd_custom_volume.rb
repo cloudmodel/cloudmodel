@@ -310,11 +310,45 @@ module CloudModel
     # derived from its mount (inside the container the data volume's mount source
     # is the ZFS dataset name). Returns nil if it is not on ZFS.
     # @return [String, nil]
-    def backup_root_dataset
+    def self.backup_root_dataset
       dir = CloudModel.config.backup_directory
       source = `df --output=source #{dir.shellescape} 2>/dev/null`.lines.last.to_s.strip
       return nil if source.empty? || source.start_with?('/')
       source
+    end
+
+    # All received backup snapshots on the local backup host, grouped by
+    # volume id — ONE SSH call, for overview pages where per-volume round
+    # trips would be too slow.
+    # @return [Hash{String => Array<Hash>}] volume id =>
+    #   [{timestamp:, time:, used_bytes:, referenced_bytes:}], newest first
+    def self.backup_target_snapshots
+      backup_host = CloudModel::Host.local
+      root = backup_root_dataset
+      return {} unless backup_host && root
+
+      success, out = backup_host.exec "zfs list -Hp -o name,used,refer -t snapshot -r #{"#{root}/zfs_backups".shellescape}"
+      return {} unless success
+
+      result = Hash.new { |hash, key| hash[key] = [] }
+      out.split("\n").each do |line|
+        name, used, referenced = line.split("\t")
+        match = name.to_s.match %r{/([0-9a-f]{24})@#{ZFS_BACKUP_SNAPSHOT_PREFIX}([0-9]{14})\z}
+        next unless match
+        result[match[1]] << {
+          timestamp: match[2],
+          time: (Time.strptime(match[2], "%Y%m%d%H%M%S") rescue nil),
+          used_bytes: used.to_i,
+          referenced_bytes: referenced.to_i
+        }
+      end
+      result.each_value { |snapshots| snapshots.sort_by! { |s| s[:timestamp] }.reverse! }
+      result.default = nil
+      result
+    end
+
+    def backup_root_dataset
+      self.class.backup_root_dataset
     end
 
     # Per-volume target dataset on the backup host, or nil if unresolvable.

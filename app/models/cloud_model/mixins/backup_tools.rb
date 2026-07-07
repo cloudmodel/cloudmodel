@@ -1,4 +1,5 @@
 require 'time' # for Time.strptime
+require 'shellwords'
 
 module CloudModel
   module Mixins
@@ -90,6 +91,40 @@ module CloudModel
         nil
       end
     
+      # All backups with display metadata (for the admin UI), newest first.
+      # Sizes come from a single `du` call over all backup dirs.
+      # @return [Array<Hash>] {timestamp:, time:, size_bytes:, latest:}
+      def backups_with_info
+        latest = begin
+          File.basename File.readlink("#{backup_directory}/latest")
+        rescue SystemCallError
+          nil
+        end
+
+        sizes = backup_sizes
+        list_backups.map do |timestamp|
+          {
+            timestamp: timestamp,
+            time: (Time.strptime(timestamp, "%Y%m%d%H%M%S") rescue nil),
+            size_bytes: sizes[timestamp],
+            latest: timestamp == latest
+          }
+        end
+      end
+
+      # On-disk size of every backup dir in one `du` call.
+      # @return [Hash{String => Integer}] timestamp => bytes
+      def backup_sizes
+        backups = list_backups
+        return {} if backups.empty?
+
+        paths = backups.map { |timestamp| "#{backup_directory}/#{timestamp}".shellescape }
+        `du -sk #{paths.join(' ')} 2>/dev/null`.lines.to_h do |line|
+          size, path = line.split("\t", 2)
+          [File.basename(path.to_s.strip), size.to_i * 1024]
+        end
+      end
+
       # Returns backup timestamps that fall outside the retention policy and can
       # be safely deleted.
       # @return [Array<String>] timestamps eligible for deletion

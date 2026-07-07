@@ -76,6 +76,29 @@ describe CloudModel::Mixins::BackupTools do
     end
   end
 
+  describe 'backups_with_info' do
+    it 'returns timestamps with size and latest flag, newest first' do
+      allow(subject).to receive(:list_backups).and_return %w(20240102000000 20240101000000)
+      allow(File).to receive(:readlink).with('/var/backups/my_item/latest').and_return '20240102000000'
+      allow(subject).to receive(:`).with(/\Adu -sk /).and_return(
+        "12\t/var/backups/my_item/20240102000000\n8\t/var/backups/my_item/20240101000000\n"
+      )
+
+      info = subject.backups_with_info
+      expect(info.map { |i| i[:timestamp] }).to eq %w(20240102000000 20240101000000)
+      expect(info.first).to include latest: true, size_bytes: 12 * 1024
+      expect(info.last).to include latest: false, size_bytes: 8 * 1024
+      expect(info.first[:time]).to eq Time.strptime('20240102000000', '%Y%m%d%H%M%S')
+    end
+
+    it 'marks nothing latest without a readable symlink' do
+      allow(subject).to receive(:list_backups).and_return %w(20240101000000)
+      allow(subject).to receive(:`).and_return ''
+
+      expect(subject.backups_with_info.first[:latest]).to eq false
+    end
+  end
+
   describe '.disposable_timestamps' do
     it 'applies the retention policy to any timestamp list (e.g. ZFS snapshot names)' do
       keep = (0..2).map { |i| (Time.now - i.days).strftime '%Y%m%d%H%M%S' }
