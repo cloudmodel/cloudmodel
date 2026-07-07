@@ -512,6 +512,20 @@ describe CloudModel::LxdCustomVolume do
       expect(subject.backup).to eq true
     end
 
+    it 'should chain from the newest snapshot both sides share, not a stray newer one' do
+      stray = "#{dataset}@cm-bkp-20240102000000" # aborted run: never reached the target
+      base  = "#{dataset}@cm-bkp-20240101000000"
+      target = subject.send :backup_target_dataset
+      allow(subject).to receive(:zfs_backup_snapshots).and_return([stray, base])
+      allow(host).to receive(:exec).and_return([true, ''])
+      allow(backup_host).to receive(:exec).with(/\Azfs list /).and_return([true, "#{target}@cm-bkp-20240101000000\n"])
+      expect(subject).to receive(:send_to_backup_host).with(anything, base, anything).and_return(true)
+      allow(subject).to receive(:prune_source_snapshots)
+      allow(subject).to receive(:prune_target_snapshots)
+
+      expect(subject.backup).to eq true
+    end
+
     it 'should destroy the snapshot and return false when the transfer fails' do
       allow(subject).to receive(:zfs_backup_snapshots).and_return([])
       allow(host).to receive(:exec).and_return([true, ''])

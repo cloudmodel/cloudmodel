@@ -327,22 +327,23 @@ module CloudModel
 
     # Incremental base for the next send, or nil to force a full send.
     #
-    # An incremental stream needs its base snapshot on BOTH sides: the newest
-    # backup snapshot on the source AND the same snapshot on the target
-    # dataset. When the target is gone or lost the base (deleted backups, a
-    # never-completed first transfer), `zfs receive` fails with "destination
-    # does not exist" on every retry — so verify the base against the target
-    # and fall back to a full send, which (re)creates the target dataset.
+    # An incremental stream needs its base snapshot on BOTH sides — `zfs send
+    # -i base` diffs two snapshots of the SOURCE, and the receive needs the
+    # same base on the target. So pick the newest snapshot both sides still
+    # share (an aborted run can leave a newer stray snapshot on the source
+    # that never reached the target — the older common one still chains).
+    # Without any common snapshot (deleted backups, never-completed first
+    # transfer) fall back to a full send, which recreates the target dataset.
     # @return [String, nil] full source snapshot name usable as `-i` base
     def incremental_base target
-      base = zfs_backup_snapshots.first
-      return nil unless base
+      source_snapshots = zfs_backup_snapshots # newest first
+      return nil if source_snapshots.empty?
 
       success, out = backup_host.exec "zfs list -H -o name -t snapshot -r #{target.shellescape}"
       return nil unless success # target dataset missing -> full send
 
-      snapshot_name = base.rpartition('@').last
-      out.split("\n").include?("#{target}@#{snapshot_name}") ? base : nil
+      target_names = out.split("\n").map { |snapshot| snapshot.rpartition('@').last }
+      source_snapshots.find { |snapshot| target_names.include? snapshot.rpartition('@').last }
     end
 
     # Pull the (incremental) stream from the source host and `zfs receive` it
