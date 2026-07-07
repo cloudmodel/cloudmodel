@@ -201,7 +201,7 @@ module CloudModel
       end
 
       timestamp = Time.now.strftime "%Y%m%d%H%M%S"
-      base = zfs_backup_snapshots.first # newest existing -> incremental base
+      base = incremental_base target
       snapshot = "#{source}@#{ZFS_BACKUP_SNAPSHOT_PREFIX}#{timestamp}"
 
       # 1. atomic, crash-consistent snapshot on the source host (quiescing the
@@ -314,6 +314,26 @@ module CloudModel
 
     def ssh_command
       "ssh -o StrictHostKeyChecking=no -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa"
+    end
+
+    # Incremental base for the next send, or nil to force a full send.
+    #
+    # An incremental stream needs its base snapshot on BOTH sides: the newest
+    # backup snapshot on the source AND the same snapshot on the target
+    # dataset. When the target is gone or lost the base (deleted backups, a
+    # never-completed first transfer), `zfs receive` fails with "destination
+    # does not exist" on every retry — so verify the base against the target
+    # and fall back to a full send, which (re)creates the target dataset.
+    # @return [String, nil] full source snapshot name usable as `-i` base
+    def incremental_base target
+      base = zfs_backup_snapshots.first
+      return nil unless base
+
+      success, out = backup_host.exec "zfs list -H -o name -t snapshot -r #{target.shellescape}"
+      return nil unless success # target dataset missing -> full send
+
+      snapshot_name = base.rpartition('@').last
+      out.split("\n").include?("#{target}@#{snapshot_name}") ? base : nil
     end
 
     # Pull the (incremental) stream from the source host and `zfs receive` it
