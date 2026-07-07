@@ -17,37 +17,46 @@ end
 
 namespace :cloudmodel do
   desc "Backup marked services and volumes, then clean up obsolete backups. " \
-       "GUESTS=0 / SETS=0 disable a whole category (e.g. SETS=0 = all guests + cleanup, no replica sets). " \
-       "GUEST=name[,name] / SET=name[,name] back up only those subjects. " \
+       "One switch per category: GUESTS / SETS — unset = all, 0 = skip, name[,name] = only those " \
+       "(naming only one category skips the other, e.g. GUESTS=hub06). " \
        "CLEANUP=0|1 forces the trailing cleanup off/on (default: on, except for name-filtered runs)."
   task :backup => [:environment] do
-    guest_names = ENV['GUEST']&.split(',')
-    set_names = ENV['SET']&.split(',')
-    # Naming a subject implies its category; naming ONLY the other category's
-    # subjects skips this one. GUESTS=0 / SETS=0 always win.
-    run_guests = ENV['GUESTS'] != '0' && !(set_names && !guest_names)
-    run_sets = ENV['SETS'] != '0' && !(guest_names && !set_names)
+    # nil = all subjects, :off = skip category, Array = only these names
+    parse = ->(value) do
+      case value
+      when nil, '' then nil
+      when '0', 'none' then :off
+      else value.split(',')
+      end
+    end
+    guests_param = parse.call ENV['GUESTS']
+    sets_param = parse.call ENV['SETS']
+
+    # Naming subjects in only one category implies skipping the other.
+    sets_param ||= :off if guests_param.is_a? Array
+    guests_param ||= :off if sets_param.is_a? Array
+
     cleanup = if ENV['CLEANUP']
       ENV['CLEANUP'] == '1'
     else
-      guest_names.nil? && set_names.nil?
+      !(guests_param.is_a?(Array) || sets_param.is_a?(Array))
     end
 
     with_backup_run_lock do
-      if run_guests
+      unless guests_param == :off
         guests = CloudModel::Guest.all
-        if guest_names
-          guests = guests.where :name.in => guest_names
-          abort "No guest named #{guest_names * ', '} found." if guests.count == 0
+        if guests_param
+          guests = guests.where :name.in => guests_param
+          abort "No guest named #{guests_param * ', '} found." if guests.count == 0
         end
         CloudModel::Guest.backup_all guests
       end
 
-      if run_sets
+      unless sets_param == :off
         sets = CloudModel::MongodbReplicationSet.where has_backups: true
-        if set_names
-          sets = sets.where :name.in => set_names
-          abort "No replica set with backups named #{set_names * ', '} found." if sets.count == 0
+        if sets_param
+          sets = sets.where :name.in => sets_param
+          abort "No replica set with backups named #{sets_param * ', '} found." if sets.count == 0
         end
         CloudModel::MongodbReplicationSet.backup_all sets
       end
