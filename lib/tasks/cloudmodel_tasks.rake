@@ -1,8 +1,9 @@
 namespace :cloudmodel do
-  desc "Backup marked services and volumes"
+  desc "Backup marked services and volumes, then clean up obsolete backups"
   task :backup => [:environment] do
     CloudModel::Guest.backup_all
     CloudModel::MongodbReplicationSet.backup_all
+    CloudModel::BackupCleanup.run_after_backup
   end
 
   namespace :migrate do
@@ -209,6 +210,7 @@ namespace :cloudmodel do
     task :backup_all => [:environment] do
       CloudModel::Guest.backup_all
       CloudModel::MongodbReplicationSet.backup_all
+      CloudModel::BackupCleanup.run_after_backup
     end
 
     desc "Build guest image"

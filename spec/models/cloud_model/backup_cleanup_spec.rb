@@ -109,6 +109,27 @@ describe CloudModel::BackupCleanup do
     end
   end
 
+  describe '.run_after_backup' do
+    let(:output) { StringIO.new }
+
+    it 'cleans up for real after a backup run' do
+      CloudModel::MongodbReplicationSet.create! name: 'rs-live'
+      orphan = "#{root}/mongodb_replication_sets/#{BSON::ObjectId.new}"
+      make_backup orphan, '20250101000000'
+
+      described_class.run_after_backup output: output
+
+      expect(File.exist?(orphan)).to eq false
+    end
+
+    it 'reports but never raises when the sanity check refuses to run' do
+      allow(Rails.logger).to receive(:error)
+
+      expect { described_class.run_after_backup output: output }.not_to raise_error
+      expect(output.string).to match(/Backup cleanup skipped: .*no guests or replica sets/)
+    end
+  end
+
   describe 'cleanup!' do
     let(:output) { StringIO.new }
 
