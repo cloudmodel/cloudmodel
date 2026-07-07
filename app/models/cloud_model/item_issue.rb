@@ -90,6 +90,9 @@ module CloudModel
 
     index subject_type: 1, subject_id: 1, resolved_at: 1
     index 'subject_chain_ids.type': 1, 'subject_chain_ids.id': 1, resolved_at: 1
+    # TTL: resolved issues are historical records — Mongo drops them a year
+    # after resolution (documents without resolved_at never expire).
+    index({resolved_at: 1}, {expire_after_seconds: 1.year.to_i})
 
     # @return [Mongoid::Criteria] all unresolved issues
     def self.open
