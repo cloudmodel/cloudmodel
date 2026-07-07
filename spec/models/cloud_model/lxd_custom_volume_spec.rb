@@ -475,11 +475,37 @@ describe CloudModel::LxdCustomVolume do
       expect(subject.backup).to eq true
     end
 
-    it 'should send incrementally against the newest existing snapshot' do
+    it 'should send incrementally when the target still has the base snapshot' do
+      base = "#{dataset}@cm-bkp-20240101000000"
+      target = subject.send :backup_target_dataset
+      allow(subject).to receive(:zfs_backup_snapshots).and_return([base])
+      allow(host).to receive(:exec).and_return([true, ''])
+      allow(backup_host).to receive(:exec).with(/\Azfs list /).and_return([true, "#{target}@cm-bkp-20240101000000\n"])
+      expect(subject).to receive(:send_to_backup_host).with(anything, base, anything).and_return(true)
+      allow(subject).to receive(:prune_source_snapshots)
+      allow(subject).to receive(:prune_target_snapshots)
+
+      expect(subject.backup).to eq true
+    end
+
+    it 'should fall back to a full send when the target dataset is missing' do
       base = "#{dataset}@cm-bkp-20240101000000"
       allow(subject).to receive(:zfs_backup_snapshots).and_return([base])
       allow(host).to receive(:exec).and_return([true, ''])
-      expect(subject).to receive(:send_to_backup_host).with(anything, base, anything).and_return(true)
+      allow(backup_host).to receive(:exec).with(/\Azfs list /).and_return([false, 'cannot open: dataset does not exist'])
+      expect(subject).to receive(:send_to_backup_host).with(anything, nil, anything).and_return(true)
+      allow(subject).to receive(:prune_source_snapshots)
+      allow(subject).to receive(:prune_target_snapshots)
+
+      expect(subject.backup).to eq true
+    end
+
+    it 'should fall back to a full send when the target lost the base snapshot' do
+      base = "#{dataset}@cm-bkp-20240101000000"
+      allow(subject).to receive(:zfs_backup_snapshots).and_return([base])
+      allow(host).to receive(:exec).and_return([true, ''])
+      allow(backup_host).to receive(:exec).with(/\Azfs list /).and_return([true, ''])
+      expect(subject).to receive(:send_to_backup_host).with(anything, nil, anything).and_return(true)
       allow(subject).to receive(:prune_source_snapshots)
       allow(subject).to receive(:prune_target_snapshots)
 
