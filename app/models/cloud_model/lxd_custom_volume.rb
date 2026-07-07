@@ -355,6 +355,19 @@ module CloudModel
       parent = target.rpartition('/').first
       backup_host.exec "zfs create -p #{parent.shellescape}" unless parent.empty?
 
+      unless base
+        # A full stream cannot overwrite a dataset that still has snapshots
+        # ("destination has snapshots ... must destroy them"). Reaching the
+        # full-send path means those snapshots share no base with the source —
+        # a dead chain no future incremental can build on — so drop the target
+        # and receive fresh.
+        exists, _out = backup_host.exec "zfs list -H -o name #{target.shellescape}"
+        if exists
+          CloudModel.backup_log "volume #{mount_point}: destroying stale backup target (dead snapshot chain)"
+          backup_host.exec "zfs destroy -r #{target.shellescape}"
+        end
+      end
+
       run_pipeline "#{ssh} root@#{host.private_address} \"zfs send #{flags} #{snapshot.shellescape}\" | " +
                    "#{ssh} root@#{backup_host.private_address} \"zfs receive -v -F -u #{target.shellescape}\""
     end

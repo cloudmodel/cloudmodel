@@ -548,6 +548,46 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
+  describe 'send_to_backup_host' do
+    let(:backup_host) { double 'backup_host', private_address: '10.42.0.9' }
+    let(:target) { 'data/admin-backups/zfs_backups/h/g/v' }
+
+    before do
+      subject.guest = guest
+      subject.mount_point = 'var/data'
+      allow(subject).to receive(:backup_host).and_return(backup_host)
+      allow(host).to receive(:private_address).and_return('10.42.0.1')
+      allow(CloudModel.config).to receive(:data_directory).and_return('/data')
+      allow(backup_host).to receive(:exec).with(/\Azfs create -p /).and_return([true, ''])
+      allow(Rails.logger).to receive(:info)
+    end
+
+    it 'destroys a stale target with dead snapshots before a full send' do
+      expect(backup_host).to receive(:exec).with("zfs list -H -o name #{target}").and_return([true, target])
+      expect(backup_host).to receive(:exec).with("zfs destroy -r #{target}").and_return([true, ''])
+      expect(subject).to receive(:run_pipeline).with(/zfs send  ds@snap.*zfs receive -v -F -u/).and_return(true)
+
+      expect {
+        expect(subject.send(:send_to_backup_host, 'ds@snap', nil, target)).to eq true
+      }.to output(/destroying stale backup target/).to_stdout
+    end
+
+    it 'does not destroy anything when the target does not exist yet' do
+      expect(backup_host).to receive(:exec).with("zfs list -H -o name #{target}").and_return([false, 'does not exist'])
+      expect(backup_host).not_to receive(:exec).with(/zfs destroy/)
+      expect(subject).to receive(:run_pipeline).and_return(true)
+
+      expect(subject.send(:send_to_backup_host, 'ds@snap', nil, target)).to eq true
+    end
+
+    it 'does not touch the target on incremental sends' do
+      expect(backup_host).not_to receive(:exec).with(/\Azfs (list|destroy)/)
+      expect(subject).to receive(:run_pipeline).with(/zfs send -i ds@base ds@snap/).and_return(true)
+
+      expect(subject.send(:send_to_backup_host, 'ds@snap', 'ds@base', target)).to eq true
+    end
+  end
+
   describe 'run_pipeline' do
     it 'streams output through backup_log and returns success' do
       expect {
