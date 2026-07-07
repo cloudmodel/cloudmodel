@@ -17,9 +17,21 @@ module CloudModel
   # never leaves the configured backup root. ZFS volume backups live in
   # datasets (pruned chain-safe after each send), not in this tree.
   #
-  # Driven by `rake cloudmodel:cleanup:backups` (dry run unless CONFIRM=1).
+  # Runs automatically after every backup run (see the backup rake tasks) and
+  # manually via `rake cloudmodel:cleanup:backups` (dry run unless CONFIRM=1).
   class BackupCleanup
     ID_PATTERN = /\A[0-9a-f]{24}\z/
+
+    # Post-backup sweep: deletes for real, but never lets a cleanup problem
+    # fail a backup run that just succeeded — the guards (empty DB, missing
+    # root) and any unexpected error only report and move on.
+    def self.run_after_backup output: $stdout
+      output.puts "\nCleaning up obsolete backups:"
+      new.cleanup! dry_run: false, output: output
+    rescue => e
+      output.puts "Backup cleanup skipped: #{e.message}"
+      Rails.logger.error "Backup cleanup failed: #{e.message}"
+    end
 
     # @return [String] the configured dump backup root
     def backup_root
