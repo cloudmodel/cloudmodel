@@ -237,11 +237,24 @@ module CloudModel
       key
     end
 
+    # Guards against silently dead connections: without keepalive a dropped
+    # peer blocks a Net::SSH read FOREVER (in-process, so not even visible as
+    # a child process) — a single unreachable host could hang a whole backup
+    # run. With these options Net::SSH probes every 15s and raises after 3
+    # missed answers (~45s); `timeout` bounds the initial TCP connect.
+    SSH_OPTIONS = {
+      timeout: 15,
+      keepalive: true,
+      keepalive_interval: 15,
+      keepalive_maxcount: 3
+    }.freeze
+
     def ssh_connection
       @ssh_connection ||= if initial_root_pw
         Net::SSH.start(primary_address.ip, "root",
           password: initial_root_pw,
-          verify_host_key: :never
+          verify_host_key: :never,
+          **SSH_OPTIONS
         )
       else
         host_ip = if CloudModel.config.use_external_ip
@@ -254,14 +267,16 @@ module CloudModel
           Net::SSH.start(host_ip, "root",
             keys: ["#{CloudModel.config.data_directory}/keys/id_rsa"],
             keys_only: true,
-            password: ''
+            password: '',
+            **SSH_OPTIONS
           )
         rescue Errno::EHOSTUNREACH, Errno::ETIMEDOUT, Errno::ENETUNREACH
           # If not reachable via VPN, try external IP
           Net::SSH.start(primary_address.ip, "root",
             keys: ["#{CloudModel.config.data_directory}/keys/id_rsa"],
             keys_only: true,
-            password: ''
+            password: '',
+            **SSH_OPTIONS
           )
         end
       end

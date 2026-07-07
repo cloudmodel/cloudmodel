@@ -440,19 +440,19 @@ describe CloudModel::Host do
     it "should open a new SSH connection to the host on first call via external address" do
       CloudModel.config.use_external_ip = true
       allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
-      expect(Net::SSH).to receive(:start).with(subject.primary_address.ip, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_return "SSH CONNECTION"
+      expect(Net::SSH).to receive(:start).with(subject.primary_address.ip, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: '', **CloudModel::Host::SSH_OPTIONS}).and_return "SSH CONNECTION"
       expect(subject.ssh_connection).to eq "SSH CONNECTION"
     end
 
     it "should open a new SSH connection to the host on first call via private address" do
       allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
-      expect(Net::SSH).to receive(:start).with(subject.private_address, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_return "SSH CONNECTION"
+      expect(Net::SSH).to receive(:start).with(subject.private_address, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: '', **CloudModel::Host::SSH_OPTIONS}).and_return "SSH CONNECTION"
       expect(subject.ssh_connection).to eq "SSH CONNECTION"
     end
 
     it "should reuse SSH connection on further calls" do
       allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
-      allow(Net::SSH).to receive(:start).with(subject.private_address, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_return "SSH CONNECTION"
+      allow(Net::SSH).to receive(:start).with(subject.private_address, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: '', **CloudModel::Host::SSH_OPTIONS}).and_return "SSH CONNECTION"
       subject.ssh_connection
       expect(Net::SSH).not_to receive(:start)
       expect(subject.ssh_connection).to eq "SSH CONNECTION"
@@ -460,8 +460,8 @@ describe CloudModel::Host do
 
     it "should try to access host via external address if internal failed" do
       allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
-      allow(Net::SSH).to receive(:start).with(subject.private_address, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_raise Errno::ENETUNREACH
-      allow(Net::SSH).to receive(:start).with(subject.primary_address.ip, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: ''}).and_return "SSH CONNECTION"
+      allow(Net::SSH).to receive(:start).with(subject.private_address, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: '', **CloudModel::Host::SSH_OPTIONS}).and_raise Errno::ENETUNREACH
+      allow(Net::SSH).to receive(:start).with(subject.primary_address.ip, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: '', **CloudModel::Host::SSH_OPTIONS}).and_return "SSH CONNECTION"
       subject.ssh_connection
     end
   end
