@@ -94,10 +94,19 @@ module CloudModel
       # be safely deleted.
       # @return [Array<String>] timestamps eligible for deletion
       def list_disposable_backups
-        backups = list_backups.sort{|a,b| b<=>a}
-      
+        CloudModel::Mixins::BackupTools.disposable_timestamps list_backups
+      end
+
+      # The retention policy itself, applicable to any list of 14-digit backup
+      # timestamps (dump directories, ZFS snapshot names, …): returns the
+      # timestamps that fall outside the policy documented above.
+      # @param backups [Array<String>] 14-digit timestamps, any order
+      # @return [Array<String>] timestamps eligible for deletion
+      def self.disposable_timestamps backups
+        backups = backups.sort{|a,b| b<=>a}
+
         #puts "\n ALL #{backups * ', '}"
-      
+
         now = Time.now
       
         keep_backups = backups[0..2] # always keep last 3 updates
