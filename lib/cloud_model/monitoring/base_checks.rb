@@ -22,24 +22,20 @@ module CloudModel
         nil
       end
 
-      # Store the current data to the subject
+      # Store the current data to the subject.
+      #
+      # Atomic `set`, NOT update_attributes: saving with validations runs the
+      # subject's full validation set (including uniqueness queries) — any
+      # unrelated data drift on the document (e.g. a host failing a
+      # uniqueness check) would permanently break its monitoring. Bookkeeping
+      # must store regardless of subject validity; real driver errors still
+      # raise, with their message included for the check_crashed issue.
       def store_data
-        attrs = {monitoring_last_check_at: Time.now, monitoring_last_check_result: data}
-
-        if @subject.update_attributes attrs
-          record_sample
-          true
-        else
-          #pp attrs
-          pp @subject.errors.as_json
-          #pp data[:system].keys
-          #pp data[:system]["labels:sep(0)"]
-          # data[:system].each do |k,v|
-          #   puts "#{k}: #{v.to_json.size}"
-          # end
-          raise "Failed to store monitoring data"#, "Data:\n #{data}"
-        end
-        #@subject.update_attributes attrs
+        @subject.set monitoring_last_check_at: Time.now, monitoring_last_check_result: data
+        record_sample
+        true
+      rescue => e
+        raise "Failed to store monitoring data: #{e.class}: #{e.message}"
       end
 
       # Get the data for the subject

@@ -67,15 +67,21 @@ describe CloudModel::Monitoring::BaseChecks do
       subject.store_data
     end
 
-    it 'should raise and print errors when update_attributes fails' do
+    it 'should store even when the subject is invalid (set bypasses validations)' do
+      check_subject = Factory :certificate
+      check_subject.name = nil # would fail a validating save
+      subject.instance_variable_set :@subject, check_subject
       allow(subject).to receive(:data).and_return 'data' => 'some data'
-      errors = double 'errors', as_json: {'name' => ['is invalid']}
-      allow(check_subject).to receive(:update_attributes).and_return false
-      allow(check_subject).to receive(:errors).and_return errors
 
-      expect do
-        expect { subject.store_data }.to raise_error('Failed to store monitoring data')
-      end.to output(/is invalid/).to_stdout
+      expect(subject.store_data).to eq true
+      expect(check_subject.reload.monitoring_last_check_result).to eq 'data' => 'some data'
+    end
+
+    it 'should raise with the cause when the write fails' do
+      allow(subject).to receive(:data).and_return 'data' => 'some data'
+      allow(check_subject).to receive(:set).and_raise Mongo::Error::OperationFailure.new('boom')
+
+      expect { subject.store_data }.to raise_error(/Failed to store monitoring data: Mongo::Error::OperationFailure/)
     end
   end
 
