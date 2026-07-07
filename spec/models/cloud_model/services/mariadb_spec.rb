@@ -94,6 +94,72 @@ describe CloudModel::Services::Mariadb do
 
       expect(subject.backup).to eq true
     end
+
+    it 'should create the missing backup user and retry once on access denied' do
+      calls = 0
+      allow(subject).to receive(:`) do
+        calls += 1
+        if calls == 1
+          `false`; "mysqldump: Got error: 1045: \"Access denied for user 'backup'@'10.42.23.9' (using password: NO)\""
+        else
+          `true`; ''
+        end
+      end
+      expect(subject).to receive(:ensure_backup_user).and_return(true)
+      allow(File).to receive(:exist?).and_return(true)
+      allow(FileUtils).to receive(:rm_f)
+      allow(FileUtils).to receive(:ln_s)
+      allow(subject).to receive(:cleanup_backups)
+
+      expect(subject.backup).to eq true
+      expect(calls).to eq 2
+    end
+
+    it 'should not retry when the backup user cannot be created' do
+      calls = 0
+      allow(subject).to receive(:`) { calls += 1; `false`; 'Access denied' }
+      expect(subject).to receive(:ensure_backup_user).and_return(false)
+      allow(FileUtils).to receive(:rm_rf)
+
+      expect(subject.backup).to eq false
+      expect(calls).to eq 1
+    end
+
+    it 'should not touch the backup user on other failures' do
+      allow(subject).to receive(:`) { `false`; 'mysqldump: Got error: 2002: connection refused' }
+      expect(subject).not_to receive(:ensure_backup_user)
+      allow(FileUtils).to receive(:rm_rf)
+
+      expect(subject.backup).to eq false
+    end
+  end
+
+  describe 'ensure_backup_user' do
+    let(:guest) { double 'guest', name: 'db-guest', private_address: '10.42.23.1' }
+
+    before do
+      allow(subject).to receive(:guest).and_return guest
+    end
+
+    it 'should create the passwordless dump user limited to the VPN /16 via the guest socket' do
+      expect(guest).to receive(:exec) do |command|
+        expect(command).to match(/\Amysql -e /)
+        plain = command.gsub('\\', '') # undo shellescaping for readability
+        expect(plain).to include 'CREATE USER IF NOT EXISTS'
+        expect(plain).to include "'backup'@'10.42.%'"
+        expect(plain).to include 'SELECT, SHOW VIEW, TRIGGER, LOCK TABLES, PROCESS, EVENT'
+        [true, '']
+      end
+
+      expect(subject.ensure_backup_user).to eq true
+    end
+
+    it 'should log and return false when the user cannot be created' do
+      allow(guest).to receive(:exec).and_return([false, 'ERROR 2002: no socket'])
+      expect(Rails.logger).to receive(:error).with(/backup user on db-guest/)
+
+      expect(subject.ensure_backup_user).to eq false
+    end
   end
 
   describe 'restore' do

@@ -51,12 +51,21 @@ module CloudModel
         return false unless has_backups
         timestamp = Time.now.strftime "%Y%m%d%H%M%S"
         FileUtils.mkdir_p "#{backup_directory}/#{timestamp}"
-        command = "LC_ALL=C mysqldump -h #{guest.private_address.shellescape} -P #{port.to_i} -u backup --all-databases --all-tablespaces > #{backup_directory}/#{timestamp}/dump.sql"
+        # `2>&1 >file`: the dump (stdout) goes to the file while stderr comes
+        # back through the backticks — so auth failures are detectable here.
+        command = "LC_ALL=C mysqldump -h #{guest.private_address.shellescape} -P #{port.to_i} -u backup --all-databases --all-tablespaces 2>&1 > #{backup_directory}/#{timestamp}/dump.sql"
 
         Rails.logger.debug command
-        Rails.logger.debug `#{command}`
+        output = `#{command}`
+        success = $?.success?
 
-        if $?.success? and File.exist? "#{backup_directory}/#{timestamp}/dump.sql"
+        if !success && output.match?(/access denied/i) && ensure_backup_user
+          output = `#{command}`
+          success = $?.success?
+        end
+        Rails.logger.debug output
+
+        if success and File.exist? "#{backup_directory}/#{timestamp}/dump.sql"
           FileUtils.rm_f "#{backup_directory}/latest"
           FileUtils.ln_s "#{backup_directory}/#{timestamp}", "#{backup_directory}/latest"
           record_successful_backup
@@ -71,6 +80,25 @@ module CloudModel
 
       def restore timestamp='latest'
         # ToDo: mysql import data
+      end
+
+      # Read-only grants the dump user needs for `mysqldump --all-databases`.
+      BACKUP_USER_GRANTS = 'SELECT, SHOW VIEW, TRIGGER, LOCK TABLES, PROCESS, EVENT'
+
+      # (Re)create the passwordless `backup` user {#backup} connects with,
+      # restricted to the private VPN /16 (same scheme as the `monitoring`
+      # user). Older guests got this user by hand — creating it on demand via
+      # the guest's local root socket lets backups self-heal when it is
+      # missing (fresh deploys, restored databases).
+      # @return [Boolean] whether the user is in place now
+      def ensure_backup_user
+        from = "#{guest.private_address.split('.').first(2).join('.')}.%"
+        sql = "CREATE USER IF NOT EXISTS 'backup'@'#{from}'; " +
+              "GRANT #{BACKUP_USER_GRANTS} ON *.* TO 'backup'@'#{from}'; " +
+              "FLUSH PRIVILEGES;"
+        success, out = guest.exec "mysql -e #{sql.shellescape}"
+        Rails.logger.error "Could not ensure mariadb backup user on #{guest.name}: #{out}" unless success
+        success
       end
     end
   end
