@@ -76,6 +76,15 @@ describe CloudModel::Mixins::BackupTools do
     end
   end
 
+  describe '.disposable_timestamps' do
+    it 'applies the retention policy to any timestamp list (e.g. ZFS snapshot names)' do
+      keep = (0..2).map { |i| (Time.now - i.days).strftime '%Y%m%d%H%M%S' }
+      old  = (Time.now - 8.years).strftime '%Y%m%d%H%M%S'
+
+      expect(CloudModel::Mixins::BackupTools.disposable_timestamps(keep + [old])).to eq [old]
+    end
+  end
+
   describe 'list_disposable_backups' do
     it "should keep last 3 backups" do
       keep_backups = [

@@ -675,6 +675,35 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
+  describe 'prune_target_snapshots' do
+    let(:backup_host) { double 'backup_host', private_address: '10.42.0.9' }
+    let(:target) { 'data/admin-backups/zfs_backups/h/g/v' }
+
+    before do
+      subject.guest = guest
+      allow(subject).to receive(:backup_host).and_return(backup_host)
+    end
+
+    it 'destroys snapshots beyond the GFS retention and keeps fresh ones' do
+      old    = (Time.now - 12.months).strftime '%Y%m%d%H%M%S'
+      fresh  = (0..2).map { |i| (Time.now - i.hours).strftime '%Y%m%d%H%M%S' }
+      names  = ([old] + fresh).map { |ts| "#{target}@cm-bkp-#{ts}" }
+      listing = (names + ["#{target}@manual-snapshot"]).join("\n")
+      allow(backup_host).to receive(:exec).with(/\Azfs list /).and_return([true, listing])
+
+      expect(backup_host).to receive(:exec).with("zfs destroy #{target}@cm-bkp-#{old}").and_return([true, ''])
+
+      subject.send :prune_target_snapshots, target
+    end
+
+    it 'does nothing when the snapshot list cannot be read' do
+      allow(backup_host).to receive(:exec).with(/\Azfs list /).and_return([false, 'boom'])
+      expect(backup_host).not_to receive(:exec).with(/zfs destroy/)
+
+      subject.send :prune_target_snapshots, target
+    end
+  end
+
   describe 'run_pipeline' do
     it 'streams output through backup_log and returns success' do
       expect {

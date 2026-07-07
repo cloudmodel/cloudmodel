@@ -140,9 +140,6 @@ module CloudModel
     # Prefix for the ZFS snapshots this backup creates.
     ZFS_BACKUP_SNAPSHOT_PREFIX = 'cm-bkp-'
 
-    # Number of received snapshots to keep on the backup host.
-    ZFS_BACKUP_KEEP = 30
-
     # Number of backup snapshots to keep on the SOURCE. More than one buys a
     # chain buffer: an aborted transfer can cost the newest base, but an older
     # snapshot still shared with the target avoids a full resend. Costs only
@@ -440,14 +437,22 @@ module CloudModel
       end
     end
 
-    # Keep the most recent {ZFS_BACKUP_KEEP} snapshots on the backup host,
-    # destroy older ones. Chain-safe: the newest (next `-i` base) is retained.
+    # Apply the same grandfather-father-son retention as dump backups (see
+    # {CloudModel::Mixins::BackupTools}) to the received snapshots on the
+    # backup host: everything from the last 3 days, then one per day/week/
+    # month out to 6 months. Chain-safe: the policy always keeps the newest
+    # snapshots (the next `-i` base among them).
     def prune_target_snapshots target
       success, out = backup_host.exec "zfs list -H -o name -t snapshot -r #{target.shellescape}"
       return unless success
-      snapshots = out.split("\n").select { |s| s.include? "@#{ZFS_BACKUP_SNAPSHOT_PREFIX}" }.sort # oldest first
-      (snapshots[0...-ZFS_BACKUP_KEEP] || []).each do |snapshot|
-        backup_host.exec "zfs destroy #{snapshot.shellescape}"
+
+      by_timestamp = out.split("\n").filter_map do |snapshot|
+        timestamp = snapshot[/@#{ZFS_BACKUP_SNAPSHOT_PREFIX}([0-9]{14})\z/, 1]
+        [timestamp, snapshot] if timestamp
+      end.to_h
+
+      CloudModel::Mixins::BackupTools.disposable_timestamps(by_timestamp.keys).each do |timestamp|
+        backup_host.exec "zfs destroy #{by_timestamp[timestamp].shellescape}"
       end
     end
 
