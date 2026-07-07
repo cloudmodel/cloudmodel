@@ -624,12 +624,14 @@ module CloudModel
     # breakage stops being silent. Run from the daily backup timer.
     def self.backup_all
       CloudModel.parallel_each(all.to_a) do |guest|
-        begin
-          guest.backup
-        rescue => e
-          puts "Backup of Guest #{guest.name} failed: #{e.message}"
-          if defined?(ExceptionNotifier)
-            ExceptionNotifier.notify_exception e, data: {guest: guest.name, guest_id: guest.id.to_s}
+        CloudModel.with_backup_label guest.name do
+          begin
+            guest.backup
+          rescue => e
+            CloudModel.backup_log "guest backup FAILED: #{e.message}"
+            if defined?(ExceptionNotifier)
+              ExceptionNotifier.notify_exception e, data: {guest: guest.name, guest_id: guest.id.to_s}
+            end
           end
         end
       end
@@ -643,14 +645,16 @@ module CloudModel
       failed = []
 
       lxd_custom_volumes.where(has_backups: true).each do |volume|
+        started = Time.now
         ok = volume.backup
-        Rails.logger.debug "V #{volume.mount_point}: #{ok}"
+        CloudModel.backup_log "volume #{volume.mount_point}: #{ok ? "done (#{(Time.now - started).round}s)" : 'FAILED'}"
         failed << "volume #{volume.mount_point}" unless ok
       end
 
       services.where(has_backups: true).each do |service|
+        started = Time.now
         ok = service.backup
-        Rails.logger.debug "S #{service._type}: #{ok}"
+        CloudModel.backup_log "#{service._type.demodulize.underscore}: #{ok ? "done (#{(Time.now - started).round}s)" : 'FAILED'}"
         failed << "service #{service._type}" unless ok
       end
 

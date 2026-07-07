@@ -204,6 +204,12 @@ module CloudModel
       base = incremental_base target
       snapshot = "#{source}@#{ZFS_BACKUP_SNAPSHOT_PREFIX}#{timestamp}"
 
+      if base
+        CloudModel.backup_log "volume #{mount_point}: incremental ZFS send since #{base.rpartition('@').last.delete_prefix(ZFS_BACKUP_SNAPSHOT_PREFIX)}"
+      else
+        CloudModel.backup_log "volume #{mount_point}: full ZFS send (no incremental base on backup target)"
+      end
+
       # 1. atomic, crash-consistent snapshot on the source host (quiescing the
       #    owning service first, if it asks to — e.g. MongoDB fsyncLock)
       unless take_consistent_snapshot snapshot
@@ -260,12 +266,15 @@ module CloudModel
     # the last one. Plain backticks expose only the exit status of the final
     # command, so a `zfs send` that dies mid-stream could be masked by a
     # `zfs receive` that still exits 0. `bash -c 'set -o pipefail; …'` makes the
-    # pipeline fail if any stage fails. The whole pipeline is shell-escaped into
-    # a single bash argument, so embedded quotes/escapes are preserved.
+    # pipeline fail if any stage fails. Output is streamed line by line through
+    # CloudModel.backup_log, so long transfers show progress on the console
+    # with the current backup label as prefix.
     # @return [Boolean] whether every stage of the pipeline succeeded
     def run_pipeline command
       Rails.logger.debug command
-      Rails.logger.debug `bash -c #{"set -o pipefail; #{command}".shellescape}`
+      IO.popen(['bash', '-c', "set -o pipefail; #{command}"], err: [:child, :out]) do |io|
+        io.each_line { |line| CloudModel.backup_log line.chomp }
+      end
       $?.success?
     end
 
@@ -347,7 +356,7 @@ module CloudModel
       backup_host.exec "zfs create -p #{parent.shellescape}" unless parent.empty?
 
       run_pipeline "#{ssh} root@#{host.private_address} \"zfs send #{flags} #{snapshot.shellescape}\" | " +
-                   "#{ssh} root@#{backup_host.private_address} \"zfs receive -F -u #{target.shellescape}\""
+                   "#{ssh} root@#{backup_host.private_address} \"zfs receive -v -F -u #{target.shellescape}\""
     end
 
     # Destroy all backup snapshots on the source except `keep` (the new base).

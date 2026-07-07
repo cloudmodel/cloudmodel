@@ -350,12 +350,19 @@ module CloudModel
 
     def self.backup_all
       CloudModel.parallel_each(where(has_backups: true).to_a) do |set|
-        begin
-          set.backup
-        rescue => e
-          puts "Backup of replication set #{set.name} failed: #{e.message}"
-          if defined?(ExceptionNotifier)
-            ExceptionNotifier.notify_exception e, data: {replication_set: set.name, id: set.id.to_s}
+        CloudModel.with_backup_label set.name do
+          started = Time.now
+          begin
+            if set.backup
+              CloudModel.backup_log "replica set backup finished (#{(Time.now - started).round}s)"
+            else
+              CloudModel.backup_log "replica set backup FAILED"
+            end
+          rescue => e
+            CloudModel.backup_log "replica set backup FAILED: #{e.message}"
+            if defined?(ExceptionNotifier)
+              ExceptionNotifier.notify_exception e, data: {replication_set: set.name, id: set.id.to_s}
+            end
           end
         end
       end
@@ -389,9 +396,11 @@ module CloudModel
 
       member = backup_member
       unless member
+        CloudModel.backup_log "no usable member to dump replica set #{name} from"
         Rails.logger.error "ReplSet backup: no usable member for #{name}"
         return false
       end
+      CloudModel.backup_log "dumping via #{member.guest.name}:#{member.port}"
 
       timestamp = Time.now.strftime "%Y%m%d%H%M%S"
       target = "#{backup_directory}/#{timestamp}"
@@ -469,9 +478,7 @@ module CloudModel
     end
 
     def run_command command
-      Rails.logger.debug command
-      Rails.logger.debug `#{command}`
-      $?.success?
+      CloudModel.backup_exec command
     end
 
   end
