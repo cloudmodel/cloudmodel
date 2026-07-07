@@ -1,9 +1,28 @@
+# Concurrent backup runs (nightly cron + a manual run) write into the same
+# target datasets and dump dirs and quiesce the same services — they corrupt
+# each other's chains. flock on a file in the shared data dir keeps it to one
+# run per machine; a second start aborts immediately instead of interleaving.
+def with_backup_run_lock
+  lock = File.open "#{CloudModel.config.data_directory}/backup_run.lock", File::CREAT, 0o644
+  unless lock.flock(File::LOCK_EX | File::LOCK_NB)
+    abort "Another backup run is already active (#{lock.path} is locked) — refusing to start a second one."
+  end
+  yield
+ensure
+  if lock
+    lock.flock File::LOCK_UN
+    lock.close
+  end
+end
+
 namespace :cloudmodel do
   desc "Backup marked services and volumes, then clean up obsolete backups"
   task :backup => [:environment] do
-    CloudModel::Guest.backup_all
-    CloudModel::MongodbReplicationSet.backup_all
-    CloudModel::BackupCleanup.run_after_backup
+    with_backup_run_lock do
+      CloudModel::Guest.backup_all
+      CloudModel::MongodbReplicationSet.backup_all
+      CloudModel::BackupCleanup.run_after_backup
+    end
   end
 
   namespace :migrate do
@@ -208,9 +227,11 @@ namespace :cloudmodel do
     # bash -c 'cd /var/www/rails/current && RAILS_ENV=production /usr/local/bin/bundle exec rake cloudmodel:guest:backup_all'
     desc "Backup all guest"
     task :backup_all => [:environment] do
-      CloudModel::Guest.backup_all
-      CloudModel::MongodbReplicationSet.backup_all
-      CloudModel::BackupCleanup.run_after_backup
+      with_backup_run_lock do
+        CloudModel::Guest.backup_all
+        CloudModel::MongodbReplicationSet.backup_all
+        CloudModel::BackupCleanup.run_after_backup
+      end
     end
 
     desc "Build guest image"
