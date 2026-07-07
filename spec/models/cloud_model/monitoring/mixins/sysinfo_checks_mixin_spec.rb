@@ -223,6 +223,32 @@ describe CloudModel::Monitoring::Mixins::SysinfoChecksMixin do
     end
   end
 
+  describe 'check_load on guests' do
+    # /proc/loadavg in containers shows the HOST load (lxcfs default), so the
+    # per-core ratio must not alert on guests — and stale issues get resolved.
+    let(:guest) { CloudModel::Guest.new }
+    subject(:guest_checks) { CloudModel::Monitoring::GuestChecks.new guest, skip_header: true }
+
+    it 'should not alert and should resolve an open load issue' do
+      issue = double 'issue'
+      issues = double 'issues'
+      allow(guest).to receive(:item_issues).and_return issues
+      allow(issues).to receive(:where).with(key: :load_per_core, resolved_at: nil).and_return [issue]
+      expect(issue).to receive(:update_attribute).with(:resolved_at, kind_of(Time))
+      expect(guest_checks).not_to receive(:do_check_value)
+
+      guest_checks.check_load
+    end
+
+    it 'should not record a load_per_core sample metric' do
+      allow(guest_checks).to receive(:data).and_return({system: {'cpu' => {'last_15_minutes_load' => '8.0', 'cpus' => '2'}}})
+      allow(guest).to receive(:item_issues).and_return(double(where: []))
+      allow(guest).to receive(:lxd_custom_volumes).and_return []
+
+      expect(guest_checks.sysinfo_sample_metrics).not_to have_key 'cpu.load_per_core'
+    end
+  end
+
   describe 'check_inodes_usage' do
     it 'should flag the highest inode usage across mounts' do
       allow(subject).to receive(:data).and_return({system: {'df_inodes' => {

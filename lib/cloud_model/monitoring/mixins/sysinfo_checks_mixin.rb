@@ -91,6 +91,18 @@ module CloudModel
         end
 
         def check_load
+          # Guests: without lxcfs loadavg virtualisation (`lxcfs -l`, not the
+          # LXD snap default) /proc/loadavg inside a container shows the HOST
+          # load, while cpuinfo shows the guest's limited core count — the
+          # ratio then fires on every guest of a busy host at once. Alert on
+          # hosts only; resolve any issues from when this ran on guests.
+          if @subject.is_a? CloudModel::Guest
+            if issue = @subject.item_issues.where(key: :load_per_core, resolved_at: nil).first
+              issue.update_attribute :resolved_at, Time.now
+            end
+            return
+          end
+
           if sys_info = data[:system] and cpu = sys_info['cpu']
             cpus = cpu['cpus'].to_i
             return if cpus == 0
@@ -257,7 +269,9 @@ module CloudModel
             end
           end
 
-          if cpu = sys_info['cpu'] and (cpus = cpu['cpus'].to_i) > 0
+          # load-per-core only for hosts — on guests the loadavg is the host's
+          # (lxcfs default), so the ratio against guest cores is meaningless.
+          if !@subject.is_a?(CloudModel::Guest) and cpu = sys_info['cpu'] and (cpus = cpu['cpus'].to_i) > 0
             metrics['cpu.load_per_core'] = cpu['last_15_minutes_load'].to_f / cpus
           end
 
