@@ -348,8 +348,10 @@ module CloudModel
     # WebImage does not run on the mongo host, so the admin forwards it to the
     # dump). Stored under {#backup_directory}; retention via BackupTools.
 
-    def self.backup_all
-      CloudModel.parallel_each(where(has_backups: true).to_a) do |set|
+    # @param sets [Enumerable<CloudModel::MongodbReplicationSet>] subjects
+    #   (default: all sets with backups enabled)
+    def self.backup_all sets = where(has_backups: true)
+      CloudModel.parallel_each(sets.to_a) do |set|
         CloudModel.with_backup_label set.name do
           started = Time.now
           begin

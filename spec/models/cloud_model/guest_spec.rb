@@ -1313,6 +1313,16 @@ describe CloudModel::Guest do
       CloudModel::Guest.backup_all
     end
 
+    it 'should back up only the passed subset when given' do
+      g1 = double 'guest', name: 'g1'
+      g2 = double 'guest', name: 'g2'
+      expect(g1).to receive(:backup)
+      expect(g2).not_to receive(:backup)
+      expect(CloudModel::Guest).not_to receive(:all)
+
+      CloudModel::Guest.backup_all [g1]
+    end
+
     it 'should notify via ExceptionNotifier and continue when a guest backup fails' do
       boom = CloudModel::BackupError.new 'nope'
       g1 = double 'guest', name: 'g1', id: 'id1'

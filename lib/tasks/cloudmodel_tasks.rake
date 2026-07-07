@@ -16,12 +16,34 @@ ensure
 end
 
 namespace :cloudmodel do
-  desc "Backup marked services and volumes, then clean up obsolete backups"
+  desc "Backup marked services and volumes, then clean up obsolete backups. " \
+       "GUEST=name[,name] and/or SET=name[,name] back up only those subjects " \
+       "(partial runs skip the cleanup); SKIP_CLEANUP=1 skips it on full runs."
   task :backup => [:environment] do
+    guest_names = ENV['GUEST']&.split(',')
+    set_names = ENV['SET']&.split(',')
+    partial = guest_names || set_names
+
     with_backup_run_lock do
-      CloudModel::Guest.backup_all
-      CloudModel::MongodbReplicationSet.backup_all
-      CloudModel::BackupCleanup.run_after_backup
+      if guest_names || !set_names
+        guests = CloudModel::Guest.all
+        if guest_names
+          guests = guests.where :name.in => guest_names
+          abort "No guest named #{guest_names * ', '} found." if guests.count == 0
+        end
+        CloudModel::Guest.backup_all guests
+      end
+
+      if set_names || !guest_names
+        sets = CloudModel::MongodbReplicationSet.where has_backups: true
+        if set_names
+          sets = sets.where :name.in => set_names
+          abort "No replica set with backups named #{set_names * ', '} found." if sets.count == 0
+        end
+        CloudModel::MongodbReplicationSet.backup_all sets
+      end
+
+      CloudModel::BackupCleanup.run_after_backup unless partial || ENV['SKIP_CLEANUP'] == '1'
     end
   end
 
