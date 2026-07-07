@@ -369,8 +369,59 @@ module CloudModel
         end
       end
 
-      run_pipeline "#{ssh} root@#{host.private_address} \"zfs send #{flags} #{snapshot.shellescape}\" | " +
-                   "#{ssh} root@#{backup_host.private_address} \"zfs receive -v -F -u #{target.shellescape}\""
+      estimate = send_size_estimate snapshot, base
+      CloudModel.backup_log "volume #{mount_point}: stream size ~#{human_size estimate}" if estimate
+
+      # Full sends can run for hours; report the received amount once a minute
+      # (the target starts empty there, so its `used` tracks the transfer —
+      # for incrementals it would not, they are short and end with the
+      # receive -v summary anyway).
+      monitor = base ? nil : start_transfer_monitor(target, estimate)
+      begin
+        run_pipeline "#{ssh} root@#{host.private_address} \"zfs send #{flags} #{snapshot.shellescape}\" | " +
+                     "#{ssh} root@#{backup_host.private_address} \"zfs receive -v -F -u #{target.shellescape}\""
+      ensure
+        monitor&.kill
+      end
+    end
+
+    # Estimated stream size in bytes via a dry-run send, nil if unavailable.
+    # (`zfs send -nP` reports on stderr on some ZFS versions, so merge.)
+    def send_size_estimate snapshot, base
+      flags = base ? "-i #{base.shellescape}" : ""
+      success, out = host.exec "zfs send -nP #{flags} #{snapshot.shellescape} 2>&1"
+      return nil unless success
+      out[/^size\s+([0-9]+)/, 1]&.to_i
+    end
+
+    # Background reporter for a running full send: logs the target's `used`
+    # (and % of the estimate) every +interval+ seconds until killed.
+    # @return [Thread]
+    def start_transfer_monitor target, estimate, interval: 60
+      label = Thread.current[:cloud_model_backup_label]
+      Thread.new do
+        # Own host instance — SSH connections are not shared across threads.
+        backup_host = CloudModel::Host.local
+        loop do
+          sleep interval
+          begin
+            success, out = backup_host.exec "zfs get -Hp -o value used #{target.shellescape}"
+            next unless success
+            used = out.strip.to_i
+            message = "volume #{mount_point}: #{human_size used} received"
+            if estimate && estimate > 0
+              message += " of ~#{human_size estimate} (#{(used * 100.0 / estimate).round}%)"
+            end
+            CloudModel.with_backup_label(label) { CloudModel.backup_log message }
+          rescue
+            nil # never let the reporter kill or outlive the transfer
+          end
+        end
+      end
+    end
+
+    def human_size bytes
+      ActiveSupport::NumberHelper.number_to_human_size bytes
     end
 
     # Destroy all backup snapshots on the source except `keep` (the new base).
