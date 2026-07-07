@@ -3,6 +3,11 @@ require "cloud_model/config_modules/api"
 module CloudModel
   class Config
     attr_writer :data_directory, :backup_directory, :bundle_command
+    # Max number of backups (replica sets / guests) to run concurrently in
+    # backup_all. Backups mostly shell out (mongodump / zfs send), so threads
+    # overlap their wait. Default 4. Note: each concurrent backup uses a Mongoid
+    # connection, so keep this <= the Mongoid pool size.
+    attr_writer :backup_concurrency
     attr_writer :skip_sync_images
     # Use external IP, useful for testing without setting up a VPN for your development box or if you have troubles with tinc
     attr_writer :use_external_ip
@@ -44,6 +49,10 @@ module CloudModel
 
     def backup_directory
       @backup_directory || "#{data_directory}/backups"
+    end
+
+    def backup_concurrency
+      @backup_concurrency || 4
     end
 
     def bundle_command
