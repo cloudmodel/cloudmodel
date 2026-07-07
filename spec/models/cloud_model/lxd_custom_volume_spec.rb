@@ -653,6 +653,35 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
+  describe '.backup_target_snapshots' do
+    it 'groups received snapshots by volume id from one listing' do
+      backup_host = double 'backup_host'
+      allow(CloudModel::Host).to receive(:local).and_return backup_host
+      allow(CloudModel::LxdCustomVolume).to receive(:backup_root_dataset).and_return 'data/bk'
+      volume_id = 'a' * 24
+      listing = [
+        "data/bk/zfs_backups/h/g/#{volume_id}@cm-bkp-20240101000000\t100\t200",
+        "data/bk/zfs_backups/h/g/#{volume_id}@cm-bkp-20240102000000\t300\t400",
+        "data/bk/zfs_backups/h/g/#{volume_id}@manual-snap\t1\t1"
+      ].join("\n")
+      expect(backup_host).to receive(:exec)
+        .with('zfs list -Hp -o name,used,refer -t snapshot -r data/bk/zfs_backups')
+        .and_return([true, listing])
+
+      snapshots = CloudModel::LxdCustomVolume.backup_target_snapshots
+      expect(snapshots.keys).to eq [volume_id]
+      expect(snapshots[volume_id].map { |s| s[:timestamp] }).to eq %w(20240102000000 20240101000000)
+      expect(snapshots[volume_id].first).to include used_bytes: 300, referenced_bytes: 400
+    end
+
+    it 'returns an empty hash when the backup root is not on ZFS' do
+      allow(CloudModel::Host).to receive(:local).and_return double
+      allow(CloudModel::LxdCustomVolume).to receive(:backup_root_dataset).and_return nil
+
+      expect(CloudModel::LxdCustomVolume.backup_target_snapshots).to eq({})
+    end
+  end
+
   describe 'prune_source_snapshots' do
     it 'keeps the newest ZFS_SOURCE_BACKUP_KEEP snapshots as chain buffer and destroys older ones' do
       subject.guest = guest
