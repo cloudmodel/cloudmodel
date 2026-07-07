@@ -217,15 +217,23 @@ module CloudModel
 
     # The host THIS cloudmodel instance runs on, resolved by matching a local
     # IP to a guest's private address (the app runs inside a guest container).
-    # Used as the local ZFS receive target for pull backups. Memoized.
+    # Used as the local ZFS receive target for pull backups.
+    #
+    # Memoized PER THREAD: the instance carries a Net::SSH session, which is
+    # not thread safe — parallel backup workers and transfer monitors all
+    # exec through this host, and a process-wide shared instance dies with
+    # "stream closed in another thread" for every user at once. One instance
+    # (and thus one SSH session) per thread keeps them isolated while still
+    # reusing the connection within a worker.
     # @return [CloudModel::Host, nil]
     def self.local
       # Only memoize a resolved host: caching nil (e.g. DB not yet reachable on
-      # first call) would pin the failure for the whole process lifetime.
-      return @local if defined?(@local) && @local
+      # first call) would pin the failure for the whole thread lifetime.
+      cached = Thread.current[:cloud_model_local_host]
+      return cached if cached
       require 'socket'
       ips = Socket.ip_address_list.select(&:ipv4?).map(&:ip_address)
-      @local = CloudModel::Guest.where(:private_address.in => ips).first&.host
+      Thread.current[:cloud_model_local_host] = CloudModel::Guest.where(:private_address.in => ips).first&.host
     end
 
     def tinc_private_key
