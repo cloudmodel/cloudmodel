@@ -410,7 +410,9 @@ module CloudModel
 
       if run_replset_mongodump member, target
         FileUtils.rm_f "#{backup_directory}/latest"
-        FileUtils.ln_s target, "#{backup_directory}/latest"
+        # Relative link: an absolute path would run through the Capistrano
+        # release dir and dangle once that release is pruned.
+        FileUtils.ln_s timestamp, "#{backup_directory}/latest"
         record_successful_backup
         cleanup_backups
         true

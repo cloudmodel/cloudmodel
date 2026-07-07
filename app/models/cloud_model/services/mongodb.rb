@@ -182,7 +182,8 @@ module CloudModel
 
         if run_mongodump target
           FileUtils.rm_f "#{backup_directory}/latest"
-          FileUtils.ln_s target, "#{backup_directory}/latest"
+          # Relative link: survives Capistrano release pruning.
+          FileUtils.ln_s timestamp, "#{backup_directory}/latest"
           record_successful_backup
           cleanup_backups
 
