@@ -860,8 +860,8 @@ describe CloudModel::Host do
   end
 
   describe '.local' do
-    before { CloudModel::Host.remove_instance_variable(:@local) if CloudModel::Host.instance_variable_defined?(:@local) }
-    after  { CloudModel::Host.remove_instance_variable(:@local) if CloudModel::Host.instance_variable_defined?(:@local) }
+    before { Thread.current[:cloud_model_local_host] = nil }
+    after  { Thread.current[:cloud_model_local_host] = nil }
 
     it 'resolves the host of the guest whose private address is a local IP' do
       addr = double ipv4?: true, ip_address: '10.44.3.5'
@@ -878,6 +878,17 @@ describe CloudModel::Host do
       allow(CloudModel::Guest).to receive(:where).and_return(double(first: nil))
 
       expect(CloudModel::Host.local).to be_nil
+    end
+
+    it 'memoizes per thread, so each backup worker gets its own SSH session' do
+      addr = double ipv4?: true, ip_address: '10.44.3.5'
+      allow(Socket).to receive(:ip_address_list).and_return [addr]
+      guest = double 'guest', host: subject
+      allow(CloudModel::Guest).to receive(:where).and_return(double(first: guest))
+
+      CloudModel::Host.local
+      expect(Thread.current[:cloud_model_local_host]).to eq subject
+      expect(Thread.new { Thread.current[:cloud_model_local_host] }.value).to be_nil
     end
   end
 end
