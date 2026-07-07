@@ -15,6 +15,23 @@ ensure
   end
 end
 
+# Track the run in a BackupRun document (live log + progress for the admin
+# UI). Failures — including Ctrl-C — mark the run failed and re-raise.
+def with_tracked_backup_run total_subjects
+  run = CloudModel::BackupRun.start! total_subjects: total_subjects
+  CloudModel.current_backup_run = run
+  begin
+    yield
+    run.finish! success: true
+  rescue Exception => e
+    run.append_log "Backup run aborted: #{e.class}: #{e.message}\n"
+    run.finish! success: false
+    raise
+  ensure
+    CloudModel.current_backup_run = nil
+  end
+end
+
 namespace :cloudmodel do
   desc "Backup marked services and volumes, then clean up obsolete backups. " \
        "One switch per category: GUESTS / MONGO_SETS — unset = all, 0 = skip, name[,name] = only those " \
@@ -43,25 +60,29 @@ namespace :cloudmodel do
     end
 
     with_backup_run_lock do
+      guests = nil
       unless guests_param == :off
         guests = CloudModel::Guest.all
         if guests_param
           guests = guests.where :name.in => guests_param
           abort "No guest named #{guests_param * ', '} found." if guests.count == 0
         end
-        CloudModel::Guest.backup_all guests
       end
 
+      sets = nil
       unless sets_param == :off
         sets = CloudModel::MongodbReplicationSet.where has_backups: true
         if sets_param
           sets = sets.where :name.in => sets_param
           abort "No replica set with backups named #{sets_param * ', '} found." if sets.count == 0
         end
-        CloudModel::MongodbReplicationSet.backup_all sets
       end
 
-      CloudModel::BackupCleanup.run_after_backup if cleanup
+      with_tracked_backup_run guests.try(:count).to_i + sets.try(:count).to_i do
+        CloudModel::Guest.backup_all guests if guests
+        CloudModel::MongodbReplicationSet.backup_all sets if sets
+        CloudModel::BackupCleanup.run_after_backup if cleanup
+      end
     end
   end
 
@@ -268,9 +289,12 @@ namespace :cloudmodel do
     desc "Backup all guest"
     task :backup_all => [:environment] do
       with_backup_run_lock do
-        CloudModel::Guest.backup_all
-        CloudModel::MongodbReplicationSet.backup_all
-        CloudModel::BackupCleanup.run_after_backup
+        total = CloudModel::Guest.count + CloudModel::MongodbReplicationSet.where(has_backups: true).count
+        with_tracked_backup_run total do
+          CloudModel::Guest.backup_all
+          CloudModel::MongodbReplicationSet.backup_all
+          CloudModel::BackupCleanup.run_after_backup
+        end
       end
     end
 

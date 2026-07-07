@@ -634,6 +634,8 @@ module CloudModel
             if defined?(ExceptionNotifier)
               ExceptionNotifier.notify_exception e, data: {guest: guest.name, guest_id: guest.id.to_s}
             end
+          ensure
+            CloudModel.current_backup_run&.subject_finished!
           end
         end
       end
