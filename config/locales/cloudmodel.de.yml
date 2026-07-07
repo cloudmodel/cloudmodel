@@ -390,6 +390,8 @@ de:
         state: Status
         monitoring_last_check_at: Zuletzt überwacht
         feature_compatibility_version: Funktionskompatibilität
+        has_backups: Backups aktiv?
+        last_successful_backup_at: Letztes Backup
       cloud_model/redis_sentinel_set:
         name: Setname
         services: Dienste
