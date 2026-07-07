@@ -125,6 +125,43 @@ module CloudModel
         end
       end
 
+      # Delete a single backup version. Re-points the `latest` link to the
+      # newest remaining backup (or drops it), and removes the whole backup
+      # directory once nothing is left — the next backup recreates it.
+      # @param timestamp [String] 14-digit backup timestamp
+      # @return [Boolean] whether the backup existed and was deleted
+      def delete_backup timestamp
+        unless timestamp.to_s =~ /\A[0-9]{14}\z/
+          raise ArgumentError, "invalid backup timestamp #{timestamp.inspect}"
+        end
+        dir = "#{backup_directory}/#{timestamp}"
+        return false unless File.directory? dir
+
+        FileUtils.rm_rf dir
+
+        link = "#{backup_directory}/latest"
+        begin
+          if File.symlink?(link) && File.basename(File.readlink(link)) == timestamp
+            File.delete link
+            if newest = list_backups.first
+              FileUtils.ln_s newest, link # relative — survives release pruning
+            end
+          end
+        rescue SystemCallError
+          nil
+        end
+
+        if list_backups.empty?
+          FileUtils.rm_f link
+          begin
+            Dir.rmdir backup_directory # only when truly empty — foreign files stay
+          rescue SystemCallError
+            nil
+          end
+        end
+        true
+      end
+
       # Returns backup timestamps that fall outside the retention policy and can
       # be safely deleted.
       # @return [Array<String>] timestamps eligible for deletion

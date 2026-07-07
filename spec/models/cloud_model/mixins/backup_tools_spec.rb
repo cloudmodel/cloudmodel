@@ -76,6 +76,58 @@ describe CloudModel::Mixins::BackupTools do
     end
   end
 
+  describe 'delete_backup' do
+    require 'tmpdir'
+
+    let(:root) { Dir.mktmpdir 'delete_backup' }
+    let(:model) do
+      model = TestBackupToolsModel.new
+      allow(model).to receive(:backup_directory).and_return "#{root}/subject"
+      model
+    end
+
+    after { FileUtils.remove_entry root }
+
+    def make_backup timestamp, link_latest: false
+      FileUtils.mkdir_p "#{root}/subject/#{timestamp}"
+      File.write "#{root}/subject/#{timestamp}/dump", 'data'
+      FileUtils.ln_sf timestamp, "#{root}/subject/latest" if link_latest
+    end
+
+    it 'deletes a version and re-points latest to the newest remaining one' do
+      make_backup '20240101000000'
+      make_backup '20240102000000', link_latest: true
+
+      expect(model.delete_backup('20240102000000')).to eq true
+      expect(File.directory?("#{root}/subject/20240102000000")).to eq false
+      expect(File.readlink("#{root}/subject/latest")).to eq '20240101000000'
+    end
+
+    it 'keeps latest untouched when deleting an older version' do
+      make_backup '20240101000000'
+      make_backup '20240102000000', link_latest: true
+
+      expect(model.delete_backup('20240101000000')).to eq true
+      expect(File.readlink("#{root}/subject/latest")).to eq '20240102000000'
+    end
+
+    it 'removes the whole directory when the last backup goes' do
+      make_backup '20240101000000', link_latest: true
+
+      expect(model.delete_backup('20240101000000')).to eq true
+      expect(File.exist?("#{root}/subject")).to eq false
+    end
+
+    it 'is false for versions that do not exist' do
+      FileUtils.mkdir_p "#{root}/subject"
+      expect(model.delete_backup('20240101000000')).to eq false
+    end
+
+    it 'rejects invalid timestamps' do
+      expect { model.delete_backup('../../etc') }.to raise_error ArgumentError
+    end
+  end
+
   describe 'backups_with_info' do
     it 'returns timestamps with size and latest flag, newest first' do
       allow(subject).to receive(:list_backups).and_return %w(20240102000000 20240101000000)
