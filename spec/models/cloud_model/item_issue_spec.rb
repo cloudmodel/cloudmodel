@@ -20,6 +20,12 @@ describe CloudModel::ItemIssue do
   it { expect(subject).to belong_to(:subject).with_polymorphism.with_optional }
   it { expect(subject).to have_field(:subject_chain_ids).of_type(Array).with_default_value_of [] }
 
+  it 'expires resolved issues via a TTL index after a year' do
+    index = CloudModel::ItemIssue.index_specifications.find { |spec| spec.key == {resolved_at: 1} }
+    expect(index).not_to be_nil
+    expect(index.options[:expire_after]).to eq 1.year.to_i
+  end
+
   describe '#open' do
     it 'should filter for open items' do
       scoped = double
