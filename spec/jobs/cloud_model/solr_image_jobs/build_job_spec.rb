@@ -6,6 +6,7 @@ describe CloudModel::SolrImageJobs::BuildJob do
 
   it 'finds the solr image, builds a SolrImageWorker and builds it in debug mode' do
     expect(CloudModel::SolrImage).to receive(:find).with('solr-id').and_return(solr_image)
+    allow(subject).to receive(:with_live_log).with(solr_image).and_yield
     expect(CloudModel::Workers::SolrImageWorker).to receive(:new).with(solr_image).and_return(worker)
     expect(worker).to receive(:build).with(debug: true)
 

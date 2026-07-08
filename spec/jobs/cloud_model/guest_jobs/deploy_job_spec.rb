@@ -6,6 +6,7 @@ describe CloudModel::GuestJobs::DeployJob do
 
   it 'finds the guest, builds a GuestWorker and deploys' do
     expect(CloudModel::Guest).to receive(:find).with('guest-id').and_return(guest)
+    allow(subject).to receive(:with_live_log).with(guest).and_yield
     expect(CloudModel::Workers::GuestWorker).to receive(:new).with(guest).and_return(worker)
     expect(worker).to receive(:deploy)
 

@@ -57,6 +57,7 @@ module CloudModel
 
     include Mongoid::Document
     include Mongoid::Timestamps
+    include CloudModel::Mixins::LiveLog
     include CloudModel::Mixins::ENumFields
     include CloudModel::Mixins::HasIssues
     prepend CloudModel::Mixins::SmartToString
