@@ -1341,7 +1341,7 @@ describe CloudModel::Guest do
   describe 'backup' do
     it 'should call backup on services with has_backups' do
       service = double 'service', has_backups: true, _type: 'TestService'
-      allow(service).to receive(:backup).and_return(true)
+      allow(service).to receive(:backup_with_state).and_return(true)
       services = double 'services'
       allow(services).to receive(:where).with(has_backups: true).and_return([service])
       allow(subject).to receive(:services).and_return(services)
@@ -1352,7 +1352,7 @@ describe CloudModel::Guest do
 
     it 'should raise a BackupError if any service backup fails' do
       service = double 'service', has_backups: true, _type: 'TestService'
-      allow(service).to receive(:backup).and_return(false)
+      allow(service).to receive(:backup_with_state).and_return(false)
       services = double 'services'
       allow(services).to receive(:where).with(has_backups: true).and_return([service])
       allow(subject).to receive(:services).and_return(services)
@@ -1368,13 +1368,13 @@ describe CloudModel::Guest do
       allow(subject).to receive(:lxd_custom_volumes).and_return(volumes)
       allow(Rails.logger).to receive(:debug)
 
-      expect(volume).to receive(:backup).and_return(true)
+      expect(volume).to receive(:backup_with_state).and_return(true)
       expect(subject.backup).to eq true
     end
 
     it 'should raise a BackupError if any volume backup fails' do
       volume = double 'volume', has_backups: true, mount_point: '/data'
-      allow(volume).to receive(:backup).and_return(false)
+      allow(volume).to receive(:backup_with_state).and_return(false)
       volumes = double 'volumes'
       allow(volumes).to receive(:where).with(has_backups: true).and_return([volume])
       allow(subject).to receive(:lxd_custom_volumes).and_return(volumes)

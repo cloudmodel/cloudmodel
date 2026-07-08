@@ -27,6 +27,27 @@ module CloudModel
     # backup workers), and a shared lock avoids lazy-init races.
     LOG_MUTEX = Mutex.new
 
+    # Machine-wide backup lock file. Concurrent backup runs (nightly cron,
+    # manual rake, single-subject delayed jobs) write into the same target
+    # datasets and dump dirs — they must never interleave. The rake task
+    # flocks this non-blocking (aborts), {#with_file_lock} waits.
+    def self.lock_file_path
+      "#{CloudModel.config.data_directory}/backup_run.lock"
+    end
+
+    # Hold the machine-wide backup lock while the block runs, waiting for a
+    # running backup (e.g. the nightly rake run) to finish first.
+    def self.with_file_lock
+      lock = File.open lock_file_path, File::CREAT, 0o644
+      lock.flock File::LOCK_EX
+      yield
+    ensure
+      if lock
+        lock.flock File::LOCK_UN
+        lock.close
+      end
+    end
+
     # Begin a new run: close stale unfinished runs (killed processes never
     # reach finish!) and prune old ones.
     # @return [CloudModel::BackupRun]

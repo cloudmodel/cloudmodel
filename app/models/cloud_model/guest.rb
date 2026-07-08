@@ -650,14 +650,14 @@ module CloudModel
 
       lxd_custom_volumes.where(has_backups: true).each do |volume|
         started = Time.now
-        ok = volume.backup
+        ok = volume.backup_with_state
         CloudModel.backup_log "volume #{volume.mount_point}: #{ok ? "done (#{(Time.now - started).round}s)" : 'FAILED'}"
         failed << "volume #{volume.mount_point}" unless ok
       end
 
       services.where(has_backups: true).each do |service|
         started = Time.now
-        ok = service.backup
+        ok = service.backup_with_state
         CloudModel.backup_log "#{service._type.demodulize.underscore}: #{ok ? "done (#{(Time.now - started).round}s)" : 'FAILED'}"
         failed << "service #{service._type}" unless ok
       end
