@@ -17,6 +17,15 @@ location <%= location %> {
     add_header                      Cache-Control public;
     access_log                      off;
   }
+  <%- if model.rails_cable_supported -%>
+
+  # ActionCable WebSocket: own app group with unlimited concurrency, so open
+  # sockets don't occupy regular Passenger app processes.
+  location <%= location.chomp('/') %>/cable {
+    passenger_app_group_name        <%= model.guest.name %>_cable;
+    passenger_force_max_concurrent_requests_per_process 0;
+  }
+  <%- end -%>
   <%- model.location_overwrites.each do |f| -%>
     <%- if f.location =~ /^#{location}/ -%>
 

@@ -21,6 +21,7 @@ describe CloudModel::Workers::GuestWorker do
       allow(guest).to receive(:update_attributes)
       allow(guest).to receive(:collection).and_return(double(update_one: true))
       allow(guest).to receive(:id).and_return(BSON::ObjectId.new)
+      allow(guest).to receive(:services).and_return([])
       allow(subject).to receive(:run_steps)
       allow(Rails.logger).to receive(:debug)
       lxc = double('lxc', name: 'test-lxc')

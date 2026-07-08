@@ -40,12 +40,29 @@ module CloudModel
       field :reverse_proxy_supported, type: Mongoid::Boolean, default: false
       field :reverse_proxy_for, type: String, default: nil
 
+      # Attribute changes fully covered by the rendered nginx config files —
+      # NginxWorker#sync_config can push them to the running guest without a
+      # redeploy. Everything else (ports/firewall, SSL certs, systemd units,
+      # web image, dependencies, web locations, …) only takes effect on the
+      # next deploy. Changes to embedded location_overwrites are live-syncable
+      # too; embedded web_locations are not (their app confs render at deploy).
+      LIVE_SYNCABLE_ATTRIBUTES = %w(
+        ssl_only ssl_enforce
+        unsafe_inline_script_allowed unsafe_eval_script_allowed
+        google_analytics_supported hubspot_forms_supported pingdom_supported
+        reverse_proxy_for passenger_env rails_cable_supported
+      ).freeze
+
       # Passenger support
       field :passenger_supported, type: Mongoid::Boolean, default: false
       field :passenger_env, type: String, default: 'production'
       field :passenger_ruby_version, type: String, default: CloudModel.config.ruby_version
       field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
       field :delayed_jobs_queues, type: Array, default: ['default']
+      # Serve /cable (Rails ActionCable WebSocket) in a dedicated Passenger app
+      # group with unlimited request concurrency, so open sockets don't pin
+      # regular app processes.
+      field :rails_cable_supported, type: Mongoid::Boolean, default: false
 
       # Deploy via capistrano
       field :capistrano_supported, type: Mongoid::Boolean, default: false

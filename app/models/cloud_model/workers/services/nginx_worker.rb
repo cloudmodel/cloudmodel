@@ -341,6 +341,113 @@ module CloudModel
           mkdir_p "#{@guest.deploy_path}#{log_dir_path}"
           @host.exec  "chmod -R 2770 #{@guest.deploy_path}#{log_dir_path}"
           @host.exec  "chown -R 101001:101001 #{@guest.deploy_path}#{log_dir_path}"
+
+          # Baseline for later live syncs: record what was deployed, so
+          # sync_config can tell manual edits on the guest from drift.
+          write_config_baseline_manifest
+        end
+
+        # Best-effort bookkeeping — a failed manifest write must never fail
+        # the deploy; the next sync then reports the files as unrecorded.
+        def write_config_baseline_manifest
+          write_config_manifest config_sync_plan
+        rescue => e
+          Rails.logger.warn "Could not write nginx config manifest: #{e.message}"
+        end
+
+        # Hash manifest of the last written nginx configs, kept on the guest.
+        # sync_config compares the live files against it to detect manual
+        # edits before overwriting anything.
+        CONFIG_MANIFEST_PATH = '/etc/nginx/.cloudmodel_manifest.json'
+
+        # The files a live config sync manages — the same set write_config
+        # renders. Deploy-only artefacts (web app location confs, systemd
+        # units, SSL files, …) are deliberately not part of this.
+        # @return [Array<Hash>] {template:, path:, content:, hash:}
+        def config_sync_plan
+          files = [
+            {template: '/cloud_model/guest/etc/nginx/nginx.conf', path: '/etc/nginx/nginx.conf'},
+            {template: '/cloud_model/guest/etc/nginx/sites-available/cloudmodel.conf', path: '/etc/nginx/sites-available/cloudmodel.conf'}
+          ]
+          if @model.web_locations.where(location: '/').count == 0
+            if @model.reverse_proxy_supported?
+              files << {template: '/cloud_model/guest/etc/nginx/server.d/proxy.conf', path: '/etc/nginx/server.d/proxy.conf'}
+            elsif @model.passenger_supported?
+              files << {template: '/cloud_model/guest/etc/nginx/server.d/passenger.conf', path: '/etc/nginx/server.d/passenger.conf'}
+            elsif @model.capistrano_supported?
+              files << {template: '/cloud_model/guest/etc/nginx/server.d/cap-deployed.conf', path: '/etc/nginx/server.d/cap-deployed.conf'}
+            end
+          end
+
+          files.each do |file|
+            # upload_to_guest/render_to_remote write via IO#puts — hash the
+            # content as it lands on disk (with trailing newline).
+            content = render file[:template], guest: @guest, model: @model
+            content += "\n" unless content.end_with? "\n"
+            file[:content] = content
+            file[:hash] = Digest::SHA256.hexdigest content
+          end
+        end
+
+        # Push the current nginx config to the RUNNING container without a
+        # redeploy. Refuses to touch files that differ from the recorded
+        # manifest (manually edited or never recorded) unless force is given.
+        # Validates with `nginx -t` — on failure the previous files are
+        # restored — and reloads nginx only when files actually changed.
+        #
+        # @param force [Boolean] overwrite manually edited/unrecorded files
+        # @return [Hash] {state: :applied|:unchanged|:blocked|:failed,
+        #   applied: [paths], blocked: [{path:, reason:}], output: String}
+        def sync_config force: false
+          manifest = read_config_manifest
+          plan = config_sync_plan.each do |file|
+            remote = remote_file_hash file[:path]
+            file[:state] = if remote.nil?
+              :missing # not on the guest yet -> just write it
+            elsif remote == file[:hash]
+              :unchanged
+            elsif manifest[file[:path]].nil?
+              :unrecorded # pre-manifest deploy -> unknown provenance
+            elsif remote != manifest[file[:path]]
+              :edited # manually changed on the guest
+            else
+              :changed
+            end
+          end
+
+          blocked = plan.select { |f| [:edited, :unrecorded].include? f[:state] }
+          if blocked.any? && !force
+            return {state: :blocked, applied: [],
+                    blocked: blocked.map { |f| {path: f[:path], reason: f[:state]} }}
+          end
+
+          to_write = plan.reject { |f| f[:state] == :unchanged }
+          if to_write.empty?
+            write_config_manifest plan
+            return {state: :unchanged, applied: [], blocked: []}
+          end
+
+          to_write.each do |file|
+            guest_sh "if [ -f #{file[:path].shellescape} ]; then cp -a #{file[:path].shellescape} #{file[:path].shellescape}.cm-bak; fi"
+            upload_to_guest file[:content], file[:path]
+          end
+
+          success, output = guest_sh 'nginx -t 2>&1'
+          unless success
+            to_write.each do |file|
+              guest_sh "if [ -f #{file[:path].shellescape}.cm-bak ]; then mv #{file[:path].shellescape}.cm-bak #{file[:path].shellescape}; else rm -f #{file[:path].shellescape}; fi"
+            end
+            return {state: :failed, applied: [], blocked: [], output: output}
+          end
+
+          success, output = guest_sh 'systemctl reload nginx 2>&1'
+          unless success
+            return {state: :failed, applied: [], blocked: [], output: output}
+          end
+
+          to_write.each { |file| guest_sh "rm -f #{file[:path].shellescape}.cm-bak" }
+          write_config_manifest plan
+          {state: :applied, applied: to_write.map { |f| f[:path] }, blocked: []}
         end
 
         def auto_restart
@@ -355,6 +462,35 @@ module CloudModel
           # Services::Ssh.new(@host, @options).write_config
 
           super
+        end
+
+        private
+
+        # Run a shell line inside the container — plain @guest.exec would let
+        # the HOST shell interpret operators like `&&` after `lxc exec` ends.
+        def guest_sh command
+          @guest.exec "sh -c #{command.shellescape}"
+        end
+
+        # @return [String, nil] SHA256 of the file on the guest, nil if absent
+        def remote_file_hash path
+          success, output = guest_sh "sha256sum #{path.shellescape}"
+          return nil unless success
+          output.split(' ').first
+        end
+
+        # @return [Hash{String => String}] path => sha256 of the last write
+        def read_config_manifest
+          success, output = guest_sh "cat #{CONFIG_MANIFEST_PATH.shellescape}"
+          return {} unless success
+          JSON.parse output
+        rescue JSON::ParserError
+          {}
+        end
+
+        def write_config_manifest plan
+          manifest = plan.to_h { |file| [file[:path], file[:hash]] }
+          upload_to_guest JSON.pretty_generate(manifest), CONFIG_MANIFEST_PATH
         end
       end
     end

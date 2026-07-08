@@ -101,4 +101,22 @@ RSpec.describe 'cloud_model/guest/etc/nginx/server_d/passenger_conf', type: :vie
     CONF
     )
   end
+  it 'renders the ActionCable location when rails_cable_supported' do
+    model.rails_cable_supported = true
+    allow(model).to receive(:guest).and_return(CloudModel::Guest.new(name: 'app01'))
+
+    render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
+
+    expect(rendered).to include "  location /cable {\n" \
+      "    passenger_app_group_name        app01_cable;\n" \
+      "    passenger_force_max_concurrent_requests_per_process 0;\n" \
+      "  }\n"
+  end
+
+  it 'renders no cable location by default' do
+    render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
+
+    expect(rendered).not_to include '/cable'
+  end
+
 end

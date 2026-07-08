@@ -41,6 +41,24 @@ module CloudModel
       #     by {#components_needed})
       field :additional_components, type: Array, default: []
 
+      # @!attribute [rw] config_staged_at
+      #   @return [Time, nil] set when the stored configuration was changed while
+      #     the guest was already deployed and the change was not applied live —
+      #     i.e. the running guest does not reflect the stored config. Cleared by
+      #     a successful deploy (and, for nginx, by a successful live config sync
+      #     when no deploy-only change is pending).
+      field :config_staged_at, type: Time
+      # @!attribute [rw] config_staged_deploy_required
+      #   @return [Boolean] true when the staged change needs a full redeploy
+      #     (systemd units, web image, dependencies, …) — a live config sync is
+      #     not enough then
+      field :config_staged_deploy_required, type: Mongoid::Boolean, default: false
+
+      # The running guest does not reflect the stored config yet?
+      def config_staged?
+        !config_staged_at.nil?
+      end
+
       embedded_in :guest, class_name: "CloudModel::Guest", inverse_of: :services
 
       # Reject exposing service types that must never be reachable from public
