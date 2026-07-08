@@ -9,6 +9,11 @@ module CloudModel
     #   keeps the console quiet — the output only reaches the sink
     def self.capture sink, passthrough: true
       original = $stdout
+      # A nested capture must keep feeding the outer one — only the OUTERMOST
+      # capture decides whether the terminal sees the output. Without this a
+      # quiet inner capture (e.g. a per-guest rollout log inside a web image
+      # rollout) would starve the outer log.
+      passthrough = true if original.is_a? self
       $stdout = new(original, sink, passthrough: passthrough)
       yield
     ensure

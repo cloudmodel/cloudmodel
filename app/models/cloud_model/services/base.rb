@@ -21,6 +21,7 @@ module CloudModel
       field :last_successful_backup_at, type: Time
       include CloudModel::Mixins::Backupable
       include CloudModel::Mixins::HasIssues
+      include CloudModel::Mixins::LiveLog
 
       # @!attribute [rw] name
       #   @return [String, nil] optional human-readable label for this service instance
