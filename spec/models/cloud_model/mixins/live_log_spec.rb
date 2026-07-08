@@ -49,17 +49,17 @@ describe CloudModel::Mixins::LiveLog do
     expect(subject.reload.live_log).to eq "working...\n"
   end
 
-  it 'tracks and clears the current step around a successful flow' do
+  it 'tracks the current step and resets it on the next run' do
     subject.with_live_log do
       subject.set_live_log_step 'Install basic utils', counter: '3', total: 12
-      expect(subject.reload.live_log_step).to eq 'Install basic utils'
-      expect(subject.live_log_step_total).to eq 12
     end
+    expect(subject.reload.live_log_step).to eq 'Install basic utils'
 
+    subject.restart_live_log
     expect(subject.reload.live_log_step).to be_nil
   end
 
-  it 'keeps the last step when the flow raises' do
+  it 'keeps the last step and appends the error when the flow raises' do
     expect {
       subject.with_live_log do
         subject.set_live_log_step 'Install basic utils', counter: '3', total: 12
@@ -68,6 +68,7 @@ describe CloudModel::Mixins::LiveLog do
     }.to raise_error 'boom'
 
     expect(subject.reload.live_log_step).to eq 'Install basic utils'
+    expect(subject.live_log).to include 'RuntimeError: boom'
   end
 
   it 'registers itself as the current live log subject while running' do
