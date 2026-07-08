@@ -10,12 +10,14 @@ module CloudModel
       class NginxComponentWorker < BaseComponentWorker
         def _prepare_passenger_repository build_path
           chroot! build_path, "apt-get install dirmngr gnupg -y", "Failed to install key management"
-          # Phusion signs the repo with a ROTATING "automatic software
-          # signing" key — fetch the current one from Phusion into a
-          # signed-by keyring. The former fixed key (561F9B9CAC40B2F7 via
-          # keyserver + deprecated apt-key) no longer verifies the repo.
+          # Phusion rotated its "automatic software signing" key in 2025 (the
+          # repo Release files are signed with it since 2026-07); the old URL
+          # still serves the expired 2013 key, so fetch the -2025 key — plus
+          # the legacy one for older dists — into a signed-by keyring. The
+          # former keyserver fetch via deprecated apt-key got the stale copy.
           chroot! build_path,
-            "sh -c 'curl -sSLf https://oss-binaries.phusionpassenger.com/auto-software-signing-gpg-key.txt | gpg --dearmor -o /usr/share/keyrings/phusion.gpg'",
+            "curl -sSLf https://oss-binaries.phusionpassenger.com/auto-software-signing-gpg-key-2025.txt | gpg --dearmor > /usr/share/keyrings/phusion.gpg && " \
+            "curl -sSLf https://oss-binaries.phusionpassenger.com/auto-software-signing-gpg-key.txt | gpg --dearmor >> /usr/share/keyrings/phusion.gpg",
             "Failed to add phusion signing key"
           render_to_remote "/cloud_model/guest/etc/apt/sources.list.d/passenger.list", "#{build_path}/etc/apt/sources.list.d/passenger.list", 600, template: @template
         end
