@@ -313,7 +313,12 @@ module CloudModel
           return false
         end
 
-        worker.redeploy_web_image options
+        # Per-instance console: the rollout details land on this nginx
+        # service, while the web image build_log keeps its summary lines.
+        # Nested captures propagate outward via StdoutTee.
+        with_live_log verbose: options[:verbose] do
+          worker.redeploy_web_image options
+        end
       end
 
     end
