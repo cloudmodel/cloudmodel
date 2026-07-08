@@ -10,7 +10,13 @@ module CloudModel
       class NginxComponentWorker < BaseComponentWorker
         def _prepare_passenger_repository build_path
           chroot! build_path, "apt-get install dirmngr gnupg -y", "Failed to install key management"
-          chroot! build_path, "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 561F9B9CAC40B2F7", "Failed to add fusion key"
+          # Phusion signs the repo with a ROTATING "automatic software
+          # signing" key — fetch the current one from Phusion into a
+          # signed-by keyring. The former fixed key (561F9B9CAC40B2F7 via
+          # keyserver + deprecated apt-key) no longer verifies the repo.
+          chroot! build_path,
+            "sh -c 'curl -sSLf https://oss-binaries.phusionpassenger.com/auto-software-signing-gpg-key.txt | gpg --dearmor -o /usr/share/keyrings/phusion.gpg'",
+            "Failed to add phusion signing key"
           render_to_remote "/cloud_model/guest/etc/apt/sources.list.d/passenger.list", "#{build_path}/etc/apt/sources.list.d/passenger.list", 600, template: @template
         end
 
