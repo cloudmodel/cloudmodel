@@ -62,9 +62,16 @@ server {
   <%- if model.ssl_enforce? or model.ssl_only? -%>
   add_header                    Strict-Transport-Security max-age=63072000 always;
   <%- end -%>
+<%- if model.ssl_certbot? && defined?(certbot_cert_available) && certbot_cert_available -%>
+  ssl_certificate               /etc/letsencrypt/live/<%= guest.external_hostname %>/fullchain.pem;
+  ssl_certificate_key           /etc/letsencrypt/live/<%= guest.external_hostname %>/privkey.pem;
+<%- else -%>
   ssl_certificate               ssl/<%= guest.external_hostname %>.crt;
   ssl_certificate_key           ssl/<%= guest.external_hostname %>.key;
+<%- end -%>
+<%- unless model.ssl_certbot? -%>
   ssl_client_certificate        ssl/<%= guest.external_hostname %>.ca.crt;
+<%- end -%>
   ssl_dhparam                   ssl/dhparam.pem;
   ssl_session_timeout           10m;
 

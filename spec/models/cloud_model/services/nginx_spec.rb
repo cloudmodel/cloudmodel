@@ -272,4 +272,32 @@ describe CloudModel::Services::Nginx do
       expect(worker).to have_received(:redeploy_web_image)
     end
   end
+  describe 'ssl cert handling with certbot' do
+    it 'clears a selected certificate when certbot is enabled' do
+      subject.ssl_supported = true
+      subject.ssl_certbot = true
+      subject.ssl_cert_id = BSON::ObjectId.new
+
+      subject.valid?
+      expect(subject.ssl_cert_id).to be_nil
+    end
+
+    it 'requires a certificate for manual ssl without certbot' do
+      subject.ssl_supported = true
+      subject.ssl_certbot = false
+      subject.ssl_cert = nil
+
+      subject.valid?
+      expect(subject.errors[:ssl_cert]).not_to be_empty
+    end
+
+    it 'does not require a certificate with certbot' do
+      subject.ssl_supported = true
+      subject.ssl_certbot = true
+
+      subject.valid?
+      expect(subject.errors[:ssl_cert]).to be_empty
+    end
+  end
+
 end
