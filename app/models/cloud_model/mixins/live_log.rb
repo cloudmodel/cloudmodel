@@ -25,6 +25,7 @@ module CloudModel
 
       # Begin a fresh console for a new flow run.
       def restart_live_log
+        @live_log_pending_restart = false
         @live_log_buffer = +''
         @live_log_flushed_at = nil
         self.live_log = ''
@@ -36,8 +37,17 @@ module CloudModel
         Rails.logger.warn "Could not restart live log: #{e.message}"
       end
 
+      # First real activity of a pending flow performs the deferred restart
+      # (see with_live_log).
+      def ensure_live_log_started
+        return unless @live_log_pending_restart
+        @live_log_pending_restart = false
+        restart_live_log
+      end
+
       # Record the flow's current numbered step (nil clears it).
       def set_live_log_step step, counter: nil, total: nil
+        ensure_live_log_started
         self.live_log_step = step
         self.live_log_step_counter = counter
         self.live_log_step_total = total
@@ -47,6 +57,7 @@ module CloudModel
       end
 
       def append_live_log text
+        ensure_live_log_started
         @live_log_buffer = "#{@live_log_buffer}#{text}"
         if @live_log_flushed_at.nil? || Time.now - @live_log_flushed_at >= FLUSH_INTERVAL
           flush_live_log
@@ -59,7 +70,11 @@ module CloudModel
       # web); verbose: true additionally passes the output through to stdout
       # (interactive console runs, the delayed_job logfile).
       def with_live_log verbose: false
-        restart_live_log
+        # Restart lazily on the FIRST output: delayed_job retries a raised
+        # flow, and the retry immediately refuses to run (state already
+        # failed) — an eager restart would wipe the previous attempt's log,
+        # which is exactly what you need to debug the failure.
+        @live_log_pending_restart = true
         previous_subject = CloudModel.current_live_log_subject
         CloudModel.current_live_log_subject = self
         CloudModel::StdoutTee.capture ->(text) { append_live_log text }, passthrough: verbose do
