@@ -56,6 +56,37 @@ en:
     finished: Finished
     failed: Failed to deploy
 
+  cloud_model/web_image/redeploy_step:
+    unroll: Unpacking
+    transfer: Transferring
+    permissions: Setting permissions
+    activate: Activating
+    restart: Restarting application
+    done: Done
+
+  cloud_model/guest_template/build_state: &template_build_state
+    not_started: Not started
+    pending: Scheduled for execution
+    running: Building
+    packaging: Packaging
+    downloading: Downloading
+    finished: Finished
+    failed: Failed to build
+
+  cloud_model/guest_core_template/build_state: *template_build_state
+
+  cloud_model/host_template/build_state: *template_build_state
+
+  cloud_model/solr_image/build_state:
+    not_started: Not started
+    pending: Scheduled for execution
+    running: Building
+    checking_out: Checking out
+    packaging: Packaging
+    storing: Storing data
+    finished: Finished
+    failed: Failed to build
+
   cloud_model/services/nginx/redeploy_web_image_state:
     undefined: undefined
     not_started: Not started
