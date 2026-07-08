@@ -266,16 +266,34 @@ module CloudModel
             ssl_base_dir = File.expand_path("etc/nginx/ssl", @guest.deploy_path)
             mkdir_p ssl_base_dir
 
-            @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.crt", ssl_base_dir), 'w') do |f|
-              f.write @model.ssl_cert.crt
-            end
+            if @model.ssl_cert
+              @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.crt", ssl_base_dir), 'w') do |f|
+                f.write @model.ssl_cert.crt
+              end
 
-            @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.key", ssl_base_dir), 'w') do |f|
-              f.write @model.ssl_cert.key
-            end
+              @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.key", ssl_base_dir), 'w') do |f|
+                f.write @model.ssl_cert.key
+              end
 
-            @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.ca.crt", ssl_base_dir), 'w') do |f|
-              f.write @model.ssl_cert.ca
+              @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.ca.crt", ssl_base_dir), 'w') do |f|
+                f.write @model.ssl_cert.ca
+              end
+            elsif @model.ssl_certbot?
+              # No cert record needed with certbot: write a self-signed
+              # bootstrap cert so nginx can start; certbot replaces it via
+              # ExecStartPost (certbot_init.conf) on first start.
+              comment_sub_step "Generate self-signed bootstrap cert for certbot"
+              hostname = @guest.external_hostname.shellescape
+              chroot! @guest.deploy_path,
+                "openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 30 " \
+                "-subj '/CN=#{hostname}' " \
+                "-keyout /etc/nginx/ssl/#{hostname}.key -out /etc/nginx/ssl/#{hostname}.crt",
+                "Failed to generate bootstrap cert"
+              @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.ca.crt", ssl_base_dir), 'w') do |f|
+                f.write ''
+              end
+            else
+              raise "nginx service '#{@model.name}' has ssl_supported but neither ssl_cert nor ssl_certbot set"
             end
 
             host_source_dir = "/inst/hosts_by_ip/#{@guest.private_address}"
