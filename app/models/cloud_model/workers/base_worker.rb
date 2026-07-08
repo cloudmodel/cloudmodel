@@ -404,6 +404,10 @@ module CloudModel
 
           print "#{' ' * current_indent}(#{counter_prefix}#{counter}) #{step[0]} "
           Rails.logger.debug "STEP START: (#{counter_prefix}#{counter}) #{step[0]}"
+          # Live progress for the admin state displays; total only for the
+          # top level — nested counters read "3.1" instead.
+          CloudModel.current_live_log_subject&.set_live_log_step step[0],
+            counter: "#{counter_prefix}#{counter}", total: (counter_prefix.blank? ? steps.size : nil)
 
           if skip_to > counter and not (step[2] and step[2][:no_skip])
             if step[2] and step[2][:on_skip]
