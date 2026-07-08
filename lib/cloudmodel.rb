@@ -48,6 +48,17 @@ module CloudModel
     @current_backup_run
   end
 
+  # The subject whose live console (Mixins::LiveLog#with_live_log) is
+  # currently capturing — BaseWorker#run_steps reports its numbered steps to
+  # it so the admin UI can show "building — (3/12) Install basic utils".
+  def self.current_live_log_subject
+    @current_live_log_subject
+  end
+
+  def self.current_live_log_subject= subject
+    @current_live_log_subject = subject
+  end
+
   def self.current_backup_run= run
     @current_backup_run = run
   end

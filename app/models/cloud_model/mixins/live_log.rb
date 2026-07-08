@@ -15,6 +15,12 @@ module CloudModel
       def self.included(base)
         base.field :live_log, type: String, default: ''
         base.field :live_log_started_at, type: Time
+        # Current numbered step of the running flow (see BaseWorker#run_steps)
+        # — "(3/12) Install basic utils" in the admin state displays. Kept on
+        # failure (shows WHERE it failed), cleared on success and restart.
+        base.field :live_log_step, type: String
+        base.field :live_log_step_counter, type: String
+        base.field :live_log_step_total, type: Integer
       end
 
       # Begin a fresh console for a new flow run.
@@ -23,9 +29,21 @@ module CloudModel
         @live_log_flushed_at = nil
         self.live_log = ''
         self.live_log_started_at = Time.now
-        set live_log: '', live_log_started_at: live_log_started_at
+        self.live_log_step = self.live_log_step_counter = self.live_log_step_total = nil
+        set live_log: '', live_log_started_at: live_log_started_at,
+            live_log_step: nil, live_log_step_counter: nil, live_log_step_total: nil
       rescue => e
         Rails.logger.warn "Could not restart live log: #{e.message}"
+      end
+
+      # Record the flow's current numbered step (nil clears it).
+      def set_live_log_step step, counter: nil, total: nil
+        self.live_log_step = step
+        self.live_log_step_counter = counter
+        self.live_log_step_total = total
+        set live_log_step: step, live_log_step_counter: counter, live_log_step_total: total
+      rescue => e
+        Rails.logger.warn "Could not record live log step: #{e.message}"
       end
 
       def append_live_log text
@@ -42,10 +60,17 @@ module CloudModel
       # (interactive console runs, the delayed_job logfile).
       def with_live_log verbose: false
         restart_live_log
-        CloudModel::StdoutTee.capture ->(text) { append_live_log text }, passthrough: verbose do
+        previous_subject = CloudModel.current_live_log_subject
+        CloudModel.current_live_log_subject = self
+        result = CloudModel::StdoutTee.capture ->(text) { append_live_log text }, passthrough: verbose do
           yield
         end
+        # Only reached without an exception: a failed flow keeps its last
+        # step visible ("failed — (3) Install basic utils").
+        set_live_log_step nil
+        result
       ensure
+        CloudModel.current_live_log_subject = previous_subject
         flush_live_log
       end
 

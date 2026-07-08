@@ -49,6 +49,35 @@ describe CloudModel::Mixins::LiveLog do
     expect(subject.reload.live_log).to eq "working...\n"
   end
 
+  it 'tracks and clears the current step around a successful flow' do
+    subject.with_live_log do
+      subject.set_live_log_step 'Install basic utils', counter: '3', total: 12
+      expect(subject.reload.live_log_step).to eq 'Install basic utils'
+      expect(subject.live_log_step_total).to eq 12
+    end
+
+    expect(subject.reload.live_log_step).to be_nil
+  end
+
+  it 'keeps the last step when the flow raises' do
+    expect {
+      subject.with_live_log do
+        subject.set_live_log_step 'Install basic utils', counter: '3', total: 12
+        raise 'boom'
+      end
+    }.to raise_error 'boom'
+
+    expect(subject.reload.live_log_step).to eq 'Install basic utils'
+  end
+
+  it 'registers itself as the current live log subject while running' do
+    seen = nil
+    subject.with_live_log { seen = CloudModel.current_live_log_subject }
+
+    expect(seen).to eq subject
+    expect(CloudModel.current_live_log_subject).to be_nil
+  end
+
   it 'never raises on bookkeeping errors' do
     subject.restart_live_log
     allow(subject).to receive(:set).and_raise('db gone')
