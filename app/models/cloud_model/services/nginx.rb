@@ -28,6 +28,12 @@ module CloudModel
       field :ssl_port, type: Integer, default: 443
       field :ssl_certbot, type: Mongoid::Boolean, default: false
       belongs_to :ssl_cert, class_name: CloudModel::Certificate, inverse_of: :services, optional: true
+      # With Let's Encrypt the cert is certbot's business: no preselected
+      # certificate — the deploy bootstraps a self-signed one so nginx comes
+      # up at all (no ssl listener without cert files, no running nginx no
+      # ACME challenge) and certbot replaces it on first start.
+      before_validation :clear_ssl_cert_for_certbot
+      validates :ssl_cert, presence: true, if: -> { ssl_supported? && !ssl_certbot? }
 
       # Content Security Policies
       field :unsafe_inline_script_allowed, type: Mongoid::Boolean, default: false
@@ -306,6 +312,10 @@ module CloudModel
           guest.host.exec!("echo '#{ssl_cert.crt}' | lxc file push - #{guest.current_lxd_container.name}/etc/nginx/ssl/#{guest.external_hostname}.crt", "Failed to copy crt")
           guest.host.exec!("lxc exec #{guest.current_lxd_container.name} -- systemctl reload nginx", "Failed to reload nginx")
         end
+      end
+
+      def clear_ssl_cert_for_certbot
+        self.ssl_cert_id = nil if ssl_certbot?
       end
 
       def redeploy!(options = {})

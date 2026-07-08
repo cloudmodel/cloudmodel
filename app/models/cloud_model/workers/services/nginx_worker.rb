@@ -266,7 +266,20 @@ module CloudModel
             ssl_base_dir = File.expand_path("etc/nginx/ssl", @guest.deploy_path)
             mkdir_p ssl_base_dir
 
-            if @model.ssl_cert
+            if @model.ssl_certbot?
+              # Certbot manages the cert — never preinstall a managed one.
+              # Write a self-signed bootstrap cert so nginx can start at all
+              # (no ssl listener without cert files, and without a running
+              # nginx no ACME challenge); certbot replaces it via
+              # ExecStartPost (certbot_init.conf) on first start.
+              comment_sub_step "Generate self-signed bootstrap cert for certbot"
+              hostname = @guest.external_hostname.shellescape
+              chroot! @guest.deploy_path,
+                "openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 30 " \
+                "-subj '/CN=#{hostname}' " \
+                "-keyout /etc/nginx/ssl/#{hostname}.key -out /etc/nginx/ssl/#{hostname}.crt",
+                "Failed to generate bootstrap cert"
+            elsif @model.ssl_cert
               @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.crt", ssl_base_dir), 'w') do |f|
                 f.write @model.ssl_cert.crt
               end
@@ -277,20 +290,6 @@ module CloudModel
 
               @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.ca.crt", ssl_base_dir), 'w') do |f|
                 f.write @model.ssl_cert.ca
-              end
-            elsif @model.ssl_certbot?
-              # No cert record needed with certbot: write a self-signed
-              # bootstrap cert so nginx can start; certbot replaces it via
-              # ExecStartPost (certbot_init.conf) on first start.
-              comment_sub_step "Generate self-signed bootstrap cert for certbot"
-              hostname = @guest.external_hostname.shellescape
-              chroot! @guest.deploy_path,
-                "openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 30 " \
-                "-subj '/CN=#{hostname}' " \
-                "-keyout /etc/nginx/ssl/#{hostname}.key -out /etc/nginx/ssl/#{hostname}.crt",
-                "Failed to generate bootstrap cert"
-              @host.sftp.file.open(File.expand_path("#{@guest.external_hostname}.ca.crt", ssl_base_dir), 'w') do |f|
-                f.write ''
               end
             else
               raise "nginx service '#{@model.name}' has ssl_supported but neither ssl_cert nor ssl_certbot set"
@@ -350,7 +349,9 @@ module CloudModel
         # Best-effort bookkeeping — a failed manifest write must never fail
         # the deploy; the next sync then reports the files as unrecorded.
         def write_config_baseline_manifest
-          write_config_manifest config_sync_plan
+          # Hash what THIS deploy wrote: a fresh container never has the
+          # certbot cert yet, so the config was rendered with the bootstrap.
+          write_config_manifest config_sync_plan(certbot_cert_available: false)
         rescue => e
           Rails.logger.warn "Could not write nginx config manifest: #{e.message}"
         end
@@ -364,7 +365,7 @@ module CloudModel
         # renders. Deploy-only artefacts (web app location confs, systemd
         # units, SSL files, …) are deliberately not part of this.
         # @return [Array<Hash>] {template:, path:, content:, hash:}
-        def config_sync_plan
+        def config_sync_plan certbot_cert_available: nil
           files = [
             {template: '/cloud_model/guest/etc/nginx/nginx.conf', path: '/etc/nginx/nginx.conf'},
             {template: '/cloud_model/guest/etc/nginx/sites-available/cloudmodel.conf', path: '/etc/nginx/sites-available/cloudmodel.conf'}
@@ -379,14 +380,28 @@ module CloudModel
             end
           end
 
+          certbot_cert = certbot_cert_available.nil? ? certbot_cert_available? : certbot_cert_available
           files.each do |file|
             # upload_to_guest/render_to_remote write via IO#puts — hash the
             # content as it lands on disk (with trailing newline).
-            content = render file[:template], guest: @guest, model: @model
+            content = render file[:template], guest: @guest, model: @model, certbot_cert_available: certbot_cert
             content += "\n" unless content.end_with? "\n"
             file[:content] = content
             file[:hash] = Digest::SHA256.hexdigest content
           end
+        end
+
+        # Certbot manages its cert under /etc/letsencrypt on the RUNNING
+        # guest — when it is already there, the rendered config references it
+        # directly instead of the self-signed bootstrap (which only exists so
+        # a fresh nginx can start and answer the ACME challenge).
+        def certbot_cert_available?
+          return false unless @model.ssl_certbot?
+          success, _out = guest_sh "test -f /etc/letsencrypt/live/#{@guest.external_hostname.shellescape}/fullchain.pem"
+          !!success
+        rescue => e
+          Rails.logger.warn "Could not check for certbot cert: #{e.message}"
+          false
         end
 
         # Push the current nginx config to the RUNNING container without a
