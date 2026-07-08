@@ -79,6 +79,14 @@ describe CloudModel::Mixins::LiveLog do
     expect(CloudModel.current_live_log_subject).to be_nil
   end
 
+  it 'keeps the previous log when a run produces no output (refused retry)' do
+    subject.with_live_log { puts 'first attempt' }
+    expect(subject.reload.live_log).to eq "first attempt\n"
+
+    subject.with_live_log { false } # e.g. build_state already failed -> no-op
+    expect(subject.reload.live_log).to eq "first attempt\n"
+  end
+
   it 'never raises on bookkeeping errors' do
     subject.restart_live_log
     allow(subject).to receive(:set).and_raise('db gone')
