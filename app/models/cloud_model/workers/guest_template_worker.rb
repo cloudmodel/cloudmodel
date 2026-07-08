@@ -36,6 +36,9 @@ module CloudModel
         comment_sub_step 'Install rsync, wget, and curl'
         chroot! build_path, "apt-get install sudo rsync wget curl -y", "Failed to install rsync, wget, and curl"
 
+        comment_sub_step 'Install zstd'
+        chroot! build_path, "apt-get install zstd -y", "Failed to install zstd"
+
         comment_sub_step 'Install nano editor'
         chroot! build_path, "apt-get install sudo nano -y", "Failed to install nano"
 
