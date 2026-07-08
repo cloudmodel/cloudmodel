@@ -62,13 +62,18 @@ module CloudModel
         restart_live_log
         previous_subject = CloudModel.current_live_log_subject
         CloudModel.current_live_log_subject = self
-        result = CloudModel::StdoutTee.capture ->(text) { append_live_log text }, passthrough: verbose do
+        CloudModel::StdoutTee.capture ->(text) { append_live_log text }, passthrough: verbose do
           yield
+        rescue Exception => e
+          # The failure reason belongs in the console too — workers that
+          # don't catch the error would otherwise leave the log ending
+          # mid-step while the message only reaches the *_last_issue field.
+          append_live_log "\n#{e.class}: #{e.message}\n"
+          raise
         end
-        # Only reached without an exception: a failed flow keeps its last
-        # step visible ("failed — (3) Install basic utils").
-        set_live_log_step nil
-        result
+        # The step fields stay as they are: the last step of a FAILED flow
+        # shows where it failed; the state displays skip the step once the
+        # flow finished successfully.
       ensure
         CloudModel.current_live_log_subject = previous_subject
         flush_live_log
