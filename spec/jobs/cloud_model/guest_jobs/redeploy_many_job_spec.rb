@@ -1,6 +1,8 @@
 require 'spec_helper'
 
 describe CloudModel::GuestJobs::RedeployManyJob do
+  before { allow(subject).to receive(:with_live_log) { |_subject, &block| block.call } }
+
   let(:guest_a) { double CloudModel::Guest, deploy_state: :pending, host_id: 'host-1', name: 'guest-a' }
   let(:guest_b) { double CloudModel::Guest, deploy_state: :pending, host_id: 'host-1', name: 'guest-b' }
   let(:guest_other_host) { double CloudModel::Guest, deploy_state: :pending, host_id: 'host-2', name: 'guest-c' }

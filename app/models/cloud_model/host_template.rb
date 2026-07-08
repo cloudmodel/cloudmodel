@@ -8,6 +8,7 @@ module CloudModel
   class HostTemplate
     include Mongoid::Document
     include Mongoid::Timestamps
+    include CloudModel::Mixins::LiveLog
     include CloudModel::Mixins::ENumFields
     prepend CloudModel::Mixins::SmartToString
 

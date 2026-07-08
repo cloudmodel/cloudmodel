@@ -6,6 +6,7 @@ describe CloudModel::HostJobs::RedeployJob do
 
   it 'finds the host, builds a HostWorker and redeploys' do
     expect(CloudModel::Host).to receive(:find).with('host-id').and_return(host)
+    allow(subject).to receive(:with_live_log).with(host).and_yield
     expect(CloudModel::Workers::HostWorker).to receive(:new).with(host).and_return(worker)
     expect(worker).to receive(:redeploy)
 

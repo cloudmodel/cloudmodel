@@ -4,9 +4,9 @@ module CloudModel
       def perform(template_id, host_id)
         host = CloudModel::Host.find(host_id)
         template = CloudModel::HostTemplate.find(template_id)
-        host_template_worker = CloudModel::Workers::HostTemplateWorker.new host
-
-        host_template_worker.build_template template, debug: true
+        with_live_log template do
+          CloudModel::Workers::HostTemplateWorker.new(host).build_template template, debug: true
+        end
       end
     end
   end

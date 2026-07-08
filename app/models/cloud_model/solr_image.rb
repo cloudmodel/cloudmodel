@@ -12,6 +12,7 @@ module CloudModel
   class SolrImage
     include Mongoid::Document
     include Mongoid::Timestamps
+    include CloudModel::Mixins::LiveLog
     include CloudModel::Mixins::UsedInGuestsAs
     include CloudModel::Mixins::ENumFields
     include CloudModel::Mixins::HasIssues
