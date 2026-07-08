@@ -16,7 +16,7 @@ module CloudModel
           puts "** Deploy on Host #{host_id}"
           guests.each do |guest|
             puts "=> Redeploy Guest '#{guest.name}'"
-            with_live_log guest do
+            guest.with_live_log verbose: true do
               CloudModel::Workers::GuestWorker.new(guest).redeploy
             end
           end

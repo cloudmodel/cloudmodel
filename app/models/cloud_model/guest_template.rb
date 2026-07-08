@@ -98,7 +98,9 @@ module CloudModel
 
       self.build_state = :pending
 
-      worker(host).build_template self, options
+      with_live_log verbose: options[:verbose] do
+        worker(host).build_template self, options
+      end
     end
 
     # Maps the stored arch to the LXD architecture string.

@@ -139,7 +139,9 @@ module CloudModel
 
       self.build_state = :pending
 
-      worker.build options
+      with_live_log verbose: options[:verbose] do
+        worker.build options
+      end
     end
   end
 end

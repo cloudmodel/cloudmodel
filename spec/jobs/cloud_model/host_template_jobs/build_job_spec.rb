@@ -7,7 +7,7 @@ describe CloudModel::HostTemplateJobs::BuildJob do
 
   it 'finds host and template, then builds the host template in debug mode' do
     expect(CloudModel::Host).to receive(:find).with('host-id').and_return(host)
-    allow(subject).to receive(:with_live_log).with(template).and_yield
+    allow(template).to receive(:with_live_log).and_yield
     expect(CloudModel::HostTemplate).to receive(:find).with('template-id').and_return(template)
     expect(CloudModel::Workers::HostTemplateWorker).to receive(:new).with(host).and_return(worker)
     expect(worker).to receive(:build_template).with(template, debug: true)
