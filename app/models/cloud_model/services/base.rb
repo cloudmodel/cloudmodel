@@ -53,6 +53,11 @@ module CloudModel
       #     (systemd units, web image, dependencies, …) — a live config sync is
       #     not enough then
       field :config_staged_deploy_required, type: Mongoid::Boolean, default: false
+      # @!attribute [rw] config_staged_changes
+      #   @return [Array<String>] the attribute names whose staged changes need
+      #     the deploy — shown in the admin UI so a stale/false marker is
+      #     recognizable instead of a bare "deploy required"
+      field :config_staged_changes, type: Array, default: []
 
       # The running guest does not reflect the stored config yet?
       def config_staged?

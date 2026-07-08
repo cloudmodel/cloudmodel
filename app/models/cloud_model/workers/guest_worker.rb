@@ -252,7 +252,7 @@ module CloudModel
 
         # The fresh deploy reflects the stored config — clear staged markers.
         guest.services.each do |service|
-          service.set config_staged_at: nil, config_staged_deploy_required: false if service.config_staged?
+          service.set config_staged_at: nil, config_staged_deploy_required: false, config_staged_changes: [] if service.config_staged?
         end
 
         puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"
