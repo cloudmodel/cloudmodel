@@ -250,6 +250,11 @@ module CloudModel
         guest.collection.update_one({_id:  guest.id}, '$set' => { 'deploy_state_id': 0xf0, 'last_deploy_finished_at': Time.now })
         #guest.update_attribute :deploy_state, :finished
 
+        # The fresh deploy reflects the stored config — clear staged markers.
+        guest.services.each do |service|
+          service.set config_staged_at: nil, config_staged_deploy_required: false if service.config_staged?
+        end
+
         puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"
         Rails.logger.debug "GUEST_WORKER: Deploy guest #{guest.name} on container #{@lxc.name} done in #{Time.now - build_start_at}"
       end
