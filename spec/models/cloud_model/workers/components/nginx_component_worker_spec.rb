@@ -17,7 +17,7 @@ describe CloudModel::Workers::Components::NginxComponentWorker do
 
     it 'should include passenger repository for ubuntu' do
       expect(subject).to receive(:chroot!).with('/tmp/build', "apt-get install dirmngr gnupg -y", "Failed to install key management").ordered
-      expect(subject).to receive(:chroot!).with('/tmp/build', "sh -c 'curl -sSLf https://oss-binaries.phusionpassenger.com/auto-software-signing-gpg-key.txt | gpg --dearmor -o /usr/share/keyrings/phusion.gpg'", "Failed to add phusion signing key").ordered
+      expect(subject).to receive(:chroot!).with('/tmp/build', "curl -sSLf https://oss-binaries.phusionpassenger.com/auto-software-signing-gpg-key-2025.txt | gpg --dearmor > /usr/share/keyrings/phusion.gpg && curl -sSLf https://oss-binaries.phusionpassenger.com/auto-software-signing-gpg-key.txt | gpg --dearmor >> /usr/share/keyrings/phusion.gpg", "Failed to add phusion signing key").ordered
       expect(subject).to receive(:render_to_remote).with("/cloud_model/guest/etc/apt/sources.list.d/passenger.list", "/tmp/build/etc/apt/sources.list.d/passenger.list", 600, {template: template}).ordered
 
       subject._prepare_passenger_repository '/tmp/build'
