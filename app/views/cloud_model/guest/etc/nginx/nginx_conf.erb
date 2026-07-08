@@ -21,7 +21,10 @@ http {
   access_log                    /var/log/nginx/access.log  main;
 
   server_names_hash_max_size    1024;
-  #server_names_hash_bucket_size 64;
+  # Must live here (http context), NOT in sites-available/cloudmodel.conf:
+  # certbot's nginx plugin duplicates top-of-site-file http directives when
+  # rewriting the site config and nginx then fails with "directive is duplicate".
+  server_names_hash_bucket_size 64;
   server_tokens                 off;
 
   client_header_timeout         10m;
