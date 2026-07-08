@@ -355,7 +355,7 @@ module CloudModel
         CloudModel.with_backup_label set.name do
           started = Time.now
           begin
-            if set.backup
+            if set.backup_with_state
               CloudModel.backup_log "replica set backup finished (#{(Time.now - started).round}s)"
             else
               CloudModel.backup_log "replica set backup FAILED"

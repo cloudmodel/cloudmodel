@@ -3,7 +3,7 @@
 # each other's chains. flock on a file in the shared data dir keeps it to one
 # run per machine; a second start aborts immediately instead of interleaving.
 def with_backup_run_lock
-  lock = File.open "#{CloudModel.config.data_directory}/backup_run.lock", File::CREAT, 0o644
+  lock = File.open CloudModel::BackupRun.lock_file_path, File::CREAT, 0o644
   unless lock.flock(File::LOCK_EX | File::LOCK_NB)
     abort "Another backup run is already active (#{lock.path} is locked) — refusing to start a second one."
   end

@@ -604,8 +604,8 @@ describe CloudModel::MongodbReplicationSet do
     it 'should back up each set with backups and notify on failure' do
       good = double 'good', name: 'good'
       bad  = double 'bad',  name: 'bad', id: 'id1'
-      expect(good).to receive(:backup)
-      allow(bad).to receive(:backup).and_raise('boom')
+      expect(good).to receive(:backup_with_state)
+      allow(bad).to receive(:backup_with_state).and_raise('boom')
       rel = double 'rel', to_a: [good, bad]
       allow(CloudModel::MongodbReplicationSet).to receive(:where).with(has_backups: true).and_return(rel)
 
@@ -614,7 +614,7 @@ describe CloudModel::MongodbReplicationSet do
 
     it 'should back up only the passed subset when given' do
       only = double 'only', name: 'only'
-      expect(only).to receive(:backup).and_return(true)
+      expect(only).to receive(:backup_with_state).and_return(true)
       expect(CloudModel::MongodbReplicationSet).not_to receive(:where)
 
       expect { CloudModel::MongodbReplicationSet.backup_all [only] }.to output(/\[only\] replica set backup finished/).to_stdout
