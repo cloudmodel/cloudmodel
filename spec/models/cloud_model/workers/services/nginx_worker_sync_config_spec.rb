@@ -99,7 +99,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       stub_remote_hashes '/etc/nginx/a.conf' => 'old-a', '/etc/nginx/b.conf' => hash_b
 
       expect(subject).to receive(:guest_sh).with('nginx -t 2>&1').and_return [false, 'nginx: broken']
-      expect(subject).to receive(:guest_sh).with(/mv \/etc\/nginx\/a\.conf\.cm-bak/).and_return [true, '']
+      expect(subject).to receive(:guest_sh).with(%r{mv /var/lib/cloud_model/nginx_bak/etc/nginx/a\.conf}).and_return [true, '']
       expect(subject).not_to receive(:guest_sh).with('systemctl reload nginx 2>&1')
       expect(subject).not_to receive(:write_config_manifest)
 

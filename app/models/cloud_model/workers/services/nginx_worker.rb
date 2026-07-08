@@ -428,14 +428,16 @@ module CloudModel
           end
 
           to_write.each do |file|
-            guest_sh "if [ -f #{file[:path].shellescape} ]; then cp -a #{file[:path].shellescape} #{file[:path].shellescape}.cm-bak; fi"
+            bak = backup_path(file[:path]).shellescape
+            guest_sh "if [ -f #{file[:path].shellescape} ]; then mkdir -p $(dirname #{bak}) && cp -a #{file[:path].shellescape} #{bak}; fi"
             upload_to_guest file[:content], file[:path]
           end
 
           success, output = guest_sh 'nginx -t 2>&1'
           unless success
             to_write.each do |file|
-              guest_sh "if [ -f #{file[:path].shellescape}.cm-bak ]; then mv #{file[:path].shellescape}.cm-bak #{file[:path].shellescape}; else rm -f #{file[:path].shellescape}; fi"
+              bak = backup_path(file[:path]).shellescape
+              guest_sh "if [ -f #{bak} ]; then mv #{bak} #{file[:path].shellescape}; else rm -f #{file[:path].shellescape}; fi"
             end
             return {state: :failed, applied: [], blocked: [], output: output}
           end
@@ -445,9 +447,17 @@ module CloudModel
             return {state: :failed, applied: [], blocked: [], output: output}
           end
 
-          to_write.each { |file| guest_sh "rm -f #{file[:path].shellescape}.cm-bak" }
+          to_write.each { |file| guest_sh "rm -f #{backup_path(file[:path]).shellescape}" }
           write_config_manifest plan
           {state: :applied, applied: to_write.map { |f| f[:path] }, blocked: []}
+        end
+
+        # Rollback copies must live OUTSIDE the config directories nginx
+        # includes — cloudmodel.conf pulls in server.d/* (any suffix), so an
+        # in-place .cm-bak neighbour would itself break `nginx -t` with
+        # duplicate locations.
+        def backup_path path
+          "/var/lib/cloud_model/nginx_bak#{path}"
         end
 
         def auto_restart
