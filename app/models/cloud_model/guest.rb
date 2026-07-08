@@ -331,7 +331,9 @@ module CloudModel
 
       self.deploy_state = :pending
 
-      worker.deploy options
+      with_live_log verbose: options[:verbose] do
+        worker.deploy options
+      end
     end
 
     def redeploy(options = {})
@@ -355,7 +357,9 @@ module CloudModel
         return false
       end
 
-      worker.redeploy options
+      with_live_log verbose: options[:verbose] do
+        worker.redeploy options
+      end
     end
 
     def self.redeploy(ids, options = {})

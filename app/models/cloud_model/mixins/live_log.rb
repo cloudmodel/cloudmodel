@@ -35,6 +35,20 @@ module CloudModel
         end
       end
 
+      # Runs the block with $stdout captured into this subject's live console
+      # — the one shared mechanism behind every deploy/build console in the
+      # admin UI. By default the console stays quiet (watch the log on the
+      # web); verbose: true additionally passes the output through to stdout
+      # (interactive console runs, the delayed_job logfile).
+      def with_live_log verbose: false
+        restart_live_log
+        CloudModel::StdoutTee.capture ->(text) { append_live_log text }, passthrough: verbose do
+          yield
+        end
+      ensure
+        flush_live_log
+      end
+
       def flush_live_log
         return if @live_log_buffer.nil? || @live_log_buffer.empty?
         combined = "#{live_log}#{@live_log_buffer}"

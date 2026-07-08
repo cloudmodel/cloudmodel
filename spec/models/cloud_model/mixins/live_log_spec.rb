@@ -33,6 +33,22 @@ describe CloudModel::Mixins::LiveLog do
     expect(log.length).to be <= described_class::LOG_LIMIT + 20
   end
 
+  it 'captures stdout into the log and keeps the console quiet by default' do
+    expect {
+      subject.with_live_log { puts 'working...' }
+    }.not_to output.to_stdout
+
+    expect(subject.reload.live_log).to eq "working...\n"
+  end
+
+  it 'passes stdout through with verbose: true' do
+    expect {
+      subject.with_live_log(verbose: true) { puts 'working...' }
+    }.to output("working...\n").to_stdout
+
+    expect(subject.reload.live_log).to eq "working...\n"
+  end
+
   it 'never raises on bookkeeping errors' do
     subject.restart_live_log
     allow(subject).to receive(:set).and_raise('db gone')

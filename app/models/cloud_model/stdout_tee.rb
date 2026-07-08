@@ -5,17 +5,20 @@ module CloudModel
   # flows own their process.
   class StdoutTee
     # @param sink [Proc] called with every written string
-    def self.capture sink
+    # @param passthrough [Boolean] also write to the original stdout; false
+    #   keeps the console quiet — the output only reaches the sink
+    def self.capture sink, passthrough: true
       original = $stdout
-      $stdout = new(original, sink)
+      $stdout = new(original, sink, passthrough: passthrough)
       yield
     ensure
       $stdout = original
     end
 
-    def initialize original, sink
+    def initialize original, sink, passthrough: true
       @original = original
       @sink = sink
+      @passthrough = passthrough
     end
 
     def write *args
@@ -26,7 +29,7 @@ module CloudModel
         rescue => e
           Rails.logger.warn "StdoutTee sink failed: #{e.message}"
         end
-        @original.write text
+        @passthrough ? @original.write(text) : text.bytesize
       end
     end
 
