@@ -62,7 +62,6 @@ server {
   <%- if model.ssl_enforce? or model.ssl_only? -%>
   add_header                    Strict-Transport-Security max-age=63072000 always;
   <%- end -%>
-  ssl                           on;
   ssl_certificate               ssl/<%= guest.external_hostname %>.crt;
   ssl_certificate_key           ssl/<%= guest.external_hostname %>.key;
   ssl_client_certificate        ssl/<%= guest.external_hostname %>.ca.crt;
