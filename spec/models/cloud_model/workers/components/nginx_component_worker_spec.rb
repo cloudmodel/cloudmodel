@@ -47,7 +47,7 @@ describe CloudModel::Workers::Components::NginxComponentWorker do
       allow(template).to receive(:os_version).and_return 'ubuntu-22.04'
       expect(subject).to receive(:_prepare_passenger_repository).with('/tmp/build').ordered
       expect(subject).to receive(:chroot!).with('/tmp/build', "apt-get update", "Failed to update packages").ordered
-      expect(subject).to receive(:chroot!).with('/tmp/build', "apt-get install nginx-extras libnginx-mod-http-passenger certbot python3-certbot-nginx python3-venv python3-pip -y", "Failed to install nginx+passenger+certbot+python3").ordered
+      expect(subject).to receive(:chroot!).with('/tmp/build', "apt-get install nginx-core libnginx-mod-http-headers-more-filter libnginx-mod-http-passenger certbot python3-certbot-nginx python3-venv python3-pip -y", "Failed to install nginx+passenger+certbot+python3").ordered
 
       subject.build '/tmp/build'
     end

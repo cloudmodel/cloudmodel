@@ -5,7 +5,7 @@ module CloudModel
       # into a guest template chroot.
       #
       # Adds the Phusion Passenger apt repository (and on Ubuntu 18.04 also the
-      # certbot PPA), then installs `nginx-extras`, `libnginx-mod-http-passenger`,
+      # certbot PPA), then installs `nginx-core`, `libnginx-mod-http-passenger`,
       # and `certbot` with the nginx plugin.
       class NginxComponentWorker < BaseComponentWorker
         def _prepare_passenger_repository build_path
@@ -44,7 +44,10 @@ module CloudModel
             chroot! build_path, "apt-get install nginx-extras libnginx-mod-http-passenger certbot python-certbot-nginx -y", "Failed to install nginx+passenger+certbot"
           else
             chroot! build_path, "apt-get update", "Failed to update packages"
-            chroot! build_path, "apt-get install nginx-extras libnginx-mod-http-passenger certbot python3-certbot-nginx python3-venv python3-pip -y", "Failed to install nginx+passenger+certbot+python3"
+            # Passenger >= 6.1.7 pins nginx-core (the flavors conflict, so
+            # nginx-extras is out); headers-more comes as its own dynamic
+            # module package instead (more_clear_headers in cloudmodel.conf).
+            chroot! build_path, "apt-get install nginx-core libnginx-mod-http-headers-more-filter libnginx-mod-http-passenger certbot python3-certbot-nginx python3-venv python3-pip -y", "Failed to install nginx+passenger+certbot+python3"
           end
           log_dir_path = "/var/log/nginx"
           @host.exec! "rm -rf #{build_path}#{log_dir_path}", "Failed to clear log dir"
