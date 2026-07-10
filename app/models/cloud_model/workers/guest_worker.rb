@@ -3,8 +3,9 @@ module CloudModel
     # Worker that deploys and redeploys a {CloudModel::Guest} (LXD container).
     #
     # Orchestrates the full guest deployment lifecycle:
-    # template sync → LXD image import → container creation → custom volume
-    # setup → service configuration → network/firewall → container start.
+    # ZFS template volume → container creation (cloned from the template
+    # snapshot) → custom volume setup → service configuration →
+    # network/firewall → container start.
     # Each phase is a named step that can be skipped via the `skip_to` option.
     class GuestWorker < BaseWorker
       include CloudModel::Workers::Mixins::CheckMkAgentGuestPlugins
@@ -36,48 +37,22 @@ module CloudModel
         host.exec! "chown -R 100000:100000 #{remote_file}", "failed to set owner for #{remote_file}"
       end
 
-      def download_template template
-        return if CloudModel.config.skip_sync_images
-        super template
-        # Download build template to local distribution
-        tarball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"
-        #FileUtils.mkdir_p File.dirname(tarball_target)
-        command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape} #{tarball_target.shellescape}"
-        Rails.logger.debug command
-        local_exec! command, "Failed to download archived template"
-      end
-
-      def upload_template template
-        return if CloudModel.config.skip_sync_images
-        super template
-        # Upload build template to host
-        srcball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"
-        #mkdir_p File.dirname(template.tarball)
-        command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa #{srcball_target.shellescape} root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape}"
-        Rails.logger.debug command
-        local_exec! command, "Failed to upload built template"
-      end
-
-
-      def ensure_template
+      # Makes sure the guest's template is available as a ZFS volume on the
+      # guest's host, so the container can be cloned from its ready snapshot.
+      # Missing volumes are synced over from the build host (zfs send/receive)
+      # or built if no host has them; concurrent deploys are serialized by an
+      # atomic build claim (see Mixins::HasZfsBuildVolume).
+      def ensure_zfs_template
         @template = guest.template
-
-        begin
-          host.sftp.stat!("#{@template.tarball}")
-          host.sftp.stat!("#{@template.lxd_image_metadata_tarball}")
-        rescue
-          puts '      Uploading template'
-          upload_template @template
+        unless @template.build_volume(host).ready?
+          comment_sub_step "Template not available as ZFS volume on host, syncing or building it"
+          @template.ensure_build_volume! host
         end
       end
 
-      def ensure_lxd_image
-        @lxc = guest.lxd_containers.new guest_template: guest.template, created_at: Time.now, updated_at: Time.now
-        @lxc.import_template
-      end
-
       def create_lxd_container
-        #@lxc = guest.lxd_containers.create! guest_template: guest.template, created_at: Time.now, updated_at: Time.now
+        # @template was resolved by ensure_zfs_template (a no_skip step)
+        @lxc = guest.lxd_containers.new guest_template: @template, created_at: Time.now, updated_at: Time.now
         @lxc.save!
         @lxc.mount
         host.exec!("echo #{"Deployed at #{Time.now} with CloudModel".shellescape} | lxc file push - #{@lxc.name}/etc/deployed", "Failed to render deploy stemp")
@@ -85,7 +60,7 @@ module CloudModel
 
       def mount_lxd_container
         @lxc = guest.lxd_containers.desc(:created_at).first
-        comment_sub_step "Mounting guests/containers/#{name} to #{mountpoint}"
+        comment_sub_step "Mounting guests/containers/#{@lxc.name} to #{@lxc.mountpoint}"
         @lxc.mount
         host.exec!("echo #{"Resumed deployment at #{Time.now} with CloudModel".shellescape} | lxc file push - #{@lxc.name}/etc/deployed.resume", "Failed to render deploy stemp")
       end
@@ -110,7 +85,6 @@ module CloudModel
         guest.stop
         guest.start @lxc
       end
-
 
       def config_services
         #@lxc.mount
@@ -193,6 +167,11 @@ module CloudModel
         end
         # config mail out
         render_to_remote "/cloud_model/guest/etc/msmtprc", "#{guest.deploy_path}/etc/msmtprc", guest: guest
+
+        # LXD applied /etc/hostname and /etc/hosts through image templates on
+        # container create; containers cloned from ZFS volumes get them here.
+        render_to_remote "/cloud_model/guest/etc/hostname", "#{guest.deploy_path}/etc/hostname", container_name: @lxc.name
+        render_to_remote "/cloud_model/guest/etc/hosts", "#{guest.deploy_path}/etc/hosts", container_name: @lxc.name
       end
 
       def config_firewall
@@ -217,8 +196,7 @@ module CloudModel
         build_start_at = Time.now
 
         steps = [
-          ['Sync template', :ensure_template, no_skip: true],
-          ['Ensure LXD image', :ensure_lxd_image],
+          ['Ensure ZFS template volume', :ensure_zfs_template, no_skip: true],
           ['Create LXD container', :create_lxd_container, on_skip: :mount_lxd_container],
           ['Ensure LXD custom volumes', :ensure_lxd_custom_volumes, no_skip: true],
           ['Config LXD container', :config_lxd_container],

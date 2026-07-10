@@ -10,6 +10,7 @@ module CloudModel
     include Mongoid::Timestamps
     include CloudModel::Mixins::LiveLog
     include CloudModel::Mixins::ENumFields
+    include CloudModel::Mixins::HasZfsBuildVolume
     prepend CloudModel::Mixins::SmartToString
 
     # @!attribute [rw] os_version
@@ -77,6 +78,7 @@ module CloudModel
       end
 
       update_attribute :build_state, :pending
+      reset_live_log
 
       begin
         CloudModel::GuestTemplateJobs::BuildJob.perform_later id.to_s, host.id.to_s
@@ -122,17 +124,30 @@ module CloudModel
       end
     end
 
+    # @return [String] name of the ZFS dataset the template is built in
+    def build_dataset
+      "#{CloudModel.config.build_dataset}/#{template_type_id}/#{id}"
+    end
+
+    # @return [String] mountpoint of the build dataset on the build host
+    def build_mountpoint
+      "/cloud/build/#{template_type_id}/#{id}"
+    end
+
+    # Builds this template on the given host (see {Mixins::HasZfsBuildVolume}).
+    # @param host [CloudModel::Host]
+    def build_on! host
+      worker(host).build_template self
+    end
+
     # @return [String] path to the LXD metadata tarball on the host filesystem
+    # Legacy (pre-ZFS builds); still used to clean up old tarballs.
     def lxd_image_metadata_tarball
       "/cloud/templates/#{template_type_id}/#{id}.lxd.tar.gz"
     end
 
-    # @return [String] LXD image alias used when importing the template
-    def lxd_alias
-      "#{template_type_id}/#{id}"
-    end
-
     # @return [String] path to the rootfs tarball on the host filesystem
+    # Legacy (pre-ZFS builds); still used to clean up old tarballs.
     def tarball
       "/cloud/templates/#{template_type_id}/#{id}.tar.gz"
     end

@@ -21,7 +21,7 @@
 # Snap LXD needs to be mounted on another location:
 # /dev/md4                /var/snap/lxd/common/lxd    ext4            noatime             0 0
 <%- swap_disks.each do |dev| -%>
-/dev/<%= dev.ljust(19, ' ') %>swap            swap            defaults            0 0
+/dev/<%= dev.ljust(19, ' ') %> swap            swap            defaults            0 0
 <%- end -%>
 
 proc                    /proc           proc            defaults            0 0

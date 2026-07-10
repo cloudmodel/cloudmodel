@@ -28,9 +28,9 @@ describe "cloud_model/host/etc/fstab", type: :view do
       /dev/md4                /var/lib/lxd    ext4            noatime             0 0
       # Snap LXD needs to be mounted on another location:
       # /dev/md4                /var/snap/lxd/common/lxd    ext4            noatime             0 0
-      /dev/sda2               swap            swap            defaults            0 0
-      /dev/sdb2               swap            swap            defaults            0 0
-      /dev/nvme0n1p2          swap            swap            defaults            0 0
+      /dev/sda2                swap            swap            defaults            0 0
+      /dev/sdb2                swap            swap            defaults            0 0
+      /dev/nvme0n1p2           swap            swap            defaults            0 0
 
       proc                    /proc           proc            defaults            0 0
       sysfs                   /sys            sysfs           noauto              0 0

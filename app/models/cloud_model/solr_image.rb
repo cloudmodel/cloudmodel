@@ -118,6 +118,7 @@ module CloudModel
       end
 
       update_attribute :build_state, :pending
+      reset_live_log
 
       begin
         CloudModel::SolrImageJobs::BuildJob.perform_later id.to_s

@@ -82,6 +82,7 @@ module CloudModel
       end
 
       update_attributes build_state: :pending, arch: host.arch
+      reset_live_log
 
       begin
         CloudModel::HostTemplateJobs::BuildJob.perform_later id.to_s, host.id.to_s

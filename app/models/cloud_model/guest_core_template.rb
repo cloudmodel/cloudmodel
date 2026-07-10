@@ -11,6 +11,7 @@ module CloudModel
     include Mongoid::Timestamps
     include CloudModel::Mixins::LiveLog
     include CloudModel::Mixins::ENumFields
+    include CloudModel::Mixins::HasZfsBuildVolume
     prepend CloudModel::Mixins::SmartToString
 
     # @!attribute [rw] os_version
@@ -139,7 +140,26 @@ module CloudModel
       # template
     end
 
+    # Builds this template on the given host (see {Mixins::HasZfsBuildVolume}).
+    # @param host [CloudModel::Host]
+    def build_on! host
+      worker(host).build_core_template self
+    end
+
+    # Returns the name of the ZFS dataset the template is built in.
+    # @return [String]
+    def build_dataset
+      "#{CloudModel.config.build_dataset}/core/#{id}"
+    end
+
+    # Returns the mountpoint of the build dataset on the build host.
+    # @return [String]
+    def build_mountpoint
+      "/cloud/build/core/#{id}"
+    end
+
     # Returns the path to the core template tarball on the host filesystem.
+    # Legacy (pre-ZFS builds); still used to clean up old tarballs.
     # @return [String]
     def tarball
       "/cloud/templates/core/#{id}.tar.gz"

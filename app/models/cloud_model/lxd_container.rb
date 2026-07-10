@@ -61,19 +61,45 @@ module CloudModel
       self
     end
 
-    def import_template
-      ensure_template_is_set
-
-      Rails.logger.debug "Import #{guest_template.name} to lxd"
-      lxc "image import #{guest_template.lxd_image_metadata_tarball.shellescape} #{guest_template.tarball.shellescape} --alias #{guest_template.lxd_alias.shellescape}"
-
-      # TODO: check if import worked or failed with {1=>"Error: Image with same fingerprint already exists\n"}
-      true
+    def root_dataset
+      "guests/containers/#{name}"
     end
 
     def create_container
-      Rails.logger.debug "Create lxd container #{name} from #{guest_template.lxd_alias} "
-      lxc! "init #{guest_template.lxd_alias.shellescape} #{name}", "Failed to init LXD container"
+      Rails.logger.debug "Create lxd container #{name} from ZFS volume #{guest_template.build_dataset}"
+      # -s adds a root disk from the storage pool to the instance itself;
+      # relying on the host's default profile fails with "No root device
+      # could be found" on hosts where lxd init didn't add one.
+      lxc! "init #{name} --empty -s default", "Failed to init LXD container"
+      begin
+        attach_template_volume
+      rescue Exception => e
+        # Don't leave an orphaned LXD entry behind when the swap failed
+        lxc "delete #{name}"
+        raise e
+      end
+    end
+
+    # Swaps the empty container's root dataset for a clone of the guest
+    # template's ready snapshot, keeping LXD's bookkeeping (backup.yaml).
+    # This is what deploys a template — no image tarballs are involved.
+    # The clone still carries host-range uids, so LXD's recorded on-disk
+    # idmap is cleared to make it remap the filesystem on first start.
+    def attach_template_volume
+      mount
+      backup_yaml_present, backup_yaml = host.exec "cat #{mountpoint}/backup.yaml"
+      unmount
+      host.exec! "zfs destroy -r #{root_dataset}", "Failed to remove empty container dataset"
+      host.exec! "zfs clone -o mountpoint=#{mountpoint.shellescape} -o canmount=noauto #{guest_template.build_snapshot.shellescape} #{root_dataset}", "Failed to clone template volume"
+      mount
+      if backup_yaml_present
+        host.sftp.file.open("#{mountpoint}/backup.yaml", 'w') { |f| f.write backup_yaml }
+      end
+      # Template builds don't pre-shift uids (fuidshift isn't available on
+      # snap-LXD hosts). An empty last_state.idmap tells LXD the rootfs is
+      # unshifted, so it remaps into the container's unprivileged range on
+      # first start — preserving suid bits, caps, and ACLs like fuidshift.
+      lxc! "config set #{name} volatile.last_state.idmap '[]'", "Failed to reset container idmap state"
     end
 
     def destroy_container
@@ -101,20 +127,25 @@ module CloudModel
       end
     end
 
+    def mounted?
+      success, state = host.exec "zfs get -H -o value mounted #{root_dataset}"
+      success and state.to_s.strip == 'yes'
+    end
+
     def mount
       mountpoint # to init mountpoint
-      host.exec! "zfs mount guests/containers/#{name}", "Failed to mount containers fs"
+      host.exec! "zfs mount #{root_dataset}", "Failed to mount containers fs" unless mounted?
       return [true, mountpoint]
     end
 
     def unmount
-      host.exec "zfs unmount guests/containers/#{name}"
+      host.exec "zfs unmount #{root_dataset}"
     end
 
     def mountpoint
       return @mountpoint if @mountpoint
 
-      res, out = host.exec("zfs list | grep guests/containers/#{name}")
+      res, out = host.exec("zfs list | grep #{root_dataset}")
       if res
         @mountpoint = out.split(' ').last
 
@@ -122,7 +153,7 @@ module CloudModel
           #@mountpoint = "/var/snap/lxd/common/lxd/storage-pools/default/containers/#{name}"
           host.exec("mkdir -p /var/lib/lxd/storage-pools/default/containers")
           @mountpoint = "/var/lib/lxd/storage-pools/default/containers/#{name}"
-          host.exec "zfs set mountpoint=#{@mountpoint} canmount=noauto guests/containers/#{name}"
+          host.exec "zfs set mountpoint=#{@mountpoint} canmount=noauto #{root_dataset}"
         end
 
         #puts @mountpoint

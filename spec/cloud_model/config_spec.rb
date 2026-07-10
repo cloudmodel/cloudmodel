@@ -74,6 +74,29 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'ssh_key_file' do
+    it 'should allow to set the ssh key file' do
+      subject.ssh_key_file = '/secure/id_ed25519'
+      expect(subject.ssh_key_file).to eq '/secure/id_ed25519'
+    end
+
+    it 'should default to keys/id_rsa in the data directory' do
+      allow(subject).to receive(:data_directory).and_return('/data')
+      expect(subject.ssh_key_file).to eq '/data/keys/id_rsa'
+    end
+  end
+
+  describe 'build_dataset' do
+    it 'should allow to set the ZFS build dataset' do
+      subject.build_dataset = 'tank/builds'
+      expect(subject.build_dataset).to eq 'tank/builds'
+    end
+
+    it 'should default to guests/build' do
+      expect(subject.build_dataset).to eq 'guests/build'
+    end
+  end
+
   describe 'use_external_ip' do
     it 'should allow to set options to use external ip' do
       subject.use_external_ip = true

@@ -314,6 +314,7 @@ module CloudModel
       end
 
       update_attribute :deploy_state, :pending
+      reset_live_log
 
       begin
         CloudModel::GuestJobs::DeployJob.perform_later id.to_s
@@ -342,6 +343,7 @@ module CloudModel
       end
 
       update_attribute :deploy_state, :pending
+      reset_live_log
 
       begin
         CloudModel::GuestJobs::RedeployJob.perform_later id.to_s
@@ -368,7 +370,8 @@ module CloudModel
 
       return false if valid_ids.empty? and not options[:force]
 
-      criteria.update_all deploy_state_id: deploy_state_id_for(:pending)
+      criteria.update_all deploy_state_id: deploy_state_id_for(:pending),
+        live_log: '', live_log_step: nil, live_log_step_counter: nil, live_log_step_total: nil
 
       begin
         CloudModel::GuestJobs::RedeployManyJob.perform_later valid_ids.map &:to_s

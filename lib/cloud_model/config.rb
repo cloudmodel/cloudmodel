@@ -9,6 +9,10 @@ module CloudModel
     # connection, so keep this <= the Mongoid pool size.
     attr_writer :backup_concurrency
     attr_writer :skip_sync_images
+    # ZFS dataset guest template builds are created under (on the build host)
+    attr_writer :build_dataset
+    # SSH private key used to reach hosts from the controller machine
+    attr_writer :ssh_key_file
     # Use external IP, useful for testing without setting up a VPN for your development box or if you have troubles with tinc
     attr_writer :use_external_ip
     attr_writer :dns_servers, :job_queue
@@ -62,6 +66,17 @@ module CloudModel
     # If true do not sync images on deploy
     def skip_sync_images
       @skip_sync_images || false
+    end
+
+    # ZFS dataset guest template builds are created under; lives in the same
+    # pool as the LXD container datasets, so deploys can `zfs clone`.
+    def build_dataset
+      @build_dataset || 'guests/build'
+    end
+
+    # SSH private key used to reach hosts from the controller machine
+    def ssh_key_file
+      @ssh_key_file || "#{data_directory}/keys/id_rsa"
     end
 
     def use_external_ip

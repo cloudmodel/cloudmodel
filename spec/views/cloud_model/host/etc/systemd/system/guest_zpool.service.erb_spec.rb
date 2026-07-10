@@ -22,10 +22,19 @@ describe "cloud_model/host/etc/systemd/system/guest_zpool_service", type: :view 
     # Try to force mount guests pool; exists with error if already mounted
     ExecStartPre=-/sbin/zpool import -f guests
 
-    # Init lxd if zpool create did not exit with error code aka create success
-    ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool default
+    # Init lxd if zpool create did not exit with error code aka create success.
+    # --storage-pool names the ZFS pool to use (the LXD pool is always created
+    # as "default") — it must reference the guests zpool created above, else
+    # lxd init tries to conjure a zpool "default" and fails, leaving LXD
+    # without any storage pool while the network create below still succeeds.
+    ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests
 
     ExecStartPre=-/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=10.42.23.1/25 ipv4.nat=true
+    # lxd init above creates lxdbr0 itself with a RANDOM subnet, making the
+    # create a silent no-op — force the intended config either way.
+    ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv4.address 10.42.23.1/25
+    ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv4.nat true
+    ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv6.address none
 
     ExecStart=/bin/echo 'done'
 
@@ -61,12 +70,21 @@ describe "cloud_model/host/etc/systemd/system/guest_zpool_service", type: :view 
     # Try to force mount data pool; exists with error if already mounted
     ExecStartPre=-/sbin/zpool import -f data
 
-    # Init lxd if zpool create did not exit with error code aka create success
-    ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool default
+    # Init lxd if zpool create did not exit with error code aka create success.
+    # --storage-pool names the ZFS pool to use (the LXD pool is always created
+    # as "default") — it must reference the guests zpool created above, else
+    # lxd init tries to conjure a zpool "default" and fails, leaving LXD
+    # without any storage pool while the network create below still succeeds.
+    ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests
 
     ExecStartPre=-/usr/bin/lxc storage create data zfs source=data
 
     ExecStartPre=-/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=10.23.42.129/25 ipv4.nat=true
+    # lxd init above creates lxdbr0 itself with a RANDOM subnet, making the
+    # create a silent no-op — force the intended config either way.
+    ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv4.address 10.23.42.129/25
+    ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv4.nat true
+    ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv6.address none
 
     ExecStart=/bin/echo 'done'
 
@@ -102,12 +120,21 @@ describe "cloud_model/host/etc/systemd/system/guest_zpool_service", type: :view 
     # Try to force mount data\\\;\\\ killall\\\ httpd pool; exists with error if already mounted
     ExecStartPre=-/sbin/zpool import -f data\\\;\\\ killall\\\ httpd
 
-    # Init lxd if zpool create did not exit with error code aka create success
-    ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool default
+    # Init lxd if zpool create did not exit with error code aka create success.
+    # --storage-pool names the ZFS pool to use (the LXD pool is always created
+    # as "default") — it must reference the guests zpool created above, else
+    # lxd init tries to conjure a zpool "default" and fails, leaving LXD
+    # without any storage pool while the network create below still succeeds.
+    ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests
 
     ExecStartPre=-/usr/bin/lxc storage create data\\\;\\\ killall\\\ httpd zfs source=data\\\;\\\ killall\\\ httpd
 
     ExecStartPre=-/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=10.23.42.129/25 ipv4.nat=true
+    # lxd init above creates lxdbr0 itself with a RANDOM subnet, making the
+    # create a silent no-op — force the intended config either way.
+    ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv4.address 10.23.42.129/25
+    ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv4.nat true
+    ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv6.address none
 
     ExecStart=/bin/echo 'done'
 

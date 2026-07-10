@@ -336,12 +336,10 @@ module CloudModel
         return true
       end
 
-      def config_lxd
-        chroot root, "/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests"
-        # lxc profile device add default root disk path=/ pool=guests
-        # lxc storage set default volume.zfs.use_refquota true
-        chroot root, "/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=#{host.private_address}/#{host.private_network.subnet} ipv4.nat=true"
-      end
+      # LXD initialisation (storage pool + lxdbr0) happens on first boot via
+      # guest_zpool.service — it cannot run here: pre-boot the deploy root is
+      # only a chroot without a running LXD daemon, and the guests zpool does
+      # not exist yet either.
 
       def recover_lxd
         # # lxd recover
@@ -398,52 +396,55 @@ module CloudModel
       def deploy options={}
         return false unless @host.deploy_state == :pending or options[:force]
 
-        @host.update_attributes deploy_state: :running, deploy_last_issue: nil
+        with_live_log_capture @host, options do
+          @host.update_attributes deploy_state: :running, deploy_last_issue: nil
 
-        build_start_at = Time.now
+          build_start_at = Time.now
 
-        steps = [
-          ['Allow to access with SSH key', :set_authorized_keys],
-          ['Prepare disk for new system', :init_system_disk],
-          ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
-          ['Populate volume with new system image', :populate_deploy_root],
-          ['Make crypto keys', :make_keys],
-          ['Config new system', :config_deploy_root],
-          ['Render guest_zpool.service', :render_guest_zpool_service],
-          ['Config LXD', :config_lxd],
-          # TODO: apply existing guests and restore backups
-          ['Update TINC config', :update_tinc],
-          ['Write boot config and reboot', :boot_deploy_root],
-        ]
+          steps = [
+            ['Allow to access with SSH key', :set_authorized_keys],
+            ['Prepare disk for new system', :init_system_disk],
+            ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
+            ['Populate volume with new system image', :populate_deploy_root],
+            ['Make crypto keys', :make_keys],
+            ['Config new system', :config_deploy_root],
+            ['Render guest_zpool.service', :render_guest_zpool_service],
+            # TODO: apply existing guests and restore backups
+            ['Update TINC config', :update_tinc],
+            ['Write boot config and reboot', :boot_deploy_root],
+          ]
 
-        run_steps :deploy, steps, options
+          run_steps :deploy, steps, options
 
-        @host.update_attributes deploy_state: :finished, last_deploy_finished_at: Time.now
+          @host.update_attributes deploy_state: :finished, last_deploy_finished_at: Time.now
 
-        puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"
+          puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"
+        end
       end
 
       def redeploy options={}
         return false unless @host.deploy_state == :pending or options[:force]
 
-        @host.update_attributes deploy_state: :running, deploy_last_issue: nil
+        with_live_log_capture @host, options do
+          @host.update_attributes deploy_state: :running, deploy_last_issue: nil
 
-        build_start_at = Time.now
+          build_start_at = Time.now
 
-        steps = [
-          ['Upsync system images', :sync_inst_images],
-          ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
-          ['Populate volume with new system image', :populate_deploy_root],
-          ['Config new system', :config_deploy_root],
-          ['Copy crypto keys from old system', :copy_keys],
-          ['Write boot config and reboot', :boot_deploy_root],
-        ]
+          steps = [
+            ['Upsync system images', :sync_inst_images],
+            ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
+            ['Populate volume with new system image', :populate_deploy_root],
+            ['Config new system', :config_deploy_root],
+            ['Copy crypto keys from old system', :copy_keys],
+            ['Write boot config and reboot', :boot_deploy_root],
+          ]
 
-        run_steps :deploy, steps, options
+          run_steps :deploy, steps, options
 
-        @host.update_attributes deploy_state: :finished, last_deploy_finished_at: Time.now
+          @host.update_attributes deploy_state: :finished, last_deploy_finished_at: Time.now
 
-        puts "Finished redeploy host in #{distance_of_time_in_words_to_now build_start_at}"
+          puts "Finished redeploy host in #{distance_of_time_in_words_to_now build_start_at}"
+        end
       end
 
     end

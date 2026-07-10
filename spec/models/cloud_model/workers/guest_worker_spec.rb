@@ -102,11 +102,21 @@ describe CloudModel::Workers::GuestWorker do
   end
 
   describe 'config_network' do
-    it 'should render network config' do
+    before do
+      subject.instance_variable_set(:@lxc, double('lxc', name: 'test-lxc'))
       allow(guest).to receive(:deploy_path).and_return('/deploy')
       allow(subject).to receive(:mkdir_p)
       allow(subject).to receive(:render_to_remote)
       allow(subject).to receive(:chroot)
+    end
+
+    it 'should render network config' do
+      subject.config_network
+    end
+
+    it 'should render hostname and hosts for the container' do
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/guest/etc/hostname', '/deploy/etc/hostname', container_name: 'test-lxc')
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/guest/etc/hosts', '/deploy/etc/hosts', container_name: 'test-lxc')
 
       subject.config_network
     end
@@ -175,114 +185,59 @@ describe CloudModel::Workers::GuestWorker do
     end
   end
 
-  describe 'download_template' do
-    let(:template) { double 'template', lxd_image_metadata_tarball: '/cloud/templates/meta.tar.gz' }
-
-    it 'should skip when skip_sync_images is configured' do
-      allow(CloudModel.config).to receive(:skip_sync_images).and_return(true)
-      expect(subject).not_to receive(:local_exec!)
-
-      subject.download_template template
-    end
-
-    it 'should scp the metadata tarball from the host' do
-      allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
-      allow(CloudModel.config).to receive(:data_directory).and_return('/data')
-      allow(host).to receive(:ssh_address).and_return('1.2.3.4')
-      allow_any_instance_of(CloudModel::Workers::BaseWorker).to receive(:download_template)
-      expect(subject).to receive(:local_exec!).with(
-        /scp -C -i \/data\/keys\/id_rsa root@1.2.3.4:\/cloud\/templates\/meta.tar.gz \/data\/cloud\/templates\/meta.tar.gz/,
-        'Failed to download archived template')
-
-      subject.download_template template
-    end
-  end
-
-  describe 'upload_template' do
-    let(:template) { double 'template', lxd_image_metadata_tarball: '/cloud/templates/meta.tar.gz' }
-
-    it 'should skip when skip_sync_images is configured' do
-      allow(CloudModel.config).to receive(:skip_sync_images).and_return(true)
-      expect(subject).not_to receive(:local_exec!)
-
-      subject.upload_template template
-    end
-
-    it 'should scp the metadata tarball to the host' do
-      allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
-      allow(CloudModel.config).to receive(:data_directory).and_return('/data')
-      allow(host).to receive(:ssh_address).and_return('1.2.3.4')
-      allow_any_instance_of(CloudModel::Workers::BaseWorker).to receive(:upload_template)
-      expect(subject).to receive(:local_exec!).with(
-        /scp -C -i \/data\/keys\/id_rsa \/data\/cloud\/templates\/meta.tar.gz root@1.2.3.4:\/cloud\/templates\/meta.tar.gz/,
-        'Failed to upload built template')
-
-      subject.upload_template template
-    end
-  end
-
-  describe 'ensure_template' do
-    let(:template) { double 'template', tarball: '/t.tar.gz', lxd_image_metadata_tarball: '/t.lxd.tar.gz' }
-    let(:sftp) { double 'sftp' }
+  describe 'ensure_zfs_template' do
+    let(:template) { double 'template' }
+    let(:volume) { double CloudModel::BuildZfsVolume }
 
     before do
       allow(guest).to receive(:template).and_return(template)
-      allow(host).to receive(:sftp).and_return(sftp)
+      allow(template).to receive(:build_volume).with(host).and_return(volume)
     end
 
-    it 'should not upload when both tarballs already exist on the host' do
-      expect(sftp).to receive(:stat!).with('/t.tar.gz')
-      expect(sftp).to receive(:stat!).with('/t.lxd.tar.gz')
-      expect(subject).not_to receive(:upload_template)
+    it 'should do nothing when the template volume is ready on the host' do
+      allow(volume).to receive(:ready?).and_return(true)
+      expect(template).not_to receive(:ensure_build_volume!)
 
-      subject.ensure_template
+      subject.ensure_zfs_template
     end
 
-    it 'should upload the template when a tarball is missing' do
-      allow(sftp).to receive(:stat!).and_raise('not found')
-      expect(subject).to receive(:upload_template).with(template)
+    it 'should sync or build the template volume when missing on the host' do
+      allow(volume).to receive(:ready?).and_return(false)
+      allow(subject).to receive(:comment_sub_step)
+      expect(template).to receive(:ensure_build_volume!).with(host)
 
-      expect { subject.ensure_template }.to output(/Uploading template/).to_stdout
-    end
-  end
-
-  describe 'ensure_lxd_image' do
-    it 'should build a new lxd container and import the template' do
-      template = double 'template'
-      lxc = double 'lxc'
-      allow(guest).to receive(:template).and_return(template)
-      lxd_containers = double 'lxd_containers'
-      allow(guest).to receive(:lxd_containers).and_return(lxd_containers)
-      expect(lxd_containers).to receive(:new).with(hash_including(guest_template: template)).and_return(lxc)
-      expect(lxc).to receive(:import_template)
-
-      subject.ensure_lxd_image
-      expect(subject.instance_variable_get(:@lxc)).to eq lxc
+      subject.ensure_zfs_template
     end
   end
 
   describe 'create_lxd_container' do
-    it 'should save, mount and write the deploy stamp' do
+    it 'should create a container for the guest template, mount it and write the deploy stamp' do
+      template = double 'template'
+      subject.instance_variable_set(:@template, template)
       lxc = double 'lxc', name: 'test-lxc'
-      subject.instance_variable_set(:@lxc, lxc)
+      lxd_containers = double 'lxd_containers'
+      allow(guest).to receive(:lxd_containers).and_return(lxd_containers)
+      expect(lxd_containers).to receive(:new).with(hash_including(guest_template: template)).and_return(lxc)
       expect(lxc).to receive(:save!)
       expect(lxc).to receive(:mount)
       expect(host).to receive(:exec!).with(/lxc file push - test-lxc\/etc\/deployed/, 'Failed to render deploy stemp')
 
       subject.create_lxd_container
+      expect(subject.instance_variable_get(:@lxc)).to eq lxc
     end
   end
 
   describe 'mount_lxd_container' do
-    it 'should look up the latest container and raise on the undefined name/mountpoint refs (source quirk)' do
-      lxc = double 'lxc', name: 'test-lxc', mount: true
+    it 'should look up the latest container and mount it' do
+      lxc = double 'lxc', name: 'test-lxc', mountpoint: '/var/lib/lxd/storage-pools/default/containers/test-lxc'
       desc = double 'desc'
       allow(guest).to receive(:lxd_containers).and_return(double('containers', desc: desc))
       allow(desc).to receive(:first).and_return(lxc)
-      allow(subject).to receive(:comment_sub_step)
+      expect(subject).to receive(:comment_sub_step).with('Mounting guests/containers/test-lxc to /var/lib/lxd/storage-pools/default/containers/test-lxc')
+      expect(lxc).to receive(:mount)
+      expect(host).to receive(:exec!).with(/lxc file push - test-lxc\/etc\/deployed.resume/, 'Failed to render deploy stemp')
 
-      # comment_sub_step interpolates undefined local vars `name` and `mountpoint`
-      expect { subject.mount_lxd_container }.to raise_error(NameError)
+      subject.mount_lxd_container
     end
   end
 

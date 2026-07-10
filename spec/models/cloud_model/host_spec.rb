@@ -891,4 +891,25 @@ describe CloudModel::Host do
       expect(Thread.new { Thread.current[:cloud_model_local_host] }.value).to be_nil
     end
   end
+
+  describe '.build_host' do
+    it 'resolves the host configured as build host' do
+      host = Factory :host, name: 'buildhost'
+      allow(CloudModel.config).to receive(:build_host_name).and_return('buildhost')
+
+      expect(CloudModel::Host.build_host).to eq host
+    end
+
+    it 'is nil when no build host is configured' do
+      allow(CloudModel.config).to receive(:build_host_name).and_return(nil)
+
+      expect(CloudModel::Host.build_host).to be_nil
+    end
+
+    it 'is nil when the configured build host is unknown' do
+      allow(CloudModel.config).to receive(:build_host_name).and_return('missing')
+
+      expect(CloudModel::Host.build_host).to be_nil
+    end
+  end
 end

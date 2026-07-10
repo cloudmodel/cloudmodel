@@ -95,24 +95,21 @@ describe CloudModel::LxdContainer do
     end
   end
 
-  describe 'import_template' do
-    it 'should ensure template and call lxc image import' do
-      subject.guest_template = template
+  describe 'root_dataset' do
+    it 'should return the container´s ZFS dataset' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
 
-      expect(subject).to receive(:ensure_template_is_set)
-      expect(subject).to receive(:lxc).with("image import #{template.lxd_image_metadata_tarball} #{template.tarball} --alias #{template.lxd_alias}")
-
-      expect(subject.import_template).to eq true
+      expect(subject.root_dataset).to eq 'guests/containers/some_guest-20200331133742'
     end
   end
 
   describe 'create_container' do
-    it 'should call lxc create' do
+    it 'should init an empty container and attach the template volume' do
       subject.guest_template = template
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
 
-      expect(subject).to receive(:lxc!).with("init #{template.template_type.id}/#{template.id} some_guest-20200331133742", 'Failed to init LXD container')
+      expect(subject).to receive(:lxc!).with("init some_guest-20200331133742 --empty -s default", 'Failed to init LXD container').ordered
+      expect(subject).to receive(:attach_template_volume).ordered
 
       subject.create_container
     end
@@ -120,6 +117,70 @@ describe CloudModel::LxdContainer do
     it 'should be called when container is created' do
       expect(subject).to receive(:create_container)
       subject.run_callbacks :create
+    end
+
+    it 'should delete the LXD container again when attaching the volume fails' do
+      subject.guest_template = template
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+
+      allow(subject).to receive(:lxc!)
+      allow(subject).to receive(:attach_template_volume).and_raise('clone failed')
+      expect(subject).to receive(:lxc).with('delete some_guest-20200331133742')
+
+      expect { subject.create_container }.to raise_error('clone failed')
+    end
+  end
+
+  describe 'attach_template_volume' do
+    let(:mountpoint) { '/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742' }
+    let(:sftp_file) { double 'sftp_file' }
+    let(:file_handle) { double 'file_handle' }
+
+    before do
+      subject.guest_template = template
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+
+      allow(subject).to receive(:mountpoint).and_return(mountpoint)
+      allow(subject).to receive(:mount)
+      allow(subject).to receive(:unmount)
+      allow(host).to receive(:exec!)
+      allow(host).to receive(:sftp).and_return(double('sftp', file: sftp_file))
+      allow(sftp_file).to receive(:open).and_yield(file_handle)
+      allow(file_handle).to receive(:write)
+    end
+
+    it 'should swap the empty dataset for a clone of the template snapshot' do
+      allow(host).to receive(:exec).with("cat #{mountpoint}/backup.yaml").and_return([true, 'BACKUP'])
+
+      expect(host).to receive(:exec!).with("zfs destroy -r guests/containers/some_guest-20200331133742", 'Failed to remove empty container dataset').ordered
+      expect(host).to receive(:exec!).with("zfs clone -o mountpoint=#{mountpoint} -o canmount=noauto #{template.build_snapshot} guests/containers/some_guest-20200331133742", 'Failed to clone template volume').ordered
+
+      subject.attach_template_volume
+    end
+
+    it 'should preserve LXD´s backup.yaml' do
+      allow(host).to receive(:exec).with("cat #{mountpoint}/backup.yaml").and_return([true, 'BACKUP'])
+
+      expect(sftp_file).to receive(:open).with("#{mountpoint}/backup.yaml", 'w').and_yield(file_handle)
+      expect(file_handle).to receive(:write).with('BACKUP')
+
+      subject.attach_template_volume
+    end
+
+    it 'should not write backup.yaml if the empty container had none' do
+      allow(host).to receive(:exec).with("cat #{mountpoint}/backup.yaml").and_return([false, 'no such file'])
+
+      expect(sftp_file).not_to receive(:open)
+
+      subject.attach_template_volume
+    end
+
+    it 'should mark the cloned rootfs as unshifted so LXD remaps it on first start' do
+      allow(host).to receive(:exec).with("cat #{mountpoint}/backup.yaml").and_return([false, 'no such file'])
+
+      expect(host).to receive(:exec!).with("echo \"lxc config set #{subject.name} volatile.last_state.idmap '[]'\" | bash", 'Failed to reset container idmap state')
+
+      subject.attach_template_volume
     end
   end
 

@@ -102,6 +102,18 @@ namespace :cloudmodel do
         end
       end
     end
+
+    desc "One-time migration of tarball-built templates into ZFS build volumes on the build host — required for templates that can no longer be rebuilt. Dry run unless CONFIRM=1; HOST_ID overrides the configured build host."
+    task :templates_to_zfs => [:environment] do
+      host = if ENV['HOST_ID'].present?
+        CloudModel::Host.find ENV['HOST_ID']
+      else
+        CloudModel::Host.build_host
+      end
+      abort "No build host configured — set config.build_host_name or pass HOST_ID=<id>" unless host
+
+      CloudModel::ZfsTemplateMigration.new(host).migrate! dry_run: ENV['CONFIRM'] != '1'
+    end
   end
 
   namespace :cleanup do
@@ -170,6 +182,38 @@ namespace :cloudmodel do
 
       puts "\nDeployed check_mk plugins to #{hosts.size - failures}/#{hosts.size} host(s)."
       abort "#{failures} host(s) failed" if failures > 0
+    end
+
+    desc "Make sure the guest templates used on a host exist as ZFS build volumes there (migration from tarball-built templates; builds on the configured build host and syncs via zfs send/receive). Set HOST_ID=<id> to target a single host."
+    task :prepare_zfs_templates => [:environment] do
+      hosts = if ENV['HOST_ID'].present?
+        [CloudModel::Host.find(ENV['HOST_ID'])]
+      else
+        CloudModel::Host.all.reject { |host| [:booting, :not_started].include? host.deploy_state }
+      end
+
+      if hosts.empty?
+        abort "No hosts found in #{Rails.env} database — forgot RAILS_ENV=production?"
+      end
+
+      failures = 0
+      hosts.each do |host|
+        puts "#{host.name}:"
+        # guest.template picks (and if necessary registers) the current
+        # template for the guest's component set
+        host.guests.map(&:template).uniq.each do |template|
+          print "  #{template.name}: "
+          begin
+            template.ensure_build_volume! host
+            puts "\e[32mOK\e[39m"
+          rescue Exception => e
+            failures += 1
+            puts "\e[31mFAILED\e[39m (#{e.class}: #{e.message})"
+          end
+        end
+      end
+
+      abort "#{failures} template volume(s) failed" if failures > 0
     end
   end
 

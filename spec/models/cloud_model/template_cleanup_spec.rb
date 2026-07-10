@@ -59,6 +59,18 @@ describe CloudModel::TemplateCleanup do
     end
   end
 
+  describe '#obsolete_datasets' do
+    it 'lists the build datasets of obsolete guest and core templates' do
+      type = CloudModel::GuestTemplateType.create!
+      obsolete_guest = type.templates.create! arch: 'amd64', build_state_id: 0xf0
+      type.templates.create! arch: 'amd64', build_state_id: 0xf0 # kept (newest)
+      obsolete_core = CloudModel::GuestCoreTemplate.create! arch: 'amd64', build_state_id: 0xf0
+      CloudModel::GuestCoreTemplate.create! arch: 'amd64', build_state_id: 0xf0 # kept (newest)
+
+      expect(cleanup.obsolete_datasets).to match_array [obsolete_guest.build_dataset, obsolete_core.build_dataset]
+    end
+  end
+
   describe '#cleanup!' do
     let(:output) { StringIO.new }
 
@@ -94,6 +106,24 @@ describe CloudModel::TemplateCleanup do
 
       expect(CloudModel::HostTemplate.where(id: old.id).count).to eq 0
       expect(CloudModel::HostTemplate.where(id: newest.id).count).to eq 1
+    end
+
+    it 'destroys obsolete build datasets on hosts, tolerating failures' do
+      type = CloudModel::GuestTemplateType.create!
+      obsolete = type.templates.create! arch: 'amd64', build_state_id: 0xf0
+      type.templates.create! arch: 'amd64', build_state_id: 0xf0 # kept (newest)
+
+      host = double 'host', name: 'core00', deploy_state: :finished
+      allow(CloudModel::Host).to receive(:all).and_return [host]
+      allow(host).to receive(:exec!)
+      allow(host).to receive(:exec).with('ls -d /cloud/build/*/* 2>/dev/null').and_return [false, '']
+      # Non-bang exec: destroy may fail while an old container still clones it
+      expect(host).to receive(:exec).with("zfs destroy -r #{obsolete.build_dataset.shellescape}").and_return [false, 'dataset is busy']
+
+      cleanup.cleanup! dry_run: false, output: output
+
+      expect(CloudModel::GuestTemplate.where(id: obsolete.id).count).to eq 0
+      expect(output.string).to include "zfs destroy -r #{obsolete.build_dataset}"
     end
   end
 end

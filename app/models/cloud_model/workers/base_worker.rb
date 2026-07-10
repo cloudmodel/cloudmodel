@@ -21,6 +21,7 @@ module CloudModel
     class BaseWorker
       include AbstractController::Rendering
       include ActionView::Helpers::DateHelper
+      include CloudModel::Mixins::LocalExec
 
       def initialize host, options={}
         @host = host
@@ -35,6 +36,20 @@ module CloudModel
       # @return [Object] the model object whose deploy/build state is updated on failure
       def error_log_object
         host
+      end
+
+      # Runs the block with stdout teed into +subject+'s live console unless a
+      # capture for that subject is already active (jobs and the model bang
+      # methods wrap their worker calls in with_live_log themselves — without
+      # the guard every line would be appended twice). This way the web
+      # console also fills up when a worker is invoked directly, e.g. from a
+      # rails console.
+      def with_live_log_capture subject, options={}, &block
+        if CloudModel.current_live_log_subject == subject
+          yield
+        else
+          subject.with_live_log(verbose: options.fetch(:verbose, true), &block)
+        end
       end
 
       # Converts a template path to a form acceptable to Rails 7+ view lookup
@@ -85,6 +100,10 @@ module CloudModel
 
         content = render(template, locals)
 
+        # Same visibility as Host#exec's command echo — config phases would
+        # otherwise pass without a trace in the live console.
+        puts "\n      > write #{remote_file}" if $stdout.is_a? CloudModel::StdoutTee
+
         @host.sftp.file.open(remote_file, 'w', perm) do |f|
           f.puts content
         end
@@ -128,6 +147,11 @@ module CloudModel
       # @param chroot_dir [String] path to the chroot root
       # @return [true]
       def cleanup_chroot chroot_dir
+        # Rescue paths clean up unconditionally — when the failure happened
+        # before anything was mounted (e.g. guest deploy_path not yet set),
+        # there is nothing to do. Crashing here would mask the real error.
+        return true if chroot_dir.blank?
+
         @chroot_prepared ||= {}
         chroot_dir = chroot_dir.gsub(/[\/]$/, '') # Remove tailing slashes from path
 
@@ -189,30 +213,6 @@ module CloudModel
       # @param path [String] remote directory path to create
       def mkdir_p path
         @host.exec! "mkdir -p #{path.shellescape}", "Failed to make directory #{path}"
-      end
-
-      # Runs a shell command locally on the CloudModel controller machine.
-      # @param command [String] shell command
-      # @return [String] combined stdout/stderr output
-      def local_exec command
-        Rails.logger.debug "LOKAL EXEC: #{command}"
-        result = %x(#{command} 2>&1)
-        Rails.logger.debug "    #{result}"
-        result
-      end
-
-      # Like {#local_exec} but raises on non-zero exit.
-      # @param command [String] shell command
-      # @param message [String] error message prefix on failure
-      # @return [String] command output
-      # @raise [RuntimeError] if the command fails
-      def local_exec! command, message
-        result = local_exec command
-
-        unless $?.success?
-          raise "#{message}: #{result}"
-        end
-        result
       end
 
       # Downloads a built template tarball from the remote host to the local

@@ -79,6 +79,12 @@ describe CloudModel::Workers::BaseWorker do
   end
 
   describe '.cleanup_chroot' do
+    it 'does nothing for a blank chroot dir (failure before anything was mounted)' do
+      expect(host).not_to receive(:mounted_at?)
+      expect(subject.cleanup_chroot(nil)).to eq true
+    end
+
+
     it 'should unmount all chroot mounts' do
       allow(host).to receive(:mounted_at?).and_return(true)
       expect(host).to receive(:exec!).exactly(4).times

@@ -1,9 +1,9 @@
 require 'shellwords'
 
 module CloudModel
-  # Removes obsolete template tarballs and stale build directories — the only
-  # things that ever prune /cloud, where template generations otherwise
-  # accumulate forever (tens of GB per host).
+  # Removes obsolete template tarballs (legacy), ZFS build datasets, and stale
+  # build directories — the only things that ever prune /cloud, where template
+  # generations otherwise accumulate forever (tens of GB per host).
   #
   # Cleans both sides: the admin's data directory (the canonical copies that
   # sync_inst_images rsyncs to hosts — deleting only host-side would get
@@ -22,7 +22,7 @@ module CloudModel
   # Driven by `rake cloudmodel:cleanup:templates` (dry run unless CONFIRM=1).
   class TemplateCleanup
     # finished, failed, not_started — never mid-build
-    TERMINAL_BUILD_STATES = [0xf0, 0xf1, 0xff].freeze
+    TERMINAL_BUILD_STATES = CloudModel::TERMINAL_BUILD_STATE_IDS
 
     attr_reader :keep_per_type
 
@@ -105,16 +105,26 @@ module CloudModel
       files.map(&:to_s)
     end
 
+    # Build datasets of obsolete templates (guest + core; host templates are
+    # not built in datasets). Destroy may legitimately fail on a host while an
+    # old container still clones the dataset — it is retried on the next run.
+    def obsolete_datasets
+      @obsolete_datasets ||= obsolete_guest_templates.map(&:build_dataset) +
+        obsolete_core_templates.map(&:build_dataset)
+    end
+
     # Build dirs of templates currently building — must never be removed.
     def busy_build_dirs
-      dirs = []
-      CloudModel::HostTemplate.where(:build_state_id.nin => TERMINAL_BUILD_STATES)
-        .each { |t| dirs << "/cloud/build/host/#{t.id}" }
-      CloudModel::GuestCoreTemplate.where(:build_state_id.nin => TERMINAL_BUILD_STATES)
-        .each { |t| dirs << "/cloud/build/core/#{t.id}" }
-      CloudModel::GuestTemplate.where(:build_state_id.nin => TERMINAL_BUILD_STATES)
-        .each { |t| dirs << "/cloud/build/#{t.template_type_id}/#{t.id}" }
-      dirs
+      @busy_build_dirs ||= begin
+        dirs = []
+        CloudModel::HostTemplate.where(:build_state_id.nin => TERMINAL_BUILD_STATES)
+          .each { |t| dirs << "/cloud/build/host/#{t.id}" }
+        CloudModel::GuestCoreTemplate.where(:build_state_id.nin => TERMINAL_BUILD_STATES)
+          .each { |t| dirs << "/cloud/build/core/#{t.id}" }
+        CloudModel::GuestTemplate.where(:build_state_id.nin => TERMINAL_BUILD_STATES)
+          .each { |t| dirs << "/cloud/build/#{t.template_type_id}/#{t.id}" }
+        dirs
+      end
     end
 
     # Remove obsolete template files (admin + all running hosts), stale build
@@ -160,6 +170,13 @@ module CloudModel
       unless files.empty?
         output.puts "#{prefix}#{host.name}: rm #{files.size} template file(s)"
         host.exec! "rm -f #{files.map(&:shellescape) * ' '}", 'Failed to remove obsolete template files' unless dry_run
+      end
+
+      obsolete_datasets.each do |dataset|
+        # Non-bang exec: the dataset may not exist on this host, or still be
+        # cloned by a not-yet-deleted container (ZFS refuses then — intended).
+        output.puts "#{prefix}#{host.name}: zfs destroy -r #{dataset}"
+        host.exec "zfs destroy -r #{dataset.shellescape}" unless dry_run
       end
 
       busy = busy_build_dirs

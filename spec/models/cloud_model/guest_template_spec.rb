@@ -192,10 +192,35 @@ describe CloudModel::GuestTemplate do
     end
   end
 
-  describe 'lxd_alias' do
-    it 'should return lxd alias for template' do
+  describe 'build_on!' do
+    it 'should build the template on the given host via its worker' do
+      host = double CloudModel::Host
+      worker = double CloudModel::Workers::GuestTemplateWorker
+      allow(subject).to receive(:worker).with(host).and_return(worker)
+      expect(worker).to receive(:build_template).with(subject)
+
+      subject.build_on! host
+    end
+  end
+
+  describe 'build_dataset' do
+    it 'should return the ZFS dataset the template is built in' do
       subject.template_type_id = guest_template_type.id
-      expect(subject.lxd_alias).to eq "#{guest_template_type.id}/#{subject.id}"
+      expect(subject.build_dataset).to eq "guests/build/#{guest_template_type.id}/#{subject.id}"
+    end
+  end
+
+  describe 'build_mountpoint' do
+    it 'should return the mountpoint of the build dataset' do
+      subject.template_type_id = guest_template_type.id
+      expect(subject.build_mountpoint).to eq "/cloud/build/#{guest_template_type.id}/#{subject.id}"
+    end
+  end
+
+  describe 'build_snapshot' do
+    it 'should return the ready snapshot containers are cloned from' do
+      subject.template_type_id = guest_template_type.id
+      expect(subject.build_snapshot).to eq "guests/build/#{guest_template_type.id}/#{subject.id}@ready"
     end
   end
 

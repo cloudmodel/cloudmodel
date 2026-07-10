@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
   spec.metadata["changelog_uri"] = "https://github.com/cloudmodel/cloudmodel/commits/master"
 
 
-  spec.files = Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
+  spec.files = Dir["{app,config,db,lib}/**/*", "LICENSE", "Rakefile", "README.md"]
 
   spec.add_dependency 'rails', '~> 8.0'
   spec.add_dependency 'mongoid',  '>= 7.1.2'

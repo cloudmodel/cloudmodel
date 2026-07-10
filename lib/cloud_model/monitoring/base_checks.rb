@@ -31,7 +31,14 @@ module CloudModel
       # must store regardless of subject validity; real driver errors still
       # raise, with their message included for the check_crashed issue.
       def store_data
-        @subject.set monitoring_last_check_at: Time.now, monitoring_last_check_result: data
+        attrs = { monitoring_last_check_at: Time.now, monitoring_last_check_result: data }
+        if @subject.respond_to? :set
+          @subject.set attrs
+        else
+          # Not every subject is a Mongoid document — CoreClient API models
+          # (e.g. auth repositories) persist through their regular update.
+          @subject.update attrs
+        end
         record_sample
         true
       rescue => e

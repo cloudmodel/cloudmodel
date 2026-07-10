@@ -1,11 +1,17 @@
 require 'mongoid-grid_fs'
 require "cloud_model/config"
+require "cloud_model/build_zfs_volume"
 require "cloud_model/engine"
 require "cloud_model/monitoring"
 #require "cloud_model/call_rake"
 require "cloud_model/execution_exception"
 
 module CloudModel
+  # Build states a template can rest in (finished, failed, not_started) —
+  # matches buildable_build_states on the template models. Single source for
+  # TemplateCleanup and the ZFS build claim.
+  TERMINAL_BUILD_STATE_IDS = [0xf0, 0xf1, 0xff].freeze
+
   def self.config
     @config ||= CloudModel::Config.new
   end

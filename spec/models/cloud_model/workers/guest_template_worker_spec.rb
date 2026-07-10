@@ -7,21 +7,40 @@ describe CloudModel::Workers::GuestTemplateWorker do
   subject { CloudModel::Workers::GuestTemplateWorker.new host }
 
   describe 'build_path' do
-    it 'should return core build path for GuestCoreTemplate' do
-      template = double CloudModel::GuestCoreTemplate, id: 'core123'
-      allow(template).to receive(:is_a?).with(CloudModel::GuestCoreTemplate).and_return(true)
+    it 'should return the rootfs inside the core template build volume for GuestCoreTemplate' do
+      template = double CloudModel::GuestCoreTemplate,
+        build_volume: CloudModel::BuildZfsVolume.new(host, 'guests/build/core/core123', mountpoint: '/cloud/build/core/core123')
       subject.instance_variable_set :@template, template
 
-      expect(subject.build_path).to eq '/cloud/build/core/core123'
+      expect(subject.build_path).to eq '/cloud/build/core/core123/rootfs'
     end
 
-    it 'should return template type build path for GuestTemplate' do
-      template_type = double id: 'type456'
-      template = double CloudModel::GuestTemplate, id: 'tmpl789', template_type: template_type
-      allow(template).to receive(:is_a?).with(CloudModel::GuestCoreTemplate).and_return(false)
+    it 'should return the rootfs inside the template build volume for GuestTemplate' do
+      template = double CloudModel::GuestTemplate,
+        build_volume: CloudModel::BuildZfsVolume.new(host, 'guests/build/type456/tmpl789', mountpoint: '/cloud/build/type456/tmpl789')
       subject.instance_variable_set :@template, template
 
-      expect(subject.build_path).to eq '/cloud/build/type456/tmpl789'
+      expect(subject.build_path).to eq '/cloud/build/type456/tmpl789/rootfs'
+    end
+  end
+
+  describe 'zfs_volume' do
+    it 'should get the BuildZfsVolume from the template' do
+      template = double CloudModel::GuestCoreTemplate
+      volume = double CloudModel::BuildZfsVolume
+      allow(template).to receive(:build_volume).with(host).and_return(volume)
+      subject.instance_variable_set :@template, template
+
+      expect(subject.zfs_volume).to eq volume
+    end
+
+    it 'should memoize the volume' do
+      template = double CloudModel::GuestCoreTemplate
+      volume = double CloudModel::BuildZfsVolume
+      expect(template).to receive(:build_volume).once.and_return(volume)
+      subject.instance_variable_set :@template, template
+
+      expect(subject.zfs_volume).to eq subject.zfs_volume
     end
   end
 
@@ -36,7 +55,12 @@ describe CloudModel::Workers::GuestTemplateWorker do
 
   context 'with a guest template' do
     let(:template_type) { double id: 'type1', components: [:ruby, :xml] }
-    let(:core_template) { double CloudModel::GuestCoreTemplate, tarball: '/cloud/templates/core.tar.gz' }
+    let(:core_template) do
+      double CloudModel::GuestCoreTemplate,
+        id: 'core1',
+        build_dataset: 'guests/build/core/core1',
+        build_mountpoint: '/cloud/build/core/core1'
+    end
     let(:template) do
       double CloudModel::GuestTemplate,
         id: 'tmpl1',
@@ -44,12 +68,70 @@ describe CloudModel::Workers::GuestTemplateWorker do
         core_template: core_template,
         os_version: 'ubuntu-22.04',
         created_at: Time.now,
-        lxd_image_metadata_tarball: '/cloud/templates/metadata.tar.gz'
+        build_dataset: 'guests/build/type1/tmpl1',
+        build_mountpoint: '/cloud/build/type1/tmpl1',
+        build_volume: CloudModel::BuildZfsVolume.new(host, 'guests/build/type1/tmpl1', mountpoint: '/cloud/build/type1/tmpl1')
     end
+    let(:zfs_volume) { double CloudModel::BuildZfsVolume, rootfs_path: '/cloud/build/type1/tmpl1/rootfs' }
 
     before do
-      allow(template).to receive(:is_a?).with(CloudModel::GuestCoreTemplate).and_return(false)
       subject.instance_variable_set :@template, template
+    end
+
+    describe 'prepare_build_volume' do
+      before do
+        allow(subject).to receive(:zfs_volume).and_return(zfs_volume)
+        allow(subject).to receive(:mkdir_p)
+      end
+
+      it 'should prepare a fresh volume' do
+        expect(zfs_volume).to receive(:prepare!)
+        expect(subject).to receive(:mkdir_p).with(subject.build_path)
+
+        subject.prepare_build_volume
+      end
+
+      it 'should prepare a fresh volume even over the leftover of a failed build' do
+        allow(zfs_volume).to receive(:dataset_exists?).and_return(true)
+        allow(zfs_volume).to receive(:ready?).and_return(false)
+        expect(zfs_volume).to receive(:prepare!)
+
+        subject.prepare_build_volume
+      end
+
+      context 'when resuming with skip_to' do
+        before do
+          subject.instance_variable_set :@build_options, {skip_to: '3'}
+        end
+
+        it 'should reuse an uncommitted volume' do
+          allow(zfs_volume).to receive(:dataset_exists?).and_return(true)
+          allow(zfs_volume).to receive(:ready?).and_return(false)
+          expect(zfs_volume).not_to receive(:prepare!)
+          expect(zfs_volume).to receive(:mount!)
+
+          subject.prepare_build_volume
+        end
+
+        it 'should prepare a fresh volume over a committed one' do
+          allow(zfs_volume).to receive(:dataset_exists?).and_return(true)
+          allow(zfs_volume).to receive(:ready?).and_return(true)
+          expect(zfs_volume).to receive(:prepare!)
+
+          subject.prepare_build_volume
+        end
+      end
+    end
+
+    describe 'commit_build_volume' do
+      it 'should cleanup the chroot, commit the snapshot and unmount' do
+        allow(subject).to receive(:zfs_volume).and_return(zfs_volume)
+        expect(subject).to receive(:cleanup_chroot).with(subject.build_path).ordered
+        expect(zfs_volume).to receive(:commit!).ordered
+        expect(zfs_volume).to receive(:unmount!).ordered
+
+        subject.commit_build_volume
+      end
     end
 
     describe 'install_utils' do
@@ -243,165 +325,124 @@ describe CloudModel::Workers::GuestTemplateWorker do
       end
     end
 
-    describe 'pack_template' do
-      it 'should set build state to packaging and tar the template' do
-        expect(template).to receive(:update_attribute).with(:build_state, :packaging)
-        expect(subject).to receive(:tar_template).with(subject.build_path, template)
+    describe 'write_lxd_metadata' do
+      before do
+        allow(subject).to receive(:mkdir_p)
+        allow(subject).to receive(:render_to_remote)
+      end
 
-        subject.pack_template
+      it 'should render metadata.yaml at the build volume root' do
+        expect(subject).to receive(:render_to_remote).with(
+          "/cloud_model/guest_template/metadata.yaml",
+          "/cloud/build/type1/tmpl1/metadata.yaml",
+          template: template
+        )
+        subject.write_lxd_metadata
+      end
+
+      it 'should render host and hostname templates' do
+        expect(subject).to receive(:mkdir_p).with("/cloud/build/type1/tmpl1/templates")
+        %w(hosts.tpl hostname.tpl).each do |file|
+          expect(subject).to receive(:render_to_remote).with(
+            "/cloud_model/guest_template/#{file}",
+            "/cloud/build/type1/tmpl1/templates/#{file}",
+            template: template
+          )
+        end
+        subject.write_lxd_metadata
       end
     end
 
-    describe 'pack_manifest' do
+    describe 'ensure_core_template' do
+      let(:core_volume) { double CloudModel::BuildZfsVolume }
+
       before do
-        allow(subject).to receive(:mkdir_p)
+        allow(core_template).to receive(:build_volume).with(host).and_return(core_volume)
+        allow(subject).to receive(:comment_sub_step)
+      end
+
+      it 'should return the core template if its volume is ready on the host' do
+        allow(core_volume).to receive(:ready?).and_return(true)
+        expect(core_template).not_to receive(:ensure_build_volume!)
+
+        expect(subject.ensure_core_template).to eq core_template
+      end
+
+      it 'should sync or build the core template volume if missing on the host' do
+        allow(core_volume).to receive(:ready?).and_return(false)
+        expect(core_template).to receive(:ensure_build_volume!).with(host)
+
+        expect(subject.ensure_core_template).to eq core_template
+      end
+
+      it 'should create a core template if the template has none' do
+        allow(template).to receive(:core_template).and_return(nil, core_template)
+        expect(template).to receive(:update_attributes) do |attrs|
+          expect(attrs[:core_template]).to eq core_template
+        end
+        allow(CloudModel::GuestCoreTemplate).to receive(:create!).with(arch: 'amd64', os_version: 'ubuntu-22.04').and_return(core_template)
+        allow(core_volume).to receive(:ready?).and_return(true)
+
+        expect(subject.ensure_core_template).to eq core_template
+      end
+    end
+
+    describe 'cleanup_template' do
+      before do
+        allow(subject).to receive(:zfs_volume).and_return(zfs_volume)
+        allow(zfs_volume).to receive(:scrub_identity!)
+        allow(subject).to receive(:comment_sub_step)
+        allow(subject).to receive(:chroot!)
         allow(subject).to receive(:render_to_remote)
         allow(host).to receive(:exec!)
       end
 
-      it 'should render metadata.yaml' do
+      it 'should clean apt caches' do
+        expect(subject).to receive(:chroot!).with(subject.build_path, "apt-get clean", "Failed to clean apt caches")
+        subject.cleanup_template
+      end
+
+      it 'should scrub identity data and enable ssh host key regeneration on first boot' do
+        expect(zfs_volume).to receive(:scrub_identity!)
         expect(subject).to receive(:render_to_remote).with(
-          "/cloud_model/guest_template/metadata.yaml",
-          "#{subject.build_path}/metadata.yaml",
-          template: template
+          "/cloud_model/guest/etc/systemd/system/regenerate_ssh_host_keys.service",
+          "#{subject.build_path}/etc/systemd/system/regenerate_ssh_host_keys.service"
         )
-        subject.pack_manifest
+        expect(subject).to receive(:chroot!).with(
+          subject.build_path,
+          "ln -sf /etc/systemd/system/regenerate_ssh_host_keys.service /etc/systemd/system/multi-user.target.wants/regenerate_ssh_host_keys.service",
+          "Failed to enable ssh host key regeneration"
+        )
+        subject.cleanup_template
       end
 
-      it 'should render host and hostname templates' do
-        %w(hosts.tpl hostname.tpl).each do |file|
-          expect(subject).to receive(:render_to_remote).with(
-            "/cloud_model/guest_template/#{file}",
-            "#{subject.build_path}/templates/#{file}",
-            template: template
-          )
-        end
-        subject.pack_manifest
-      end
-
-      it 'should tar the metadata' do
+      it 'should clear temporary files and docs' do
         expect(host).to receive(:exec!).with(
-          "cd #{subject.build_path} && tar czvf #{template.lxd_image_metadata_tarball} metadata.yaml templates/*",
-          "Failed to write metadata"
+          "rm -rf #{subject.build_path}/tmp/* #{subject.build_path}/var/tmp/* #{subject.build_path}/run/* #{subject.build_path}/var/cache/* #{subject.build_path}/usr/share/man/* #{subject.build_path}/usr/share/doc/*",
+          "Failed to clear temporary files"
         )
-        subject.pack_manifest
+        subject.cleanup_template
       end
     end
 
-    describe 'fetch_core_template' do
-      before do
-        allow(host).to receive(:exec!)
-        allow(host).to receive(:sftp).and_return(double('sftp'))
-        allow(subject).to receive(:comment_sub_step)
-        allow(subject).to receive(:upload_template)
-        allow(core_template).to receive(:tarball).and_return('/cloud/templates/core.tar.gz')
-      end
+    describe 'clone_core_template' do
+      it 'should clone the core template volume and refresh resolv.conf' do
+        allow(subject).to receive(:ensure_core_template).and_return(core_template)
+        allow(subject).to receive(:zfs_volume).and_return(zfs_volume)
+        expect(zfs_volume).to receive(:prepare_from!).with('guests/build/core/core1')
+        expect(host).to receive(:exec!).with("cp /etc/resolv.conf #{subject.build_path}/etc", "Failed to copy resolve conf")
 
-      context 'when core template is already present' do
-        before do
-          allow(template).to receive(:core_template).and_return(core_template)
-          allow(host.sftp).to receive(:stat!).and_return(true)
-        end
-
-        it 'should not upload the template if stat succeeds' do
-          expect(subject).not_to receive(:upload_template)
-          subject.fetch_core_template
-        end
-
-        it 'should unpack the core template tarball' do
-          expect(host).to receive(:exec!).with(
-            "cd #{subject.build_path} && tar xzpf /cloud/templates/core.tar.gz",
-            "Failed to unpack core template"
-          )
-          subject.fetch_core_template
-        end
-
-        it 'should refresh resolv.conf' do
-          expect(host).to receive(:exec!).with("rm #{subject.build_path}/etc/resolv.conf", "Failed to remove old resolve conf")
-          expect(host).to receive(:exec!).with("cp /etc/resolv.conf #{subject.build_path}/etc", "Failed to copy resolve conf")
-          subject.fetch_core_template
-        end
-      end
-
-      context 'when core template tarball is missing on host' do
-        before do
-          allow(template).to receive(:core_template).and_return(core_template)
-          allow(host.sftp).to receive(:stat!).and_raise(RuntimeError.new('no such file'))
-        end
-
-        it 'should upload the core template' do
-          expect(subject).to receive(:comment_sub_step).with("Downloading core template")
-          expect(subject).to receive(:upload_template).with(core_template)
-          subject.fetch_core_template
-        end
-      end
-
-      context 'when no core template exists yet' do
-        let(:new_core) { double CloudModel::GuestCoreTemplate, tarball: '/cloud/templates/new_core.tar.gz' }
-
-        before do
-          allow(template).to receive(:core_template).and_return(nil, new_core, new_core, new_core)
-          allow(template).to receive(:core_template=)
-          allow(template).to receive(:os_version).and_return('ubuntu-22.04')
-          allow(CloudModel::GuestCoreTemplate).to receive(:create!).and_return(new_core)
-          allow(new_core).to receive(:build!)
-          allow(host.sftp).to receive(:stat!).and_return(true)
-        end
-
-        it 'should create and build a new core template' do
-          expect(CloudModel::GuestCoreTemplate).to receive(:create!).with(arch: 'amd64', os_version: 'ubuntu-22.04').and_return(new_core)
-          expect(new_core).to receive(:build!).with(host)
-          subject.fetch_core_template
-        end
-      end
-    end
-
-    describe 'download_template' do
-      before do
-        allow(subject).to receive(:local_exec!)
-        allow(FileUtils).to receive(:mkdir_p)
-      end
-
-      it 'should skip when skip_sync_images is configured' do
-        allow(CloudModel.config).to receive(:skip_sync_images).and_return(true)
-        expect(subject).not_to receive(:local_exec!)
-        subject.download_template template
-      end
-
-      it 'should download tarball and metadata for a non-core template' do
-        allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
-        allow(CloudModel.config).to receive(:data_directory).and_return('/data')
-        allow(template).to receive(:tarball).and_return('/cloud/templates/tmpl.tar.gz')
-        # super (base download_template)
-        expect(subject).to receive(:local_exec!).with(/scp .*metadata\.tar\.gz/, "Failed to download archived metadata")
-        allow(subject).to receive(:local_exec!)
-        subject.download_template template
-      end
-    end
-
-    describe 'upload_template' do
-      before do
-        allow(subject).to receive(:local_exec!)
-        allow(subject).to receive(:mkdir_p)
-      end
-
-      it 'should skip when skip_sync_images is configured' do
-        allow(CloudModel.config).to receive(:skip_sync_images).and_return(true)
-        expect(subject).not_to receive(:local_exec!)
-        subject.upload_template template
-      end
-
-      it 'should upload tarball and metadata for a non-core template' do
-        allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
-        allow(CloudModel.config).to receive(:data_directory).and_return('/data')
-        allow(template).to receive(:tarball).and_return('/cloud/templates/tmpl.tar.gz')
-        expect(subject).to receive(:local_exec!).with(/scp .*metadata\.tar\.gz.*root@10\.0\.0\.1/, "Failed to upload built metadata")
-        allow(subject).to receive(:local_exec!)
-        subject.upload_template template
+        subject.clone_core_template
       end
     end
 
     describe 'build_template' do
+      before do
+        allow(subject).to receive(:zfs_volume).and_return(zfs_volume)
+        allow(template).to receive(:update_attributes)
+        allow(subject).to receive(:run_steps)
+      end
+
       it 'should return false if template is not pending and force is not set' do
         allow(template).to receive(:build_state).and_return(:finished)
 
@@ -410,9 +451,6 @@ describe CloudModel::Workers::GuestTemplateWorker do
 
       it 'should run build steps when template is pending' do
         allow(template).to receive(:build_state).and_return(:pending)
-        allow(template).to receive(:update_attributes)
-        allow(subject).to receive(:mkdir_p)
-        allow(subject).to receive(:run_steps)
 
         expect(template).to receive(:update_attributes).with(build_state: :running)
         expect(subject).to receive(:run_steps).with(:build, anything, {})
@@ -422,32 +460,26 @@ describe CloudModel::Workers::GuestTemplateWorker do
 
       it 'should set build state to finished on success' do
         allow(template).to receive(:build_state).and_return(:pending)
-        allow(template).to receive(:update_attributes)
-        allow(subject).to receive(:mkdir_p)
-        allow(subject).to receive(:run_steps)
 
-        expect(template).to receive(:update_attributes).with(build_state: :finished, build_last_issue: "")
+        expect(template).to receive(:update_attributes).with(build_state: :finished, build_last_issue: "", build_host: host)
 
         subject.build_template(template)
       end
 
-      it 'should set build state to failed on error' do
+      it 'should set build state to failed and mark the volume on error' do
         allow(template).to receive(:build_state).and_return(:pending)
-        allow(template).to receive(:update_attributes)
-        allow(subject).to receive(:mkdir_p)
         allow(subject).to receive(:run_steps).and_raise(RuntimeError.new("boom"))
         allow(subject).to receive(:cleanup_chroot)
         allow(CloudModel).to receive(:log_exception)
 
         expect(template).to receive(:update_attributes).with(build_state: :failed, build_last_issue: "boom")
-        expect { subject.build_template(template) }.to raise_error("Failed to build core image!")
+        expect(subject).to receive(:cleanup_chroot).with(subject.build_path)
+        expect(zfs_volume).to receive(:fail!)
+        expect { subject.build_template(template) }.to raise_error("Failed to build guest template!")
       end
 
       it 'should run build steps with force option' do
         allow(template).to receive(:build_state).and_return(:finished)
-        allow(template).to receive(:update_attributes)
-        allow(subject).to receive(:mkdir_p)
-        allow(subject).to receive(:run_steps)
 
         expect(subject).to receive(:run_steps)
 
@@ -456,9 +488,6 @@ describe CloudModel::Workers::GuestTemplateWorker do
 
       it 'should print prepend_output when given' do
         allow(template).to receive(:build_state).and_return(:pending)
-        allow(template).to receive(:update_attributes)
-        allow(subject).to receive(:mkdir_p)
-        allow(subject).to receive(:run_steps)
 
         expect(subject).to receive(:puts).with('hello')
 
@@ -471,29 +500,30 @@ describe CloudModel::Workers::GuestTemplateWorker do
     let(:core_template) do
       double CloudModel::GuestCoreTemplate,
         id: 'core1',
-        os_version: 'ubuntu-22.04'
+        os_version: 'ubuntu-22.04',
+        build_dataset: 'guests/build/core/core1',
+        build_mountpoint: '/cloud/build/core/core1',
+        build_volume: CloudModel::BuildZfsVolume.new(host, 'guests/build/core/core1', mountpoint: '/cloud/build/core/core1')
     end
+    let(:zfs_volume) { double CloudModel::BuildZfsVolume, rootfs_path: '/cloud/build/core/core1/rootfs' }
 
     before do
-      allow(core_template).to receive(:is_a?).with(CloudModel::GuestCoreTemplate).and_return(true)
       subject.instance_variable_set :@template, core_template
     end
 
     describe 'build_path' do
-      it 'should return the core build path' do
-        expect(subject.build_path).to eq '/cloud/build/core/core1'
+      it 'should return the rootfs inside the core build volume' do
+        expect(subject.build_path).to eq '/cloud/build/core/core1/rootfs'
       end
     end
 
     describe 'build_core_template' do
       before do
         allow(subject).to receive(:os_version).and_return('ubuntu-22.04')
-        allow(subject).to receive(:download_path).and_return('/cloud/downloads')
-        allow(subject).to receive(:mkdir_p)
+        allow(subject).to receive(:zfs_volume).and_return(zfs_volume)
         allow(subject).to receive(:run_steps)
         allow(subject).to receive(:cleanup_chroot)
         allow(core_template).to receive(:update_attributes)
-        allow(core_template).to receive(:update_attribute)
       end
 
       it 'should return false if not pending and force not set' do
@@ -506,7 +536,7 @@ describe CloudModel::Workers::GuestTemplateWorker do
 
         expect(core_template).to receive(:update_attributes).with(build_state: :running, os_version: 'ubuntu-22.04')
         expect(subject).to receive(:run_steps).with(:build, anything, {})
-        expect(core_template).to receive(:update_attributes).with(build_state: :finished, build_last_issue: "")
+        expect(core_template).to receive(:update_attributes).with(build_state: :finished, build_last_issue: "", build_host: host)
 
         expect(subject.build_core_template(core_template)).to eq core_template
       end
@@ -518,13 +548,14 @@ describe CloudModel::Workers::GuestTemplateWorker do
         subject.build_core_template(core_template, force: true)
       end
 
-      it 'should set build state to failed and clean up on error' do
+      it 'should set build state to failed, clean up and mark the volume on error' do
         allow(core_template).to receive(:build_state).and_return(:pending)
         allow(subject).to receive(:run_steps).and_raise(RuntimeError.new("kaboom"))
         allow(CloudModel).to receive(:log_exception)
 
         expect(core_template).to receive(:update_attributes).with(build_state: :failed, build_last_issue: "kaboom")
         expect(subject).to receive(:cleanup_chroot).with(subject.build_path)
+        expect(zfs_volume).to receive(:fail!)
         expect { subject.build_core_template(core_template) }.to raise_error("Failed to build core image!")
       end
 
@@ -532,31 +563,6 @@ describe CloudModel::Workers::GuestTemplateWorker do
         allow(core_template).to receive(:build_state).and_return(:pending)
         expect(subject).to receive(:puts).with('starting')
         subject.build_core_template(core_template, prepend_output: 'starting')
-      end
-    end
-
-    describe 'download_template for core template' do
-      it 'should only call super (no metadata transfer) for core templates' do
-        allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
-        allow(CloudModel.config).to receive(:data_directory).and_return('/data')
-        allow(core_template).to receive(:tarball).and_return('/cloud/templates/core.tar.gz')
-        allow(FileUtils).to receive(:mkdir_p)
-
-        # Only one local_exec! (from super), no metadata download
-        expect(subject).to receive(:local_exec!).once.with(/scp .*core\.tar\.gz/, "Failed to download archived template")
-        subject.download_template core_template
-      end
-    end
-
-    describe 'upload_template for core template' do
-      it 'should only call super (no metadata transfer) for core templates' do
-        allow(CloudModel.config).to receive(:skip_sync_images).and_return(false)
-        allow(CloudModel.config).to receive(:data_directory).and_return('/data')
-        allow(core_template).to receive(:tarball).and_return('/cloud/templates/core.tar.gz')
-        allow(subject).to receive(:mkdir_p)
-
-        expect(subject).to receive(:local_exec!).once.with(/scp .*core\.tar\.gz/, "Failed to upload built template")
-        subject.upload_template core_template
       end
     end
   end

@@ -237,6 +237,14 @@ module CloudModel
       Thread.current[:cloud_model_local_host] = CloudModel::Guest.where(:private_address.in => ips).first&.host
     end
 
+    # The host guest templates are built on, as configured via
+    # `CloudModel.config.build_host_name`.
+    # @return [CloudModel::Host, nil] nil if not configured or unknown
+    def self.build_host
+      return nil if CloudModel.config.build_host_name.blank?
+      where(name: CloudModel.config.build_host_name).first
+    end
+
     def tinc_private_key
       require 'openssl'
       key = OpenSSL::PKey::RSA.new(2048)
@@ -279,8 +287,10 @@ module CloudModel
             password: '',
             **SSH_OPTIONS
           )
-        rescue Errno::EHOSTUNREACH, Errno::ETIMEDOUT, Errno::ENETUNREACH
-          # If not reachable via VPN, try external IP
+        rescue Errno::EHOSTUNREACH, Errno::ETIMEDOUT, Errno::ENETUNREACH, Net::SSH::ConnectionTimeout
+          # If not reachable via VPN, try external IP.
+          # Since SSH_OPTIONS sets timeout:, Net::SSH raises its own
+          # ConnectionTimeout instead of the OS-level Errno::ETIMEDOUT.
           Net::SSH.start(primary_address.ip, "root",
             keys: ["#{CloudModel.config.data_directory}/keys/id_rsa"],
             keys_only: true,
@@ -317,6 +327,10 @@ module CloudModel
 
     def exec command
       Rails.logger.debug "EXEC: #{command}"
+      # Echo the remote command into the running flow's console — with only
+      # the step names the live log gives no clue WHAT a step was doing when
+      # it failed. Outside a capture (monitoring, rails console) stay quiet.
+      puts "\n      $ #{command}" if $stdout.is_a? CloudModel::StdoutTee
 
       stdout_data = ''
       stderr_data = {}
@@ -363,6 +377,16 @@ module CloudModel
       stdout = stdout_data
       unless success
         stdout += "\n\n" + stderr_data.values * "\n"
+      end
+
+      # Echo the command's result under the `$ command` line — truncated so
+      # chatty commands (mount, check lists) don't drown the console; the
+      # full output is in Rails.logger.debug above either way.
+      if $stdout.is_a? CloudModel::StdoutTee
+        lines = stdout.lines
+        shown = lines.first(12).map { |l| "        #{l.chomp}" }
+        shown << "        … (#{lines.size - 12} more lines)" if lines.size > 12
+        puts shown.join("\n") unless shown.empty?
       end
 
       return [success, stdout]
@@ -417,8 +441,19 @@ module CloudModel
         end
 
         success, result = exec('cat /proc/cpuinfo')
-        if success
-          name = result.lines.select{|l| l =~ /model name/}.first.split(':')[1].strip
+        # ARM kernels (e.g. aarch64 VMs) have no "model name" in cpuinfo —
+        # fall back to lscpu's "Model name" there.
+        line = success && result.lines.find{|l| l =~ /model name/}
+        unless line
+          success, result = exec('lscpu')
+          line = success && result.lines.find{|l| l =~ /Model name/}
+        end
+        name = line && line.split(':')[1].to_s.strip
+        if name.blank? or name == '-' # QEMU's virtual CPU reports no model
+          success, machine = exec('uname -m')
+          name = success ? "Unknown (#{machine.strip})" : nil
+        end
+        if name
           update_attribute :cpu_name, name
           name
         else
@@ -505,6 +540,7 @@ module CloudModel
       end
 
       update_attribute :deploy_state, :pending
+      reset_live_log
 
       begin
         CloudModel::HostJobs::DeployJob.perform_later id.to_s
@@ -531,6 +567,7 @@ module CloudModel
       end
 
       update_attribute :deploy_state, :pending
+      reset_live_log
 
       begin
         CloudModel::HostJobs::RedeployJob.perform_later id.to_s

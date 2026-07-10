@@ -470,15 +470,6 @@ describe CloudModel::Workers::HostWorker do
     end
   end
 
-  describe 'config_lxd' do
-    it 'should init lxd and create network bridge' do
-      allow(host).to receive(:private_address).and_return('10.42.0.1')
-      allow(host).to receive(:private_network).and_return(double(subnet: 24))
-
-      subject.config_lxd
-    end
-  end
-
   describe 'recover_lxd' do
     it 'should be defined' do
       expect(subject).to respond_to(:recover_lxd)

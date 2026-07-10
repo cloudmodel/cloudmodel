@@ -18,14 +18,23 @@ ExecStartPre=-/sbin/zpool create <%= zpool.name.to_s.shellescape %> <%=raw zpool
 ExecStartPre=-/sbin/zpool import -f <%= zpool.name.to_s.shellescape%>
 
 <%- end -%>
-# Init lxd if zpool create did not exit with error code aka create success
-ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool default
+# Init lxd if zpool create did not exit with error code aka create success.
+# --storage-pool names the ZFS pool to use (the LXD pool is always created
+# as "default") — it must reference the guests zpool created above, else
+# lxd init tries to conjure a zpool "default" and fails, leaving LXD
+# without any storage pool while the network create below still succeeds.
+ExecStartPre=-/usr/bin/lxd init --auto --storage-backend zfs --storage-pool guests
 
 <%- host.extra_zpools.each do |zpool| -%>
 ExecStartPre=-/usr/bin/lxc storage create <%= zpool.name.shellescape %> zfs source=<%= zpool.name.shellescape %>
 
 <%- end -%>
 ExecStartPre=-/usr/bin/lxc network create lxdbr0 ipv6.address=none ipv4.address=<%= host.private_address %>/<%= host.private_network.subnet %> ipv4.nat=true
+# lxd init above creates lxdbr0 itself with a RANDOM subnet, making the
+# create a silent no-op — force the intended config either way.
+ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv4.address <%= host.private_address %>/<%= host.private_network.subnet %>
+ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv4.nat true
+ExecStartPre=-/usr/bin/lxc network set lxdbr0 ipv6.address none
 
 ExecStart=/bin/echo 'done'
 

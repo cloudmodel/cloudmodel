@@ -37,6 +37,19 @@ module CloudModel
         Rails.logger.warn "Could not restart live log: #{e.message}"
       end
 
+      # Clear the console and step badge the moment a new flow is ENQUEUED —
+      # a pending flow still showing the previous run's failed step ("Geplant
+      # — (2/11) …") reads as if it were already mid-flight. The job itself
+      # still does its lazy restart_live_log on first output (with_live_log),
+      # which also covers flows run without going through an enqueue method.
+      def reset_live_log
+        self.live_log = ''
+        self.live_log_step = self.live_log_step_counter = self.live_log_step_total = nil
+        set live_log: '', live_log_step: nil, live_log_step_counter: nil, live_log_step_total: nil
+      rescue => e
+        Rails.logger.warn "Could not reset live log: #{e.message}"
+      end
+
       # First real activity of a pending flow performs the deferred restart
       # (see with_live_log).
       def ensure_live_log_started

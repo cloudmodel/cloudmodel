@@ -2,25 +2,52 @@ module CloudModel
   module Workers
     # Worker that builds {CloudModel::GuestCoreTemplate} and {CloudModel::GuestTemplate} images.
     #
+    # Builds happen inside a per-template ZFS dataset ({CloudModel::BuildZfsVolume}).
     # For core templates: bootstraps an Ubuntu/Debian root, installs utilities,
-    # networking, SSH, and the check_mk monitoring agent, then tarballs the result.
+    # networking, SSH, and the check_mk monitoring agent, then commits the
+    # dataset as a ready snapshot.
     #
-    # For full guest templates: unpacks the core template, installs each component
-    # listed in the {CloudModel::GuestTemplateType}, creates an LXD metadata
-    # tarball, and downloads/archives both artefacts.
+    # For full guest templates: clones the core template's ready snapshot,
+    # installs each component listed in the {CloudModel::GuestTemplateType},
+    # writes the LXD metadata, and commits. Deploys then `zfs clone` the
+    # committed snapshot — no tarballs are packed or synced.
     class GuestTemplateWorker < TemplateWorker
       include CloudModel::Workers::Mixins::CheckMkAgentGuestPlugins
 
+      def zfs_volume
+        @zfs_volume ||= @template.build_volume @host
+      end
+
+      # The template's rootfs inside the build dataset (LXD container layout)
       def build_path
-        if @template.is_a? CloudModel::GuestCoreTemplate
-          "/cloud/build/core/#{@template.id}"
-        else
-          "/cloud/build/#{@template.template_type.id}/#{@template.id}"
-        end
+        zfs_volume.rootfs_path
       end
 
       def error_log_object
         @template
+      end
+
+      def prepare_build_volume
+        if resuming_build? and zfs_volume.dataset_exists? and not zfs_volume.ready?
+          # Resuming an aborted build (skip_to) — keep what is there
+          zfs_volume.mount!
+        else
+          zfs_volume.prepare!
+        end
+        mkdir_p build_path
+        mkdir_p download_path
+      end
+
+      # True when the current build was started with skip_to, i.e. it resumes
+      # an earlier, aborted build instead of starting fresh.
+      def resuming_build?
+        @build_options.present? and @build_options[:skip_to].present?
+      end
+
+      def commit_build_volume
+        cleanup_chroot build_path
+        zfs_volume.commit!
+        zfs_volume.unmount!
       end
 
       def install_utils
@@ -81,48 +108,30 @@ module CloudModel
         chroot! build_path, "ln -s /etc/systemd/system/cgroup_load_writer.timer /etc/systemd/system/timers.target.wants/cgroup_load_writer.timer", "Failed to enable cgroup_load_writer service"
       end
 
-      def pack_template
-        @template.update_attribute :build_state, :packaging
-        tar_template build_path, @template
+      # Strips data that must not be shared between containers cloned from
+      # this template (the tarball flow excluded these from the tar):
+      # SSH host keys + machine-id (see {BuildZfsVolume#scrub_identity!}),
+      # caches, temp files, and docs.
+      def cleanup_template
+        comment_sub_step 'Clean apt caches'
+        chroot! build_path, "apt-get clean", "Failed to clean apt caches"
+
+        comment_sub_step 'Remove ssh host keys and machine id'
+        zfs_volume.scrub_identity!
+        render_to_remote "/cloud_model/guest/etc/systemd/system/regenerate_ssh_host_keys.service", "#{build_path}/etc/systemd/system/regenerate_ssh_host_keys.service"
+        chroot! build_path, "ln -sf /etc/systemd/system/regenerate_ssh_host_keys.service /etc/systemd/system/multi-user.target.wants/regenerate_ssh_host_keys.service", "Failed to enable ssh host key regeneration"
+
+        comment_sub_step 'Clear temporary files and docs'
+        @host.exec! "rm -rf #{build_path}/tmp/* #{build_path}/var/tmp/* #{build_path}/run/* #{build_path}/var/cache/* #{build_path}/usr/share/man/* #{build_path}/usr/share/doc/*", "Failed to clear temporary files"
       end
 
-      def pack_manifest
-        mkdir_p "#{build_path}/templates"
-        render_to_remote "/cloud_model/guest_template/metadata.yaml", "#{build_path}/metadata.yaml", template: @template
+      # Renders the LXD image metadata beside the rootfs. Cloned containers
+      # carry it at their dataset root, as LXD expects.
+      def write_lxd_metadata
+        mkdir_p "#{@template.build_mountpoint}/templates"
+        render_to_remote "/cloud_model/guest_template/metadata.yaml", "#{@template.build_mountpoint}/metadata.yaml", template: @template
         %w(hosts.tpl hostname.tpl).each do |file|
-          render_to_remote "/cloud_model/guest_template/#{file}", "#{build_path}/templates/#{file}", template: @template
-        end
-
-        @host.exec! "cd #{build_path} && tar czvf #{@template.lxd_image_metadata_tarball} metadata.yaml templates/*", "Failed to write metadata"
-      end
-
-      def download_template template
-        return if CloudModel.config.skip_sync_images
-
-        super template
-
-        unless template.is_a? CloudModel::GuestCoreTemplate
-          # Download build template to local distribution
-          tarball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"
-          FileUtils.mkdir_p File.dirname(tarball_target)
-          command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape} #{tarball_target.shellescape}"
-          Rails.logger.debug command
-          local_exec! command, "Failed to download archived metadata"
-        end
-      end
-
-      def upload_template template
-        return if CloudModel.config.skip_sync_images
-
-        super template
-
-        unless template.is_a? CloudModel::GuestCoreTemplate
-          # Upload build template to host
-          srcball_target = "#{CloudModel.config.data_directory}#{template.lxd_image_metadata_tarball}"
-          mkdir_p File.dirname(template.tarball)
-          command = "scp -C -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa #{srcball_target.shellescape} root@#{@host.ssh_address}:#{template.lxd_image_metadata_tarball.shellescape}"
-          Rails.logger.debug command
-          local_exec! command, "Failed to upload built metadata"
+          render_to_remote "/cloud_model/guest_template/#{file}", "#{@template.build_mountpoint}/templates/#{file}", template: @template
         end
       end
 
@@ -133,60 +142,44 @@ module CloudModel
         end
 
         @template = template
-
         template.update_attributes build_state: :running, os_version: os_version
 
-        mkdir_p build_path
-        mkdir_p download_path
-
         steps = [
+          ["Prepare build volume", :prepare_build_volume, no_skip: true],
           ["Download #{os_version}", :fetch_os],
           ["Update base system", :update_base],
           ["Install basic utils", :install_utils],
           ["Install network utils", :install_network],
           ["Install SSH server", :install_ssh],
           ["Install check_mk agent for monitoring", :install_check_mk_agent],
-          ["Pack template tarball", :pack_template],
-          ["Download template tarball", :download_new_template],
-          ["Finalize", :finalize_template]
+          ["Commit build volume", :commit_build_volume, no_skip: true]
         ]
 
-
-        if options[:prepend_output]
-          puts options[:prepend_output]
-        end
-
-        begin
-          run_steps :build, steps, options
-        rescue Exception => e
-          CloudModel.log_exception e
-          template.update_attributes build_state: :failed, build_last_issue: "#{e}"
-          cleanup_chroot build_path
-          raise "Failed to build core image!"
-        end
-
-        template.update_attributes build_state: :finished, build_last_issue: ""
-
-        return template
+        run_template_build steps, "Failed to build core image!", options
       end
 
       #---
 
-      def fetch_core_template
+      # Makes sure the template's core template exists and its volume is
+      # ready on this host (synced from another host or built if missing).
+      def ensure_core_template
         if @template.core_template.blank?
-          @template.core_template = CloudModel::GuestCoreTemplate.create! arch: @host.arch, os_version: @template.os_version
-          @template.core_template.build! @host
+          @template.update_attributes core_template: CloudModel::GuestCoreTemplate.create!(arch: @host.arch, os_version: @template.os_version)
+        end
+        core_template = @template.core_template
+
+        unless core_template.build_volume(@host).ready?
+          comment_sub_step "Core template not available on host, syncing or building it"
+          core_template.ensure_build_volume! @host
         end
 
-        begin
-          @host.sftp.stat!("#{@template.core_template.tarball}")
-        rescue
-          comment_sub_step "Downloading core template"
-          upload_template @template.core_template
-        end
-        @host.exec! "cd #{build_path} && tar xzpf #{@template.core_template.tarball.shellescape}", "Failed to unpack core template"
-        # Copy resolv.conf
-        @host.exec! "rm #{build_path}/etc/resolv.conf", "Failed to remove old resolve conf"
+        core_template
+      end
+
+      def clone_core_template
+        core_template = ensure_core_template
+        zfs_volume.prepare_from! core_template.build_dataset
+        # Copy resolv.conf so the chroot can resolve during component install
         @host.exec! "cp /etc/resolv.conf #{build_path}/etc", "Failed to copy resolve conf"
       end
 
@@ -210,21 +203,30 @@ module CloudModel
         return false unless template.build_state == :pending or options[:force]
 
         @template = template
-
         template.update_attributes build_state: :running
 
-        mkdir_p build_path
-        mkdir_p download_path
-
         steps = [
-          ["Download Core Template #{@template.core_template.try(:id)} (#{@template.created_at})", :fetch_core_template],
+          ["Clone core template #{template.core_template.try(:id)}", :clone_core_template, no_skip: true],
           ["Install Components", :install_components],
-          ["Pack template tarball", :pack_template],
-          ["Create lxd manifest", :pack_manifest],
-          ["Download template tarball", :download_new_template],
-          ["Finalize", :finalize_template]
+          ["Write LXD metadata", :write_lxd_metadata],
+          # A skipped cleanup would silently commit a template with shared
+          # identity; the step is idempotent. Uids stay unshifted — LXD
+          # remaps each cloned container on first start
+          # (see LxdContainer#attach_template_volume).
+          ["Cleanup template for cloning", :cleanup_template, no_skip: true],
+          ["Commit build volume", :commit_build_volume, no_skip: true]
         ]
 
+        run_template_build steps, "Failed to build guest template!", options
+      end
+
+      private
+
+      # Shared build runner: runs the steps, transitions build_state, marks
+      # the volume failed and re-raises on error. @template must be set and
+      # :running already recorded by the caller.
+      def run_template_build steps, failure_message, options
+        @build_options = options
 
         if options[:prepend_output]
           puts options[:prepend_output]
@@ -234,51 +236,15 @@ module CloudModel
           run_steps :build, steps, options
         rescue Exception => e
           CloudModel.log_exception e
-          template.update_attributes build_state: :failed, build_last_issue: "#{e}"
+          @template.update_attributes build_state: :failed, build_last_issue: "#{e}"
           cleanup_chroot build_path
-          raise "Failed to build core image!"
+          zfs_volume.fail!
+          raise failure_message
         end
 
-        template.update_attributes build_state: :finished, build_last_issue: ""
+        @template.update_attributes build_state: :finished, build_last_issue: "", build_host: @host
 
-        return template
-        #----
-
-        begin
-
-
-          template.template_type.components.each do |component_type|
-            begin
-              component_const = "CloudModel::Components::#{component_type.to_s.gsub(/[^a-z0-9]*/, '').camelcase}ComponentWorker".constantize
-              component = component_const.new @host
-            rescue Exception => e
-              CloudModel.log_exception e
-              raise "Component :#{component_type} has no worker"
-            end
-            component.build build_path
-          end
-
-          puts '    Packaging'
-          template.update_attribute :build_state, :packaging
-          pack_template build_path, template
-
-          puts '    Downloading'
-          template.update_attribute :build_state, :downloading
-          download_template template
-
-          template.update_attribute :build_state, :finished
-        rescue Exception => e
-          CloudModel.log_exception e
-          template.update_attributes build_state: :failed, build_last_issue: "#{e}"
-          cleanup_chroot build_path
-          raise "Failed to build core image!"
-        end
-
-        puts "    Cleanup"
-        cleanup_chroot build_path
-        @host.exec "rm -rf #{build_path.shellescape}"
-
-        return template
+        return @template
       end
     end
   end

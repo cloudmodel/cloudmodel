@@ -188,6 +188,29 @@ describe CloudModel::GuestCoreTemplate do
     end
   end
 
+  describe 'build_on!' do
+    it 'should build the core template on the given host via its worker' do
+      host = double CloudModel::Host
+      worker = double CloudModel::Workers::GuestTemplateWorker
+      allow(subject).to receive(:worker).with(host).and_return(worker)
+      expect(worker).to receive(:build_core_template).with(subject)
+
+      subject.build_on! host
+    end
+  end
+
+  describe 'build_dataset' do
+    it 'should return the ZFS dataset the template is built in' do
+      expect(subject.build_dataset).to eq "guests/build/core/#{subject.id}"
+    end
+  end
+
+  describe 'build_mountpoint' do
+    it 'should return the mountpoint of the build dataset' do
+      expect(subject.build_mountpoint).to eq "/cloud/build/core/#{subject.id}"
+    end
+  end
+
   describe 'tarball' do
     it 'should return path to templates tarball' do
       expect(subject.tarball).to eq "/cloud/templates/core/#{subject.id}.tar.gz"
