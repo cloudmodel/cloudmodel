@@ -383,9 +383,13 @@ module CloudModel
                 hash[context][name] ||= {}
                 keys.each_with_index { |k, i| hash[context][name][k] = vals[i] if vals[i] }
               end
-            when 'ntp', 'kernel_log', 'updates', 'edac', 'cgroup_limits'
+            when 'ntp', 'kernel_log', 'updates', 'edac', 'cgroup_limits', 'versions'
               key, value = line.strip.split(' ', 2)
               hash[context][key] = value if key
+            when 'packages'
+              # name<TAB>version<TAB>arch — full dpkg inventory for auditing
+              name, version, arch = line.strip.split("\t")
+              hash[context][name] = {'version' => version, 'arch' => arch} if name and not name.empty?
             when 'diskstats'
               # /proc/diskstats: major minor name reads reads_merged
               # sectors_read ms_reading writes writes_merged sectors_written
@@ -437,7 +441,9 @@ module CloudModel
                   else
                     hash[context][_systemd_unit] ||= {}
                     hash[context][_systemd_unit]['status'] ||= ''
-                    hash[context][_systemd_unit]['status'] << line.force_encoding('ASCII-8BIT').encode("UTF-8", invalid: :replace, undef: :replace)
+                    # systemctl output is UTF-8 (`●` bullets) — tag it as such and
+                    # only replace genuinely invalid bytes; strip ANSI escapes.
+                    hash[context][_systemd_unit]['status'] << line.dup.force_encoding(Encoding::UTF_8).scrub.gsub(/\e\[[0-9;]*[A-Za-z]/, '')
                     #puts "#{_systemd_unit}: #{hash[context][_systemd_unit]['status']}"
                   end
 

@@ -1,0 +1,7 @@
+#!/bin/bash
+# Full installed-package inventory (name, version, arch) for auditing — lets
+# operators cross-check running package versions against advisories. Low
+# churn and a few hundred lines, so this plugin is deployed into a cached
+# subdir (see CACHED_PLUGINS) and only re-runs hourly.
+echo "<<<packages>>>"
+dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' 2>/dev/null

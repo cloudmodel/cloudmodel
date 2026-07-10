@@ -1,0 +1,26 @@
+#!/bin/bash
+# Live software versions of the running system (host or guest). The check_mk
+# agent's own <<<check_mk>>> section only carries the agent version and
+# "AgentOS: linux" — not the distro release, kernel, or ZFS/LXD versions, so
+# collect them here. zpool/lxc only exist on hosts; guarded so the same
+# plugin is a no-op for those lines inside a container.
+echo "<<<versions>>>"
+
+# /etc/os-release: ID / VERSION_ID / PRETTY_NAME (e.g. debian / 12 / "Debian …")
+if [ -r /etc/os-release ]; then
+  . /etc/os-release 2>/dev/null
+  echo "os_id ${ID}"
+  echo "os_version ${VERSION_ID}"
+  echo "os_pretty ${PRETTY_NAME}"
+fi
+
+echo "kernel $(uname -r)"
+echo "arch $(uname -m)"
+
+if command -v zfs >/dev/null 2>&1; then
+  echo "zfs $(zfs version 2>/dev/null | head -1 | sed 's/^zfs-//')"
+fi
+
+if command -v lxc >/dev/null 2>&1; then
+  echo "lxd $(lxc version 2>/dev/null | sed -n 's/^Server version: *//p')"
+fi

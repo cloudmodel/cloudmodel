@@ -16,11 +16,12 @@ module CloudModel
         # Guest plugins run on every agent poll. Host-only sensors (conntrack,
         # net_dev, ntp, kernel_log, diskstats, updates, edac) are intentionally
         # absent — those are host-kernel concerns and GuestChecks never uses them.
-        GUEST_PLUGINS = %w(cgroup_mem cgroup_cpu cgroup_limits df_k systemd guest_load).freeze
+        # `versions` runs everywhere (its zpool/lxc lines self-skip in a container).
+        GUEST_PLUGINS = %w(cgroup_mem cgroup_cpu cgroup_limits df_k systemd guest_load versions).freeze
 
-        # Cached (async) guest plugins: { cache_seconds => plugin_name }. None
-        # yet; kept for symmetry with the host set so adding one is a one-liner.
-        GUEST_CACHED_PLUGINS = {}.freeze
+        # Cached (async) guest plugins: { cache_seconds => [plugin_names] }.
+        # The package inventory is audit-relevant for containers too.
+        GUEST_CACHED_PLUGINS = { '3600' => %w(packages) }.freeze
 
         TEMPLATE_DIR = '/cloud_model/support/usr/lib/check_mk_agent/plugins'.freeze
 
@@ -39,9 +40,11 @@ module CloudModel
           GUEST_PLUGINS.each do |plugin|
             render_to_remote "#{TEMPLATE_DIR}/#{plugin}", "#{plugins_dir}/#{plugin}", 0755
           end
-          GUEST_CACHED_PLUGINS.each do |cache_seconds, plugin|
+          GUEST_CACHED_PLUGINS.each do |cache_seconds, plugins|
             mkdir_p "#{plugins_dir}/#{cache_seconds}"
-            render_to_remote "#{TEMPLATE_DIR}/#{plugin}", "#{plugins_dir}/#{cache_seconds}/#{plugin}", 0755
+            plugins.each do |plugin|
+              render_to_remote "#{TEMPLATE_DIR}/#{plugin}", "#{plugins_dir}/#{cache_seconds}/#{plugin}", 0755
+            end
           end
 
           render_to_remote '/cloud_model/support/usr/sbin/cgroup_load_writer', "#{base_path}/usr/sbin/cgroup_load_writer", 0755
@@ -61,9 +64,11 @@ module CloudModel
           GUEST_PLUGINS.each do |plugin|
             push_file_to_guest cname, "#{TEMPLATE_DIR}/#{plugin}", "#{PLUGINS_DIR}/#{plugin}", plugin
           end
-          GUEST_CACHED_PLUGINS.each do |cache_seconds, plugin|
+          GUEST_CACHED_PLUGINS.each do |cache_seconds, plugins|
             guest.exec! "mkdir -p #{PLUGINS_DIR}/#{cache_seconds}", "Failed to create cache dir in #{cname}"
-            push_file_to_guest cname, "#{TEMPLATE_DIR}/#{plugin}", "#{PLUGINS_DIR}/#{cache_seconds}/#{plugin}", plugin
+            plugins.each do |plugin|
+              push_file_to_guest cname, "#{TEMPLATE_DIR}/#{plugin}", "#{PLUGINS_DIR}/#{cache_seconds}/#{plugin}", plugin
+            end
           end
 
           # Also refresh the cgroup CPU-usage history writer that feeds the

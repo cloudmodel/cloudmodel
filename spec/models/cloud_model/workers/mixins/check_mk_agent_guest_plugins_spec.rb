@@ -50,6 +50,28 @@ describe CloudModel::Workers::Mixins::CheckMkAgentGuestPlugins do
         '/cloud_model/support/usr/sbin/cgroup_load_writer', '/cloud/build/guest/1/usr/sbin/cgroup_load_writer', 0755
       )
     end
+
+    it 'renders cached guest plugins (packages) into their cache subdir' do
+      allow(worker).to receive(:mkdir_p)
+
+      worker.render_check_mk_guest_plugins '/cloud/build/guest/1'
+
+      described_class::GUEST_CACHED_PLUGINS.each do |cache_seconds, plugins|
+        expect(worker).to have_received(:mkdir_p).with("/cloud/build/guest/1/usr/lib/check_mk_agent/plugins/#{cache_seconds}")
+        plugins.each do |plugin|
+          expect(worker).to have_received(:render_to_remote).with(
+            "/cloud_model/support/usr/lib/check_mk_agent/plugins/#{plugin}",
+            "/cloud/build/guest/1/usr/lib/check_mk_agent/plugins/#{cache_seconds}/#{plugin}",
+            0755
+          )
+        end
+      end
+    end
+
+    it 'includes versions in guest plugins and packages in cached guest plugins' do
+      expect(described_class::GUEST_PLUGINS).to include('versions')
+      expect(described_class::GUEST_CACHED_PLUGINS.values.flatten).to include('packages')
+    end
   end
 
   describe '#deploy_check_mk_plugins (live)' do

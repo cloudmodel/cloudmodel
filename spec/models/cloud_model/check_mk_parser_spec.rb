@@ -325,6 +325,27 @@ describe CloudModel::CheckMkParser do
       expect(result['updates']['security_updates']).to eq '3'
     end
 
+    it 'should parse versions section (value keeps spaces)' do
+      result = CloudModel::CheckMkParser.parse "<<<versions>>>\nos_id debian\nos_version 12\nos_pretty Debian GNU/Linux 12 (bookworm)\nkernel 6.1.0-cloud-amd64\narch x86_64\nzfs 2.1.11-1\nlxd 5.0.2\n"
+      expect(result['versions']['os_id']).to eq 'debian'
+      expect(result['versions']['os_version']).to eq '12'
+      expect(result['versions']['os_pretty']).to eq 'Debian GNU/Linux 12 (bookworm)'
+      expect(result['versions']['kernel']).to eq '6.1.0-cloud-amd64'
+      expect(result['versions']['zfs']).to eq '2.1.11-1'
+      expect(result['versions']['lxd']).to eq '5.0.2'
+    end
+
+    it 'should parse packages section into name => version/arch' do
+      result = CloudModel::CheckMkParser.parse "<<<packages>>>\nbash\t5.2.15-2\tamd64\nzfsutils-linux\t2.1.11-1\tamd64\n"
+      expect(result['packages']['bash']).to eq({'version' => '5.2.15-2', 'arch' => 'amd64'})
+      expect(result['packages']['zfsutils-linux']['version']).to eq '2.1.11-1'
+    end
+
+    it 'should parse a cached packages section (strips the :cached annotation)' do
+      result = CloudModel::CheckMkParser.parse "<<<packages:cached(1700000000,3600)>>>\nbash\t5.2.15-2\tamd64\n"
+      expect(result['packages']['bash']['version']).to eq '5.2.15-2'
+    end
+
     it 'should parse edac section' do
       result = CloudModel::CheckMkParser.parse "<<<edac>>>\nce_count 4\nue_count 0\n"
       expect(result['edac']['ce_count']).to eq '4'
@@ -390,6 +411,17 @@ describe CloudModel::CheckMkParser do
         result = CloudModel::CheckMkParser.parse input
         expect(result['systemd_units']['']['status']).to include 'Active: active (running)'
         expect(result['systemd_units']['']['status']).to include 'ssh.service'
+      end
+
+      it 'should keep UTF-8 bullets intact and strip ANSI escapes in status lines' do
+        input = "<<<systemd_units>>>\n" \
+                "[status]\n" \
+                "\e[0;1;32m●\e[0m ssh.service - OpenSSH\n" \
+                "   Active: active (running)\n"
+        result = CloudModel::CheckMkParser.parse input.dup.force_encoding('ASCII-8BIT')
+        expect(result['systemd_units']['']['status']).to include '● ssh.service'
+        expect(result['systemd_units']['']['status']).not_to include "\e["
+        expect(result['systemd_units']['']['status']).not_to include "�"
       end
     end
 

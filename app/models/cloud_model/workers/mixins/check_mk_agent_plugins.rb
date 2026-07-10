@@ -12,14 +12,14 @@ module CloudModel
         # Plugins that run on every agent poll.
         PLUGINS = %w(
           cgroup_cpu zfs lxd sensors smart systemd
-          nf_conntrack net_dev ntp diskstats edac
+          nf_conntrack net_dev ntp diskstats edac versions
         ).freeze
 
         # Heavier / low-churn plugins, deployed into a subdir named after a
         # number of seconds so the agent runs them asynchronously and caches
         # their output for that long instead of on every poll:
-        # `{ cache_seconds => plugin_name }`.
-        CACHED_PLUGINS = { '3600' => 'updates', '120' => 'kernel_log' }.freeze
+        # `{ cache_seconds => [plugin_names] }`.
+        CACHED_PLUGINS = { '3600' => %w(updates packages), '120' => %w(kernel_log) }.freeze
 
         TEMPLATE_DIR = '/cloud_model/support/usr/lib/check_mk_agent/plugins'.freeze
 
@@ -37,9 +37,11 @@ module CloudModel
             render_to_remote "#{TEMPLATE_DIR}/#{plugin}", "#{plugins_dir}/#{plugin}", 0755
           end
 
-          CACHED_PLUGINS.each do |cache_seconds, plugin|
+          CACHED_PLUGINS.each do |cache_seconds, plugins|
             mkdir_p "#{plugins_dir}/#{cache_seconds}"
-            render_to_remote "#{TEMPLATE_DIR}/#{plugin}", "#{plugins_dir}/#{cache_seconds}/#{plugin}", 0755
+            plugins.each do |plugin|
+              render_to_remote "#{TEMPLATE_DIR}/#{plugin}", "#{plugins_dir}/#{cache_seconds}/#{plugin}", 0755
+            end
           end
 
           # The cgroup CPU-usage history writer feeds the cgroup_cpu plugin —
