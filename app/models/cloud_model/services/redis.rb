@@ -61,7 +61,10 @@ module CloudModel
       end
 
       def redis_sentinel_slave?
-        not redis_sentinel_master?
+        # A standalone Redis (no sentinel set) is neither master nor slave in
+        # the sentinel sense — only emit `slaveof` when it actually belongs to
+        # a set and is not that set's master.
+        redis_sentinel_set.present? && !redis_sentinel_master?
       end
 
       def redis_sentinel_set_version
