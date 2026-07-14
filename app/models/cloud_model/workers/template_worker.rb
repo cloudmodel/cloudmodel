@@ -98,6 +98,17 @@ module CloudModel
         # chroot build_path, "apt-get install software-properties-common -y"#, "Failed to update sources"
         # chroot! build_path, "apt-add-repository contrib -y", "Failed to update sources"
         chroot! build_path, 'sed -r -i "s/^deb(.*)$/deb\1 contrib/g" /etc/apt/sources.list', "Failed to update sources"
+
+        # debootstrap writes only the base suite — add -security and -updates
+        # so guests actually receive security fixes. Without -security, the
+        # newest nginx-core (a security release) is invisible here, which
+        # breaks Passenger: its module pins the exact -security nginx-core
+        # version and apt can only offer the older point-release one.
+        codename = CloudModel.debian_short_name(os_version).shellescape
+        chroot! build_path,
+          "printf 'deb http://security.debian.org/debian-security %s-security main contrib\\ndeb http://ftp.de.debian.org/debian %s-updates main contrib\\n' #{codename} #{codename} >> /etc/apt/sources.list",
+          "Failed to add security/updates sources"
+
         chroot! build_path, 'apt update', "Failed to update sources"
 
         # apt-get install debootstrap
