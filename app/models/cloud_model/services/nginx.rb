@@ -126,7 +126,11 @@ module CloudModel
         end
 
         if passenger_supported or capistrano_supported
-          components = [:"ruby@#{passenger_ruby_version}"] + components
+          # The deployed web image's ruby_version is the source of truth — the
+          # runtime Ruby that Passenger boots must match the one the artifact was
+          # built against. Fall back to passenger_ruby_version when unset.
+          ruby = deploy_web_image&.ruby_version.presence || passenger_ruby_version
+          components = [:"ruby@#{ruby}"] + components
           if deploy_web_image
             components += deploy_web_image.additional_components.map &:to_sym
           end

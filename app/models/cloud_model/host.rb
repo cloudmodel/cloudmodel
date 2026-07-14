@@ -68,6 +68,38 @@ module CloudModel
     field :initial_root_pw, type: String
     field :cpu_name, type: String
     field :cpu_count, type: Integer, default: -1
+    # Debian architecture names. amd64/arm64 are tested end-to-end; ppc64el,
+    # riscv64 and loong64 are recognized for future use (i18n, forms, arch
+    # detection) but NOT yet validated for template builds or VM provisioning.
+    ARCHITECTURES = %w(amd64 arm64 ppc64el riscv64 loong64).freeze
+    TESTED_ARCHITECTURES = %w(amd64 arm64).freeze
+
+    # Which arches each OS release sensibly supports as an official *release*
+    # architecture (not Debian-ports). Guides valid arch/os_version combos;
+    # keys are matched by prefix so "ubuntu-22.04.4" resolves to "ubuntu-22.04".
+    # Notably: riscv64 is a Debian release arch only from Debian 13 (trixie);
+    # loong64 (LoongArch) has no stable release yet — recognized but with no OS.
+    OS_ARCHITECTURES = {
+      'debian-12'    => %w(amd64 arm64 ppc64el),
+      'debian-13'    => %w(amd64 arm64 ppc64el riscv64),
+      'ubuntu-18.04' => %w(amd64 arm64 ppc64el),
+      'ubuntu-20.04' => %w(amd64 arm64 ppc64el riscv64),
+      'ubuntu-22.04' => %w(amd64 arm64 ppc64el riscv64),
+      'ubuntu-24.04' => %w(amd64 arm64 ppc64el riscv64),
+    }.freeze
+
+    # Arches the given OS version sensibly supports (falls back to the tested
+    # set for an unknown OS). @param os_version [String] e.g. "debian-13"
+    def self.arches_for_os(os_version)
+      key = OS_ARCHITECTURES.keys.find { |k| os_version.to_s.start_with?(k) }
+      key ? OS_ARCHITECTURES[key] : TESTED_ARCHITECTURES
+    end
+
+    # @return [Boolean] whether os_version sensibly runs on arch
+    def self.os_supports_arch?(os_version, arch)
+      arches_for_os(os_version).include?(arch.to_s)
+    end
+
     field :arch, type: String, default: 'amd64'
     field :mac_address_prefix, type: String
     field :system_disks, type: Array, default: ['sda', 'sdb']
@@ -238,11 +270,29 @@ module CloudModel
     end
 
     # The host guest templates are built on, as configured via
-    # `CloudModel.config.build_host_name`.
+    # `CloudModel.config.build_host_name` — either one name for all
+    # architectures or a hash mapping arch to name
+    # (e.g. `{'amd64' => 'core06', 'arm64' => 'host22'}`). Templates are
+    # arch-specific, so builds must happen on a host of the template's arch;
+    # an arch without a configured build host returns nil (the caller then
+    # builds on the target host itself).
+    # @param arch [String, nil] architecture the build is for. On a per-arch
+    #   (hash) config an arch is required; without one there is no meaningful
+    #   build host (building must target a specific platform) → nil.
     # @return [CloudModel::Host, nil] nil if not configured or unknown
-    def self.build_host
-      return nil if CloudModel.config.build_host_name.blank?
-      where(name: CloudModel.config.build_host_name).first
+    def self.build_host arch = nil
+      name = CloudModel.config.build_host_name
+      name = (arch ? (name[arch.to_s] || name[arch.to_s.to_sym]) : nil) if name.is_a? Hash
+      return nil if name.blank?
+      where(name: name).first
+    end
+
+    # The arch an arch-agnostic caller should build for by default: the first
+    # configured build-host arch (hash config), or nil for a plain-string
+    # config that already applies to every arch.
+    def self.default_build_arch
+      name = CloudModel.config.build_host_name
+      name.is_a?(Hash) ? name.keys.first&.to_s : nil
     end
 
     def tinc_private_key
@@ -330,7 +380,19 @@ module CloudModel
       # Echo the remote command into the running flow's console — with only
       # the step names the live log gives no clue WHAT a step was doing when
       # it failed. Outside a capture (monitoring, rails console) stay quiet.
-      puts "\n      $ #{command}" if $stdout.is_a? CloudModel::StdoutTee
+      stream_output = $stdout.is_a? CloudModel::StdoutTee
+      puts "\n      $ #{command}" if stream_output
+      # Long-running commands (debootstrap, apt) stream their output LIVE
+      # into the console line by line; \r counts as a line break so apt
+      # progress updates don't buffer forever.
+      stream_buffer = +''
+      stream_lines = lambda do |data|
+        stream_buffer << data
+        while i = stream_buffer.index(/[\r\n]/)
+          line = stream_buffer.slice!(0..i)
+          puts "        #{line.chomp("\n").chomp("\r")}"
+        end
+      end
 
       stdout_data = ''
       stderr_data = {}
@@ -350,12 +412,14 @@ module CloudModel
           channel.on_data do |ch,data|
             Rails.logger.debug "  STDOUT: #{data}"
             stdout_data += data
+            stream_lines.call data if stream_output
           end
 
           channel.on_extended_data do |ch,type,data|
             Rails.logger.debug "  STDERR: (#{type}): #{data}"
             stderr_data[type] ||= ''
             stderr_data[type] += data
+            stream_lines.call data if stream_output
           end
 
           channel.on_request("exit-status") do |ch,data|
@@ -379,15 +443,8 @@ module CloudModel
         stdout += "\n\n" + stderr_data.values * "\n"
       end
 
-      # Echo the command's result under the `$ command` line — truncated so
-      # chatty commands (mount, check lists) don't drown the console; the
-      # full output is in Rails.logger.debug above either way.
-      if $stdout.is_a? CloudModel::StdoutTee
-        lines = stdout.lines
-        shown = lines.first(12).map { |l| "        #{l.chomp}" }
-        shown << "        … (#{lines.size - 12} more lines)" if lines.size > 12
-        puts shown.join("\n") unless shown.empty?
-      end
+      # Flush a trailing partial line of the live stream
+      puts "        #{stream_buffer}" if stream_output and not stream_buffer.empty?
 
       return [success, stdout]
     end

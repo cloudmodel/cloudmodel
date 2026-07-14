@@ -1,416 +1,154 @@
 require 'spec_helper'
 
 describe CloudModel::Workers::WebImageWorker do
+  let(:host) { double CloudModel::Host, name: 'host23', arch: 'MOS6502', ssh_address: '10.0.0.23' }
+  let(:template) { double CloudModel::GuestTemplate, id: 'tid', name: 'ruby', build_dataset: 'guests/build/1/tid' }
+
   let(:web_image) do
     double 'WebImage',
       id: 'web42',
       name: 'test-app',
       build_path: '/tmp/web_build/web42',
-      build_gem_home: '/tmp/web_build/web42/bundle/ruby/3.4.0',
+      build_dataset: 'guests/build/web/web42/tid-MOS6502',
+      build_mountpoint: '/cloud/build/web/web42/tid-MOS6502',
       git_server: 'git@github.com',
       git_repo: 'org/webapp',
       git_branch: 'main',
       build_state: :pending,
-      has_assets: false,
-      file_id: nil
+      has_assets: false
   end
 
-  subject { CloudModel::Workers::WebImageWorker.new web_image }
+  subject { CloudModel::Workers::WebImageWorker.new host, web_image }
 
-  describe 'checkout_git' do
+  before do
+    allow(web_image).to receive(:build_dataset).with(template, 'MOS6502').and_return 'guests/build/web/web42/tid-MOS6502'
+    allow(web_image).to receive(:build_mountpoint).with(template, 'MOS6502').and_return '/cloud/build/web/web42/tid-MOS6502'
+    allow(subject).to receive(:puts)
+    allow(subject).to receive(:print)
+    allow(subject).to receive(:comment_sub_step)
+  end
+
+  describe 'checkout_git (local, keeps github credentials on admin)' do
     before do
-      allow(File).to receive(:directory?).with(web_image.build_path).and_return(true)
+      allow(FileUtils).to receive(:mkdir_p)
+      allow(File).to receive(:directory?).with("#{web_image.build_path}/.git").and_return(true)
       allow(subject).to receive(:run_with_clean_env).and_return('abc123')
       allow(web_image).to receive(:update_attribute)
-      allow(subject).to receive(:puts)
     end
 
-    it 'should pull latest changes when directory exists' do
+    it 'pulls and hard-resets to the remote branch head' do
       expect(subject).to receive(:run_with_clean_env).with("Pulling", /git fetch.*git checkout -f.*git reset --hard/m)
       subject.checkout_git
     end
 
-    it 'should update git_commit attribute' do
+    it 'records the built commit' do
       expect(web_image).to receive(:update_attribute).with(:git_commit, 'abc123')
       subject.checkout_git
     end
 
-    it 'should return true on success' do
-      expect(subject.checkout_git).to eq true
-    end
-
-    context 'when build directory does not exist' do
-      before do
-        allow(File).to receive(:directory?).with(web_image.build_path).and_return(false)
-        allow(FileUtils).to receive(:mkdir_p).and_return(['/tmp/web_build/web42'])
-      end
-
-      it 'should create the directory and clone the repo' do
-        expect(FileUtils).to receive(:mkdir_p).with(web_image.build_path).and_return(['/tmp/web_build/web42'])
-        expect(subject).to receive(:run_with_clean_env).with("Cloning", /git clone/)
-        expect(subject.checkout_git).to eq true
-      end
-
-      it 'should fail and clean up when clone raises' do
-        allow(FileUtils).to receive(:rm_rf)
-        allow(CloudModel).to receive(:log_exception)
-        allow(web_image).to receive(:update_attributes)
-        allow(subject).to receive(:puts)
-        # The rescue in source calls `puts e.trace`, so the exception must respond to #trace.
-        clone_error = StandardError.new('boom')
-        def clone_error.trace; 'traceback'; end
-        allow(subject).to receive(:run_with_clean_env).with("Cloning", anything).and_raise(clone_error)
-
-        expect(web_image).to receive(:update_attributes).with(build_state: :failed, build_last_issue: /Unable to clone/)
-        expect(FileUtils).to receive(:rm_rf).with(web_image.build_path)
-        expect(subject.checkout_git).to eq false
-      end
-    end
-
-    it 'should fail when pulling raises an ExecutionException' do
-      allow(CloudModel).to receive(:log_exception)
-      allow(web_image).to receive(:update_attributes)
-      allow(subject).to receive(:run_with_clean_env).with("Pulling", anything).and_raise(CloudModel::ExecutionException.new('cmd', 'fail', ''))
-
-      expect(web_image).to receive(:update_attributes).with(build_state: :failed, build_last_issue: /Unable to checkout branch/)
-      expect(subject.checkout_git).to eq false
-    end
-
-    it 'should set a fallback commit hash when git log lookup raises' do
-      allow(CloudModel).to receive(:log_exception)
-      allow(subject).to receive(:run_with_clean_env).with("Pulling", anything).and_return('')
-      allow(subject).to receive(:run_with_clean_env).with("Get Version", anything).and_raise(StandardError.new('no git'))
-
-      expect(web_image).to receive(:update_attribute).with(:git_commit, 'failed to get commit hash')
-      expect(subject.checkout_git).to eq true
+    it 'clones when there is no checkout yet' do
+      allow(File).to receive(:directory?).with("#{web_image.build_path}/.git").and_return(false)
+      expect(subject).to receive(:run_with_clean_env).with("Cloning", /git clone git@github.com:org\/webapp/)
+      subject.checkout_git
     end
   end
 
-  describe 'bundle_image' do
-    it 'should run bundle install' do
-      allow(subject).to receive(:run_with_clean_env)
-      expect(subject).to receive(:run_with_clean_env).with("Bundling", /bundle.*install/)
-      expect(subject.bundle_image).to eq true
+  describe 'volume layout' do
+    it 'clones a throwaway build system next to the app dataset' do
+      subject.instance_variable_set :@template, template
+      subject.instance_variable_set :@arch, 'MOS6502'
+      expect(subject.buildsys_volume.dataset_name).to eq 'guests/build/web/web42/tid-MOS6502-buildenv'
     end
 
-    it 'should skip bundling when Gemfile.lock is unchanged' do
-      lock   = '/tmp/web_build/web42/Gemfile.lock'
-      marker = '/tmp/web_build/web42/.cloudmodel_gemfile.sha'
-      allow(File).to receive(:file?).and_return(false)
-      allow(File).to receive(:file?).with(lock).and_return(true)
-      allow(File).to receive(:file?).with(marker).and_return(true)
-      allow(File).to receive(:read).with(marker).and_return("abc123:#{described_class::DEPENDENCY_INSTALL_FINGERPRINT}\n")
-      allow(Digest::SHA256).to receive(:file).with(lock).and_return(double(hexdigest: 'abc123'))
-      allow(File).to receive(:directory?).with('/tmp/web_build/web42/bundle').and_return(true)
-
-      expect(subject).not_to receive(:run_with_clean_env)
-      expect(subject.bundle_image).to eq true
-    end
-
-    it 'should return false on failure' do
-      allow(subject).to receive(:run_with_clean_env).and_raise(CloudModel::ExecutionException.new('cmd', 'fail', ''))
-      allow(CloudModel).to receive(:log_exception)
-      allow(web_image).to receive(:update_attributes)
-      allow(FileUtils).to receive(:rm_rf)
-
-      expect(subject.bundle_image).to eq false
+    it 'mounts the app volume at the staging path inside the build system' do
+      subject.instance_variable_set :@template, template
+      subject.instance_variable_set :@arch, 'MOS6502'
+      expect(subject.app_volume.dataset_name).to eq 'guests/build/web/web42/tid-MOS6502'
+      expect(subject.app_volume.mountpoint).to end_with described_class::CHROOT_APP_ROOT
     end
   end
 
-  describe 'yarn_install' do
-    it 'should install all yarn packages (incl. dev build tooling, not --production)' do
-      allow(subject).to receive(:run_with_clean_env)
-      # full install (no --production): Vite/Sass build deps are needed to build assets
-      expect(subject).to receive(:run_with_clean_env).with("Yarn install", /yarn install --non-interactive(?! --no-bin-links)/)
-      expect(subject.yarn_install).to eq true
-    end
+  describe 'build_app_volume' do
+    let(:app_volume) { double CloudModel::BuildZfsVolume, prepare!: true, mount!: true, unmount!: true, dataset_exists?: false, dataset_name: 'guests/build/web/web42/tid-MOS6502', mountpoint: '/mnt/ws' }
+    let(:buildsys_volume) { double CloudModel::BuildZfsVolume, prepare_from!: true, destroy!: true, rootfs_path: '/cloud/build/web/web42/tid-MOS6502-buildenv/rootfs' }
 
-    it 'should skip yarn install when yarn.lock is unchanged' do
-      lock   = '/tmp/web_build/web42/yarn.lock'
-      marker = '/tmp/web_build/web42/.cloudmodel_yarn.sha'
-      allow(File).to receive(:file?).and_return(false)
-      allow(File).to receive(:file?).with(lock).and_return(true)
-      allow(File).to receive(:file?).with(marker).and_return(true)
-      allow(File).to receive(:read).with(marker).and_return("def456:#{described_class::DEPENDENCY_INSTALL_FINGERPRINT}\n")
-      allow(Digest::SHA256).to receive(:file).with(lock).and_return(double(hexdigest: 'def456'))
-      allow(File).to receive(:directory?).with('/tmp/web_build/web42/node_modules').and_return(true)
-
-      expect(subject).not_to receive(:run_with_clean_env)
-      expect(subject.yarn_install).to eq true
-    end
-
-    it 'should return false and clean up on failure' do
-      allow(FileUtils).to receive(:rm_rf)
-      allow(CloudModel).to receive(:log_exception)
-      allow(web_image).to receive(:update_attributes)
-      allow(subject).to receive(:run_with_clean_env).and_raise(CloudModel::ExecutionException.new('cmd', 'fail', ''))
-
-      expect(web_image).to receive(:update_attributes).with(build_state: :failed, build_last_issue: 'Unable to install yarn packages.')
-      expect(FileUtils).to receive(:rm_rf).with(web_image.build_gem_home)
-      expect(subject.yarn_install).to eq false
-    end
-  end
-
-  describe 'build_assets' do
-    it 'should precompile rails assets' do
-      allow(FileUtils).to receive(:rm_rf)
-      allow(subject).to receive(:run_with_clean_env)
-      expect(subject).to receive(:run_with_clean_env).with("Building Assets", /assets:precompile/)
-      expect(subject.build_assets).to eq true
-    end
-
-    it 'should return false on failure' do
-      allow(FileUtils).to receive(:rm_rf)
-      allow(subject).to receive(:run_with_clean_env).and_raise(CloudModel::ExecutionException.new('cmd', 'fail', ''))
-      allow(CloudModel).to receive(:log_exception)
-      allow(web_image).to receive(:update_attributes)
-
-      expect(subject.build_assets).to eq false
-    end
-  end
-
-  describe 'package_build' do
     before do
-      # the worker writes a tar --exclude-from list into a sibling file
-      allow(File).to receive(:write)
-      allow(File).to receive(:delete)
-    end
-
-    it 'should create a tar.bz2 package with anchored excludes from a list file' do
-      allow(subject).to receive(:run_within_build_env)
-      allow(FileUtils).to receive(:mv)
-      expect(subject).to receive(:run_within_build_env).with(
-        "Packaging",
-        /tar -cpjf .*--anchored --no-wildcards-match-slash .*--exclude-from=\S*web42-package\.excludes /
-      )
-      expect(subject.package_build).to eq true
-    end
-
-    it 'should write anchored excludes (gem cache + rust target out, runtime code kept)' do
-      allow(subject).to receive(:run_within_build_env)
-      allow(FileUtils).to receive(:mv)
-      expect(File).to receive(:write).with(
-        '/tmp/web_build/web42-package.excludes',
-        satisfy do |c|
-          c.include?("./bundle/ruby/*/cache\n") and          # anchored gem cache, not active_support/cache
-          c.include?('./bundle/ruby/*/bundler/gems/*/ext/*/target') and
-          c.include?("./.git\n") and c.include?("./doc\n") and
-          !c.include?('node_modules') and !c.include?('.bundle/config') and
-          !c.match?(%r{^\*/ext}m)                             # no un-anchored ext globs
-        end
-      )
-      subject.package_build
-    end
-
-    it 'should return false on failure' do
-      allow(subject).to receive(:run_within_build_env).and_raise(CloudModel::ExecutionException.new('cmd', 'fail', ''))
-      allow(CloudModel).to receive(:log_exception)
-      allow(web_image).to receive(:update_attributes)
-
-      expect(subject.package_build).to eq false
-    end
-  end
-
-  describe 'build' do
-    it 'should return false if not pending and not forced' do
-      allow(web_image).to receive(:build_state).and_return(:running)
-      expect(subject.build).to eq false
-    end
-
-    it 'should run full build pipeline when pending' do
       allow(web_image).to receive(:update_attributes)
       allow(web_image).to receive(:update_attribute)
-      allow(subject).to receive(:checkout_git).and_return(true)
-      allow(subject).to receive(:package_build).and_return(true)
-      allow(File).to receive(:file?).and_return(false)
-      file = double 'GridFsFile', id: 'file123'
-      allow(Mongoid::GridFs).to receive(:put).and_return(file)
-
-      expect(web_image).to receive(:update_attributes).with(build_state: :running, build_last_issue: nil, build_log: '')
-      expect(web_image).to receive(:update_attributes).with(build_state: :finished)
-      expect(subject.build).to eq true
-    end
-
-    it 'should run when forced even if not pending' do
-      allow(web_image).to receive(:build_state).and_return(:finished)
-      allow(web_image).to receive(:update_attributes)
-      allow(web_image).to receive(:update_attribute)
-      allow(subject).to receive(:checkout_git).and_return(true)
-      allow(subject).to receive(:package_build).and_return(true)
-      allow(File).to receive(:file?).and_return(false)
-      file = double 'GridFsFile', id: 'file123'
-      allow(Mongoid::GridFs).to receive(:put).and_return(file)
-
-      expect(subject.build(force: true)).to eq true
-    end
-
-    it 'should clean the build path when :clean option is given' do
-      allow(web_image).to receive(:update_attributes)
-      allow(web_image).to receive(:update_attribute)
-      allow(subject).to receive(:checkout_git).and_return(true)
-      allow(subject).to receive(:package_build).and_return(true)
-      allow(File).to receive(:file?).and_return(false)
-      allow(Mongoid::GridFs).to receive(:put).and_return(double('GridFsFile', id: 'file123'))
-      allow(FileUtils).to receive(:rm_rf)
-
-      expect(FileUtils).to receive(:rm_rf).with(web_image.build_path)
-      subject.build(clean: true)
-    end
-
-    it 'should run bundle, yarn and assets steps when files/flags present' do
-      allow(web_image).to receive(:has_assets).and_return(true)
-      allow(web_image).to receive(:update_attributes)
-      allow(web_image).to receive(:update_attribute)
-      allow(subject).to receive(:checkout_git).and_return(true)
-      allow(subject).to receive(:package_build).and_return(true)
+      allow(web_image).to receive(:record_artifact_size)
+      allow(web_image).to receive(:record_artifact_version)
+      allow(template).to receive(:ensure_build_volume!)
+      allow(host).to receive(:exec!)
+      allow(host).to receive(:exec).and_return([true, '123456'])
+      allow(subject).to receive(:buildsys_volume).and_return buildsys_volume
+      allow(subject).to receive(:app_volume).and_return app_volume
+      allow(subject).to receive(:checkout_git)
+      allow(subject).to receive(:transfer_source)
+      allow(subject).to receive(:configure_git_credentials)
+      allow(subject).to receive(:cleanup_chroot)
+      allow(subject).to receive(:chroot!)
       allow(File).to receive(:file?).and_return(true)
-      allow(Mongoid::GridFs).to receive(:put).and_return(double('GridFsFile', id: 'file123'))
-
-      expect(subject).to receive(:bundle_image).and_return(true)
-      expect(subject).to receive(:yarn_install).and_return(true)
-      expect(subject).to receive(:build_assets).and_return(true)
-      expect(subject.build).to eq true
     end
 
-    it 'should return false when checkout_git fails' do
-      allow(web_image).to receive(:update_attributes)
-      allow(subject).to receive(:checkout_git).and_return(false)
+    it 'runs the pipeline, snapshots a version and keeps the workspace' do
+      expect(subject).to receive(:checkout_git).ordered
+      expect(buildsys_volume).to receive(:prepare_from!).with('guests/build/1/tid').ordered
+      expect(app_volume).to receive(:prepare!).ordered   # first build (dataset_exists? false)
+      expect(subject).to receive(:transfer_source).ordered
+      expect(subject).to receive(:chroot!).at_least(:once)
+      # versioned snapshot, workspace NOT destroyed, only the build system is
+      expect(host).to receive(:exec!).with(/zfs snapshot .*tid-MOS6502@v\d+/, anything).ordered
+      expect(web_image).to receive(:record_artifact_version).with(template, 'MOS6502', /\A\d{14}\z/)
+      expect(buildsys_volume).to receive(:destroy!).ordered
+      expect(app_volume).not_to receive(:destroy!)
 
-      expect(subject.build).to eq false
+      expect(subject.build_app_volume(template, 'MOS6502')).to eq true
     end
 
-    it 'should delete the old file when replacing the stored image' do
-      allow(web_image).to receive(:build_state).and_return(:pending)
-      allow(web_image).to receive(:file_id).and_return('old123')
-      allow(web_image).to receive(:update_attributes)
-      allow(web_image).to receive(:update_attribute)
-      allow(subject).to receive(:checkout_git).and_return(true)
-      allow(subject).to receive(:package_build).and_return(true)
-      allow(File).to receive(:file?).and_return(false)
-      allow(Mongoid::GridFs).to receive(:put).and_return(double('GridFsFile', id: 'new456'))
-      allow(Mongoid::GridFs).to receive(:delete)
-
-      expect(Mongoid::GridFs).to receive(:delete).with('old123')
-      subject.build
+    it 'reuses an existing workspace incrementally (mount, not wipe)' do
+      allow(app_volume).to receive(:dataset_exists?).and_return true
+      expect(app_volume).to receive(:mount!)
+      expect(app_volume).not_to receive(:prepare!)
+      subject.build_app_volume(template, 'MOS6502')
     end
 
-    it 'should record build_last_issue when storing raises' do
-      allow(web_image).to receive(:update_attributes)
-      allow(web_image).to receive(:update_attribute)
-      allow(subject).to receive(:checkout_git).and_return(true)
-      allow(subject).to receive(:package_build).and_return(true)
-      allow(File).to receive(:file?).and_return(false)
-      allow(CloudModel).to receive(:log_exception)
-      allow(Mongoid::GridFs).to receive(:put).and_raise(StandardError.new('gridfs down'))
+    it 'records the artifact size after snapshot' do
+      allow(host).to receive(:exec).with(/zfs list -H -p -o used/).and_return([true, "789\n"])
+      expect(web_image).to receive(:record_artifact_size).with(template, 'MOS6502', 789)
+      subject.build_app_volume(template, 'MOS6502')
+    end
 
+    it 'marks the image failed and cleans up on error' do
+      allow(subject).to receive(:checkout_git).and_raise('boom')
       expect(web_image).to receive(:update_attributes).with(hash_including(build_state: :failed))
-      subject.build
+      expect(subject).to receive(:cleanup_build_env)
+      expect(subject.build_app_volume(template, 'MOS6502')).to eq false
     end
   end
 
-  describe 'redeploy' do
-    let(:service_a) { double 'ServiceA', redeployable?: true }
-    let(:service_b) { double 'ServiceB', redeployable?: false }
-
+  describe 'redeploy (rolls the built artifact out per service)' do
     before do
-      allow(subject).to receive(:puts)
-      allow(web_image).to receive(:redeploy_state).and_return(:pending)
+      allow(web_image).to receive(:redeploy_state).and_return :pending
       allow(web_image).to receive(:update_attributes)
-      allow(web_image).to receive(:services).and_return([service_a, service_b])
-      allow(service_a).to receive(:update_attributes)
-      allow(service_a).to receive(:redeploy!)
-      allow(service_b).to receive(:redeploy!)
       allow(web_image).to receive(:append_to_build_log)
     end
 
-    it 'should refuse when not pending and not forced' do
-      allow(web_image).to receive(:redeploy_state).and_return(:running)
-      expect(subject.redeploy).to eq false
-    end
+    it 'sets each service pending and redeploys it' do
+      service = double 'service', redeployable?: true
+      allow(web_image).to receive(:services).and_return [service]
+      expect(service).to receive(:update_attributes).with(redeploy_web_image_state: :pending)
+      expect(service).to receive(:redeploy!)
 
-    it 'should mark redeployable services pending and fan out redeploy!' do
-      expect(service_a).to receive(:update_attributes).with(redeploy_web_image_state: :pending)
-      expect(service_b).not_to receive(:update_attributes)
-      expect(service_a).to receive(:redeploy!)
-      expect(service_b).to receive(:redeploy!)
       subject.redeploy
-    end
-
-    it 'should mark every service pending when forced' do
-      allow(service_b).to receive(:update_attributes)
-      expect(service_b).to receive(:update_attributes).with(redeploy_web_image_state: :pending)
-      subject.redeploy(force: true)
-    end
-
-    it 'should set redeploy_state to finished on success' do
-      expect(web_image).to receive(:update_attributes).with(redeploy_state: :finished)
-      subject.redeploy
-    end
-
-    it 'should fail and record issue when a service redeploy raises' do
-      allow(CloudModel).to receive(:log_exception)
-      allow(service_a).to receive(:redeploy!).and_raise(StandardError.new('deploy broke'))
-
-      expect(web_image).to receive(:update_attributes).with(hash_including(redeploy_state: :failed))
-      expect(subject.redeploy).to eq false
     end
   end
 
   describe 'run_step' do
-    before do
-      allow(Rails.logger).to receive(:debug)
-      allow(Rails.logger).to receive(:error)
-    end
-
-    before do
-      allow(subject).to receive(:append_build_log)
-    end
-
-    it 'should return command output on success' do
-      expect(subject.run_step('Testing', 'echo all good')).to eq "all good\n"
-    end
-
-    it 'should raise ExecutionException on non-zero exit' do
-      expect { subject.run_step('Testing', 'exit 3') }.to raise_error(CloudModel::ExecutionException)
-    end
-
-    it 'should capture stderr as well — build tools log errors there' do
-      expect(subject.run_step('Testing', 'echo from stderr 1>&2')).to eq "from stderr\n"
-    end
-
-    it 'should stream step header and output into the build log' do
-      logged = +''
-      allow(subject).to receive(:append_build_log) { |text| logged << text }
-
-      subject.run_step 'Testing', 'echo streamed line'
-
-      expect(logged).to include '$ Testing'
-      expect(logged).to include "streamed line\n"
-    end
-  end
-
-  describe 'run_with_clean_env' do
-    it 'should set BUNDLE_GEMFILE and delegate to run_step' do
-      # Bundler.with_original_env restores ENV after the block, so assert inside the stub.
-      seen = nil
-      allow(subject).to receive(:run_step) do |step, cmd|
-        seen = ENV['BUNDLE_GEMFILE']
-        'ok'
-      end
-      expect(subject.run_with_clean_env('Step', 'cmd')).to eq 'ok'
-      expect(seen).to eq "#{web_image.build_path}/Gemfile"
-    end
-  end
-
-  describe 'run_within_build_env' do
-    it 'should set GEM_HOME and delegate to run_step' do
-      seen = nil
-      allow(subject).to receive(:run_step) do |step, cmd|
-        seen = ENV['GEM_HOME']
-        'ok'
-      end
-      expect(subject.run_within_build_env('Step', 'cmd')).to eq 'ok'
-      expect(seen).to eq web_image.build_gem_home
+    it 'raises an ExecutionException when the command fails' do
+      allow(subject).to receive(:system)
+      expect {
+        subject.run_step 'Failing', 'false'
+      }.to raise_error(CloudModel::ExecutionException)
     end
   end
 end

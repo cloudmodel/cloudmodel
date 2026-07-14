@@ -19,52 +19,18 @@ describe CloudModel::Workers::Services::NginxWorker do
     allow(subject).to receive(:comment_sub_step)
   end
 
-  describe '.unroll_web_image' do
-    let(:sftp) {double 'Sftp'}
-    let(:web_image) {double 'WebImage', name: 'test-image', id: 'wimg1', file_id: 'gridfs1', file: double('ImageFile', data: 'image_data'), has_mongodb?: false, has_redis?: false, master_key: nil}
-    let(:cache_file) { '/var/cache/cloud_model/web_images/wimg1-gridfs1.tar' }
+  describe '.unroll_web_image (layers instance config onto the cloned artifact)' do
+    let(:web_image) {double 'WebImage', name: 'test-image', id: 'wimg1', has_mongodb?: false, has_redis?: false, master_key: nil}
 
     before do
       allow(model).to receive(:deploy_web_image).and_return(web_image)
-      allow(sftp).to receive(:upload!)
-      allow(sftp).to receive(:remove!)
-      allow(host).to receive(:sftp).and_return(sftp)
-      # exec returns [success, stdout]; default to a cache miss (test -f false)
-      allow(host).to receive(:exec).and_return([false, ''])
+      allow(host).to receive(:exec)
       allow(host).to receive(:exec!)
     end
 
     it 'should return false if no deploy_web_image' do
       allow(model).to receive(:deploy_web_image).and_return(nil)
       expect(subject.unroll_web_image('/deploy/path')).to eq false
-    end
-
-    it 'should create deploy directory' do
-      expect(subject).to receive(:mkdir_p).with('/deploy/path')
-      subject.unroll_web_image('/deploy/path')
-    end
-
-    it 'should load from GridFS and upload to the host cache on a cache miss' do
-      expect(sftp).to receive(:upload!).with(instance_of(StringIO), cache_file)
-      subject.unroll_web_image('/deploy/path')
-    end
-
-    it 'should evict older versions of the same image on a cache miss' do
-      expect(host).to receive(:exec).with('rm -f /var/cache/cloud_model/web_images/wimg1-*.tar')
-      subject.unroll_web_image('/deploy/path')
-    end
-
-    it 'should reuse the host cache without touching GridFS on a cache hit' do
-      allow(host).to receive(:exec).with("test -f #{cache_file.shellescape}").and_return([true, ''])
-      expect(web_image).not_to receive(:file)
-      expect(sftp).not_to receive(:upload!)
-      expect(host).to receive(:exec).with(%r{cd /deploy/path && tar xpf #{Regexp.escape(cache_file)}})
-      subject.unroll_web_image('/deploy/path')
-    end
-
-    it 'should extract the cached tarball to deploy path' do
-      expect(host).to receive(:exec).with(%r{cd /deploy/path && tar xpf})
-      subject.unroll_web_image('/deploy/path')
     end
 
     it 'should create config directory' do
@@ -122,52 +88,39 @@ describe CloudModel::Workers::Services::NginxWorker do
 
     before do
       allow(model).to receive(:deploy_web_image).and_return(web_image)
-      allow(model).to receive(:www_root).and_return('/var/www')
-      allow(subject).to receive(:make_deploy_web_image_id).and_return('20240315103045')
-      allow(model).to receive(:update_attribute)
-      allow(subject).to receive(:unroll_web_image)
-      allow(host).to receive(:exec!)
+      allow(subject).to receive(:provision_web_volume)
     end
 
     it 'should do nothing if no deploy_web_image' do
       allow(model).to receive(:deploy_web_image).and_return(nil)
-      expect(subject).not_to receive(:unroll_web_image)
+      expect(subject).not_to receive(:provision_web_volume)
       subject.deploy_web_image
     end
 
-    it 'should unroll web image to timestamped deploy path' do
-      expect(subject).to receive(:unroll_web_image).with('/path/to/install/var/www/20240315103045')
-      subject.deploy_web_image
-    end
-
-    it 'should symlink current to deploy id' do
-      expect(host).to receive(:exec!).with('cd /path/to/install/var/www; rm current; ln -s 20240315103045 current', 'Failed to set current')
+    it 'should provision the web volume offline (into the rootfs)' do
+      expect(subject).to receive(:provision_web_volume).with(online: false)
       subject.deploy_web_image
     end
   end
 
-  describe '.redeploy_web_image' do
+  describe '.redeploy_web_image (clone + Capistrano-style symlink handover)' do
     let(:web_image) {double 'WebImage', name: 'test-image'}
-    let(:current_lxd_container) {double 'LxdContainer', name: 'test-container'}
 
     before do
       allow(model).to receive(:deploy_web_image).and_return(web_image)
       allow(model).to receive(:redeploy_web_image_state).and_return(:pending)
       allow(model).to receive(:update_attributes)
       allow(model).to receive(:update_attribute)
-      allow(model).to receive(:www_root).and_return('/var/www')
-      allow(model).to receive(:id).and_return('abc123')
-      allow(model).to receive(:name).and_return('test-service')
+      allow(model).to receive(:www_root).and_return('/var/www/rails')
       allow(model).to receive(:delayed_jobs_supported).and_return(false)
       allow(model).to receive(:guest).and_return(guest)
       allow(guest).to receive(:name).and_return('test-guest')
-      allow(guest).to receive(:current_lxd_container).and_return(current_lxd_container)
+      allow(guest).to receive(:host).and_return(host)
+      allow(host).to receive(:name).and_return('host23')
       allow(guest).to receive(:exec!)
       allow(guest).to receive(:exec).and_return([true, ''])
-      allow(subject).to receive(:make_deploy_web_image_id).and_return('20240315103045')
-      allow(subject).to receive(:unroll_web_image)
-      allow(host).to receive(:exec!)
-      allow(host).to receive(:exec)
+      allow(web_image).to receive(:append_to_build_log)
+      allow(subject).to receive(:provision_web_volume)
     end
 
     it 'should return false if state is not pending and not forced' do
@@ -177,33 +130,22 @@ describe CloudModel::Workers::Services::NginxWorker do
 
     it 'should proceed if forced even when state is not pending' do
       allow(model).to receive(:redeploy_web_image_state).and_return(:finished)
-      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'unroll')
+      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'transfer')
       subject.redeploy_web_image(force: true)
     end
 
     it 'should set state to running' do
-      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'unroll')
+      expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'transfer')
       subject.redeploy_web_image
     end
 
-    it 'should unroll web image to temp path' do
-      expect(subject).to receive(:unroll_web_image).with("/tmp/webimage_unroll_abc123/var/www/20240315103045")
+    it 'should provision a new release online' do
+      expect(subject).to receive(:provision_web_volume).with(online: true)
       subject.redeploy_web_image
     end
 
-    it 'should transfer unrolled data to guest via tar' do
-      expect(host).to receive(:exec!).with("cd /tmp/webimage_unroll_abc123 && tar c . | lxc exec test-container -- /bin/tar x -C / --no-same-owner", 'Failed to transfer files')
-      subject.redeploy_web_image
-    end
-
-    it 'should set ownership on deployed files' do
-      expect(guest).to receive(:exec!).with('/bin/chown -R www:www /var/www/20240315103045', 'Failed to set user to www ')
-      subject.redeploy_web_image
-    end
-
-    it 'should symlink current to new deploy' do
-      expect(guest).to receive(:exec!).with('/bin/rm -f /var/www/current', 'Failed to remove old current')
-      expect(guest).to receive(:exec!).with('/bin/ln -s /var/www/20240315103045 /var/www/current', 'Failed to set current')
+    it 'should restart the passenger app after the handover' do
+      expect(guest).to receive(:exec).with(/passenger-config restart-app/).and_return([true, ''])
       subject.redeploy_web_image
     end
 
@@ -213,7 +155,7 @@ describe CloudModel::Workers::Services::NginxWorker do
     end
 
     it 'should set state to failed on exception' do
-      allow(subject).to receive(:unroll_web_image).and_raise(RuntimeError.new('test error'))
+      allow(subject).to receive(:provision_web_volume).and_raise(RuntimeError.new('test error'))
       allow(CloudModel).to receive(:log_exception)
       expect(model).to receive(:update_attributes).with(redeploy_web_image_state: :failed, redeploy_web_image_last_issue: 'test error')
       subject.redeploy_web_image

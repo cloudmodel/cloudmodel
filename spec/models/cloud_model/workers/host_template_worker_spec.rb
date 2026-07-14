@@ -51,6 +51,11 @@ describe CloudModel::Workers::HostTemplateWorker do
       expect(subject).to receive(:chroot!).with('/cloud/build/host/test/', "apt-get install zfs-initramfs -y", "Failed to install zfs")
       subject.install_utils
     end
+
+    it 'should mask mdmonitor' do
+      expect(subject).to receive(:chroot!).with('/cloud/build/host/test/', "ln -sf /dev/null /etc/systemd/system/mdmonitor.service", "Failed to mask mdmonitor")
+      subject.install_utils
+    end
   end
 
   describe '#install_network' do

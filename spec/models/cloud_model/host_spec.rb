@@ -911,5 +911,72 @@ describe CloudModel::Host do
 
       expect(CloudModel::Host.build_host).to be_nil
     end
+
+    context 'with per-arch configuration' do
+      before do
+        allow(CloudModel.config).to receive(:build_host_name)
+          .and_return({'arm64' => 'armbuild', 'amd64' => 'intelbuild'})
+      end
+
+      it 'resolves the build host for the requested arch' do
+        arm = Factory :host, name: 'armbuild'
+        intel = Factory :host, name: 'intelbuild'
+
+        expect(CloudModel::Host.build_host('arm64')).to eq arm
+        expect(CloudModel::Host.build_host(:amd64)).to eq intel
+      end
+
+      it 'is nil for an arch without a configured build host' do
+        expect(CloudModel::Host.build_host('riscv')).to be_nil
+      end
+
+      it 'is nil when called without an arch (must target a platform)' do
+        expect(CloudModel::Host.build_host).to be_nil
+      end
+
+      it 'default_build_arch is the first configured arch' do
+        expect(CloudModel::Host.default_build_arch).to eq 'arm64'
+      end
+    end
+
+    it 'default_build_arch is nil for a plain-string config' do
+      allow(CloudModel.config).to receive(:build_host_name).and_return('buildhost')
+      expect(CloudModel::Host.default_build_arch).to be_nil
+    end
+
+    it 'applies a plain string configuration to any arch' do
+      host = Factory :host, name: 'buildhost'
+      allow(CloudModel.config).to receive(:build_host_name).and_return('buildhost')
+
+      expect(CloudModel::Host.build_host('amd64')).to eq host
+      expect(CloudModel::Host.build_host('arm64')).to eq host
+    end
+  end
+
+  describe 'architecture support' do
+    it 'lists the recognized arches, with amd64/arm64 marked tested' do
+      expect(CloudModel::Host::ARCHITECTURES).to include('amd64', 'arm64', 'ppc64el', 'riscv64', 'loong64')
+      expect(CloudModel::Host::TESTED_ARCHITECTURES).to eq %w(amd64 arm64)
+    end
+
+    describe '.arches_for_os' do
+      it 'excludes riscv64 on Debian 12 but includes it from Debian 13' do
+        expect(CloudModel::Host.arches_for_os('debian-12')).not_to include('riscv64')
+        expect(CloudModel::Host.arches_for_os('debian-13')).to include('riscv64')
+      end
+
+      it 'matches an os_version by prefix (ubuntu-22.04.4 → ubuntu-22.04)' do
+        expect(CloudModel::Host.arches_for_os('ubuntu-22.04.4')).to include('amd64', 'riscv64')
+      end
+
+      it 'falls back to the tested arches for an unknown OS' do
+        expect(CloudModel::Host.arches_for_os('MOS6502-DOS')).to eq CloudModel::Host::TESTED_ARCHITECTURES
+      end
+    end
+
+    describe '.os_supports_arch?' do
+      it { expect(CloudModel::Host.os_supports_arch?('debian-13', 'riscv64')).to be true }
+      it { expect(CloudModel::Host.os_supports_arch?('debian-12', 'riscv64')).to be false }
+    end
   end
 end

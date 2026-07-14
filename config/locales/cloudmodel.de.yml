@@ -1,4 +1,20 @@
 de:
+  # Menschenlesbare CPU-Architektur-Namen. Intern als Debian-Arch-Namen
+  # gespeichert (amd64/arm64, wie apt/debootstrap/grub sie nutzen); angezeigt
+  # als die offiziellen Architektur-Namen, Langform in _description (Tooltip).
+  cloud_model/arch:
+    amd64: x86-64
+    arm64: AArch64
+    ppc64el: ppc64le
+    riscv64: RISC-V 64
+    loong64: LoongArch64
+  cloud_model/arch_long:
+    amd64: 64-Bit x86 (Intel / AMD)
+    arm64: Arm-Architektur 64-Bit
+    ppc64el: POWER (64-Bit Little-Endian)
+    riscv64: RISC-V 64-Bit
+    loong64: LoongArch 64-Bit
+
   cloud_model/guest/state:
     undefined: Nicht Definiert
     running: Läuft

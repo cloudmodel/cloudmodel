@@ -1,6 +1,11 @@
 require "cloud_model/config_modules/api"
 
 module CloudModel
+  # Central configuration, set from the host app's initializer via a
+  # `configure` block. Every option has a default (see the getters below).
+  #
+  # A full, categorised reference of all options — defaults, allowed values and
+  # purpose — lives in `doc/configuration.md`.
   class Config
     attr_writer :data_directory, :backup_directory, :bundle_command
     # Max number of backups (replica sets / guests) to run concurrently in
@@ -11,8 +16,17 @@ module CloudModel
     attr_writer :skip_sync_images
     # ZFS dataset guest template builds are created under (on the build host)
     attr_writer :build_dataset
+    # ZFS compression for build volumes (guest/core templates AND web-image
+    # artifacts). One of "lz4" (default, universal, near-free CPU), "zstd"
+    # (better ratio but needs OpenZFS >= 2.0 on every host that receives it) or
+    # "off". See {#zfs_compression}.
+    attr_writer :zfs_compression
     # SSH private key used to reach hosts from the controller machine
     attr_writer :ssh_key_file
+    # SSH private key that can read the private git repos referenced as
+    # git-source gems in a WebImage's Gemfile. Copied into the throwaway build
+    # system chroot for `bundle install`, then destroyed with it.
+    attr_writer :git_ssh_key_file
     # Use external IP, useful for testing without setting up a VPN for your development box or if you have troubles with tinc
     attr_writer :use_external_ip
     attr_writer :dns_servers, :job_queue
@@ -77,6 +91,20 @@ module CloudModel
     # SSH private key used to reach hosts from the controller machine
     def ssh_key_file
       @ssh_key_file || "#{data_directory}/keys/id_rsa"
+    end
+
+    def git_ssh_key_file
+      @git_ssh_key_file || File.expand_path('~/.ssh/id_rsa')
+    end
+
+    # ZFS compression for build volumes (templates + web-image artifacts).
+    # "lz4" is available in every OpenZFS and near-free on CPU, so builds,
+    # deploy clones and cross-host `zfs send`/receive work everywhere. "zstd"
+    # compresses better (~3.2x vs ~2.35x) but needs OpenZFS >= 2.0 on every
+    # host it is sent to; set it only when the whole cloud supports it. "off"
+    # disables compression.
+    def zfs_compression
+      @zfs_compression || 'lz4'
     end
 
     def use_external_ip

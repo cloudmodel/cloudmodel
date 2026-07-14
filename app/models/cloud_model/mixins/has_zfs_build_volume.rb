@@ -16,7 +16,7 @@ module CloudModel
     # Including classes must define `build_dataset`, `build_mountpoint`, and
     # `build_on!(host)` (dispatch to their build worker).
     module HasZfsBuildVolume
-      include CloudModel::Mixins::LocalExec
+      include CloudModel::Mixins::ZfsDatasetSync
 
       # Terminal build states a new build may be claimed from
       # (finished, failed, not_started — see buildable_build_states)
@@ -34,7 +34,8 @@ module CloudModel
       # @param host [CloudModel::Host]
       # @return [CloudModel::BuildZfsVolume] this template's volume on `host`
       def build_volume host
-        CloudModel::BuildZfsVolume.new host, build_dataset, mountpoint: build_mountpoint
+        CloudModel::BuildZfsVolume.new host, build_dataset, mountpoint: build_mountpoint,
+          compression: CloudModel.config.zfs_compression
       end
 
       # Atomically claims the template for building by moving `build_state`
@@ -77,9 +78,10 @@ module CloudModel
             if sync_build_volume_to host
               next
             elsif claim_build!
-              # Build on the configured build host; the next loop pass syncs
-              # the result over. Without one, build directly on the target.
-              build_on! CloudModel::Host.build_host || host
+              # Build on the build host configured for the template's arch;
+              # the next loop pass syncs the result over. Without one, build
+              # directly on the target (which by definition has the arch).
+              build_on! CloudModel::Host.build_host(arch) || host
               next
             end
           end
@@ -105,33 +107,18 @@ module CloudModel
         source_host = build_volume_source_host exclude: target_host
         return false unless source_host
 
-        # -C: the stream is multi-GB and routed source → admin → target
-        ssh_source = "ssh -C -i #{CloudModel.config.ssh_key_file.shellescape} root@#{source_host.ssh_address}"
-        ssh_target = "ssh -C -i #{CloudModel.config.ssh_key_file.shellescape} root@#{target_host.ssh_address}"
-        parent_dataset = File.dirname build_dataset
-
-        local_exec! "#{ssh_target} 'zfs list #{parent_dataset.shellescape} >/dev/null 2>&1 || zfs create -p #{parent_dataset.shellescape}'",
-          "Failed to create parent dataset on #{target_host.name}"
-        # Guest template volumes are ZFS CLONES of the core template snapshot.
-        # `send -R` would emit an origin-dependent stream that the target can
-        # only receive when it already has that origin ("cannot receive:
-        # local origin for clone … does not exist"). A plain send of the
-        # @ready snapshot is a full, self-contained stream; -p keeps the
-        # dataset properties (com.cloudmodel:status etc.).
-        local_exec! "#{ssh_source} 'zfs send -p #{build_snapshot.shellescape}' | #{ssh_target} 'zfs receive -u -F #{build_dataset.shellescape}'",
-          "Failed to sync build volume from #{source_host.name} to #{target_host.name}"
-
-        true
+        sync_zfs_dataset! source_host, target_host, build_dataset
       rescue Exception => e
         CloudModel.log_exception e
         false
       end
 
       # Finds a host that has this template's volume ready — the recorded
-      # build host first, then the configured build host, then all others.
+      # build host first, then the build host configured for the template's
+      # arch, then all others.
       # @return [CloudModel::Host, nil]
       def build_volume_source_host exclude: nil
-        hosts = ([build_host, CloudModel::Host.build_host] + CloudModel::Host.all.to_a).compact.uniq - [exclude]
+        hosts = ([build_host, CloudModel::Host.build_host(arch)] + CloudModel::Host.all.to_a).compact.uniq - [exclude]
         hosts.find do |host|
           begin
             build_volume(host).ready?

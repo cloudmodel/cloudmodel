@@ -14,45 +14,28 @@ module CloudModel
       # `authorized_keys` for the `www` user.
       class NginxWorker < CloudModel::Workers::Services::BaseWorker
 
-        def web_image_cache_dir
-          "/var/cache/cloud_model/web_images"
+        # LXD disk-device name the web-app volume is attached under.
+        WEB_DEVICE = 'webapp'
+
+        # ZFS dataset / host mountpoint of a guest's web-app clone for one
+        # deploy. Timestamped so a redeploy's new clone can be attached before
+        # the previous one is destroyed.
+        def web_clone_dataset deploy_id
+          "guests/web/#{@guest.name}-#{deploy_id}"
         end
 
-        # Tarball cached on the host, keyed by web image id + GridFS file id, so a
-        # rebuilt image (new file_id) misses the cache and is re-fetched.
-        def web_image_cache_file
-          image = @model.deploy_web_image
-          "#{web_image_cache_dir}/#{image.id}-#{image.file_id}.tar"
+        def web_clone_mount deploy_id
+          "/cloud/web/#{@guest.name}-#{deploy_id}"
         end
 
-        # Ensure the current web image tarball is present on the host, loading it
-        # from GridFS (and uploading it) only once per host and image version.
-        # Returns the on-host cache path.
-        def ensure_web_image_cached_on_host
-          image = @model.deploy_web_image
-          cache_file = web_image_cache_file
-
-          return cache_file if @host.exec("test -f #{cache_file.shellescape}")&.first
-
-          comment_sub_step "Cache WebImage #{image.name} on host"
-          mkdir_p web_image_cache_dir
-          # Keep only the current version of this image on the host.
-          @host.exec "rm -f #{web_image_cache_dir}/#{image.id}-*.tar"
-          io = StringIO.new(image.file.data)
-          @host.sftp.upload!(io, cache_file)
-
-          cache_file
-        end
-
+        # Writes the per-guest runtime config into an already-populated app tree
+        # (the cloned artifact). No unpacking any more — the code is the ZFS
+        # clone; only the instance-specific config is layered on. The host app
+        # (core-admin) prepends further writes via `super deploy_path`.
         def unroll_web_image deploy_path
           return false unless @model.deploy_web_image
 
-          mkdir_p deploy_path
-
-          comment_sub_step "Unroll WebImage #{@model.deploy_web_image.name} to #{deploy_path}"
-          cache_file = ensure_web_image_cached_on_host
-          @host.exec "cd #{deploy_path} && tar xpf #{cache_file.shellescape}"
-
+          comment_sub_step "Configure WebImage #{@model.deploy_web_image.name} in #{deploy_path}"
           mkdir_p "#{deploy_path}/config"
 
           if @model.deploy_web_image.has_mongodb?
@@ -80,55 +63,141 @@ module CloudModel
           "#{Time.now.utc.strftime("%Y%m%d%H%M%S")}"
         end
 
-        def deploy_web_image
-          if @model.deploy_web_image
-            deploy_id = make_deploy_web_image_id
-            deploy_path = "#{@guest.deploy_path}#{@model.www_root}/#{deploy_id}"
+        # LXD disk-device name for a release (unique per deploy so a new release
+        # can be attached while the previous one is still mounted).
+        def web_device deploy_id
+          "#{WEB_DEVICE}-#{deploy_id}"
+        end
 
-            unroll_web_image deploy_path
+        # Clones the web image's @ready artifact for this guest's (template,
+        # arch) into a fresh dataset, writes the per-guest config into it,
+        # attaches it under releases/<id>, and hands over via the `current`
+        # symlink — the Capistrano-style atomic swap (no request ever sees a
+        # missing document root). Shared by the offline guest deploy and the
+        # live redeploy. Returns the deploy id.
+        def provision_web_volume online:
+          web_image = @model.deploy_web_image
+          template = @guest.template
+          arch = @host.arch
 
-            @host.exec! "cd #{@guest.deploy_path}#{@model.www_root}; rm current; ln -s #{deploy_id} current", "Failed to set current"
+          web_image.ensure_web_volume! @host, template, arch
+
+          deploy_id = make_deploy_web_image_id
+          dataset = web_clone_dataset deploy_id
+          mount = web_clone_mount deploy_id
+
+          comment_sub_step "Clone WebImage #{web_image.name} for #{@guest.name}"
+          @host.exec! "zfs destroy -r #{dataset.shellescape}" if @host.exec("zfs list #{dataset.shellescape}").first
+          @host.exec! "zfs clone -p -o mountpoint=#{mount.shellescape} -o compression=#{CloudModel.config.zfs_compression.shellescape} #{web_image.build_snapshot(template, arch).shellescape} #{dataset.shellescape}",
+            "Failed to clone web image #{web_image.name}"
+
+          strip_web_release mount
+
+          # The clone IS the Rails root; only the instance config is layered on.
+          unroll_web_image mount
+          # Own the whole clone as the container's www user (unprivileged LXD
+          # maps host 101001 → container 1001), so the raw disk device needs no
+          # id-shifting and Passenger can read/write immediately.
+          @host.exec! "chown -R 101001:101001 #{mount.shellescape}", "Failed to own web app volume"
+
+          attach_web_release deploy_id, mount
+          activate_web_release deploy_id, online: online
+          cleanup_old_web_releases deploy_id, online: online
+          deploy_id
+        end
+
+        # Slims a fresh deploy clone — the ZFS-clone equivalent of the old
+        # tarball PACKAGE_EXCLUDES. The workspace snapshot keeps this scratch for
+        # incremental rebuilds; each per-guest clone drops it here. Runtime
+        # output stays: public/vite, public/assets, the compiled .so in each
+        # gem's lib/, node_modules, and .cache/puppeteer (Chromium).
+        def strip_web_release mount
+          comment_sub_step "Strip build artifacts from release"
+          # Anchored globs only — NEVER a bare `-name cache`/`-name doc`, which
+          # would also delete runtime code (e.g. activesupport's own
+          # lib/active_support/cache/coder.rb) and break the app. Mirrors the
+          # old tarball PACKAGE_EXCLUDES.
+          @host.exec "cd #{mount.shellescape} && " \
+            "rm -rf .git .gitignore .rspec tmp log spec test features doc .playwright-mcp vendor/cache solr; " \
+            "rm -f db/*.sqlite3 gems/*.zip; " \
+            "rm -rf bundle/ruby/*/cache bundle/ruby/*/doc; " \
+            "rm -rf bundle/ruby/*/bundler/gems/*/.git; " \
+            "rm -rf bundle/ruby/*/gems/*/ext/*/target bundle/ruby/*/bundler/gems/*/ext/*/target; " \
+            "true"
+        end
+
+        # Attaches the cloned release read/write at releases/<id> in the container.
+        def attach_web_release deploy_id, mount
+          release_path = "#{@model.www_root}/releases/#{deploy_id}"
+          @host.exec! "lxc config device add #{@lxc.name.shellescape} #{web_device(deploy_id)} disk source=#{mount.shellescape} path=#{release_path.shellescape}",
+            "Failed to attach web release"
+        end
+
+        # Points `current` at the new release. `ln -sfn` replaces the symlink in
+        # place (atomic rename), so the handover has no window — exactly the
+        # Capistrano `current -> releases/<ts>` scheme. Live containers get it
+        # via `lxc exec`; an offline guest deploy writes it into the rootfs (the
+        # device mounts on start).
+        def activate_web_release deploy_id, online:
+          release_path = "#{@model.www_root}/releases/#{deploy_id}"
+          if online
+            @model.guest.exec! "/bin/mkdir -p #{@model.www_root}/releases", "Failed to make releases dir"
+            @model.guest.exec! "/bin/ln -sfn #{release_path.shellescape} #{@model.www_root}/current", "Failed to activate release"
+          else
+            rootfs_www = "#{@guest.deploy_path}#{@model.www_root}"
+            @host.exec! "mkdir -p #{rootfs_www.shellescape}/releases", "Failed to make releases dir"
+            @host.exec! "ln -sfn #{release_path.shellescape} #{rootfs_www.shellescape}/current", "Failed to activate release"
           end
+        end
+
+        # Detaches stale release devices (live container) and destroys the clones
+        # of previous deploys, keeping only the release now pointed at by current.
+        def cleanup_old_web_releases current_deploy_id, online:
+          keep_dataset = web_clone_dataset current_deploy_id
+          keep_device = web_device current_deploy_id
+
+          if online
+            success, devices = @host.exec "lxc config device list #{@lxc.name.shellescape}"
+            if success
+              devices.to_s.split("\n").map(&:strip).each do |dev|
+                next unless dev.start_with? "#{WEB_DEVICE}-"
+                next if dev == keep_device
+                @host.exec "lxc config device remove #{@lxc.name.shellescape} #{dev.shellescape}"
+              end
+            end
+          end
+
+          success, list = @host.exec "zfs list -H -o name -r guests/web"
+          if success
+            list.to_s.split("\n").each do |dataset|
+              next unless dataset =~ %r{\Aguests/web/#{Regexp.escape(@guest.name)}-\d+\z}
+              next if dataset == keep_dataset
+              @host.exec "zfs destroy -r #{dataset.shellescape}"
+            end
+          end
+        end
+
+        def deploy_web_image
+          provision_web_volume online: false if @model.deploy_web_image
         end
 
         def redeploy_web_image options={}
           return false unless options[:force] or (@model.deploy_web_image and @model.redeploy_web_image_state == :pending)
 
-          @model.update_attributes redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'unroll'
+          @model.update_attributes redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'transfer'
           web_image = @model.deploy_web_image
           web_image.try :append_to_build_log, "Deploying to #{@guest.name} (#{@guest.host.name})…\n"
 
           comment_sub_step "Deploy to #{@guest.name}: #{@model.name}"
           begin
-            deploy_id = make_deploy_web_image_id
-            unroll_path = "/tmp/webimage_unroll_#{@model.id}"
-            deploy_path = "#{unroll_path}#{@model.www_root}/#{deploy_id}"
+            # Clone the freshly-built artifact, layer per-guest config, attach it
+            # as a new release and hand over via the current symlink.
+            provision_web_volume online: true
 
-            @host.exec! "rm -rf #{unroll_path}", "Failed to clean unroll path"
-            mkdir_p deploy_path
-            unroll_web_image deploy_path
-
-            @model.update_attribute :redeploy_web_image_step, 'transfer'
-            comment_sub_step "Copy unrolled data to guest"
-            @host.exec! "cd #{unroll_path} && tar c . | lxc exec #{@model.guest.current_lxd_container.name.shellescape} -- /bin/tar x -C / --no-same-owner", "Failed to transfer files"
-
-            comment_sub_step "Remove unrolled data from hosts /tmp"
-            @host.exec "rm -rf #{unroll_path}"
-
-            @model.update_attribute :redeploy_web_image_step, 'permissions'
-            comment_sub_step "Align owner of guest data"
-            @model.guest.exec! "/bin/chown -R www:www #{@model.www_root}/#{deploy_id}", "Failed to set user to www "
-
-            @model.update_attribute :redeploy_web_image_step, 'activate'
-            @model.guest.exec! "/bin/rm -f #{@model.www_root}/current", "Failed to remove old current"
-            @model.guest.exec! "/bin/ln -s #{@model.www_root}/#{deploy_id} #{@model.www_root}/current", "Failed to set current"
-            @model.guest.exec! "/bin/touch #{@model.www_root}/current/tmp/restart.txt", "Failed to restart service"
-
-            # The touch alone is unreliable: the running Passenger app group
-            # resolved the current symlink at startup and watches restart.txt
-            # in the OLD target dir — the old code keeps serving. Restart the
-            # app explicitly; fall back to an nginx restart (short blip, but
-            # deterministic) when passenger-config is not available.
+            # Passenger resolved the OLD current at startup; the symlink swap
+            # alone won't move a running app group. Restart it explicitly; fall
+            # back to an nginx restart (short blip, deterministic) when
+            # passenger-config is not available.
             @model.update_attribute :redeploy_web_image_step, 'restart'
             comment_sub_step "Restart web application"
             web_image.try :append_to_build_log, "Restarting app on #{@guest.name}…\n"

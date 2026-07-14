@@ -391,13 +391,27 @@ module CloudModel
             result << line
           end
         rescue Errno::ECONNREFUSED
-          return [false, "Connection refused"]
+          return check_mk_agent_via_host
         ensure
-          s.close
+          s&.close
         end
         [true, result]
       else
-        return [false, "Connection refused"]
+        check_mk_agent_via_host
+      end
+    end
+
+    # Fallback when the guest's private address is not routable from the admin
+    # app (e.g. a dev machine outside the VPN): let the host run the agent
+    # inside the container over the existing SSH connection.
+    def check_mk_agent_via_host
+      container = current_lxd_container
+      return [false, "Connection refused"] if container.blank?
+      success, result = host.exec "lxc exec #{container.name.shellescape} -- /usr/bin/check_mk_agent"
+      if success
+        [true, result]
+      else
+        [false, "Connection refused (direct and via host)"]
       end
     end
 

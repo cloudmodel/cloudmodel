@@ -53,7 +53,7 @@ describe CloudModel::WebImage do
   it { expect(subject).to have_field(:redeploy_last_issue).of_type(String) }
 
 
-  it { expect(subject).to belong_to(:file).of_type(Mongoid::GridFS::Fs::File).with_optional }
+  it { expect(subject).to have_field(:artifact_sizes).of_type(Hash).with_default_value_of({}) }
 
   it { expect(subject).to validate_presence_of :name }
   it { expect(subject).to validate_presence_of :git_server }
@@ -104,16 +104,47 @@ describe CloudModel::WebImage do
     end
   end
 
-  describe 'file_size' do
-    it 'should get length from file object' do
-      subject.file = Mongoid::GridFS::Fs::File.new
-      subject.file.length = 4711
-      expect(subject.file_size).to eq 4711
+  describe 'total_artifact_usage' do
+    it 'should sum the recorded artifact sizes' do
+      subject.artifact_sizes = {'tpl-MOS6502' => 1000, 'tpl-MC68000' => 2000}
+      expect(subject.total_artifact_usage).to eq 3000
     end
 
-    it 'should be nil if no file was attached' do
-      subject.file = nil
-      expect(subject.file_size).to be_nil
+    it 'should be zero when nothing was built' do
+      subject.artifact_sizes = {}
+      expect(subject.total_artifact_usage).to eq 0
+    end
+  end
+
+  describe 'build_dataset / build_mountpoint / build_snapshot' do
+    let(:template) { double CloudModel::GuestTemplate, id: 'tid' }
+
+    before do
+      allow(CloudModel.config).to receive(:build_dataset).and_return 'guests/build'
+    end
+
+    it 'keys the app dataset by web image, template and arch' do
+      expect(subject.build_dataset(template, 'MOS6502')).to eq "guests/build/web/#{subject.id}/tid-MOS6502"
+    end
+
+    it 'mounts under /cloud/build/web' do
+      expect(subject.build_mountpoint(template, 'MOS6502')).to eq "/cloud/build/web/#{subject.id}/tid-MOS6502"
+    end
+
+    it 'points the current version snapshot at the app dataset' do
+      subject.artifact_versions = {'tid-MOS6502' => '20260101000000'}
+      expect(subject.build_snapshot(template, 'MOS6502')).to eq "guests/build/web/#{subject.id}/tid-MOS6502@v20260101000000"
+    end
+
+    it 'has no build snapshot before the first build' do
+      expect(subject.build_snapshot(template, 'MOS6502')).to be_nil
+    end
+
+    it 'web_volume_ready? checks the current version snapshot on the host' do
+      subject.artifact_versions = {'tid-MOS6502' => '20260101000000'}
+      host = double CloudModel::Host
+      expect(host).to receive(:exec).with(/zfs list -t snapshot .*tid-MOS6502@v20260101000000/).and_return [true, 'x']
+      expect(subject.web_volume_ready?(host, template, 'MOS6502')).to be_truthy
     end
   end
 
@@ -122,23 +153,6 @@ describe CloudModel::WebImage do
       allow(CloudModel.config).to receive(:data_directory).and_return Pathname.new '/my_home/rails_project/data'
 
       expect(subject.build_path).to eq "/my_home/rails_project/data/build/web_images/#{subject.id}"
-    end
-  end
-
-  describe 'build_gem_home' do
-    it 'should give path to gem_home of deployed WebImage' do
-      allow(subject).to receive(:build_path).and_return '/tmp/build/master'
-      allow(Bundler).to receive(:ruby_scope).and_return 'ruby/4.2.0'
-
-      expect(subject.build_gem_home).to eq '/tmp/build/master/shared/bundle/ruby/4.2.0'
-    end
-
-  end
-
-  describe 'build_gemfile' do
-    it 'should give path to Gemfile of deployed WebImage' do
-      allow(subject).to receive(:build_path).and_return '/tmp/build/master'
-      expect(subject.build_gemfile).to eq '/tmp/build/master/current/Gemfile'
     end
   end
 
@@ -151,10 +165,11 @@ describe CloudModel::WebImage do
   end
 
   describe 'worker' do
-    it 'should return worker for WebImage' do
-      worker = double CloudModel::Workers::WebImageWorker, build: true
-      expect(CloudModel::Workers::WebImageWorker).to receive(:new).with(subject).and_return worker
-      expect(subject.worker).to eq worker
+    it 'should return worker for WebImage on the given build host' do
+      host = double CloudModel::Host
+      worker = double CloudModel::Workers::WebImageWorker
+      expect(CloudModel::Workers::WebImageWorker).to receive(:new).with(host, subject).and_return worker
+      expect(subject.worker(host)).to eq worker
     end
   end
 
@@ -240,10 +255,19 @@ describe CloudModel::WebImage do
   end
 
   describe 'build!' do
-    it 'should call worker to build WebImage' do
-      worker = double CloudModel::Workers::WebImageWorker, build: true
-      expect(subject).to receive(:worker).and_return worker
+    let(:template) { double CloudModel::GuestTemplate }
+    let(:host) { double CloudModel::Host }
+    let(:worker) { double CloudModel::Workers::WebImageWorker }
+
+    before do
+      allow(subject).to receive(:build_targets).and_return [[template, 'MOS6502']]
+      allow(CloudModel::Host).to receive(:build_host).with('MOS6502').and_return host
+      allow(subject).to receive(:worker).with(host).and_return worker
+    end
+
+    it 'should build every (template, arch) target on its arch build host' do
       allow(subject).to receive(:buildable?).and_return true
+      expect(worker).to receive(:build_app_volume).with(template, 'MOS6502', {})
 
       expect(subject.build!).to eq true
       expect(subject.build_state).to eq :pending
@@ -258,11 +282,18 @@ describe CloudModel::WebImage do
     end
 
     it 'should allow to force build if not buildable' do
-      worker = double CloudModel::Workers::WebImageWorker, build: true
-      expect(subject).to receive(:worker).and_return worker
       allow(subject).to receive(:buildable?).and_return false
+      expect(worker).to receive(:build_app_volume).with(template, 'MOS6502', {force: true})
 
-      expect(subject.build! force:true).to eq true
+      expect(subject.build! force: true).to eq true
+    end
+
+    it 'should fail when no build host is configured for a target arch' do
+      allow(subject).to receive(:buildable?).and_return true
+      allow(CloudModel::Host).to receive(:build_host).with('MOS6502').and_return nil
+
+      expect(subject.build!).to eq false
+      expect(subject.build_state).to eq :failed
     end
   end
 

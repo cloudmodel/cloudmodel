@@ -812,6 +812,36 @@ describe CloudModel::Guest do
       success, result = subject.check_mk_agent
       expect(success).to eq false
     end
+
+    it 'should fall back to running the agent via the host when not routable' do
+      tcp = double 'tcp'
+      allow(Net::Ping::TCP).to receive(:new).and_return(tcp)
+      allow(tcp).to receive(:ping).and_return(false)
+      container = double 'container', name: 'test-1', blank?: false
+      allow(subject).to receive(:current_lxd_container).and_return(container)
+      host = double 'host'
+      allow(subject).to receive(:host).and_return(host)
+      expect(host).to receive(:exec).with('lxc exec test-1 -- /usr/bin/check_mk_agent').and_return([true, "<<<check_mk>>>\n"])
+
+      success, result = subject.check_mk_agent
+      expect(success).to eq true
+      expect(result).to include '<<<check_mk>>>'
+    end
+
+    it 'should report failure when the host fallback fails too' do
+      tcp = double 'tcp'
+      allow(Net::Ping::TCP).to receive(:new).and_return(tcp)
+      allow(tcp).to receive(:ping).and_return(false)
+      container = double 'container', name: 'test-1', blank?: false
+      allow(subject).to receive(:current_lxd_container).and_return(container)
+      host = double 'host'
+      allow(subject).to receive(:host).and_return(host)
+      allow(host).to receive(:exec).and_return([false, 'error'])
+
+      success, result = subject.check_mk_agent
+      expect(success).to eq false
+      expect(result).to include 'Connection refused'
+    end
   end
 
   describe 'system_info' do

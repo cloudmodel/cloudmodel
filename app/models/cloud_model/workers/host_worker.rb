@@ -45,6 +45,27 @@ module CloudModel
         # @host.update_attribute :initial_root_pw, nil
       end
 
+      # The machine's real architecture wins over whatever was set on host
+      # creation — a wrong arch would select the wrong templates and build
+      # hosts for everything deployed onto it.
+      def detect_arch
+        machine = @host.exec!('uname -m', 'Failed to detect architecture').strip
+        # Map the kernel arch (uname -m) to the Debian arch name we store.
+        arch = case machine
+        when 'x86_64' then 'amd64'
+        when 'aarch64', 'arm64' then 'arm64'
+        when 'ppc64le' then 'ppc64el'
+        when 'riscv64' then 'riscv64'
+        when 'loongarch64' then 'loong64'
+        else machine
+        end
+
+        if @host.arch != arch
+          comment_sub_step "Correcting arch #{@host.arch.inspect} → #{arch.inspect}"
+          @host.update_attributes! arch: arch
+        end
+      end
+
       def boot_deploy_root options={}
         comment_sub_step 'Ensure /boot is mounted'
         @host.unmount_boot_fs
@@ -214,8 +235,12 @@ module CloudModel
       end
 
       def make_deploy_root
-        @host.exec "umount #{deploy_root_device}"
-        @host.exec "umount #{root}"
+        # Recursive unmount: a retry after a failed deploy leaves the deploy
+        # root mounted with the lxd volume (md4) nested at var/lib/lxd, so a
+        # plain `umount #{root}` would fail busy and leave the device mounted
+        # (mkfs then refuses). -R unmounts the nested mount first.
+        @host.exec "umount -R #{root}"
+        @host.exec "umount --all-targets #{deploy_root_device}"
         mkdir_p root
 
         @host.exec! "mkfs.ext4 #{deploy_root_device}", "Failed to create system fs"
@@ -403,6 +428,7 @@ module CloudModel
 
           steps = [
             ['Allow to access with SSH key', :set_authorized_keys],
+            ['Detect architecture', :detect_arch],
             ['Prepare disk for new system', :init_system_disk],
             ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
             ['Populate volume with new system image', :populate_deploy_root],
@@ -431,6 +457,7 @@ module CloudModel
           build_start_at = Time.now
 
           steps = [
+            ['Detect architecture', :detect_arch],
             ['Upsync system images', :sync_inst_images],
             ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
             ['Populate volume with new system image', :populate_deploy_root],

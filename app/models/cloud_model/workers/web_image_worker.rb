@@ -2,256 +2,383 @@ module CloudModel
   module Workers
     # Worker that builds and redeploys a {CloudModel::WebImage} Rails application.
     #
-    # Build pipeline: git clone/pull → `bundle install` → `yarn install`
-    # (if `package.json` exists) → `assets:precompile` (if `has_assets`) →
-    # tar packaging → GridFS storage.
+    # Build pipeline (per template + arch, native on the arch's build host):
+    #   1. git clone/pull LOCALLY on the admin machine (keeps the github deploy
+    #      credentials where they already are) → source tree.
+    #   2. clone the consuming guest's {GuestTemplate} `@ready` snapshot into a
+    #      throwaway build-system dataset (carries Ruby/Rust/Node + runtime libs).
+    #   3. create the app ZFS volume mounted at the build system's
+    #      `/var/www/rails`, rsync the source into `current/`.
+    #   4. inside a chroot into the build system: `bundle install`, `yarn
+    #      install`, `assets:precompile` — native extensions link against the
+    #      exact libraries the guest runs.
+    #   5. commit the app volume as an `@ready` snapshot; destroy the build
+    #      system. Deploy `zfs clone`s the snapshot into the guest.
+    #
+    # The build console streams over the existing `web_images` ActionCable
+    # change-stream: worker stdout is teed into {WebImage#append_to_build_log},
+    # whose DB writes poke the live-status socket (no polling).
     #
     # Redeploy triggers a rolling redeploy on each nginx service that references
     # this web image.
     class WebImageWorker < BaseWorker
+      # GIT_SSH_COMMAND pointing at the injected deploy key — forces bundler's
+      # git clones to use it regardless of the chroot's HOME/.ssh resolution.
+      GIT_SSH_COMMAND = "GIT_SSH_COMMAND='ssh -i /root/.ssh/id_git -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
 
-      def initialize(web_image)
+      # Bundler settings, passed via ENV (not `bundle config set --local`, which
+      # refuses to overwrite values the app ships in .bundle/config). BUNDLE_PATH
+      # must be set for EVERY bundler invocation — bundle install AND the later
+      # `bundle exec rake assets:precompile` — or the latter looks for the gems
+      # (incl. git-source ones) in the default system path and fails.
+      BUNDLE_ENV = "BUNDLE_DEPLOYMENT=true BUNDLE_PATH=./bundle BUNDLE_WITHOUT='development:test' BUNDLE_JOBS=1"
+
+      # Rails app root inside the build-system chroot. Just a staging mount for
+      # the app volume — the committed artifact's dataset root IS the Rails
+      # root, so deploy mounts it straight at releases/<id> (Capistrano-style,
+      # `current` symlinks to it).
+      CHROOT_APP_ROOT = '/webimage'
+
+      # Excluded when transferring the git checkout to the build host: VCS/dev
+      # cruft, plus artifacts rebuilt inside the chroot (bundle/, node_modules/,
+      # compiled assets). node_modules and bundle are DELIBERATELY rebuilt there
+      # (native, correct arch) and kept in the final artifact.
+      APP_TRANSFER_EXCLUDES = %w(
+        .git .gitignore .rspec tmp log spec test features doc
+        .playwright-mcp vendor/cache node_modules bundle .cache
+        public/assets public/vite
+      ).freeze
+
+      def initialize(host, web_image)
+        @host = host
         @web_image = web_image
       end
 
-      def checkout_git
-        puts "git clone #{@web_image.git_server.shellescape}:#{@web_image.git_repo.shellescape} #{@web_image.build_path.shellescape}"
-        unless File.directory?(@web_image.build_path)
-          unless FileUtils.mkdir_p @web_image.build_path
-            raise "Could not make checkout directory '#{@web_image.build_path}'"
-            return false
-          end
+      def error_log_object
+        @web_image
+      end
 
+      # Builds the app artifact for one (template, arch) on this build host.
+      def build_app_volume(template, arch, options = {})
+        @template = template
+        @arch = arch
+        @web_image.update_attributes build_state: :running, build_last_issue: nil, build_log: ''
+
+        with_build_log do
           begin
-            run_with_clean_env "Cloning", "git clone #{@web_image.git_server.shellescape}:#{@web_image.git_repo.shellescape} #{@web_image.build_path.shellescape}"
+            @web_image.update_attribute :build_state, :checking_out
+            checkout_git
+
+            @web_image.update_attribute :build_state, :bundling
+            prepare_build_env
+            install_build_prerequisites
+            configure_git_credentials
+            bundle_image
+            pin_ruby_version
+            write_bundle_config
+            yarn_install
+
+            if @web_image.has_assets
+              @web_image.update_attribute :build_state, :building_assets
+              build_assets
+            end
+
+            @web_image.update_attribute :build_state, :storing
+            finalize_app_volume
+
+            @web_image.update_attribute :build_state, :finished
+            true
           rescue Exception => e
-            puts e.trace
             CloudModel.log_exception e
-            @web_image.update_attributes build_state: :failed, build_last_issue: "Unable to clone repository '#{@web_image.git_repo}'."
-            FileUtils.rm_rf @web_image.build_path
-            return false
+            @web_image.update_attributes build_state: :failed, build_last_issue: "#{e}"
+            cleanup_build_env
+            false
           end
+        end
+      end
+
+      # ---- build steps ----
+
+      # Clone/refresh the repository on the admin machine (where the github
+      # deploy key lives). Raises on failure (caught by build_app_volume).
+      def checkout_git
+        FileUtils.mkdir_p @web_image.build_path
+        path = @web_image.build_path.shellescape
+
+        unless File.directory? "#{@web_image.build_path}/.git"
+          run_with_clean_env "Cloning", "git clone #{@web_image.git_server.shellescape}:#{@web_image.git_repo.shellescape} #{path}"
         end
 
         # The build dir is a disposable workspace: earlier builds may have
-        # rewritten tracked files (yarn/bundler touch their lockfiles), which
-        # makes a plain pull refuse to fast-forward. Discard local changes and
-        # hard-reset to the remote branch head. Deliberately no `git clean`:
-        # untracked build caches (node_modules etc.) must survive for the
-        # lockfile-based install skip.
-        git_script = "cd #{@web_image.build_path.shellescape} && "
-        git_script += "git fetch && "
-        git_script += "git checkout -f #{@web_image.git_branch.shellescape} && "
-        git_script += "git reset --hard origin/#{@web_image.git_branch.shellescape}"
+        # rewritten tracked files. Discard local changes and hard-reset to the
+        # remote branch head.
+        run_with_clean_env "Pulling",
+          "cd #{path} && git fetch && git checkout -f #{@web_image.git_branch.shellescape} && git reset --hard origin/#{@web_image.git_branch.shellescape}"
 
-        begin
-          run_with_clean_env "Pulling", git_script
-        rescue CloudModel::ExecutionException => e
-          CloudModel.log_exception e
-          @web_image.update_attributes build_state: :failed, build_last_issue: "Unable to checkout branch '#{@web_image.git_branch}' on repository '#{@web_image.git_repo}'."
-          return false
+        commit = run_with_clean_env("Get Version", "cd #{path} && git log -1 --format=%H").to_s.strip
+        @web_image.update_attribute :git_commit, commit
+      end
+
+      def prepare_build_env
+        comment_sub_step "Ensure guest template #{@template.id} on #{@host.name}"
+        @template.ensure_build_volume! @host
+
+        comment_sub_step "Clone build system from template #{@template.id}"
+        buildsys_volume.prepare_from! @template.build_dataset
+        @host.exec! "cp /etc/resolv.conf #{buildsys_volume.rootfs_path.shellescape}/etc/resolv.conf", "Failed to copy resolv.conf into build system"
+
+        comment_sub_step "Prepare workspace"
+        if app_volume.dataset_exists?
+          # Persistent workspace across builds — bundle/, node_modules/, the
+          # git-gem caches and puppeteer's Chromium survive, so rebuilds are
+          # incremental. Just remount it into this build's fresh build system.
+          @host.exec! "zfs set mountpoint=#{app_volume.mountpoint.shellescape} #{app_volume.dataset_name.shellescape}", "Failed to set workspace mountpoint"
+          app_volume.mount!
+        else
+          app_volume.prepare!
         end
+        @host.exec! "mkdir -p #{app_build_host_path.shellescape}", "Failed to create app directory"
 
-        begin
-          @web_image.update_attribute :git_commit, run_with_clean_env("Get Version", "cd #{@web_image.build_path} && git log | head -1 | sed s/'commit '//")
-        rescue Exception => e
-          CloudModel.log_exception e
-          @web_image.update_attribute :git_commit,  "failed to get commit hash"
+        comment_sub_step "Transfer source to build host"
+        transfer_source
+      end
+
+      # rsync the local checkout into the app volume on the build host. bundle/
+      # node_modules/assets are excluded here and rebuilt natively in the chroot.
+      def transfer_source
+        excludes = APP_TRANSFER_EXCLUDES.map { |e| "--exclude=#{e.shellescape}" } * ' '
+        ssh = "ssh -i #{CloudModel.config.ssh_key_file.shellescape} -o StrictHostKeyChecking=no"
+        local_exec! "rsync -a --delete #{excludes} -e #{ssh.shellescape} #{@web_image.build_path.shellescape}/ root@#{@host.ssh_address}:#{app_build_host_path.shellescape}/",
+          "Failed to transfer source to build host"
+      end
+
+      # The build system is the guest template (Ruby/Rust/Clang) — make sure the
+      # extra build tooling the pipeline needs is present.
+      def install_build_prerequisites
+        comment_sub_step "Install build prerequisites (git, node 22)"
+        # Debian bookworm ships node 18, too old for the app's toolchain
+        # (puppeteer/vite want node >= 22). Pull node 22 from NodeSource; it
+        # brings a matching npm. (With the persistent build chroot this runs
+        # once, not per build.)
+        chroot! buildsys_volume.rootfs_path, [
+          "apt-get update",
+          "apt-get install -y git curl ca-certificates gnupg",
+          "curl -fsSL https://deb.nodesource.com/setup_22.x | bash -",
+          "apt-get install -y nodejs"
+        ] * ' && ', "Failed to install build prerequisites"
+      end
+
+      # Copies the git deploy key into the throwaway build system so
+      # `bundle install` can clone private git-source gems. The key lands only
+      # in this build system, which is destroyed right after the build. github
+      # host verification is disabled here (no persistent known_hosts to seed).
+      def configure_git_credentials
+        key = CloudModel.config.git_ssh_key_file
+        return unless key && File.file?(key)
+
+        comment_sub_step "Install git deploy key into build system"
+        ssh_dir = "#{buildsys_volume.rootfs_path}/root/.ssh"
+        @host.exec! "mkdir -p #{ssh_dir.shellescape} && chmod 700 #{ssh_dir.shellescape}", "Failed to create .ssh in build system"
+        @host.sftp.file.open("#{ssh_dir}/id_git", 'w', 0600) { |f| f.write File.read(key) }
+        @host.sftp.file.open("#{ssh_dir}/config", 'w', 0600) do |f|
+          f.write "Host github.com\n  User git\n  IdentityFile /root/.ssh/id_git\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n"
         end
-
-        return true
-      end
-
-      # Skip a dependency install when its lockfile is byte-identical to the
-      # last successful build. The marker file lives inside build_path, so a
-      # :clean build (which wipes build_path) naturally forces a fresh install.
-      # Fingerprint of how dependencies get installed — changing install flags
-      # must invalidate the skip marker, or existing build dirs would keep a
-      # node_modules laid out by the old flags (e.g. without bin links).
-      DEPENDENCY_INSTALL_FINGERPRINT = 'v2-bin-links'
-
-      def dependency_lock_digest(lockfile)
-        "#{Digest::SHA256.file(lockfile).hexdigest}:#{DEPENDENCY_INSTALL_FINGERPRINT}"
-      end
-
-      def dependency_lock_unchanged?(lockfile, key)
-        marker = "#{@web_image.build_path}/.cloudmodel_#{key}.sha"
-        File.file?(lockfile) && File.file?(marker) &&
-          File.read(marker).strip == dependency_lock_digest(lockfile)
-      end
-
-      def store_dependency_lock(lockfile, key)
-        return unless File.file?(lockfile)
-        File.write "#{@web_image.build_path}/.cloudmodel_#{key}.sha", dependency_lock_digest(lockfile)
       end
 
       def bundle_image
-        lockfile = "#{@web_image.build_path}/Gemfile.lock"
-        if dependency_lock_unchanged?(lockfile, 'gemfile') && File.directory?("#{@web_image.build_path}/bundle")
-          Rails.logger.debug "### Bundling: skipped, Gemfile.lock unchanged"
-          return true
-        end
+        return true unless File.file? "#{@web_image.build_path}/Gemfile"
 
-        begin
-          run_with_clean_env "Bundling", [
-            "cd #{@web_image.build_path.shellescape}",
-            "#{CloudModel.config.bundle_command} config set --local deployment 'true'",
-            "#{CloudModel.config.bundle_command} config set --local path './bundle'",
-            "#{CloudModel.config.bundle_command} config set --local without 'development test'",
-            "#{CloudModel.config.bundle_command} install",
-            "#{CloudModel.config.bundle_command} clean"
-          ] * ' && '
-        rescue CloudModel::ExecutionException => e
-          CloudModel.log_exception e
-          @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to build image.'
-          FileUtils.rm_rf @web_image.build_gem_home
-          return false
-        end
+        comment_sub_step "Bundle install"
+        # Configure bundler via ENV rather than `bundle config set --local`,
+        # which refuses to non-interactively overwrite the values the app ships
+        # in its own .bundle/config ("You are replacing the current local value
+        # of without…"). ENV cleanly overrides those. GIT_SSH_COMMAND forces the
+        # git-source gem clones onto the injected deploy key.
+        chroot! buildsys_volume.rootfs_path, [
+          "cd #{CHROOT_APP_ROOT}",
+          "export #{GIT_SSH_COMMAND}",
+          # Point rustup/cargo at the toolchain the template installed (with its
+          # default set) — without RUSTUP_HOME/CARGO_HOME rustup looks in root's
+          # empty ~/.rustup and fails ("could not choose a version of cargo").
+          # Needed for Rust-native gems (a native gem).
+          "export CARGO_HOME=/usr/local/cargo RUSTUP_HOME=/usr/local/rustup PATH=\"/usr/local/cargo/bin:$PATH\"",
+          # BUNDLE_JOBS=1 (in BUNDLE_ENV): serialize install so bundler doesn't
+          # unshallow the same git repo (referenced by several gems) from
+          # parallel workers, which races on git's shallow.lock.
+          "export #{BUNDLE_ENV}",
+          "bundle install",
+          "bundle clean --force"
+        ] * ' && ', "Unable to bundle image"
+      end
 
-        store_dependency_lock lockfile, 'gemfile'
-        return true
+      # The artifact's native gems are compiled against the ruby the guest
+      # template ships, so it must also RUN on that ruby. The app's own
+      # .ruby-version may pin a different patch level (e.g. 3.4.8) that is not
+      # installed in the template — RVM/Passenger then refuse to boot
+      # ("Required ruby-3.4.8 is not installed"). Overwrite it with the
+      # template's actual RUBY_VERSION so the runtime picks the matching (and
+      # ABI-compatible) interpreter.
+      def pin_ruby_version
+        return true unless File.file? "#{@web_image.build_path}/Gemfile"
+
+        if (rv = @web_image.ruby_version).present?
+          # The web image declares its Ruby — the single source of truth (the
+          # Nginx/Passenger service must install this exact version at runtime).
+          comment_sub_step "Pin .ruby-version to WebImage.ruby_version (#{rv})"
+          @host.exec! "printf %s #{rv.shellescape} > #{app_build_host_path.shellescape}/.ruby-version",
+            "Unable to pin ruby version"
+        else
+          # Fall back to whatever Ruby the build environment provides.
+          comment_sub_step "Pin .ruby-version to the build environment's ruby"
+          chroot! buildsys_volume.rootfs_path,
+            "cd #{CHROOT_APP_ROOT} && ruby -e 'print RUBY_VERSION' > .ruby-version",
+            "Unable to pin ruby version"
+        end
+      end
+
+      # Persists bundler's deployment settings into the artifact's own
+      # .bundle/config. During build the BUNDLE_* settings are ENV-only, so the
+      # gems (including git-source ones like carrierwave-mongoid) land in the
+      # app-local ./bundle — but Passenger boots with the system RVM gem home
+      # and, without this file, has no idea to look there. It then raises
+      # Bundler::PathError for the git gems and the app cannot spawn. Writing
+      # BUNDLE_PATH=bundle (relative to the Rails root, wherever the release is
+      # mounted) makes the runtime bundler resolve against the bundled gems.
+      def write_bundle_config
+        return true unless File.file? "#{@web_image.build_path}/Gemfile"
+
+        comment_sub_step "Persist bundler config (.bundle/config)"
+        @host.exec! "mkdir -p #{app_build_host_path.shellescape}/.bundle", "Failed to create .bundle dir"
+        @host.sftp.file.open("#{app_build_host_path}/.bundle/config", 'w', 0644) do |f|
+          f.write "---\n" \
+            "BUNDLE_PATH: \"bundle\"\n" \
+            "BUNDLE_DEPLOYMENT: \"true\"\n" \
+            "BUNDLE_WITHOUT: \"development:test\"\n"
+        end
+      end
+
+      # Pins puppeteer's browser cache INSIDE the app (relative to the config's
+      # own dir), so `yarn install` downloads the arch-correct Chromium into the
+      # artifact and grover/puppeteer find it at runtime wherever the release is
+      # mounted — puppeteer's default (~/.cache/puppeteer) would land outside the
+      # artifact and be lost. Skipped if the app ships its own puppeteer config.
+      def write_puppeteer_config
+        path = "#{app_build_host_path}/.puppeteerrc.cjs"
+        return if @host.exec("test -e #{path.shellescape}").first
+
+        comment_sub_step "Pin Chromium cache into app (.puppeteerrc.cjs)"
+        @host.sftp.file.open(path, 'w', 0644) do |f|
+          f.write "const { join } = require('path');\nmodule.exports = { cacheDirectory: join(__dirname, '.cache', 'puppeteer') };\n"
+        end
       end
 
       def yarn_install
-        lockfile = "#{@web_image.build_path}/yarn.lock"
-        if dependency_lock_unchanged?(lockfile, 'yarn') && File.directory?("#{@web_image.build_path}/node_modules")
-          Rails.logger.debug "### Yarn install: skipped, yarn.lock unchanged"
-          return true
-        end
+        return true unless File.file? "#{@web_image.build_path}/package.json"
 
-        begin
-          run_with_clean_env "Yarn install", [
-            "cd #{@web_image.build_path.shellescape}",
-            # Install yarn only when it is not already available.
-            "command -v yarn >/dev/null 2>&1 || npm install yarn",
-            # Full install (no --production): the Vite/Sass asset toolchain lives
-            # in devDependencies and is needed to build assets. Bin links are
-            # required — `yarn run vite` resolves via node_modules/.bin.
-            "yarn install --non-interactive"
-          ] * ' && '
-        rescue CloudModel::ExecutionException => e
-          CloudModel.log_exception e
-          @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to install yarn packages.'
-          FileUtils.rm_rf @web_image.build_gem_home
-          return false
-        end
+        write_puppeteer_config
 
-        store_dependency_lock lockfile, 'yarn'
-        return true
+        comment_sub_step "Yarn install"
+        # Full install (no --production): the Vite/Sass asset toolchain lives in
+        # devDependencies and is needed to build assets. Skip Playwright's
+        # browser download — it is a test-only devDependency and its browsers
+        # would land in ~/.cache (outside the artifact), wasting build time.
+        chroot! buildsys_volume.rootfs_path, [
+          "cd #{CHROOT_APP_ROOT}",
+          "export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1",
+          "command -v yarn >/dev/null 2>&1 || npm install -g yarn",
+          "yarn install --non-interactive"
+        ] * ' && ', "Unable to install yarn packages"
       end
 
       def build_assets
-        begin
-          FileUtils.rm_rf "#{@web_image.build_path}/public/assets"
-
-          run_with_clean_env "Building Assets", "cd #{@web_image.build_path.shellescape} && #{CloudModel.config.bundle_command} exec rake RAILS_ENV=production RAILS_GROUPS=assets assets:precompile"
-        rescue CloudModel::ExecutionException => e
-          CloudModel.log_exception e
-          @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to build assets.'
-          FileUtils.rm_rf "#{@web_image.build_path}/public/assets"
-          return false
-        end
-
-        return true
+        comment_sub_step "Build assets"
+        # BUNDLE_ENV so `bundle exec` finds the gems in ./bundle (incl. git-source
+        # ones). SECRET_KEY_BASE: a throwaway value just so the app can boot to
+        # compile assets (Rails requires one in production even when the real key
+        # comes from credentials/ENV at runtime). Never used at runtime.
+        chroot! buildsys_volume.rootfs_path, "cd #{CHROOT_APP_ROOT} && export #{BUNDLE_ENV} && SECRET_KEY_BASE=assets_build RAILS_ENV=production RAILS_GROUPS=assets bundle exec rake assets:precompile", "Unable to build assets"
       end
 
-      # Files and build artifacts that must never end up in the deployed image.
-      # Applied via `tar --anchored --no-wildcards-match-slash --exclude-from`,
-      # so every pattern is anchored at the archive root and each `*` matches a
-      # SINGLE path component. This is essential: with GNU tar's defaults `*`
-      # also matches `/`, so e.g. ./bundle/ruby/*/cache would wrongly match
-      # active_support/**/cache and strip runtime code (cache/coder.rb), and the
-      # old --exclude={...} brace form did nothing at all under dash.
-      # Deliberately curated (NOT derived from .gitignore) so build output we DO
-      # serve at runtime — public/vite, public/assets — stays in the package.
-      # NB: .bundle is kept (holds .bundle/config / deployment BUNDLE_PATH) and
-      # node_modules is kept (runtime puppeteer + Vite tooling for rebuilds).
-      PACKAGE_EXCLUDES = [
-        # app VCS / dev / runtime-state files (root level only)
-        './.git', './.gitignore', './.rspec',
-        './tmp', './log', './db/*.sqlite3',
-        './spec', './test', './features', './doc',
-        './.playwright-mcp', './vendor/cache', './solr', './gems/*.zip',
-        # bundled gem cache & docs (per ruby-abi dir)
-        './bundle/ruby/*/cache', './bundle/ruby/*/doc',
-        # Rust/cargo native-extension build scratch (the loadable .so stays)
-        './bundle/ruby/*/bundler/gems/*/ext/*/target',
-        './bundle/ruby/*/gems/*/ext/*/target'
-      ].freeze
+      def finalize_app_volume
+        comment_sub_step "Set ownership"
+        # Container 'www' runs as uid 1001; unprivileged LXD maps that to host
+        # 101001. Owning the workspace as 101001 lets the deploy clone attach
+        # without id-shifting and Passenger read/write immediately.
+        @host.exec! "chown -R 101001:101001 #{app_build_host_path.shellescape}", "Failed to set app ownership"
 
-      def package_build
-        exclude_file = "#{@web_image.build_path}-package.excludes"
-        File.write exclude_file, PACKAGE_EXCLUDES.join("\n") + "\n"
+        comment_sub_step "Snapshot artifact version"
+        cleanup_chroot buildsys_volume.rootfs_path
+        app_volume.unmount!
+        # Versioned snapshot (never a fixed @ready): a rebuild adds a new @v<ts>
+        # and never has to destroy a snapshot a deployed guest still clones from.
+        # Build scratch (.git, caches, ext target) stays in the workspace for
+        # incremental rebuilds and is stripped from the per-guest deploy clone.
+        ts = Time.now.utc.strftime("%Y%m%d%H%M%S")
+        @host.exec! "zfs snapshot #{@web_image.build_dataset(@template, @arch).shellescape}@v#{ts}", "Failed to snapshot artifact version"
+        @web_image.record_artifact_version @template, @arch, ts
 
-        begin
-          run_within_build_env "Packaging", "/bin/tar -cpjf #{@web_image.build_path.shellescape}-building.tar.bz2 --anchored --no-wildcards-match-slash --directory #{@web_image.build_path.shellescape} --exclude-from=#{exclude_file.shellescape} ."
-        rescue CloudModel::ExecutionException => e
-          CloudModel.log_exception e
-          @web_image.update_attributes build_state: :failed, build_last_issue: 'Unable to package image.'
-          return false
-        ensure
-          File.delete exclude_file if File.exist? exclude_file
-        end
-        FileUtils.mv "#{@web_image.build_path}-building.tar.bz2", "#{@web_image.build_path}.tar.bz2"
+        _success, used = @host.exec "zfs list -H -p -o used #{@web_image.build_dataset(@template, @arch).shellescape}"
+        @web_image.record_artifact_size @template, @arch, used.to_s.strip.to_i
 
-        return true
+        comment_sub_step "Destroy build system (workspace kept)"
+        buildsys_volume.destroy!
+
+        prune_old_artifact_versions
       end
 
-      def build options = {}
-        return false unless @web_image.build_state == :pending or options[:force]
-        @web_image.update_attributes build_state: :running, build_last_issue: nil, build_log: ''
+      # Prunes superseded artifact versions, keeping the most recent few. ZFS
+      # refuses to destroy a snapshot with dependent clones (a deployed guest),
+      # so those simply survive until the guest is redeployed/removed.
+      def prune_old_artifact_versions(keep: 2)
+        ds = @web_image.build_dataset(@template, @arch)
+        success, out = @host.exec "zfs list -H -o name -t snapshot -r #{ds.shellescape}"
+        return unless success
 
-        if options[:clean]
-          FileUtils.rm_rf @web_image.build_path
+        versions = out.to_s.split("\n").select { |s| s =~ /@v\d+\z/ }.sort
+        (versions[0...-keep] || []).each do |snap|
+          @host.exec "zfs destroy #{snap.shellescape}"
         end
-
-        begin
-          @web_image.update_attributes build_state: :checking_out
-          unless checkout_git
-            return false
-          end
-
-          @web_image.update_attributes build_state: :bundling
-          if File.file? "#{@web_image.build_path.shellescape}/Gemfile"
-            unless bundle_image
-              return false
-            end
-          end
-
-          if File.file? "#{@web_image.build_path.shellescape}/package.json"
-            unless yarn_install
-              return false
-            end
-          end
-
-          if @web_image.has_assets
-            @web_image.update_attributes build_state: :building_assets
-            unless build_assets
-              return false
-            end
-          end
-
-          @web_image.update_attributes build_state: :packaging
-          unless package_build
-            return false
-          end
-
-          @web_image.update_attributes build_state: :storing
-          old_file_id = @web_image.file_id
-          file = Mongoid::GridFs.put("#{@web_image.build_path}.tar.bz2")
-          @web_image.update_attribute :file_id, file.id
-          Mongoid::GridFs.delete old_file_id if old_file_id
-        rescue Exception => e
-          CloudModel.log_exception e
-          @web_image.update_attributes build_state: :failed, build_last_issue: "#{e}"
-        end
-
-        @web_image.update_attributes build_state: :finished
-
-        return true
       end
 
-      def redeploy options={}
+      def cleanup_build_env
+        cleanup_chroot buildsys_volume.rootfs_path if @buildsys_volume
+        # Keep the workspace (persistent, incremental) — only tear down this
+        # build's throwaway build system.
+        @app_volume&.unmount!
+        @buildsys_volume&.destroy!
+      rescue Exception => e
+        CloudModel.log_exception e
+      end
+
+      # ---- volumes / paths ----
+
+      # Throwaway CoW clone of the guest template — the chroot the app is built
+      # in. Sits next to the app dataset (…-buildenv).
+      def buildsys_volume
+        @buildsys_volume ||= CloudModel::BuildZfsVolume.new @host,
+          "#{@web_image.build_dataset(@template, @arch)}-buildenv",
+          mountpoint: "#{@web_image.build_mountpoint(@template, @arch)}-buildenv"
+      end
+
+      # The deployable app artifact, mounted inside the build system at the
+      # CHROOT_APP_ROOT staging path so the chroot build writes straight into
+      # it. Its dataset root is the Rails root — deploy clones and mounts it as
+      # a release.
+      def app_volume
+        @app_volume ||= CloudModel::BuildZfsVolume.new @host,
+          @web_image.build_dataset(@template, @arch),
+          mountpoint: "#{buildsys_volume.rootfs_path}#{CHROOT_APP_ROOT}",
+          compression: CloudModel.config.zfs_compression
+      end
+
+      # Host path to the Rails app root inside the build system.
+      def app_build_host_path
+        "#{buildsys_volume.rootfs_path}#{CHROOT_APP_ROOT}"
+      end
+
+      # ---- redeploy orchestration (rolls the built artifact out per service) ----
+
+      def redeploy(options = {})
         unless @web_image.redeploy_state == :pending or options[:force]
           puts "Redeploy WebImage #{@web_image.name} failed, as it is not pending for redeploy: #{@web_image.redeploy_state}"
           return false
@@ -279,92 +406,71 @@ module CloudModel
         @web_image.update_attributes redeploy_state: :finished
       end
 
-      def run_within_build_env step, command
-        orig_bundler_bin_path = ENV['BUNDLE_BIN_PATH']
-        orig_rubyopt = ENV['RUBYOPT']
+      # ---- logging ----
 
-        # This works with Bundler 1.3.5; Perhaps it needs updating when Bundler version is other
-        Bundler.with_original_env do
-          ENV['GEM_PATH'] = ''
-          ENV['GEM_HOME'] = @web_image.build_gem_home
-          ENV['BUNDLE_BIN_PATH'] = orig_bundler_bin_path
-          ENV['PATH'] = "#{@web_image.build_gem_home}/bin:#{ENV['PATH']}"
-          ENV['RUBYOPT'] = orig_rubyopt
+      # Runs the block with the worker's stdout teed into the web image's build
+      # log, buffered and flushed at most once a second so a chatty native build
+      # doesn't hammer Mongo (each flush pokes the `web_images` change-stream →
+      # WebSocket push to the admin console).
+      def with_build_log(&block)
+        buffer = +''
+        last_flush = Time.now
+        flush = lambda do
+          return if buffer.empty?
+          @web_image.append_to_build_log buffer.dup
+          buffer.clear
+          last_flush = Time.now
+        end
 
-          run_step step, command
+        # Net::SSH hands worker output back as ASCII-8BIT; sanitise to valid
+        # UTF-8 before it meets the UTF-8 build log (else concatenating a chunk
+        # with high bytes raises Encoding::CompatibilityError).
+        CloudModel::StdoutTee.capture ->(text) { buffer << text.to_s.dup.force_encoding(Encoding::UTF_8).scrub('?'); flush.call if Time.now - last_flush >= 1 } do
+          begin
+            block.call
+          ensure
+            flush.call
+          end
         end
       end
 
+      # Runs a command locally on the admin machine with a bundler-free
+      # environment (used for the git checkout).
       def run_with_clean_env step, command
-        # Bundler.with_clean_env do
-        #   run_step step, command
-        # end
-
         Bundler.with_original_env do
-          ENV.delete_if { | k, _ | k[0, 7] == "BUNDLE_" }
-          ENV["BUNDLE_GEMFILE"] = "#{@web_image.build_path}/Gemfile"
+          ENV.delete_if { |k, _| k[0, 7] == "BUNDLE_" }
           ENV["PATH"] ||= "/usr/bin:/bin:/usr/sbin:/sbin"
           ENV["PATH"] += ':/usr/local/bin'
-          ENV["GEM_PATH"] ||= ''
-          ENV["GEM_PATH"] += ":/usr/local/lib/ruby/gems/#{Gem.ruby_api_version}:/usr/lib/ruby/gems/#{Gem.ruby_api_version}"
           ENV["RUBYLIB"] = nil
           if ENV.has_key?("RUBYOPT")
             ENV["RUBYOPT"] = ENV["RUBYOPT"].sub("-rbundler/setup", "")
           end
 
-          # puts "----"
-          # pp ENV
-          # puts "----"
-          # puts command
-          # puts "----"
-          # Rails.logger.debug ENV.to_json
-
           run_step step, command
         end
-      end
-
-      # Appends streamed output to the web image, making the build log
-      # readable live on the admin page while the build runs.
-      def append_build_log text
-        @web_image.append_to_build_log text
       end
 
       def run_step step, command
         Rails.logger.debug "### #{step}: #{command}"
         command = "PATH=/bin:#{ENV["PATH"].shellescape} #{command}"
-        append_build_log "\n$ #{step}\n"
+        puts "\n$ #{step}"
 
-        # Stream stdout+stderr line by line and flush into the build log about
-        # once a second, so long steps (bundle install, asset builds) are
-        # readable live instead of appearing as one blob at the end. stderr is
-        # merged deliberately: build tools (vite, yarn, bundler) write their
-        # actual output — including the errors — to stderr.
+        # Stream stdout+stderr line by line. stderr is merged deliberately:
+        # build tools (git, bundler) write their actual output to stderr.
         c_out = +''
-        pending = +''
-        last_flush = Time.now
         IO.popen(command, err: [:child, :out]) do |io|
           io.each_line do |line|
             c_out << line
-            pending << line
-            if Time.now - last_flush >= 1
-              append_build_log pending
-              pending = +''
-              last_flush = Time.now
-            end
+            print line
           end
         end
-        append_build_log pending unless pending.empty?
 
         unless $?.success?
-          append_build_log "FAILED: #{step} (#{$?})\n"
-          Rails.logger.error "Error running command:\n  #{command}\n  #{$?}\n#{c_out.lines.map{|l| "    #{l}"} * ""}\n#----"
-          Rails.logger.error $?
-
+          puts "FAILED: #{step} (#{$?})"
           raise ExecutionException.new command, "#{step} failed (#{$?})", c_out
         end
         c_out
       end
-
     end
   end
 end

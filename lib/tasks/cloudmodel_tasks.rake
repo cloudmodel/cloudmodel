@@ -348,22 +348,70 @@ namespace :cloudmodel do
     end
   end
 
-  # namespace :web_image do
-  #   task :load_web_image do
-  #     raise "No env variable WEB_IMAGE_ID given" unless ENV['WEB_IMAGE_ID']
-  #     @web_image_worker = CloudModel::Workers::WebImageWorker.new CloudModel::WebImage.find(ENV['WEB_IMAGE_ID'])
-  #   end
-  #
-  #   desc "Build WebImage"
-  #   task :build => [:environment, :load_web_image] do
-  #     @web_image_worker.build
-  #   end
-  #
-  #   desc "Redeploy app to all guests using WebImage"
-  #   task :redeploy => [:environment, :load_web_image] do
-  #     @web_image_worker.redeploy
-  #   end
-  # end
+  namespace :web_image do
+    desc "Build a single WebImage (all its (template, arch) artifacts). Set WEB_IMAGE_ID=<id>."
+    task :build => [:environment] do
+      raise "No env variable WEB_IMAGE_ID given" unless ENV['WEB_IMAGE_ID']
+      CloudModel::WebImage.find(ENV['WEB_IMAGE_ID']).build! force: true
+    end
+
+    desc "Redeploy a single WebImage to all guests using it. Set WEB_IMAGE_ID=<id>."
+    task :redeploy => [:environment] do
+      raise "No env variable WEB_IMAGE_ID given" unless ENV['WEB_IMAGE_ID']
+      CloudModel::WebImage.find(ENV['WEB_IMAGE_ID']).redeploy! force: true
+    end
+
+    desc "One-time migration to ZFS web images: rebuild every WebImage as a ZFS app artifact per (template, arch) it is consumed on. Old GridFS tarballs are simply superseded (no downgrade). Dry-run unless CONFIRM=1; set WEB_IMAGE_ID=<id> to target a single image."
+    task :rebuild_all => [:environment] do
+      images = if ENV['WEB_IMAGE_ID'].present?
+        [CloudModel::WebImage.find(ENV['WEB_IMAGE_ID'])]
+      else
+        CloudModel::WebImage.all.to_a
+      end
+
+      abort "No web images found in #{Rails.env} database — forgot RAILS_ENV=production?" if images.empty?
+
+      dry_run = ENV['CONFIRM'] != '1'
+      puts "\e[33mDRY RUN — set CONFIRM=1 to actually build.\e[39m" if dry_run
+
+      failures = 0
+      images.each do |image|
+        targets = image.build_targets
+        if targets.empty?
+          puts "#{image.name}: \e[33mskipped\e[39m (no guest uses it)"
+          next
+        end
+        targets.each do |template, arch|
+          host = CloudModel::Host.build_host(arch)
+          label = "#{image.name} [#{template.name} / #{arch}] on #{host&.name || '???'}"
+          if host.nil?
+            failures += 1
+            puts "  #{label}: \e[31mFAILED\e[39m (no build host for arch '#{arch}')"
+            next
+          end
+          if dry_run
+            puts "  #{label}: would build"
+            next
+          end
+          print "  #{label}: "
+          begin
+            image.worker(host).build_app_volume template, arch, force: true
+            if image.reload.build_state == :finished
+              puts "\e[32mOK\e[39m"
+            else
+              failures += 1
+              puts "\e[31mFAILED\e[39m (#{image.build_last_issue})"
+            end
+          rescue Exception => e
+            failures += 1
+            puts "\e[31mFAILED\e[39m (#{e.class}: #{e.message})"
+          end
+        end
+      end
+
+      abort "#{failures} web image build(s) failed" if failures > 0 && !dry_run
+    end
+  end
 
   namespace :solr_image do
     task :load_solr_image do

@@ -26,6 +26,9 @@ module CloudModel
         chroot! build_path, "apt-get install console-setup -y", "Failed to install console-setup"
         comment_sub_step 'Install mdadm'
         chroot! build_path, "apt-get install mdadm -y", "Failed to install mdadm"
+        # mdmonitor exits 1 without MAILADDR/PROGRAM in mdadm.conf; RAID health
+        # is covered by monitoring's check_md, so mask the redundant unit.
+        chroot! build_path, "ln -sf /dev/null /etc/systemd/system/mdmonitor.service", "Failed to mask mdmonitor"
         # comment_sub_step 'Install btrfs'
         # chroot! build_path, "apt-get install sudo btrfs-tools -y", "Failed to install btrfs"
         comment_sub_step 'Install zfs'

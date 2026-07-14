@@ -123,8 +123,11 @@ module CloudModel
       template = self.where(arch: host.arch, build_state_id: 0xf0).last
       unless template
         template = new_template_to_build host
-        template.build_state = :pending
-        template.build!(host, options)
+        # No pending pre-set here: build! guards on buildable? and a pending
+        # state made it silently skip the build — the deploy then crashed
+        # on uploading the never-built tarball.
+        template.build!(host, options) \
+          or raise "Failed to build host template (#{template.reload.build_state}: #{template.build_last_issue.presence || 'see template build log'})"
       end
       template
     end

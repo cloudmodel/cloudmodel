@@ -187,10 +187,24 @@ describe CloudModel::HostTemplate do
       expect(subject.class).to receive(:where).with(arch: 'MOS6502', build_state_id: 0xf0).and_return []
       expect(subject.class).to receive(:new_template_to_build).with(host).and_return template
 
-      expect(template).to receive(:build_state=).with :pending
-      expect(template).to receive(:build!).with(host, options)
+      # NO pending pre-set: build! guards on buildable? and a pending state
+      # made it silently skip the build
+      expect(template).not_to receive(:build_state=)
+      expect(template).to receive(:build!).with(host, options).and_return template
 
       expect(subject.class.last_useable host, options).to eq template
+    end
+
+    it 'raises a clear error when the build was skipped or failed' do
+      template = double subject.class
+      allow(subject.class).to receive(:where).and_return []
+      allow(subject.class).to receive(:new_template_to_build).and_return template
+      allow(template).to receive(:build!).and_return false
+      allow(template).to receive(:reload).and_return template
+      allow(template).to receive(:build_state).and_return :not_started
+      allow(template).to receive(:build_last_issue).and_return nil
+
+      expect { subject.class.last_useable host }.to raise_error(/Failed to build host template/)
     end
   end
 

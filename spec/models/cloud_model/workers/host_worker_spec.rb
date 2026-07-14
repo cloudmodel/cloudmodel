@@ -61,6 +61,43 @@ describe CloudModel::Workers::HostWorker do
     end
   end
 
+  describe 'detect_arch' do
+    it 'corrects the arch field when the machine reports a different one' do
+      host.update_attributes arch: 'amd64'
+      allow(host).to receive(:exec!).with('uname -m', anything).and_return("aarch64\n")
+
+      subject.detect_arch
+
+      expect(host.reload.arch).to eq 'arm64'
+    end
+
+    it 'maps x86_64 to amd64' do
+      host.update_attributes arch: 'arm64'
+      allow(host).to receive(:exec!).with('uname -m', anything).and_return("x86_64\n")
+
+      subject.detect_arch
+
+      expect(host.reload.arch).to eq 'amd64'
+    end
+
+    it 'maps the kernel names of the recognized future arches' do
+      {'ppc64le' => 'ppc64el', 'riscv64' => 'riscv64', 'loongarch64' => 'loong64'}.each do |machine, debian|
+        host.update_attributes arch: 'amd64'
+        allow(host).to receive(:exec!).with('uname -m', anything).and_return("#{machine}\n")
+        subject.detect_arch
+        expect(host.reload.arch).to eq debian
+      end
+    end
+
+    it 'keeps a correct arch untouched' do
+      host.update_attributes arch: 'amd64'
+      allow(host).to receive(:exec!).with('uname -m', anything).and_return("x86_64\n")
+      expect(host).not_to receive(:update_attributes!)
+
+      subject.detect_arch
+    end
+  end
+
   describe 'boot_deploy_root' do
     before do
       allow(host).to receive(:mount_boot_fs).and_return true

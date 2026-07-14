@@ -20,12 +20,24 @@ module CloudModel
       "#{dataset}@#{READY_SNAPSHOT}"
     end
 
-    attr_reader :host, :dataset_name, :mountpoint
+    attr_reader :host, :dataset_name, :mountpoint, :compression
 
-    def initialize(host, dataset_name, mountpoint:)
+    # @param compression [String, nil] ZFS compression to create the dataset
+    #   with (e.g. "zstd"); nil inherits the parent/pool setting. Web-image
+    #   artifacts set "zstd" — it roughly matches the old tar.bz2 size (~3.2x)
+    #   transparently, and clones/send streams stay small.
+    def initialize(host, dataset_name, mountpoint:, compression: nil)
       @host = host
       @dataset_name = dataset_name
       @mountpoint = mountpoint
+      @compression = compression
+    end
+
+    # ZFS create/clone options shared by prepare! / prepare_from!.
+    def create_opts
+      opts = "-o mountpoint=#{@mountpoint.shellescape}"
+      opts += " -o compression=#{@compression.shellescape}" unless @compression.to_s.empty?
+      opts
     end
 
     # The template's rootfs inside the volume; mirrors the LXD container
@@ -39,7 +51,7 @@ module CloudModel
     # previous (failed or superseded) build is destroyed first.
     def prepare!
       destroy!
-      execute "zfs create -p -o mountpoint=#{@mountpoint.shellescape} #{@dataset_name.shellescape}"
+      execute "zfs create -p #{create_opts} #{@dataset_name.shellescape}"
       set_status 'building'
     end
 
@@ -50,7 +62,7 @@ module CloudModel
         raise "Source ZFS snapshot #{source_dataset}@#{READY_SNAPSHOT} does not exist on host"
       end
       destroy!
-      execute "zfs clone -p -o mountpoint=#{@mountpoint.shellescape} #{"#{source_dataset}@#{READY_SNAPSHOT}".shellescape} #{@dataset_name.shellescape}"
+      execute "zfs clone -p #{create_opts} #{"#{source_dataset}@#{READY_SNAPSHOT}".shellescape} #{@dataset_name.shellescape}"
       set_status 'building'
     end
 
