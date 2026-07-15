@@ -48,6 +48,13 @@ module CloudModel
     #   version. nil → fall back to the build host's/template's Ruby.
     field :ruby_version, type: String, default: nil
 
+    # @!attribute [rw] os_version
+    #   @return [String, nil] the base OS the artifact targets. Native gems link
+    #   against this OS's shared libraries (glibc/openssl/…), so the build
+    #   environment AND the consuming guests must share it. nil → derived from the
+    #   consuming guests (which must then all agree). See {#build_os_version}.
+    field :os_version, type: String, default: nil
+
     # @!attribute [rw] has_assets
     #   @return [Boolean] whether to run the Rails asset pipeline during build
     field :has_assets, type: Mongoid::Boolean, default: false
@@ -181,50 +188,79 @@ module CloudModel
     # guests on deploy. Native extensions link against the template's libs and
     # the CPU arch, so the artifact is keyed by both.
 
-    def build_dataset(template, arch)
-      "#{CloudModel.config.build_dataset}/web/#{id}/#{template.id}-#{arch}"
+    # The base OS the artifact targets, resolved for the build. Explicit field
+    # wins; otherwise the single os_version shared by the consuming guests; else
+    # the config default. The build environment is built for this OS so native
+    # gems link against the same shared libraries the guests run.
+    def build_os_version
+      os_version.presence ||
+        services.map { |s| s.guest&.os_version }.compact.uniq.first ||
+        "ubuntu-#{CloudModel.config.ubuntu_version}"
     end
 
-    def build_mountpoint(template, arch)
-      "/cloud/build/web/#{id}/#{template.id}-#{arch}"
+    # The shared build environment for (ruby_version, os_version, arch): a
+    # GuestTemplateType carrying only the toolchain (ruby + rust, no nginx), so
+    # it is built once by the normal template machinery and cloned per build —
+    # decoupled from any guest's runtime template. Requirements are expanded the
+    # way Guest#components_needed does (so rust pulls in :clang); without that
+    # the install loop would skip clang and native builds would fail.
+    # @return [CloudModel::GuestTemplate]
+    def build_env_template(host)
+      raw = [:"ruby@#{ruby_version || CloudModel.config.ruby_version}", :rust] +
+            additional_components.map(&:to_sym)
+      components = raw.flat_map do |sym|
+        comp = CloudModel::Components::BaseComponent.from_sym(sym)
+        comp.requirements + [comp.name]
+      end.uniq.sort
+      type = CloudModel::GuestTemplateType.find_or_create_by(
+        components: components, os_version: build_os_version)
+      type.last_useable(host)
     end
 
-    def artifact_key(template, arch)
-      "#{template.id}-#{arch}"
+    def build_dataset(arch)
+      "#{CloudModel.config.build_dataset}/web/#{id}/#{arch}"
     end
 
-    # Current artifact snapshot version (timestamp) for (template, arch), or nil.
-    def artifact_version(template, arch)
-      artifact_versions[artifact_key(template, arch)]
+    def build_mountpoint(arch)
+      "/cloud/build/web/#{id}/#{arch}"
+    end
+
+    def artifact_key(arch)
+      arch.to_s
+    end
+
+    # Current artifact snapshot version (timestamp) for arch, or nil.
+    def artifact_version(arch)
+      artifact_versions[artifact_key(arch)]
     end
 
     # The current deployable snapshot: `<workspace>@v<ts>`. nil until built.
     # Each build snapshots the persistent workspace under a fresh `@v<ts>`
     # rather than a fixed `@ready`, so a rebuild never destroys a snapshot a
     # deployed guest still clones from.
-    def build_snapshot(template, arch)
-      ver = artifact_version(template, arch)
-      ver && "#{build_dataset(template, arch)}@v#{ver}"
+    def build_snapshot(arch)
+      ver = artifact_version(arch)
+      ver && "#{build_dataset(arch)}@v#{ver}"
     end
 
     # @return [CloudModel::BuildZfsVolume] this image's persistent build
     #   workspace on `host` (kept across builds so bundle/node_modules/git
     #   caches make rebuilds incremental).
-    def build_volume(host, template, arch)
-      CloudModel::BuildZfsVolume.new host, build_dataset(template, arch),
-        mountpoint: build_mountpoint(template, arch),
+    def build_volume(host, arch)
+      CloudModel::BuildZfsVolume.new host, build_dataset(arch),
+        mountpoint: build_mountpoint(arch),
         compression: CloudModel.config.zfs_compression
     end
 
     # True if the current artifact version's snapshot exists on `host`.
-    def web_volume_ready?(host, template, arch)
-      snap = build_snapshot(template, arch)
+    def web_volume_ready?(host, arch)
+      snap = build_snapshot(arch)
       snap && host.exec("zfs list -t snapshot #{snap.shellescape}").first
     end
 
-    # Records the freshly built artifact version (timestamp) for (template, arch).
-    def record_artifact_version(template, arch, ts)
-      self.artifact_versions = artifact_versions.merge(artifact_key(template, arch) => ts.to_s)
+    # Records the freshly built artifact version (timestamp) for arch.
+    def record_artifact_version(arch, ts)
+      self.artifact_versions = artifact_versions.merge(artifact_key(arch) => ts.to_s)
       set artifact_versions: artifact_versions
     end
 
@@ -234,64 +270,63 @@ module CloudModel
 
     # Records a built artifact's ZFS size (bytes), queried once at the end of
     # the build so detail pages never need a live host query.
-    def record_artifact_size(template, arch, bytes)
-      self.artifact_sizes = artifact_sizes.merge(artifact_key(template, arch) => bytes.to_i)
+    def record_artifact_size(arch, bytes)
+      self.artifact_sizes = artifact_sizes.merge(artifact_key(arch) => bytes.to_i)
       set artifact_sizes: artifact_sizes
     end
 
-    # Total ZFS size (bytes) across all built (template, arch) artifacts.
+    # Total ZFS size (bytes) across all built (arch) artifacts.
     def total_artifact_usage
       artifact_sizes.values.map(&:to_i).sum
     end
 
-    # Per-(template, arch) breakdown of the built artifacts for detail views.
-    # Each entry: { key:, template:, template_id:, arch:, version:, size: }.
-    # The artifact key is "<template_id>-<arch>"; arch never contains a hyphen
-    # and template_id is a bare ObjectId, so the last hyphen splits them.
+    # Per-arch breakdown of the built artifacts for detail views.
+    # Each entry: { key:, arch:, version:, size: }. The key IS the arch.
     def artifact_list
       (artifact_versions.keys | artifact_sizes.keys).sort.map do |key|
-        template_id, _, arch = key.rpartition('-')
         {
           key: key,
-          template_id: template_id,
-          template: CloudModel::GuestTemplate.where(id: template_id).first,
-          arch: arch,
+          arch: key,
           version: artifact_versions[key],
           size: artifact_sizes[key].to_i
         }
       end
     end
 
-    # The distinct [template, arch] pairs this image must be built for, derived
-    # from the guests whose services deploy it.
+    # The distinct arches this image must be built for, derived from the guests
+    # whose services deploy it. One (web_image, arch) artifact is shared by all
+    # guests of that arch, so they must agree on os_version — enforced here.
     def build_targets
-      services.map do |service|
-        guest = service.guest
-        next unless guest and (template = guest.template) and (host = guest.host)
-        [template, host.arch]
-      end.compact.uniq
+      guests = services.map(&:guest).compact
+      oses = guests.map(&:os_version).compact.uniq
+      if oses.size > 1 || (os_version.present? && oses.any? { |o| o != os_version })
+        raise "WebImage #{name}: consuming guests disagree on os_version " \
+          "(#{oses.inspect}, image os_version=#{os_version.inspect}) — " \
+          "one artifact per (web_image, arch) cannot span base OSes."
+      end
+      guests.map { |g| g.host&.arch }.compact.uniq
     end
 
     # Ensures the current artifact version for (template, arch) is present on
     # `host`: already there → sync it from a host that has it → build it on the
     # arch's build host and sync it over.
     # @return [Boolean] true if the artifact snapshot is on `host`
-    def ensure_web_volume!(host, template, arch, options = {})
-      return true if web_volume_ready?(host, template, arch)
-      return true if sync_web_volume_to(host, template, arch) && web_volume_ready?(host, template, arch)
+    def ensure_web_volume!(host, arch, options = {})
+      return true if web_volume_ready?(host, arch)
+      return true if sync_web_volume_to(host, arch) && web_volume_ready?(host, arch)
 
       build_host = CloudModel::Host.build_host(arch) || host
-      worker(build_host).build_app_volume template, arch, options
-      sync_web_volume_to host, template, arch unless web_volume_ready?(host, template, arch)
-      web_volume_ready?(host, template, arch)
+      worker(build_host).build_app_volume arch, options
+      sync_web_volume_to host, arch unless web_volume_ready?(host, arch)
+      web_volume_ready?(host, arch)
     end
 
     # Copies the current artifact version's snapshot from a host that already
     # has it to `target_host` (via {ZfsDatasetSync#sync_zfs_dataset!}).
     # @return [Boolean] true if a source was found and the sync succeeded
-    def sync_web_volume_to(target_host, template, arch)
+    def sync_web_volume_to(target_host, arch)
       return false if CloudModel.config.skip_sync_images
-      snap = build_snapshot(template, arch)
+      snap = build_snapshot(arch)
       return false unless snap
 
       candidates = ([CloudModel::Host.build_host(arch)] + CloudModel::Host.all.to_a).compact.uniq - [target_host]
@@ -305,7 +340,7 @@ module CloudModel
       end
       return false unless source_host
 
-      sync_zfs_dataset! source_host, target_host, build_dataset(template, arch), snapshot: snap
+      sync_zfs_dataset! source_host, target_host, build_dataset(arch), snapshot: snap
     rescue Exception => e
       CloudModel.log_exception e
       false
@@ -360,13 +395,13 @@ module CloudModel
         return false
       end
 
-      targets.each do |template, arch|
+      targets.each do |arch|
         host = CloudModel::Host.build_host(arch)
         unless host
           update_attributes build_state: :failed, build_last_issue: "No build host configured for arch '#{arch}'."
           return false
         end
-        worker(host).build_app_volume template, arch, options
+        worker(host).build_app_volume arch, options
       end
 
       true

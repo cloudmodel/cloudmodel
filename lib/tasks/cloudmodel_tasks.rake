@@ -349,7 +349,7 @@ namespace :cloudmodel do
   end
 
   namespace :web_image do
-    desc "Build a single WebImage (all its (template, arch) artifacts). Set WEB_IMAGE_ID=<id>."
+    desc "Build a single WebImage (all its per-arch artifacts). Set WEB_IMAGE_ID=<id>."
     task :build => [:environment] do
       raise "No env variable WEB_IMAGE_ID given" unless ENV['WEB_IMAGE_ID']
       CloudModel::WebImage.find(ENV['WEB_IMAGE_ID']).build! force: true
@@ -361,7 +361,7 @@ namespace :cloudmodel do
       CloudModel::WebImage.find(ENV['WEB_IMAGE_ID']).redeploy! force: true
     end
 
-    desc "One-time migration to ZFS web images: rebuild every WebImage as a ZFS app artifact per (template, arch) it is consumed on. Old GridFS tarballs are simply superseded (no downgrade). Dry-run unless CONFIRM=1; set WEB_IMAGE_ID=<id> to target a single image."
+    desc "Rebuild every WebImage as a ZFS app artifact per arch it is consumed on (shared build-env, decoupled from guest templates). Dry-run unless CONFIRM=1; set WEB_IMAGE_ID=<id> to target a single image."
     task :rebuild_all => [:environment] do
       images = if ENV['WEB_IMAGE_ID'].present?
         [CloudModel::WebImage.find(ENV['WEB_IMAGE_ID'])]
@@ -381,9 +381,9 @@ namespace :cloudmodel do
           puts "#{image.name}: \e[33mskipped\e[39m (no guest uses it)"
           next
         end
-        targets.each do |template, arch|
+        targets.each do |arch|
           host = CloudModel::Host.build_host(arch)
-          label = "#{image.name} [#{template.name} / #{arch}] on #{host&.name || '???'}"
+          label = "#{image.name} [#{arch}] on #{host&.name || '???'}"
           if host.nil?
             failures += 1
             puts "  #{label}: \e[31mFAILED\e[39m (no build host for arch '#{arch}')"
@@ -395,7 +395,7 @@ namespace :cloudmodel do
           end
           print "  #{label}: "
           begin
-            image.worker(host).build_app_volume template, arch, force: true
+            image.worker(host).build_app_volume arch, force: true
             if image.reload.build_state == :finished
               puts "\e[32mOK\e[39m"
             else

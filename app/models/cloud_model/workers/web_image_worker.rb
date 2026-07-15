@@ -2,11 +2,12 @@ module CloudModel
   module Workers
     # Worker that builds and redeploys a {CloudModel::WebImage} Rails application.
     #
-    # Build pipeline (per template + arch, native on the arch's build host):
+    # Build pipeline (per arch, native on the arch's build host):
     #   1. git clone/pull LOCALLY on the admin machine (keeps the github deploy
     #      credentials where they already are) → source tree.
-    #   2. clone the consuming guest's {GuestTemplate} `@ready` snapshot into a
-    #      throwaway build-system dataset (carries Ruby/Rust/Node + runtime libs).
+    #   2. clone the shared build-env {GuestTemplate}'s `@ready` snapshot (see
+    #      {WebImage#build_env_template} — ruby+rust+node toolchain, no nginx)
+    #      into a throwaway build-system dataset.
     #   3. create the app ZFS volume mounted at the build system's
     #      `/var/www/rails`, rsync the source into `current/`.
     #   4. inside a chroot into the build system: `bundle install`, `yarn
@@ -58,9 +59,8 @@ module CloudModel
         @web_image
       end
 
-      # Builds the app artifact for one (template, arch) on this build host.
-      def build_app_volume(template, arch, options = {})
-        @template = template
+      # Builds the app artifact for one arch on this build host.
+      def build_app_volume(arch, options = {})
         @arch = arch
         @web_image.update_attributes build_state: :running, build_last_issue: nil, build_log: ''
 
@@ -120,11 +120,12 @@ module CloudModel
       end
 
       def prepare_build_env
-        comment_sub_step "Ensure guest template #{@template.id} on #{@host.name}"
-        @template.ensure_build_volume! @host
+        build_env = @web_image.build_env_template(@host)
+        comment_sub_step "Ensure build environment #{build_env.id} on #{@host.name}"
+        build_env.ensure_build_volume! @host
 
-        comment_sub_step "Clone build system from template #{@template.id}"
-        buildsys_volume.prepare_from! @template.build_dataset
+        comment_sub_step "Clone build system from build environment #{build_env.id}"
+        buildsys_volume.prepare_from! build_env.build_dataset
         @host.exec! "cp /etc/resolv.conf #{buildsys_volume.rootfs_path.shellescape}/etc/resolv.conf", "Failed to copy resolv.conf into build system"
 
         comment_sub_step "Prepare workspace"
@@ -152,7 +153,7 @@ module CloudModel
           "Failed to transfer source to build host"
       end
 
-      # The build system is the guest template (Ruby/Rust/Clang) — make sure the
+      # The build system is the shared build-env (Ruby/Rust/Clang) — make sure the
       # extra build tooling the pipeline needs is present.
       def install_build_prerequisites
         comment_sub_step "Install build prerequisites (git, node 22)"
@@ -314,11 +315,11 @@ module CloudModel
         # Build scratch (.git, caches, ext target) stays in the workspace for
         # incremental rebuilds and is stripped from the per-guest deploy clone.
         ts = Time.now.utc.strftime("%Y%m%d%H%M%S")
-        @host.exec! "zfs snapshot #{@web_image.build_dataset(@template, @arch).shellescape}@v#{ts}", "Failed to snapshot artifact version"
-        @web_image.record_artifact_version @template, @arch, ts
+        @host.exec! "zfs snapshot #{@web_image.build_dataset(@arch).shellescape}@v#{ts}", "Failed to snapshot artifact version"
+        @web_image.record_artifact_version @arch, ts
 
-        _success, used = @host.exec "zfs list -H -p -o used #{@web_image.build_dataset(@template, @arch).shellescape}"
-        @web_image.record_artifact_size @template, @arch, used.to_s.strip.to_i
+        _success, used = @host.exec "zfs list -H -p -o used #{@web_image.build_dataset(@arch).shellescape}"
+        @web_image.record_artifact_size @arch, used.to_s.strip.to_i
 
         comment_sub_step "Destroy build system (workspace kept)"
         buildsys_volume.destroy!
@@ -330,7 +331,7 @@ module CloudModel
       # refuses to destroy a snapshot with dependent clones (a deployed guest),
       # so those simply survive until the guest is redeployed/removed.
       def prune_old_artifact_versions(keep: 2)
-        ds = @web_image.build_dataset(@template, @arch)
+        ds = @web_image.build_dataset(@arch)
         success, out = @host.exec "zfs list -H -o name -t snapshot -r #{ds.shellescape}"
         return unless success
 
@@ -356,8 +357,8 @@ module CloudModel
       # in. Sits next to the app dataset (…-buildenv).
       def buildsys_volume
         @buildsys_volume ||= CloudModel::BuildZfsVolume.new @host,
-          "#{@web_image.build_dataset(@template, @arch)}-buildenv",
-          mountpoint: "#{@web_image.build_mountpoint(@template, @arch)}-buildenv"
+          "#{@web_image.build_dataset(@arch)}-buildenv",
+          mountpoint: "#{@web_image.build_mountpoint(@arch)}-buildenv"
       end
 
       # The deployable app artifact, mounted inside the build system at the
@@ -366,7 +367,7 @@ module CloudModel
       # a release.
       def app_volume
         @app_volume ||= CloudModel::BuildZfsVolume.new @host,
-          @web_image.build_dataset(@template, @arch),
+          @web_image.build_dataset(@arch),
           mountpoint: "#{buildsys_volume.rootfs_path}#{CHROOT_APP_ROOT}",
           compression: CloudModel.config.zfs_compression
       end

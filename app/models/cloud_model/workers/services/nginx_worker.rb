@@ -77,10 +77,9 @@ module CloudModel
         # live redeploy. Returns the deploy id.
         def provision_web_volume online:
           web_image = @model.deploy_web_image
-          template = @guest.template
           arch = @host.arch
 
-          web_image.ensure_web_volume! @host, template, arch
+          web_image.ensure_web_volume! @host, arch
 
           deploy_id = make_deploy_web_image_id
           dataset = web_clone_dataset deploy_id
@@ -88,7 +87,7 @@ module CloudModel
 
           comment_sub_step "Clone WebImage #{web_image.name} for #{@guest.name}"
           @host.exec! "zfs destroy -r #{dataset.shellescape}" if @host.exec("zfs list #{dataset.shellescape}").first
-          @host.exec! "zfs clone -p -o mountpoint=#{mount.shellescape} -o compression=#{CloudModel.config.zfs_compression.shellescape} #{web_image.build_snapshot(template, arch).shellescape} #{dataset.shellescape}",
+          @host.exec! "zfs clone -p -o mountpoint=#{mount.shellescape} -o compression=#{CloudModel.config.zfs_compression.shellescape} #{web_image.build_snapshot(arch).shellescape} #{dataset.shellescape}",
             "Failed to clone web image #{web_image.name}"
 
           strip_web_release mount

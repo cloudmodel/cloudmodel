@@ -117,34 +117,32 @@ describe CloudModel::WebImage do
   end
 
   describe 'build_dataset / build_mountpoint / build_snapshot' do
-    let(:template) { double CloudModel::GuestTemplate, id: 'tid' }
-
     before do
       allow(CloudModel.config).to receive(:build_dataset).and_return 'guests/build'
     end
 
-    it 'keys the app dataset by web image, template and arch' do
-      expect(subject.build_dataset(template, 'MOS6502')).to eq "guests/build/web/#{subject.id}/tid-MOS6502"
+    it 'keys the app dataset by web image and arch (decoupled from the template)' do
+      expect(subject.build_dataset('MOS6502')).to eq "guests/build/web/#{subject.id}/MOS6502"
     end
 
     it 'mounts under /cloud/build/web' do
-      expect(subject.build_mountpoint(template, 'MOS6502')).to eq "/cloud/build/web/#{subject.id}/tid-MOS6502"
+      expect(subject.build_mountpoint('MOS6502')).to eq "/cloud/build/web/#{subject.id}/MOS6502"
     end
 
     it 'points the current version snapshot at the app dataset' do
-      subject.artifact_versions = {'tid-MOS6502' => '20260101000000'}
-      expect(subject.build_snapshot(template, 'MOS6502')).to eq "guests/build/web/#{subject.id}/tid-MOS6502@v20260101000000"
+      subject.artifact_versions = {'MOS6502' => '20260101000000'}
+      expect(subject.build_snapshot('MOS6502')).to eq "guests/build/web/#{subject.id}/MOS6502@v20260101000000"
     end
 
     it 'has no build snapshot before the first build' do
-      expect(subject.build_snapshot(template, 'MOS6502')).to be_nil
+      expect(subject.build_snapshot('MOS6502')).to be_nil
     end
 
     it 'web_volume_ready? checks the current version snapshot on the host' do
-      subject.artifact_versions = {'tid-MOS6502' => '20260101000000'}
+      subject.artifact_versions = {'MOS6502' => '20260101000000'}
       host = double CloudModel::Host
-      expect(host).to receive(:exec).with(/zfs list -t snapshot .*tid-MOS6502@v20260101000000/).and_return [true, 'x']
-      expect(subject.web_volume_ready?(host, template, 'MOS6502')).to be_truthy
+      expect(host).to receive(:exec).with(/zfs list -t snapshot .*\/MOS6502@v20260101000000/).and_return [true, 'x']
+      expect(subject.web_volume_ready?(host, 'MOS6502')).to be_truthy
     end
   end
 
@@ -255,19 +253,18 @@ describe CloudModel::WebImage do
   end
 
   describe 'build!' do
-    let(:template) { double CloudModel::GuestTemplate }
     let(:host) { double CloudModel::Host }
     let(:worker) { double CloudModel::Workers::WebImageWorker }
 
     before do
-      allow(subject).to receive(:build_targets).and_return [[template, 'MOS6502']]
+      allow(subject).to receive(:build_targets).and_return ['MOS6502']
       allow(CloudModel::Host).to receive(:build_host).with('MOS6502').and_return host
       allow(subject).to receive(:worker).with(host).and_return worker
     end
 
-    it 'should build every (template, arch) target on its arch build host' do
+    it 'should build every arch target on its arch build host' do
       allow(subject).to receive(:buildable?).and_return true
-      expect(worker).to receive(:build_app_volume).with(template, 'MOS6502', {})
+      expect(worker).to receive(:build_app_volume).with('MOS6502', {})
 
       expect(subject.build!).to eq true
       expect(subject.build_state).to eq :pending
@@ -283,7 +280,7 @@ describe CloudModel::WebImage do
 
     it 'should allow to force build if not buildable' do
       allow(subject).to receive(:buildable?).and_return false
-      expect(worker).to receive(:build_app_volume).with(template, 'MOS6502', {force: true})
+      expect(worker).to receive(:build_app_volume).with('MOS6502', {force: true})
 
       expect(subject.build! force: true).to eq true
     end
