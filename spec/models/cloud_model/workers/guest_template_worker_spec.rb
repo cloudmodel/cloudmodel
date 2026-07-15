@@ -153,7 +153,7 @@ describe CloudModel::Workers::GuestTemplateWorker do
       end
 
       it 'should install rsync, wget, and curl' do
-        expect(subject).to receive(:chroot!).with(subject.build_path, "apt-get install sudo rsync wget curl -y", "Failed to install rsync, wget, and curl")
+        expect(subject).to receive(:chroot!).with(subject.build_path, "apt-get install sudo rsync wget curl unzip -y", "Failed to install rsync, wget, curl, and unzip")
         subject.install_utils
       end
 

@@ -199,14 +199,17 @@ module CloudModel
     end
 
     # The shared build environment for (ruby_version, os_version, arch): a
-    # GuestTemplateType carrying only the toolchain (ruby + rust, no nginx), so
-    # it is built once by the normal template machinery and cloned per build —
-    # decoupled from any guest's runtime template. Requirements are expanded the
-    # way Guest#components_needed does (so rust pulls in :clang); without that
-    # the install loop would skip clang and native builds would fail.
+    # GuestTemplateType carrying only the toolchain (ruby + node + rust, no
+    # nginx), so it is built once by the normal template machinery and cloned
+    # per build — decoupled from any guest's runtime template. node and rust are
+    # build-only (a deployed app serves precompiled assets and native
+    # extensions), so they live here and not in the runtime template.
+    # Requirements are expanded the way Guest#components_needed does (so rust
+    # pulls in :clang); without that the install loop would skip clang and
+    # native builds would fail.
     # @return [CloudModel::GuestTemplate]
     def build_env_template(host)
-      raw = [:"ruby@#{ruby_version || CloudModel.config.ruby_version}", :rust] +
+      raw = [:"ruby@#{ruby_version || CloudModel.config.ruby_version}", :nodejs, :rust] +
             additional_components.map(&:to_sym)
       components = raw.flat_map do |sym|
         comp = CloudModel::Components::BaseComponent.from_sym(sym)

@@ -60,8 +60,8 @@ module CloudModel
         # Don't try to install software-properties-common on debian < 13, it is included in base template
         # chroot build_path, "apt-get install software-properties-common -y"
 
-        comment_sub_step 'Install rsync, wget, and curl'
-        chroot! build_path, "apt-get install sudo rsync wget curl -y", "Failed to install rsync, wget, and curl"
+        comment_sub_step 'Install rsync, wget, curl, and unzip'
+        chroot! build_path, "apt-get install sudo rsync wget curl unzip -y", "Failed to install rsync, wget, curl, and unzip"
 
         comment_sub_step 'Install zstd'
         chroot! build_path, "apt-get install zstd -y", "Failed to install zstd"

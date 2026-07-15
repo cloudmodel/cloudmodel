@@ -71,7 +71,6 @@ module CloudModel
 
             @web_image.update_attribute :build_state, :bundling
             prepare_build_env
-            install_build_prerequisites
             configure_git_credentials
             bundle_image
             pin_ruby_version
@@ -151,22 +150,6 @@ module CloudModel
         ssh = "ssh -i #{CloudModel.config.ssh_key_file.shellescape} -o StrictHostKeyChecking=no"
         local_exec! "rsync -a --delete #{excludes} -e #{ssh.shellescape} #{@web_image.build_path.shellescape}/ root@#{@host.ssh_address}:#{app_build_host_path.shellescape}/",
           "Failed to transfer source to build host"
-      end
-
-      # The build system is the shared build-env (Ruby/Rust/Clang) — make sure the
-      # extra build tooling the pipeline needs is present.
-      def install_build_prerequisites
-        comment_sub_step "Install build prerequisites (git, node 22)"
-        # Debian bookworm ships node 18, too old for the app's toolchain
-        # (puppeteer/vite want node >= 22). Pull node 22 from NodeSource; it
-        # brings a matching npm. (With the persistent build chroot this runs
-        # once, not per build.)
-        chroot! buildsys_volume.rootfs_path, [
-          "apt-get update",
-          "apt-get install -y git curl ca-certificates gnupg",
-          "curl -fsSL https://deb.nodesource.com/setup_22.x | bash -",
-          "apt-get install -y nodejs"
-        ] * ' && ', "Failed to install build prerequisites"
       end
 
       # Copies the git deploy key into the throwaway build system so
