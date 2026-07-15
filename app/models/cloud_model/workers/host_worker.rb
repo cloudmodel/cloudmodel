@@ -301,6 +301,16 @@ module CloudModel
         render_to_remote "/cloud_model/support/etc/hostname", "#{root}/etc/hostname", host: @host
         render_to_remote "/cloud_model/support/etc/machine_info", "#{root}/etc/machine-info", host: @host
 
+        comment_sub_step 'config time synchronisation'
+
+        # ntpsec panics and exits when the clock is off by more than ~1000s
+        # (e.g. a QEMU dev VM resuming from host sleep with the frozen guest
+        # clock hours behind), leaving the host permanently unsynced — and apt
+        # then rejects "not valid yet" repo Release files. Let it step any offset
+        # instead of panicking so the clock self-heals, and make sure it runs.
+        chroot! root, "grep -q '^tinker panic 0' /etc/ntpsec/ntp.conf 2>/dev/null || echo 'tinker panic 0' >> /etc/ntpsec/ntp.conf", "Failed to configure ntpsec"
+        chroot root, "systemctl enable ntpsec 2>/dev/null"
+
         comment_sub_step 'config firewall'
 
         config_firewall
