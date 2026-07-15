@@ -3,12 +3,13 @@ module CloudModel
     module Components
       # Component worker that installs Ruby via RVM into a guest template chroot.
       #
-      # Imports the RVM GPG key, installs dependencies (git, zlib, curl, the
-      # Puppeteer/Chromium runtime libs), runs `rvm install`, installs bundler
-      # 1.x and 2.x, cleans up the RVM download cache, and kills the GPG agent so
-      # the chroot can be cleanly unmounted afterwards. Node/Yarn are *not* here:
-      # they are build-only and live in {NodejsComponentWorker}, pulled into a
-      # web image's build environment rather than its runtime template.
+      # Imports the RVM GPG key, installs the base dependencies (git, zlib, curl),
+      # runs `rvm install`, installs bundler 1.x and 2.x, cleans up the RVM
+      # download cache, and kills the GPG agent so the chroot can be cleanly
+      # unmounted afterwards. This installs *only* Ruby: Node/Yarn live in
+      # {NodejsComponentWorker} (build-only) and the Puppeteer/Chromium runtime
+      # libs in {PuppeteerComponentWorker} (opt-in), so a plain Rails runtime
+      # stays lean.
       class RubyComponentWorker < BaseComponentWorker
         def rubyversion
           @options[:component].try(:version) || CloudModel.config.ruby_version
@@ -25,10 +26,6 @@ module CloudModel
           else
             #packages << 'libcrypt1' # bcrypt @ Ubuntu 22.04, already seems to install automatically
           end
-          # Chromium runtime libs for grover/puppeteer — needed at runtime to run
-          # the Chromium the build bundled into the artifact, so they stay with
-          # the (runtime) Ruby component. Node/Yarn come from NodejsComponent.
-          packages += %w(libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libgbm1 libasound2 libpangocairo-1.0-0 libxss1 libgtk-3-0)
           chroot! build_path, "apt-get install #{packages * ' '} -y", "Failed to install packages for deployment of rails app"
 
           # Install RVM

@@ -241,18 +241,21 @@ module CloudModel
         end
       end
 
-      # Pins puppeteer's browser cache INSIDE the app (relative to the config's
-      # own dir), so `yarn install` downloads the arch-correct Chromium into the
-      # artifact and grover/puppeteer find it at runtime wherever the release is
-      # mounted — puppeteer's default (~/.cache/puppeteer) would land outside the
-      # artifact and be lost. Skipped if the app ships its own puppeteer config.
+      # Writes a .puppeteerrc.cjs that skips the browser download and points
+      # grover/puppeteer at the distro chromium (/usr/bin/chromium) installed by
+      # the Puppeteer component. This replaces the older "download Chromium into
+      # the artifact" approach, which has no arm64 Linux build and shipped a
+      # ~150 MB browser per artifact. Skipped if the app ships its own config.
       def write_puppeteer_config
         path = "#{app_build_host_path}/.puppeteerrc.cjs"
         return if @host.exec("test -e #{path.shellescape}").first
 
-        comment_sub_step "Pin Chromium cache into app (.puppeteerrc.cjs)"
+        comment_sub_step "Point Puppeteer at the system Chromium (.puppeteerrc.cjs)"
+        # No browser download (there is no arm64 Linux build, and the distro
+        # chromium package — installed by the Puppeteer component — is used
+        # instead); grover launches /usr/bin/chromium at runtime.
         @host.sftp.file.open(path, 'w', 0644) do |f|
-          f.write "const { join } = require('path');\nmodule.exports = { cacheDirectory: join(__dirname, '.cache', 'puppeteer') };\n"
+          f.write "module.exports = { skipDownload: true, executablePath: '/usr/bin/chromium' };\n"
         end
       end
 
@@ -263,11 +266,14 @@ module CloudModel
 
         comment_sub_step "Yarn install"
         # Full install (no --production): the Vite/Sass asset toolchain lives in
-        # devDependencies and is needed to build assets. Skip Playwright's
-        # browser download — it is a test-only devDependency and its browsers
-        # would land in ~/.cache (outside the artifact), wasting build time.
+        # devDependencies and is needed to build assets. Skip the Puppeteer and
+        # Playwright browser downloads — grover uses the distro chromium (see
+        # write_puppeteer_config) and Playwright is a test-only devDependency;
+        # their browsers would otherwise waste build time (and Puppeteer has no
+        # arm64 Linux build to fetch).
         chroot! buildsys_volume.rootfs_path, [
           "cd #{CHROOT_APP_ROOT}",
+          "export PUPPETEER_SKIP_DOWNLOAD=1",
           "export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1",
           "command -v yarn >/dev/null 2>&1 || npm install -g yarn",
           "yarn install --non-interactive"
