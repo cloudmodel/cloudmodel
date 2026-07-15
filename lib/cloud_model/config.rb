@@ -43,6 +43,10 @@ module CloudModel
 
     attr_writer :backup_hosts, :monitoring_notifiers
     attr_writer :monitoring_sample_retention
+    # Prefix for the ZFS backup snapshots (`<dataset>@<prefix><timestamp>`).
+    # The pruner and incremental-base lookup key on it, so an app that already
+    # has snapshots under a different prefix must set it to that value.
+    attr_writer :backup_snapshot_prefix
     attr_accessor :issue_url
 
     attr_accessor :build_host_name
@@ -71,6 +75,12 @@ module CloudModel
 
     def backup_concurrency
       @backup_concurrency || 4
+    end
+
+    # Prefix for ZFS backup snapshots (see the writer above). Generic default;
+    # override to match pre-existing snapshots created under another prefix.
+    def backup_snapshot_prefix
+      @backup_snapshot_prefix || 'cm-bkp-'
     end
 
     def bundle_command

@@ -137,8 +137,17 @@ module CloudModel
     # natively (old snapshots pruned with `zfs destroy`), so there are no stream
     # files and no need for periodic full backups.
 
-    # Prefix for the ZFS snapshots this backup creates.
-    ZFS_BACKUP_SNAPSHOT_PREFIX = 'cm-bkp-'
+    # Prefix for the ZFS snapshots this backup creates. Configurable via
+    # `CloudModel.config.backup_snapshot_prefix` (default 'cm-bkp-') so an app
+    # with pre-existing snapshots under another prefix keeps a single chain.
+    def self.backup_snapshot_prefix
+      CloudModel.config.backup_snapshot_prefix
+    end
+
+    # Instance-side convenience mirror of {.backup_snapshot_prefix}.
+    def backup_snapshot_prefix
+      self.class.backup_snapshot_prefix
+    end
 
     # Number of backup snapshots to keep on the SOURCE. More than one buys a
     # chain buffer: an aborted transfer can cost the newest base, but an older
@@ -171,7 +180,7 @@ module CloudModel
       return [] unless dataset = zfs_dataset
       success, out = host.exec "zfs list -H -o name -t snapshot -r #{dataset.shellescape}"
       return [] unless success
-      out.split("\n").select { |s| s.start_with? "#{dataset}@#{ZFS_BACKUP_SNAPSHOT_PREFIX}" }.sort.reverse
+      out.split("\n").select { |s| s.start_with? "#{dataset}@#{backup_snapshot_prefix}" }.sort.reverse
     end
 
     # Time of the most recent successful backup (the newest snapshot kept on the
@@ -181,7 +190,7 @@ module CloudModel
     def last_backup_at
       snapshot = zfs_backup_snapshots.first
       return nil unless snapshot
-      ts = snapshot.split("@#{ZFS_BACKUP_SNAPSHOT_PREFIX}").last
+      ts = snapshot.split("@#{backup_snapshot_prefix}").last
       return nil unless ts =~ /\A[0-9]{14}\z/
       Time.strptime(ts, "%Y%m%d%H%M%S")
     rescue ArgumentError
@@ -205,10 +214,10 @@ module CloudModel
 
       timestamp = Time.now.strftime "%Y%m%d%H%M%S"
       base = incremental_base target
-      snapshot = "#{source}@#{ZFS_BACKUP_SNAPSHOT_PREFIX}#{timestamp}"
+      snapshot = "#{source}@#{backup_snapshot_prefix}#{timestamp}"
 
       if base
-        CloudModel.backup_log "volume #{mount_point}: incremental ZFS send since #{base.rpartition('@').last.delete_prefix(ZFS_BACKUP_SNAPSHOT_PREFIX)}"
+        CloudModel.backup_log "volume #{mount_point}: incremental ZFS send since #{base.rpartition('@').last.delete_prefix(backup_snapshot_prefix)}"
       else
         CloudModel.backup_log "volume #{mount_point}: full ZFS send (no incremental base on backup target)"
       end
@@ -244,7 +253,7 @@ module CloudModel
       target = backup_target_dataset
       return false unless target
 
-      success, _out = backup_host.exec "zfs destroy #{"#{target}@#{ZFS_BACKUP_SNAPSHOT_PREFIX}#{timestamp}".shellescape}"
+      success, _out = backup_host.exec "zfs destroy #{"#{target}@#{backup_snapshot_prefix}#{timestamp}".shellescape}"
       success
     end
 
@@ -269,9 +278,9 @@ module CloudModel
       snapshot = if timestamp == 'latest'
         success, out = backup_host.exec "zfs list -H -o name -t snapshot -r #{target.shellescape}"
         return false unless success
-        out.split("\n").select { |s| s.include? "@#{ZFS_BACKUP_SNAPSHOT_PREFIX}" }.sort.last
+        out.split("\n").select { |s| s.include? "@#{backup_snapshot_prefix}" }.sort.last
       else
-        "#{target}@#{ZFS_BACKUP_SNAPSHOT_PREFIX}#{timestamp}"
+        "#{target}@#{backup_snapshot_prefix}#{timestamp}"
       end
       return false unless snapshot
 
@@ -350,7 +359,7 @@ module CloudModel
       result = Hash.new { |hash, key| hash[key] = [] }
       out.split("\n").each do |line|
         name, used, referenced = line.split("\t")
-        match = name.to_s.match %r{/([0-9a-f]{24})@#{ZFS_BACKUP_SNAPSHOT_PREFIX}([0-9]{14})\z}
+        match = name.to_s.match %r{/([0-9a-f]{24})@#{backup_snapshot_prefix}([0-9]{14})\z}
         next unless match
         result[match[1]] << {
           timestamp: match[2],
@@ -504,7 +513,7 @@ module CloudModel
       return unless success
 
       by_timestamp = out.split("\n").filter_map do |snapshot|
-        timestamp = snapshot[/@#{ZFS_BACKUP_SNAPSHOT_PREFIX}([0-9]{14})\z/, 1]
+        timestamp = snapshot[/@#{backup_snapshot_prefix}([0-9]{14})\z/, 1]
         [timestamp, snapshot] if timestamp
       end.to_h
 
