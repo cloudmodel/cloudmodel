@@ -201,7 +201,7 @@ module CloudModel
           # Point rustup/cargo at the toolchain the template installed (with its
           # default set) — without RUSTUP_HOME/CARGO_HOME rustup looks in root's
           # empty ~/.rustup and fails ("could not choose a version of cargo").
-          # Needed for Rust-native gems (a native gem).
+          # Needed for Rust-native gems.
           "export CARGO_HOME=/usr/local/cargo RUSTUP_HOME=/usr/local/rustup PATH=\"/usr/local/cargo/bin:$PATH\"",
           # BUNDLE_JOBS=1 (in BUNDLE_ENV): serialize install so bundler doesn't
           # unshallow the same git repo (referenced by several gems) from

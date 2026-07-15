@@ -431,7 +431,7 @@ module CloudModel
       def check_ntp
         if sys_info = data[:system] and ntp = sys_info['ntp']
           if synced = ntp['NTPSynchronized']
-            # Clock drift breaks TLS and TOTP 2FA (the auth service).
+            # Clock drift breaks TLS and TOTP 2FA.
             do_check :ntp_sync, 'Time synchronisation', {
               warning: synced != 'yes'
               }, message: 'System clock is not NTP-synchronised', value: synced

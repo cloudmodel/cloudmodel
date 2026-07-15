@@ -1,5 +1,5 @@
 #!/bin/bash
-# Time synchronisation status. Matters for TLS and TOTP 2FA (the auth service).
+# Time synchronisation status. Matters for TLS and TOTP 2FA.
 echo "<<<ntp>>>"
 if command -v timedatectl >/dev/null 2>&1; then
   timedatectl show -p NTP -p NTPSynchronized 2>/dev/null | sed 's/=/ /'

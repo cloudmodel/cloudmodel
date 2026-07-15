@@ -93,8 +93,8 @@ module CloudModel
 
     # @!attribute [rw] mongodb_backup_exclude_collection_prefixes
     #   @return [Array<String>] collection-name prefixes this app's transient
-    #     data uses (e.g. GridFS bucket `fs`, `search_journal`,
-    #     `index_collection`); excluded from MongoDB replica-set backups.
+    #     data uses (e.g. a GridFS bucket, search-index or import/export scratch
+    #     collections); excluded from MongoDB replica-set backups.
     #     Passed to the associated {MongodbReplicationSet}.
     field :mongodb_backup_exclude_collection_prefixes, type: Array, default: []
 
