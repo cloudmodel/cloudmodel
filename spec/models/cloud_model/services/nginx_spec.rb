@@ -74,12 +74,12 @@ describe CloudModel::Services::Nginx do
       expect(subject.components_needed).to eq [:'ruby@3.4', :nginx]
     end
 
-    it 'uses the deployed WebImage ruby_version but keeps its additional_components out of the runtime template (they are build-env only)' do
-      web_image = double CloudModel::WebImage, ruby_version: '3.4.10', additional_components: ['rust']
+    it 'keeps the WebImage runtime additional_components but drops build-only toolchain (rust/clang)' do
+      web_image = double CloudModel::WebImage, ruby_version: '3.4.10', additional_components: ['imagemagick', 'rust']
       subject.passenger_ruby_version = '2.5'
       subject.passenger_supported = true
       allow(subject).to receive(:deploy_web_image).and_return web_image
-      expect(subject.components_needed).to eq [:'ruby@3.4.10', :nginx]
+      expect(subject.components_needed).to eq [:'ruby@3.4.10', :nginx, :imagemagick]
     end
 
     it 'should require web app components' do

@@ -131,10 +131,15 @@ module CloudModel
           # built against. Fall back to passenger_ruby_version when unset.
           ruby = deploy_web_image&.ruby_version.presence || passenger_ruby_version
           components = [:"ruby@#{ruby}"] + components
-          # NOTE: deploy_web_image.additional_components (e.g. :rust) are
-          # build-env-only toolchain — they go into WebImage#build_env_template,
-          # NOT the runtime guest template, which stays lean (only the compiled
-          # native extensions run here, never cargo/rustc).
+          if deploy_web_image
+            # The web image's additional_components are its runtime libraries
+            # (e.g. imagemagick, libxml2) and stay in the guest template — only
+            # the build-only compilers (rust/clang) are dropped, since they live
+            # in WebImage#build_env_template and only the compiled native
+            # extensions run at runtime.
+            build_only = %i[rust clang]
+            components += deploy_web_image.additional_components.map(&:to_sym) - build_only
+          end
           (components + super).uniq
         else
           (components + super).uniq
