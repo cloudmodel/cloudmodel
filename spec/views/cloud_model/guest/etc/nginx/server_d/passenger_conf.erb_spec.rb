@@ -119,4 +119,22 @@ RSpec.describe 'cloud_model/guest/etc/nginx/server_d/passenger_conf', type: :vie
     expect(rendered).not_to include '/cable'
   end
 
+  it 'pins the Chromium path when the web image uses the puppeteer component' do
+    allow(model).to receive(:deploy_web_image).and_return(
+      CloudModel::WebImage.new(additional_components: %w[puppeteer imagemagick]))
+
+    render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
+
+    expect(rendered).to include 'passenger_env_var                 PUPPETEER_EXECUTABLE_PATH /usr/bin/chromium;'
+  end
+
+  it 'omits the Chromium path without the puppeteer component' do
+    allow(model).to receive(:deploy_web_image).and_return(
+      CloudModel::WebImage.new(additional_components: %w[imagemagick]))
+
+    render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
+
+    expect(rendered).not_to include 'PUPPETEER_EXECUTABLE_PATH'
+  end
+
 end

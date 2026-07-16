@@ -9,6 +9,11 @@ location <%= location %> {
   passenger_enabled                 on;
   passenger_min_instances           3;
   passenger_env_var                 HTTP_X_FORWARDED_PROTO $scheme;
+  <%- if model.deploy_web_image&.additional_components&.map(&:to_s)&.include?('puppeteer') -%>
+  # grover/Puppeteer launches the distro Chromium (Puppeteer component); its own
+  # node context does not read the app's .puppeteerrc.cjs, so pin the path here.
+  passenger_env_var                 PUPPETEER_EXECUTABLE_PATH /usr/bin/chromium;
+  <%- end -%>
   passenger_app_env                 <%= model.passenger_env %>;
   passenger_preload_bundler         on;
 
