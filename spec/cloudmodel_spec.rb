@@ -85,6 +85,19 @@ describe CloudModel do
       ids << threads.pop until threads.empty?
       expect(ids.uniq.size).to be > 1
     end
+
+    it 'still runs every item when one raises, then re-raises the failure' do
+      seen = Queue.new
+      expect {
+        CloudModel.parallel_each([1, 2, 3, 4, 5], concurrency: 3) do |i|
+          raise 'boom' if i == 3
+          seen << i
+        end
+      }.to raise_error('boom')
+      done = []
+      done << seen.pop until seen.empty?
+      expect(done.sort).to eq [1, 2, 4, 5]
+    end
   end
 end 
 

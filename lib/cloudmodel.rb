@@ -23,12 +23,19 @@ module CloudModel
   # Run +block+ for each item, up to +concurrency+ at a time, and wait for all.
   # Used to overlap backups (which mostly wait on mongodump / zfs send). Falls
   # back to a plain sequential each for concurrency <= 1 or a single item.
+  #
+  # Failures are isolated per item: a raising block never kills its worker
+  # thread, so one broken item can't abort the rest of the batch or leave the
+  # sibling threads running orphaned. Every item is attempted; once all have
+  # finished the first error is re-raised (never silently swallowed), so the
+  # failure still surfaces to the caller.
   # @return the items
   def self.parallel_each(items, concurrency: config.backup_concurrency, &block)
     items = items.to_a
     return items.each(&block) if concurrency.to_i <= 1 || items.size <= 1
 
-    queue = Queue.new
+    queue  = Queue.new
+    errors = Queue.new
     items.each { |item| queue << item }
 
     [concurrency.to_i, items.size].min.times.map do
@@ -39,10 +46,16 @@ module CloudModel
           rescue ThreadError
             break
           end
-          block.call item
+          begin
+            block.call item
+          rescue => e
+            errors << e
+          end
         end
       end
     end.each(&:join)
+
+    raise errors.pop unless errors.empty?
 
     items
   end
