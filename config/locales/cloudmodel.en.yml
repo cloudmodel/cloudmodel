@@ -683,7 +683,7 @@ en:
       zpools_usage: ZPOOL usage up to %{value}
       zpools_health: ZFS pool not healthy (not ONLINE)
       conntrack_usage: Conntrack table %{value} full
-      conntrack_insert_failed: Conntrack table full — connections are being lost (%{value})
+      conntrack_insert_failed: Conntrack insert failures — flow clashes or table full (%{value})
       conntrack_drop: Conntrack dropping packets (%{value})
       net_links_down: Network link down
       ntp_sync: System clock not NTP-synchronised

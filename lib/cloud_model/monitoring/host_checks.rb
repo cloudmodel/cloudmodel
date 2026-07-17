@@ -328,23 +328,27 @@ module CloudModel
 
         rates = conntrack_rates
 
-        # Ground truth of lost connections: insert_failed means the table was
-        # full when a new connection arrived, so it was never tracked (and, for
-        # NAT, its packets get dropped). Any occurrence is a warning; a sustained
-        # rate is critical. Catches burst exhaustion the usage gauge misses.
+        # insert_failed counts confirmed-insert failures. On modern SMP kernels
+        # this is dominated by insert *clashes* — parallel packets of the same
+        # new flow confirmed on different CPUs — not by a genuinely full table.
+        # That is normal, low-level background noise on NAT/UDP-heavy hosts
+        # (WebRTC media, DNS), so a trickle must not alert. A sustained rate is
+        # what signals real trouble (burst table exhaustion the usage gauge
+        # misses). Read together with :conntrack_usage to tell the two apart.
         if rate = rates['insert_failed']
           do_check_value :conntrack_insert_failed, rate, {
-            critical: 1,
-            warning: 0
+            critical: 50,
+            warning: 5
             }, unit: '/s', name: 'Conntrack insert failures',
-            message: "%0.3f failed inserts/s (table full on insert)" % rate
+            message: "%0.3f failed inserts/s (insert clash or table full)" % rate
         end
 
-        # Packets dropped on the conntrack path (new-entry allocation failure).
+        # Packets dropped on the conntrack path — same NAT/UDP clash caveat as
+        # insert_failed above (the two counters move together on clash drops).
         if rate = rates['drop']
           do_check_value :conntrack_drop, rate, {
-            critical: 1,
-            warning: 0
+            critical: 50,
+            warning: 5
             }, unit: '/s', name: 'Conntrack drops',
             message: "%0.3f dropped packets/s" % rate
         end
