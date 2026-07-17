@@ -6,7 +6,15 @@ module CloudModel
     def self.check
       @checks ||= []
       @checks.each do |check|
-        check.check
+        # Isolate each registered check group. A failure in one group (an
+        # unreachable driver, a DB hiccup, a bug) must not abort the whole run
+        # or the caller's subsequent RRD rollup — it opens a keyed,
+        # subject-less ItemIssue (check_crashed_<group>) and we move on. The
+        # issue auto-resolves the next time the group completes cleanly.
+        key = check.name.to_s.demodulize.underscore.to_sym
+        CloudModel::Monitoring::BaseChecks.handle_cloudmodel_monitoring_exception key, '_Monitoring_', 0 do
+          check.check
+        end
       end
     end
 

@@ -4,8 +4,15 @@ namespace :cloudmodel do
   namespace :monitoring do
     desc "Check monitoring"
     task :check => [:environment] do
-      CloudModel::Monitoring.check
-      CloudModel::MonitoringSample.rollup!
+      begin
+        CloudModel::Monitoring.check
+      ensure
+        # Consolidate the RRD even if the check run failed: Monitoring.check now
+        # tracks per-group failures as ItemIssues instead of raising, but the
+        # rollup must run regardless so the monitoring history stays consistent
+        # (and doesn't leave gaps that a later run has to backfill).
+        CloudModel::MonitoringSample.rollup!
+      end
       puts "[_Monitoring_] Done."
     end
 
