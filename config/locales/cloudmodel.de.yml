@@ -742,6 +742,25 @@ de:
       no_tomcat_status: Dienststatus nicht gefunden
       mem_usage: Speicherverbrauch von %{value}
       thread_usage: Threadverbrauch von %{value}
+    cloud_model/services/collabora:
+      not_reachable: Dienst nicht erreichbar
+      no_discovery: WOPI-Discovery nicht verfügbar
+      collabora_convert_to: Dokument-Konvertierung nicht verfügbar
+    cloud_model/services/jitsi:
+      not_reachable: Jicofo nicht erreichbar
+      no_jicofo_stats: Jicofo-Statistik nicht verfügbar
+      parse_result: Jicofo-Statistik nicht interpretierbar
+      jitsi_no_bridge: Keine funktionsfähige Videobridge
+      jitsi_videobridge_down: Videobridge antwortet nicht
+    cloud_model/services/rake:
+      not_reachable: Rake-Unit-Status nicht abfragbar
+      rake_not_running: Rake-Daemon läuft nicht
+      rake_last_run_failed: Letzter Rake-Lauf fehlgeschlagen
+      rake_timer_inactive: Rake-Timer nicht scharf (geplante Aufgabe gestoppt)
+    cloud_model/services/backup:
+      not_reachable: Dienst nicht erreichbar
+    cloud_model/services/monitoring:
+      not_reachable: Dienst nicht erreichbar
     cloud_model/lxd_custom_volume:
       existence: Das definierte LXD Laufwerk existiert nicht auf dem Server
     cloud_model/mongodb_replication_set:

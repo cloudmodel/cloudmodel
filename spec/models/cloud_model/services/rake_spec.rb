@@ -28,8 +28,43 @@ describe CloudModel::Services::Rake do
   end
 
   describe 'service_status' do
-    it 'should return false' do
-      expect(subject.service_status).to eq false
+    let(:guest) { double CloudModel::Guest }
+    before do
+      allow(subject).to receive(:guest).and_return guest
+      subject.rake_task = 'my_app:sync'
+    end
+
+    it 'parses systemctl show output for the service unit' do
+      subject.rake_mode = 'restart'
+      allow(guest).to receive(:exec).and_return([true,
+        "ActiveState=active\nSubState=running\nResult=success\nExecMainStatus=0\nNRestarts=2\nExecMainExitTimestamp=\n"])
+
+      status = subject.service_status
+      expect(status['ActiveState']).to eq 'active'
+      expect(status['exit_status']).to eq 0
+      expect(status['restarts']).to eq 2
+    end
+
+    it 'also queries the timer unit in timer mode' do
+      subject.rake_mode = 'timer'
+      allow(guest).to receive(:exec) do |cmd|
+        if cmd.include?('.timer')
+          [true, "ActiveState=active\nSubState=waiting\n"]
+        else
+          [true, "ActiveState=inactive\nSubState=dead\nResult=success\nExecMainStatus=0\n"]
+        end
+      end
+
+      expect(subject.service_status['timer']).to eq('ActiveState' => 'active', 'SubState' => 'waiting')
+    end
+
+    it 'returns a critical not_reachable error when systemctl fails' do
+      subject.rake_mode = 'restart'
+      allow(guest).to receive(:exec).and_return([false, 'boom'])
+
+      result = subject.service_status
+      expect(result[:key]).to eq :not_reachable
+      expect(result[:severity]).to eq :critical
     end
   end
 end

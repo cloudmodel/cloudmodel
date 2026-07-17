@@ -73,8 +73,50 @@ module CloudModel
         ([:nginx] + super).uniq
       end
 
+      # Probe the systemd unit(s) backing this Rake task for monitoring.
+      #
+      # NB: a *failed* rake unit is already surfaced by the guest-level
+      # failed-units check (the check_mk agent ships `systemctl --all`). This
+      # probe deliberately adds only what that generic check cannot see:
+      # the last run's exit status/timestamp (a one-shot that succeeded is
+      # "inactive", indistinguishable from one that never runs) and, in timer
+      # mode, whether the timer is still armed (a dead timer is "inactive", not
+      # "failed"). Returns a data hash, or an error hash `{key:, error:,
+      # severity:}` consumed by {CloudModel::Monitoring::Services::RakeChecks}.
       def service_status
-        false
+        unit  = "rake-#{rake_task}.service"
+        props = %w[
+          LoadState ActiveState SubState Result ExecMainStatus
+          ExecMainStartTimestamp ExecMainExitTimestamp
+          ActiveEnterTimestamp InactiveEnterTimestamp NRestarts
+        ]
+
+        success, out = guest.exec "systemctl show #{unit.shellescape} --property=#{props.join(',')} --no-pager"
+        unless success
+          return { key: :not_reachable, error: "systemctl show #{unit} failed:\n\n#{out}", severity: :critical }
+        end
+
+        status = parse_systemctl_show out
+        status['exit_status'] = status['ExecMainStatus'].to_i
+        status['restarts']    = status['NRestarts'].to_i
+
+        if rake_mode == 'timer'
+          tsuccess, tout = guest.exec "systemctl show rake-#{rake_task.shellescape}.timer --property=ActiveState,SubState,LastTriggerUSec,NextElapseUSecRealtime --no-pager"
+          status['timer'] = parse_systemctl_show(tout) if tsuccess
+        end
+
+        status
+      end
+
+      private
+
+      # Parse `systemctl show` KEY=VALUE lines into a hash (blank values kept as
+      # empty strings, e.g. `ExecMainExitTimestamp=` when the task never ran).
+      def parse_systemctl_show output
+        output.to_s.lines.each_with_object({}) do |line, h|
+          k, v = line.strip.split('=', 2)
+          h[k] = v.to_s if k
+        end
       end
     end
   end

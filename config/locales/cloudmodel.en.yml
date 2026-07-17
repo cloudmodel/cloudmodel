@@ -738,6 +738,25 @@ en:
       no_tomcat_status: Service status not found
       mem_usage: Memory usage of %{value}
       thread_usage: Thread usage of %{value}
+    cloud_model/services/collabora:
+      not_reachable: Service not reachable
+      no_discovery: WOPI discovery not available
+      collabora_convert_to: Document conversion engine unavailable
+    cloud_model/services/jitsi:
+      not_reachable: Jicofo not reachable
+      no_jicofo_stats: Jicofo stats not available
+      parse_result: Jicofo stats not parsable
+      jitsi_no_bridge: No operational video bridge
+      jitsi_videobridge_down: Videobridge not responding
+    cloud_model/services/rake:
+      not_reachable: Rake unit status not queryable
+      rake_not_running: Rake daemon not running
+      rake_last_run_failed: Last Rake run failed
+      rake_timer_inactive: Rake timer not armed (scheduled task stopped)
+    cloud_model/services/backup:
+      not_reachable: Service not reachable
+    cloud_model/services/monitoring:
+      not_reachable: Service not reachable
     cloud_model/lxd_custom_volume:
       existence: The defined LXD Volume does not exist on Server
     cloud_model/mongodb_replication_set:
