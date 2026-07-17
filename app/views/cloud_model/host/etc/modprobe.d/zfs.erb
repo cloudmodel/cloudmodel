@@ -1,0 +1,7 @@
+# Managed by cloudmodel — do not edit by hand.
+# Cap the ZFS ARC so cache growth can't push guest/application memory into
+# swap. Without a cap the ARC defaults to ~50% of RAM and reclaims lazily,
+# which on database hosts shows up as heavy swapping despite "free" memory.
+<% if max = host.effective_zfs_arc_max %>
+options zfs zfs_arc_max=<%= max %>
+<% end %>

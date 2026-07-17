@@ -103,6 +103,7 @@ module CloudModel
     field :arch, type: String, default: 'amd64'
     field :mac_address_prefix, type: String
     field :system_disks, type: Array, default: ['sda', 'sdb']
+    field :zfs_arc_max, type: Integer # bytes; nil = auto, see #effective_zfs_arc_max
     embeds_many :extra_zpools, class_name: "CloudModel::Zpool", inverse_of: :host
     accepts_nested_attributes_for :extra_zpools, allow_destroy: true
 
@@ -567,6 +568,18 @@ module CloudModel
       if check_result = monitoring_last_check_result and sys_info = check_result['system'] and mem_info = sys_info['mem']
         mem_info['mem_total'].to_i * 1024
       end
+    end
+
+    # Upper bound for the ZFS ARC in bytes, written to modprobe on deploy so the
+    # cache can't grow until it pushes guest/app memory into swap. An explicit
+    # {#zfs_arc_max} wins; otherwise default to 1/8 of RAM (min 2 GiB), leaving
+    # the bulk of RAM for guests. nil when RAM is unknown (no monitoring yet) —
+    # the template then omits the cap and ZFS keeps its own ~50%-of-RAM default.
+    def effective_zfs_arc_max
+      return zfs_arc_max if zfs_arc_max.to_i > 0
+      ram = memory_size.to_i
+      return nil if ram <= 0
+      [ram / 8, 2 * 1024**3].max
     end
 
     def mem_usage

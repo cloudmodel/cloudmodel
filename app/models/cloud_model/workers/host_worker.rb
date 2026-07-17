@@ -38,6 +38,15 @@ module CloudModel
         render_to_remote '/cloud_model/host/etc/fstab', "#{root}/etc/fstab", host: @host, timestamp: @timestamp, swap_disks: @host.system_disks.map{|d| disk_partition_device d, 2}
       end
 
+      def config_zfs
+        #
+        # Cap the ZFS ARC (modprobe param) so cache growth can't push guest
+        # memory into swap. Applies on the reboot that concludes the deploy.
+        #
+        mkdir_p "#{root}/etc/modprobe.d"
+        render_to_remote '/cloud_model/host/etc/modprobe.d/zfs', "#{root}/etc/modprobe.d/zfs.conf", host: @host
+      end
+
       def set_authorized_keys options={}
         #prepare_chroot root
         @host.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "/root/.ssh/authorized_keys"
@@ -340,6 +349,9 @@ module CloudModel
 
         comment_sub_step 'render fstab'
         config_fstab
+
+        comment_sub_step 'cap zfs arc'
+        config_zfs
 
         comment_sub_step 'config open files'
         render_to_remote "/cloud_model/host/etc/sysctl.conf", "#{root}/etc/sysctl.conf", host: @host

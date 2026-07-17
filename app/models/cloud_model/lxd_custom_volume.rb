@@ -25,6 +25,12 @@ module CloudModel
     field :mount_point, type: String
     field :writeable, type: Mongoid::Boolean, default: true
     field :has_backups, type: Mongoid::Boolean, default: false
+    # ZFS primarycache for the backing dataset: nil = inherit the pool default
+    # (cache data + metadata), 'metadata' = cache only metadata in the ARC.
+    # Set 'metadata' for volumes holding a database with its own cache (e.g.
+    # MongoDB/WiredTiger) so data blocks aren't double-cached in both the ARC
+    # and the DB cache.
+    field :primarycache, type: String
 
     validates :name, presence: true
     validates :name, uniqueness: { scope: :host }
@@ -71,7 +77,19 @@ module CloudModel
     def create_volume!
       unless guest.deploy_state == :not_started
         lxc! "storage volume create #{pool.shellescape} #{name.shellescape}", "Failed to init LXD volume"
+        apply_zfs_properties!
       end
+    end
+
+    # Applies ZFS dataset properties (currently primarycache) to the backing
+    # dataset. Idempotent — safe to re-run on an existing volume. No-op when
+    # nothing is set or the dataset can't be resolved yet.
+    # @return [Array(Boolean, String), true]
+    def apply_zfs_properties!
+      return true if primarycache.to_s.empty?
+      dataset = zfs_dataset
+      return true unless dataset
+      host.exec "zfs set primarycache=#{primarycache.shellescape} #{dataset.shellescape}"
     end
 
     def destroy_volume
