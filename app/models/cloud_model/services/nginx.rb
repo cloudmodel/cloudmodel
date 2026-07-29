@@ -263,7 +263,103 @@ module CloudModel
 
         end
 
+        if timing = timing_status
+          data['timing'] = timing
+        end
+
         data
+      end
+
+      # Path of the request-timing access log written by the timing log_format
+      # (see the nginx.conf template).
+      TIMING_LOG_PATH = '/var/log/nginx/timing.log'
+
+      # How many recent timing log lines to fetch per check at most. Bounds the
+      # transfer for high-traffic servers; metrics then describe a sample of
+      # the newest requests within the window instead of all of them.
+      TIMING_LOG_MAX_LINES = 20000
+
+      # Read the tail of the timing log from the guest and aggregate the
+      # entries since the last monitoring check into latency/traffic metrics.
+      # Returns nil when the log is not available (yet) — e.g. before the
+      # updated nginx config was synced.
+      def timing_status
+        since = monitoring_last_check_at || 5.minutes.ago
+        since = [since, 15.minutes.ago].max
+        success, out = guest.exec "tail -n #{TIMING_LOG_MAX_LINES} #{TIMING_LOG_PATH} 2>/dev/null"
+        return nil unless success and out.present?
+
+        self.class.aggregate_timing_lines out.each_line, since: since
+      rescue
+        nil
+      end
+
+      # Aggregate timing log lines ("$msec $status $request_time
+      # $upstream_response_time \"$request\"") newer than `since` into a flat
+      # metrics hash. Upstream times may be '-' for locally served requests or
+      # comma/colon separated lists when nginx tried several upstreams — those
+      # are summed, as they add up to the request's total upstream wait.
+      #
+      # @param lines [Enumerable<String>] raw log lines
+      # @param since [Time] only count entries at or after this time
+      # @param now [Time] end of the window (defaults to Time.now)
+      # @return [Hash] aggregated metrics
+      def self.aggregate_timing_lines lines, since:, now: Time.now
+        window = (now - since).to_f
+        window = 1.0 if window < 1.0
+        request_times = []
+        upstream_times = []
+        statuses = Hash.new 0
+
+        lines.each do |line|
+          # Upstream time may contain spaces ("0.100, 0.050" when nginx tried
+          # several upstreams), so a plain split would truncate it — match up
+          # to the quoted request instead.
+          match = line.match(/\A(\S+)\s+(\S+)\s+(\S+)\s+(.*?)\s+"/)
+          next unless match
+          msec, status, request_time, upstream_time = match.captures
+          next if msec.to_f < since.to_f
+
+          request_times << request_time.to_f * 1000.0
+          statuses["#{status[0]}xx"] += 1 if status =~ /\A\d{3}\z/
+          if upstream_time and upstream_time != '-'
+            parts = upstream_time.split(/[,:]/).map(&:to_f)
+            upstream_times << parts.sum * 1000.0 unless parts.empty?
+          end
+        end
+
+        request_times.sort!
+        upstream_times.sort!
+
+        result = {
+          'count' => request_times.size,
+          'rps' => (request_times.size / window).round(3),
+          'rate_4xx' => (statuses['4xx'] / window).round(3),
+          'rate_5xx' => (statuses['5xx'] / window).round(3)
+        }
+        unless request_times.empty?
+          result['request_ms'] = {
+            'p50' => percentile(request_times, 50),
+            'p95' => percentile(request_times, 95),
+            'max' => request_times.last.round(1)
+          }
+        end
+        unless upstream_times.empty?
+          result['upstream_ms'] = {
+            'p50' => percentile(upstream_times, 50),
+            'p95' => percentile(upstream_times, 95),
+            'max' => upstream_times.last.round(1)
+          }
+        end
+        result
+      end
+
+      # Nearest-rank percentile of an already sorted list.
+      # @return [Float]
+      def self.percentile sorted, pct
+        return 0.0 if sorted.empty?
+        index = ((pct / 100.0) * sorted.size).ceil - 1
+        sorted[index.clamp(0, sorted.size - 1)].round(1)
       end
 
       def allowed_deploy_mongodb_read_preferences

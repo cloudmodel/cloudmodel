@@ -151,11 +151,26 @@ describe CloudModel::Services::Nginx do
       body = "Active connections: 42\nserver accepts handled requests\n 100 100 500\nReading: 1 Writing: 2 Waiting: 39\n"
       response = double 'response', code: '200', body: body, http_version: '1.1'
       allow(Net::HTTP).to receive(:start).and_yield(double('http').tap { |h| allow(h).to receive(:request).and_return(response) })
+      timing_line = "#{Time.now.to_f} 200 0.042 0.040 \"GET / HTTP/2.0\"\n"
+      allow(guest).to receive(:exec).with(/tail .*timing\.log/).and_return [true, timing_line]
 
       result = subject.service_status
       expect(result['active']).to eq 42
       expect(result['accepted']).to eq 100
       expect(result['requests']).to eq 500
+      expect(result['timing']['count']).to eq 1
+      expect(result['timing']['request_ms']['max']).to eq 42.0
+    end
+
+    it 'omits timing when the timing log is not available' do
+      body = "Active connections: 42\nserver accepts handled requests\n 100 100 500\nReading: 1 Writing: 2 Waiting: 39\n"
+      response = double 'response', code: '200', body: body, http_version: '1.1'
+      allow(Net::HTTP).to receive(:start).and_yield(double('http').tap { |h| allow(h).to receive(:request).and_return(response) })
+      allow(guest).to receive(:exec).with(/tail .*timing\.log/).and_return [false, '']
+
+      result = subject.service_status
+      expect(result['active']).to eq 42
+      expect(result).not_to have_key 'timing'
     end
 
     it 'should return error hash when connection fails' do
@@ -164,6 +179,72 @@ describe CloudModel::Services::Nginx do
       result = subject.service_status
       expect(result[:key]).to eq :not_reachable
       expect(result[:severity]).to eq :critical
+    end
+  end
+
+  describe '.aggregate_timing_lines' do
+    let(:now) { Time.at 1_000_000 }
+    let(:since) { now - 100 }
+
+    def line at, status, request_time, upstream_time, request = 'GET /x HTTP/2.0'
+      "#{at.to_f} #{status} #{request_time} #{upstream_time} \"#{request}\"\n"
+    end
+
+    it 'aggregates request and upstream times into percentiles' do
+      lines = (1..100).map { |i| line(since + i, 200, i / 1000.0, (i / 2000.0).round(4)) }
+      result = CloudModel::Services::Nginx.aggregate_timing_lines lines, since: since, now: now
+
+      expect(result['count']).to eq 100
+      expect(result['rps']).to eq 1.0
+      expect(result['request_ms']['p50']).to eq 50.0
+      expect(result['request_ms']['p95']).to eq 95.0
+      expect(result['request_ms']['max']).to eq 100.0
+      expect(result['upstream_ms']['p95']).to eq 47.5
+    end
+
+    it 'ignores entries older than since' do
+      lines = [line(since - 10, 200, 0.5, 0.4), line(since + 10, 200, 0.1, 0.1)]
+      result = CloudModel::Services::Nginx.aggregate_timing_lines lines, since: since, now: now
+
+      expect(result['count']).to eq 1
+      expect(result['request_ms']['max']).to eq 100.0
+    end
+
+    it 'counts error classes as rates over the window' do
+      lines = [
+        line(since + 1, 200, 0.1, 0.1),
+        line(since + 2, 404, 0.1, '-'),
+        line(since + 3, 502, 0.1, '-'),
+        line(since + 4, 500, 0.1, '-')
+      ]
+      result = CloudModel::Services::Nginx.aggregate_timing_lines lines, since: since, now: now
+
+      expect(result['rate_4xx']).to eq 0.01
+      expect(result['rate_5xx']).to eq 0.02
+    end
+
+    it 'sums multi-upstream times and skips dashes' do
+      lines = [line(since + 1, 200, 0.3, '0.100, 0.050 : 0.025')]
+      result = CloudModel::Services::Nginx.aggregate_timing_lines lines, since: since, now: now
+
+      expect(result['upstream_ms']['max']).to eq 175.0
+    end
+
+    it 'returns zero counts without request_ms for an empty window' do
+      result = CloudModel::Services::Nginx.aggregate_timing_lines [], since: since, now: now
+
+      expect(result['count']).to eq 0
+      expect(result['rps']).to eq 0.0
+      expect(result).not_to have_key 'request_ms'
+      expect(result).not_to have_key 'upstream_ms'
+    end
+  end
+
+  describe '.percentile' do
+    it 'uses nearest-rank on the sorted list' do
+      expect(CloudModel::Services::Nginx.percentile([1.0, 2.0, 3.0, 4.0], 50)).to eq 2.0
+      expect(CloudModel::Services::Nginx.percentile([1.0, 2.0, 3.0, 4.0], 100)).to eq 4.0
+      expect(CloudModel::Services::Nginx.percentile([], 95)).to eq 0.0
     end
   end
 

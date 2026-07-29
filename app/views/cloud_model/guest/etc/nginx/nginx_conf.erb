@@ -19,6 +19,13 @@ http {
                                   \'$status $body_bytes_sent \"$http_referer\" \'
                                   \'\"$http_user_agent\" \"$http_x_forwarded_for\"\';
   access_log                    /var/log/nginx/access.log  main;
+  # Machine-readable request timing consumed by the monitoring checks
+  # ($msec first so entries can be windowed without date parsing). Real
+  # quotes, unlike the escaped ones above: templates are pushed via SFTP,
+  # so no shell escaping is involved and \' would end up as a literal
+  # backslash that makes nginx concatenate the tokens without spaces.
+  log_format                    timing  '$msec $status $request_time $upstream_response_time "$request"';
+  access_log                    /var/log/nginx/timing.log  timing;
 
   server_names_hash_max_size    1024;
   # Must live here (http context), NOT in sites-available/cloudmodel.conf:
