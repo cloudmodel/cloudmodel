@@ -78,6 +78,11 @@ module CloudModel
             JPW=$(sed -nE 's/^\\s*PASSWORD="(.*)"\\s*$/\\1/p' /etc/jitsi/videobridge/jvb.conf 2>/dev/null | head -1)
             [ -n "$JPW" ] || JPW=$(sed -n 's/^JVB_AUTH_PASSWORD=//p' /etc/jitsi/videobridge/config 2>/dev/null)
             [ -n "$JPW" ] && prosodyctl register jvb auth.#{new} "$JPW" </dev/null >/dev/null 2>&1 || true
+            # The focus client_proxy component only learns jicofo's sessions via
+            # presence, which requires this roster subscription (the package
+            # postinst does it on a live system) — without it every conference
+            # request bounces with service-unavailable.
+            timeout 60 prosodyctl mod_roster_command subscribe focus.#{new} focus@auth.#{new} </dev/null >/dev/null 2>&1 || true
             chown -R prosody:prosody /var/lib/prosody 2>/dev/null || true
           SH
         end
@@ -133,9 +138,11 @@ module CloudModel
             if ! grep -qE "^\\s*anonymousdomain:" #{config}; then
               sed -i "s|^\\(\\s*\\)domain: '#{host}',|\\1domain: '#{host}',\\n\\1anonymousdomain: 'guest.#{host}',|" #{config}
             fi
-            # 5. jicofo: require XMPP authentication to open a room
+            # 5. jicofo: require XMPP authentication to open a room. The block
+            # lives at jicofo.authentication (top level) — nested under xmpp it
+            # parses but is silently ignored ("Authentication service disabled").
             if ! grep -q 'authentication:' #{jicofo}; then
-              sed -i 's|xmpp: {|xmpp: {\\n    authentication: {\\n      enabled: true\\n      type: XMPP\\n      login-url: #{host}\\n    }|' #{jicofo}
+              sed -i 's|^jicofo {|jicofo {\\n  authentication: {\\n    enabled: true\\n    type: XMPP\\n    login-url: "#{host}"\\n  }|' #{jicofo}
             fi
           SH
 
