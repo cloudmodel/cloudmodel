@@ -26,6 +26,10 @@ http {
   # backslash that makes nginx concatenate the tokens without spaces.
   log_format                    timing  '$msec $status $request_time $upstream_response_time "$request"';
   access_log                    /var/log/nginx/timing.log  timing;
+<%- if model.passenger_supported? -%>
+
+  passenger_max_pool_size       <%= model.passenger_max_pool_size %>;
+<%- end -%>
 
   server_names_hash_max_size    1024;
   # Must live here (http context), NOT in sites-available/cloudmodel.conf:

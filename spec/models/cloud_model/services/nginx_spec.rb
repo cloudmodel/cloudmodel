@@ -20,6 +20,8 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:passenger_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:passenger_env).of_type(String).with_default_value_of('production') }
   it { expect(subject).to have_field(:passenger_ruby_version).of_type(String).with_default_value_of(CloudModel.config.ruby_version) }
+  it { expect(subject).to have_field(:passenger_max_pool_size).of_type(Integer).with_default_value_of(6) }
+  it { expect(subject).to validate_numericality_of(:passenger_max_pool_size).greater_than(0) }
   it { expect(subject).to have_field(:delayed_jobs_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:delayed_jobs_queues).of_type(Array).with_default_value_of(['default']) }
 

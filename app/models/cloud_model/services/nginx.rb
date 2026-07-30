@@ -56,13 +56,18 @@ module CloudModel
         ssl_only ssl_enforce
         unsafe_inline_script_allowed unsafe_eval_script_allowed
         google_analytics_supported hubspot_forms_supported pingdom_supported
-        reverse_proxy_for passenger_env rails_cable_supported
+        reverse_proxy_for passenger_env passenger_max_pool_size rails_cable_supported
       ).freeze
 
       # Passenger support
       field :passenger_supported, type: Mongoid::Boolean, default: false
       field :passenger_env, type: String, default: 'production'
       field :passenger_ruby_version, type: String, default: CloudModel.config.ruby_version
+      # Upper bound of concurrent Passenger app processes (http-context
+      # directive; Passenger's own default is 6). Sized against guest RAM —
+      # roughly 400MB per app process.
+      field :passenger_max_pool_size, type: Integer, default: 6
+      validates :passenger_max_pool_size, numericality: {only_integer: true, greater_than: 0}
       field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
       field :delayed_jobs_queues, type: Array, default: ['default']
       # Serve /cable (Rails ActionCable WebSocket) in a dedicated Passenger app
