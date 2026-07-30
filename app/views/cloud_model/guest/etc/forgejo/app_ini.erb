@@ -52,8 +52,8 @@ DEFAULT_ENABLE_TIMETRACKING = true
 NO_REPLY_ADDRESS = noreply.localhost
 
 [openid]
-ENABLE_OPENID_SIGNIN = false
-ENABLE_OPENID_SIGNUP = false
+ENABLE_OPENID_SIGNIN = <%= model.enable_openid_signin ? 'true' : 'false' %>
+ENABLE_OPENID_SIGNUP = <%= model.enable_openid_signup ? 'true' : 'false' %>
 
 [cron.update_checker]
 ENABLED = false

@@ -10,10 +10,31 @@ describe CloudModel::Workers::Services::JitsiWorker do
   subject {CloudModel::Workers::Services::JitsiWorker.new lxc, model}
 
   describe 'write_config' do
-    it 'should be a no-op' do
-      expect(subject).not_to receive(:render_to_remote)
-      expect(subject).not_to receive(:comment_sub_step)
-      expect { subject.write_config }.not_to raise_error
+    before do
+      allow(guest).to receive(:deploy_path).and_return('/var/lib/lxc/test/rootfs')
+      allow(subject).to receive(:comment_sub_step)
+      allow(subject).to receive(:chroot!)
+    end
+
+    context 'when the guest has no external hostname yet' do
+      before { allow(guest).to receive(:external_hostname).and_return(nil) }
+
+      it 'brands the UI and dedupes nginx, skipping the domain re-point' do
+        expect(subject).to receive(:comment_sub_step).with('Brand jitsi UI')
+        expect(subject).to receive(:chroot!).at_least(:once) # dedupe
+        expect { subject.write_config }.not_to raise_error
+      end
+    end
+
+    context 'when the guest has a real external hostname' do
+      before { allow(guest).to receive(:external_hostname).and_return('meet.example.com') }
+
+      it 're-points the stack from the build placeholder to the guest hostname' do
+        expect(subject).to receive(:comment_sub_step).with(/Re-point jitsi/)
+        # rename per-host files + rewrite references + regenerate certs (+ dedupe)
+        expect(subject).to receive(:chroot!).at_least(3).times
+        expect { subject.write_config }.not_to raise_error
+      end
     end
   end
 

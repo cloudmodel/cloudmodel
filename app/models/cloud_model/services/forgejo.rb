@@ -36,6 +36,36 @@ module CloudModel
       #   @return [String, nil] secret used to sign OAuth2 JWT tokens
       field :oauth_jwt_secret, type: String, default: nil
 
+      # @!attribute [rw] enable_openid_signin
+      #   @return [Boolean] allow signing in via external OpenID/OIDC providers
+      field :enable_openid_signin, type: Mongoid::Boolean, default: false
+
+      # @!attribute [rw] enable_openid_signup
+      #   @return [Boolean] allow self-registration via external OpenID/OIDC providers
+      field :enable_openid_signup, type: Mongoid::Boolean, default: false
+
+      # @!attribute [rw] oidc_name
+      #   @return [String, nil] name of the OIDC login source (e.g. `"sso"`);
+      #     when blank no external login source is provisioned
+      field :oidc_name, type: String, default: nil
+
+      # @!attribute [rw] oidc_auto_discovery_url
+      #   @return [String, nil] OIDC `.well-known/openid-configuration` URL of the provider
+      field :oidc_auto_discovery_url, type: String, default: nil
+
+      # @!attribute [rw] oidc_client_id
+      #   @return [String, nil] OAuth2 client id registered with the provider
+      field :oidc_client_id, type: String, default: nil
+
+      # @!attribute [rw] oidc_client_secret
+      #   @return [String, nil] OAuth2 client secret registered with the provider
+      field :oidc_client_secret, type: String, default: nil
+
+      # @return [Boolean] whether an external OIDC login source should be configured
+      def oidc?
+        oidc_name.present? && oidc_auto_discovery_url.present? && oidc_client_id.present?
+      end
+
       def kind
         :forgejo
       end

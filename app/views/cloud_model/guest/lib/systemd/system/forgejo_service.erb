@@ -1,0 +1,17 @@
+[Unit]
+Description=Forgejo (Beyond coding. We forge.)
+After=syslog.target
+After=network.target
+
+[Service]
+RestartSec=2s
+Type=simple
+User=forgejo
+Group=forgejo
+WorkingDirectory=/var/lib/forgejo/
+ExecStart=/usr/bin/forgejo web --config /etc/forgejo/app.ini
+Restart=always
+Environment=USER=forgejo HOME=/var/lib/forgejo GITEA_WORK_DIR=/var/lib/forgejo
+
+[Install]
+WantedBy=multi-user.target

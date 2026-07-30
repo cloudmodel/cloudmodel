@@ -28,6 +28,22 @@ module CloudModel
       #     publicly exposed service port.
       field :jicofo_stats_port, type: Integer, default: 8888
 
+      # @!attribute [rw] app_name
+      #   @return [String] product name shown in the UI (interface_config `APP_NAME`)
+      field :app_name, type: String, default: "Jitsi Meet"
+
+      # @!attribute [rw] provider_name
+      #   @return [String, nil] operator name shown in the UI (`PROVIDER_NAME`)
+      field :provider_name, type: String, default: nil
+
+      # @!attribute [rw] watermark_link
+      #   @return [String, nil] URL the watermark logo links to (`JITSI_WATERMARK_LINK`)
+      field :watermark_link, type: String, default: nil
+
+      # @!attribute [rw] watermark_svg
+      #   @return [String, nil] custom SVG watermark/logo markup overriding the default
+      field :watermark_svg, type: String, default: nil
+
 
       def kind
         :jitsi
