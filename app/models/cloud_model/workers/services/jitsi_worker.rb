@@ -58,6 +58,28 @@ module CloudModel
           rename_host_files old, new
           rewrite_host_references old, new
           regenerate_prosody_certs new
+          provision_service_accounts new
+        end
+
+        # Register jicofo's and jvb's XMPP accounts on the auth vhost with the
+        # passwords the package wrote to its config files. The package postinst
+        # does this itself on a live system, but in the template-build chroot
+        # that registration does not survive — without the accounts jicofo
+        # loops with SASL failures and every conference stays black.
+        def provision_service_accounts new
+          chroot! @guest.deploy_path, <<~SH, "Failed to provision jitsi service accounts"
+            # jicofo: current packages keep the password in jicofo.conf
+            # (client.password); older ones in /etc/jitsi/jicofo/config.
+            FPW=$(sed -nE 's/^\\s*password: "(.*)"\\s*$/\\1/p' /etc/jitsi/jicofo/jicofo.conf 2>/dev/null | head -1)
+            [ -n "$FPW" ] || FPW=$(sed -n 's/^JICOFO_AUTH_PASSWORD=//p' /etc/jitsi/jicofo/config 2>/dev/null)
+            [ -n "$FPW" ] && prosodyctl register focus auth.#{new} "$FPW" </dev/null >/dev/null 2>&1 || true
+            # jvb: xmpp-client shard PASSWORD in jvb.conf; older packages in
+            # /etc/jitsi/videobridge/config.
+            JPW=$(sed -nE 's/^\\s*PASSWORD="(.*)"\\s*$/\\1/p' /etc/jitsi/videobridge/jvb.conf 2>/dev/null | head -1)
+            [ -n "$JPW" ] || JPW=$(sed -n 's/^JVB_AUTH_PASSWORD=//p' /etc/jitsi/videobridge/config 2>/dev/null)
+            [ -n "$JPW" ] && prosodyctl register jvb auth.#{new} "$JPW" </dev/null >/dev/null 2>&1 || true
+            chown -R prosody:prosody /var/lib/prosody 2>/dev/null || true
+          SH
         end
 
         # jitsi-meet's own nginx site re-declares `server_names_hash_bucket_size`
@@ -182,6 +204,15 @@ module CloudModel
               rm -f /etc/nginx/sites-enabled/#{old}.conf
               ln -sf ../sites-available/#{new}.conf /etc/nginx/sites-enabled/#{new}.conf
             fi
+            # prosody datastore dirs (URL-encoded hostnames): carries the
+            # focus/jvb service accounts — registered at package install under
+            # the placeholder auth domain — over to the new domain, passwords
+            # intact. Without this jicofo loops with failed logins (JID=null).
+            for pre in "" "auth." "guest."; do
+              o="/var/lib/prosody/$(echo "$pre#{old}" | sed 's/\\./%2e/g')"
+              n="/var/lib/prosody/$(echo "$pre#{new}" | sed 's/\\./%2e/g')"
+              [ -d "$o" ] && [ ! -d "$n" ] && mv "$o" "$n" || true
+            done
           SH
         end
 
@@ -206,13 +237,19 @@ module CloudModel
         # regardless; these certs only cover prosody's internal XMPP TLS.
         def regenerate_prosody_certs new
           chroot! @guest.deploy_path, <<~SH, "Failed to regenerate prosody certs"
-            mkdir -p /etc/prosody/certs
+            mkdir -p /etc/prosody/certs /usr/local/share/ca-certificates
             for host in #{new} auth.#{new}; do
               timeout 60 openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
                 -batch -subj "/CN=$host" \
                 -keyout "/etc/prosody/certs/$host.key" \
                 -out "/etc/prosody/certs/$host.crt" </dev/null >/dev/null 2>&1 || true
+              # Trust the new cert system-wide AND in the Java truststore (the
+              # ca-certificates-java hook syncs it): jicofo/jvb connect to
+              # prosody over TLS and reject an untrusted cert — the package did
+              # this for its build-time cert, which the re-point replaced.
+              cp "/etc/prosody/certs/$host.crt" "/usr/local/share/ca-certificates/prosody-$host.crt" 2>/dev/null || true
             done
+            timeout 120 update-ca-certificates </dev/null >/dev/null 2>&1 || true
             chown -R prosody:prosody /var/lib/prosody /etc/prosody/certs 2>/dev/null || true
           SH
         end
