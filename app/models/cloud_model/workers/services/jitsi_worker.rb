@@ -19,16 +19,21 @@ module CloudModel
 
         def write_config
           repoint_domain
+          apply_secure_domain
+          apply_welcome_page
 
           comment_sub_step "Brand jitsi UI"
 
           if @model.watermark_svg
             upload_to_guest @model.watermark_svg, "#{WEB_ROOT}/images/watermark.svg", "0644"
+            # The brand watermark shows the same uploaded logo
+            set_interface_value "BRAND_WATERMARK_LINK", "images/watermark.svg"
           end
 
           set_interface_value "APP_NAME", @model.app_name if @model.app_name.present?
           set_interface_value "PROVIDER_NAME", @model.provider_name if @model.provider_name.present?
           set_interface_value "JITSI_WATERMARK_LINK", @model.watermark_link if @model.watermark_link.present?
+          set_interface_value "DEFAULT_BACKGROUND", @model.default_background if @model.default_background.present?
 
           dedupe_nginx_directives
         end
@@ -69,6 +74,79 @@ module CloudModel
 
         def auto_restart
           true
+        end
+
+        # "Secure domain": only registered XMPP users may open a room; guests
+        # join running rooms anonymously via a guest.<host> vhost. Mirrors the
+        # canonical Jitsi secure-domain setup: prosody main vhost switches to
+        # internal_hashed auth + a guest vhost is added, jicofo gets XMPP
+        # authentication, and config.js advertises the anonymous guest domain.
+        # All edits are idempotent (guarded by grep) so redeploys are stable.
+        def apply_secure_domain
+          return unless @model.secure_domain?
+          host = @guest.external_hostname
+          return if host.blank?
+
+          comment_sub_step "Configure jitsi secure domain"
+
+          prosody = "/etc/prosody/conf.avail/#{host}.cfg.lua"
+          config  = "/etc/jitsi/meet/#{host}-config.js"
+          jicofo  = "/etc/jitsi/jicofo/jicofo.conf"
+
+          chroot! @guest.deploy_path, <<~SH, "Failed to configure jitsi secure domain"
+            set -e
+            # 1. main vhost: require registered users
+            sed -i 's/authentication = "jitsi-anonymous"/authentication = "internal_hashed"/' #{prosody}
+            # 2. anonymous guest vhost (inserted before the conference component)
+            if ! grep -q 'VirtualHost "guest.#{host}"' #{prosody}; then
+              sed -i '/^Component "conference.#{host}"/i VirtualHost "guest.#{host}"\\n    authentication = "anonymous"\\n    c2s_require_encryption = false\\n' #{prosody}
+            fi
+            # 3. only authenticated users create rooms
+            if ! grep -q 'restrict_room_creation' #{prosody}; then
+              sed -i '/^Component "conference.#{host}"/a\\    restrict_room_creation = true' #{prosody}
+            fi
+            # 4. web client: guests join via the anonymous domain (anchor on the
+            # ACTIVE line only — the stock config carries a commented-out
+            # anonymousdomain example that must not satisfy the guard)
+            if ! grep -qE "^\\s*anonymousdomain:" #{config}; then
+              sed -i "s|^\\(\\s*\\)domain: '#{host}',|\\1domain: '#{host}',\\n\\1anonymousdomain: 'guest.#{host}',|" #{config}
+            fi
+            # 5. jicofo: require XMPP authentication to open a room
+            if ! grep -q 'authentication:' #{jicofo}; then
+              sed -i 's|xmpp: {|xmpp: {\\n    authentication: {\\n      enabled: true\\n      type: XMPP\\n      login-url: #{host}\\n    }|' #{jicofo}
+            fi
+          SH
+
+          provision_admin_user host
+        end
+
+        # Register the room-opening account. The container is rebuilt from the
+        # template on every redeploy (prosody's account store lives inside), so
+        # this runs each deploy; `register` writes the store directly, no
+        # running prosody needed.
+        def provision_admin_user host
+          return if @model.admin_user.blank? || @model.admin_password.blank?
+          require 'shellwords'
+          user = @model.admin_user.shellescape
+          pass = @model.admin_password.shellescape
+          chroot! @guest.deploy_path,
+            "prosodyctl register #{user} #{host} #{pass} </dev/null >/dev/null 2>&1 || true",
+            "Failed to register jitsi admin user"
+        end
+
+        # Redirect the welcome page to an external URL (config.js
+        # welcomePage.customUrl). Appended as a config override so the
+        # package-managed block stays untouched; idempotent via marker.
+        def apply_welcome_page
+          return if @model.welcome_page_url.blank?
+          host = @guest.external_hostname
+          return if host.blank?
+          config = "/etc/jitsi/meet/#{host}-config.js"
+          url = @model.welcome_page_url.gsub("'") { "\\'" }
+          chroot! @guest.deploy_path, <<~SH, "Failed to set jitsi welcome page"
+            sed -i "/^config.welcomePage = /d" #{config}
+            echo "config.welcomePage = { customUrl: '#{url}' };" >> #{config}
+          SH
         end
 
         private

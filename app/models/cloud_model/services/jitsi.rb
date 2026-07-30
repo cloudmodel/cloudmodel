@@ -44,6 +44,34 @@ module CloudModel
       #   @return [String, nil] custom SVG watermark/logo markup overriding the default
       field :watermark_svg, type: String, default: nil
 
+      # @!attribute [rw] default_background
+      #   @return [String, nil] CSS color for the conference background
+      #     (interface_config `DEFAULT_BACKGROUND`), e.g. `"rgb(0, 38, 50)"`
+      field :default_background, type: String, default: nil
+
+      # @!attribute [rw] welcome_page_url
+      #   @return [String, nil] external URL the welcome page redirects to
+      #     (config.js `welcomePage.customUrl`); nil keeps Jitsi's own page
+      field :welcome_page_url, type: String, default: nil
+
+      # @!attribute [rw] secure_domain
+      #   @return [Boolean] "secure domain" setup: creating a room requires a
+      #     registered XMPP user (prosody `internal_hashed` on the main vhost +
+      #     jicofo XMPP authentication), while guests join running rooms
+      #     anonymously via a `guest.<domain>` vhost
+      field :secure_domain, type: Mongoid::Boolean, default: false
+
+      # @!attribute [rw] admin_user
+      #   @return [String, nil] XMPP user to provision on deploy (only with
+      #     {#secure_domain}) — the account that may open rooms. Containers are
+      #     rebuilt from the template on every redeploy, so the account is
+      #     (re-)registered each deploy.
+      field :admin_user, type: String, default: nil
+
+      # @!attribute [rw] admin_password
+      #   @return [String, nil] password for {#admin_user}
+      field :admin_password, type: String, default: nil
+
 
       def kind
         :jitsi
