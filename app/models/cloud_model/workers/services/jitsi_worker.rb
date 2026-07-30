@@ -84,8 +84,20 @@ module CloudModel
               rm -f /etc/prosody/conf.d/#{old}.cfg.lua
               ln -sf ../conf.avail/#{new}.cfg.lua /etc/prosody/conf.d/#{new}.cfg.lua
             fi
-            # jitsi-meet web config
+            # jitsi-meet web config + the package's self-signed web cert pair
+            # (the nginx site references them by domain name)
             [ -f /etc/jitsi/meet/#{old}-config.js ] && mv -f /etc/jitsi/meet/#{old}-config.js /etc/jitsi/meet/#{new}-config.js || true
+            for ext in crt key; do
+              [ -f /etc/jitsi/meet/#{old}.$ext ] && mv -f /etc/jitsi/meet/#{old}.$ext /etc/jitsi/meet/#{new}.$ext || true
+            done
+            # Prefer the real certificate cloudmodel deployed for this guest (its
+            # nginx service ssl_cert, written to /etc/nginx/ssl before services
+            # are configured) over the package's self-signed one, so the web UI
+            # serves a trusted cert. Symlink so later cert renewals stay live.
+            if [ -f /etc/nginx/ssl/#{new}.crt ] && [ -f /etc/nginx/ssl/#{new}.key ]; then
+              ln -sf /etc/nginx/ssl/#{new}.crt /etc/jitsi/meet/#{new}.crt
+              ln -sf /etc/nginx/ssl/#{new}.key /etc/jitsi/meet/#{new}.key
+            fi
             # nginx site
             if [ -f /etc/nginx/sites-available/#{old}.conf ]; then
               mv -f /etc/nginx/sites-available/#{old}.conf /etc/nginx/sites-available/#{new}.conf
@@ -108,13 +120,20 @@ module CloudModel
 
         # Prosody references self-signed certs named after the XMPP domains
         # (`<host>` and `auth.<host>`); after the rename those point at files that
-        # don't exist, so regenerate them. Best-effort (|| true) so a packaging
-        # quirk in the cert path doesn't abort the whole deploy — the web UI TLS
-        # is served by cloudmodel's own nginx cert regardless.
+        # don't exist, so regenerate them. Plain `openssl req -batch` instead of
+        # `prosodyctl cert generate` — prosodyctl prompts on stdin (even with
+        # output redirected) and hangs forever in a non-interactive SSH exec.
+        # Best-effort (timeout + || true) so a cert quirk doesn't abort the whole
+        # deploy — the web UI TLS is served by cloudmodel's own nginx cert
+        # regardless; these certs only cover prosody's internal XMPP TLS.
         def regenerate_prosody_certs new
           chroot! @guest.deploy_path, <<~SH, "Failed to regenerate prosody certs"
+            mkdir -p /etc/prosody/certs
             for host in #{new} auth.#{new}; do
-              prosodyctl cert generate "$host" >/dev/null 2>&1 || true
+              timeout 60 openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
+                -batch -subj "/CN=$host" \
+                -keyout "/etc/prosody/certs/$host.key" \
+                -out "/etc/prosody/certs/$host.crt" </dev/null >/dev/null 2>&1 || true
             done
             chown -R prosody:prosody /var/lib/prosody /etc/prosody/certs 2>/dev/null || true
           SH
