@@ -137,4 +137,21 @@ RSpec.describe 'cloud_model/guest/etc/nginx/server_d/passenger_conf', type: :vie
     expect(rendered).not_to include 'PUPPETEER_EXECUTABLE_PATH'
   end
 
+  it 'renders custom passenger_env_vars' do
+    model.passenger_env_vars = { 'AUTH_HOST' => 'auth.dev.example.com' }
+
+    render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
+
+    expect(rendered).to include 'passenger_env_var                 AUTH_HOST auth.dev.example.com;'
+  end
+
+  it 'skips passenger_env_vars with unsafe keys and strips value control chars' do
+    model.passenger_env_vars = { 'bad key;' => 'x', 'OK_VAR' => "val;\ninjected" }
+
+    render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
+
+    expect(rendered).not_to include 'bad key'
+    expect(rendered).to include 'passenger_env_var                 OK_VAR valinjected;'
+  end
+
 end

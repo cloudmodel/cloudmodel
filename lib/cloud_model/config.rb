@@ -29,7 +29,7 @@ module CloudModel
     attr_writer :git_ssh_key_file
     # Use external IP, useful for testing without setting up a VPN for your development box or if you have troubles with tinc
     attr_writer :use_external_ip
-    attr_writer :dns_servers, :job_queue
+    attr_writer :dns_servers, :job_queue, :additional_hosts
 
     attr_writer :ubuntu_mirror, :ubuntu_deb_src, :ubuntu_version
     attr_writer :debian_version
@@ -163,6 +163,15 @@ module CloudModel
 
     def dns_domains
       @dns_domains ||= []
+    end
+
+    # Static name → address mappings rendered into every guest's `/etc/hosts`
+    # on deploy. Useful to override public names with in-cluster addresses
+    # (split-horizon), e.g. on development clusters that mirror production
+    # hostnames: `{'app.example.com' => '10.0.0.5'}`.
+    # @return [Hash{String=>String}]
+    def additional_hosts
+      @additional_hosts ||= {}
     end
 
     def host_mac_address_prefix_init

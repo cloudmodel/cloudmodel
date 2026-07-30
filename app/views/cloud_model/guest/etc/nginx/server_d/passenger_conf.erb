@@ -9,6 +9,10 @@ location <%= location %> {
   passenger_enabled                 on;
   passenger_min_instances           3;
   passenger_env_var                 HTTP_X_FORWARDED_PROTO $scheme;
+  <%- (model.passenger_env_vars || {}).each do |env_key, env_value| -%>
+  <%- next unless env_key.to_s =~ /\A[A-Za-z_][A-Za-z0-9_]*\z/ -%>
+  passenger_env_var                 <%= env_key %> <%= env_value.to_s.gsub(/[\r\n;]/, '') %>;
+  <%- end -%>
   <%- if model.deploy_web_image&.additional_components&.map(&:to_s)&.include?('puppeteer') -%>
   # grover/Puppeteer launches the distro Chromium (Puppeteer component); its own
   # node context does not read the app's .puppeteerrc.cjs, so pin the path here.

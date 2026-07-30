@@ -68,6 +68,11 @@ module CloudModel
       # roughly 400MB per app process.
       field :passenger_max_pool_size, type: Integer, default: 6
       validates :passenger_max_pool_size, numericality: {only_integer: true, greater_than: 0}
+      # Extra environment variables exposed to the Passenger app, rendered as
+      # `passenger_env_var KEY VALUE;`. Keys must look like environment variable
+      # names; anything else is skipped at render time. Useful to let a single
+      # app image advertise a per-deployment hostname or similar.
+      field :passenger_env_vars, type: Hash, default: {}
       field :delayed_jobs_supported, type: Mongoid::Boolean, default: false
       field :delayed_jobs_queues, type: Array, default: ['default']
       # Serve /cable (Rails ActionCable WebSocket) in a dedicated Passenger app
