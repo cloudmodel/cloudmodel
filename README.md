@@ -59,6 +59,10 @@ mount CloudModel::Engine, at: '/cloud'
 Configuration
 -------------
 
+> The full option-by-option reference (defaults, values, gotchas) lives in
+> **[doc/configuration.md](doc/configuration.md)** — the initializer below only
+> shows the most common settings.
+
 Create an initializer (e.g. `config/initializers/cloudmodel.rb`):
 
 ```ruby
@@ -259,6 +263,17 @@ guest.services.create!(
 | `public_service` | When `true`, binds to the external address |
 | `has_backups` | Enable backups for this service |
 | `additional_components` | Extra component symbols (e.g. `[:imagemagick]`) |
+
+**Nginx/Passenger extras** — an `Nginx` service serving a Rails app via
+Passenger can pass per-deployment environment variables to the app:
+
+```ruby
+nginx.passenger_env_vars = { 'APP_HOST' => 'app.dev.example.com' }
+```
+
+Rendered as `passenger_env_var KEY VALUE;` (keys are validated, control
+characters stripped), so a single app image can advertise a deployment-specific
+hostname or similar without rebuilding.
 
 **Address resolution**
 
