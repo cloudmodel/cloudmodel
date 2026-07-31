@@ -1,5 +1,6 @@
 [Service]
 PermissionsStartOnly=true
+TimeoutStartSec=600
 ExecStartPre=/bin/mkdir -p /var/log/nginx
 ExecStartPre=/bin/chown -R www:www /var/log/nginx
 ExecStartPre=/bin/chmod 2770 /var/log/nginx
@@ -8,5 +9,8 @@ ExecStartPre=/bin/mkdir -p /var/www/rails/current/public
 ExecStartPre=/bin/chmod 2775 /var/www/rails
 ExecStartPre=/bin/chmod 2775 /var/www/rails/current
 ExecStartPre=/bin/chmod 2775 /var/www/rails/current/public
-ExecStartPre=/bin/chown -R www:www /var/www
+# No recursive chown here: releases are owned at deploy time
+# (provision_web_volume), and walking the full release tree can blow the start
+# timeout and wedge nginx in a restart loop under Restart=always.
+ExecStartPre=/bin/chown www:www /var/www /var/www/rails /var/www/rails/current /var/www/rails/current/public
 ExecStartPre=-/usr/bin/sudo -u www RAILS_ENV=<%= model.passenger_env %> /var/www/rails/current/script/prestart
