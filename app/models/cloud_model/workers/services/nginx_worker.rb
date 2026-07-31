@@ -148,6 +148,23 @@ module CloudModel
                 end
               end
             end
+
+            # Every redeploy leaves a full copy under www_root and nothing ever
+            # removed them — over months this grows to dozens of releases and
+            # millions of files, slowing transfers and any recursive chown over
+            # www_root (like the one in the nginx unit's ExecStartPre). Prune to
+            # the fresh deploy plus rollback candidates. Best effort: a failed
+            # removal must not fail the deploy.
+            @model.update_attribute :redeploy_web_image_step, 'cleanup'
+            comment_sub_step "Remove old releases"
+            success, out = @model.guest.exec "ls #{@model.www_root}"
+            if success
+              releases = out.to_s.split("\n").map(&:strip).select { |dir| dir =~ /\A\d{14}\z/ }.sort
+              keep = (releases.last(3) + [deploy_id]).uniq
+              (releases - keep).each do |dir|
+                @model.guest.exec "rm -rf #{@model.www_root}/#{dir}"
+              end
+            end
           rescue Exception => e
             CloudModel.log_exception e
             web_image.try :append_to_build_log, "FAILED: #{@guest.name}: #{e}\n"
