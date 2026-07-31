@@ -149,30 +149,36 @@ module CloudModel
           end
         end
 
-        # Detaches stale release devices (live container) and destroys the clones
-        # of previous deploys, keeping only the release now pointed at by current.
+        # Release clones kept per guest: the active one plus rollback
+        # candidates. Clones are copy-on-write against the image snapshot, so
+        # spare releases cost next to no space but allow an instant rollback
+        # by re-pointing the `current` symlink.
+        KEPT_WEB_RELEASES = 3
+
+        # Detaches stale release devices (live container) and destroys the
+        # clones of older deploys, keeping the newest KEPT_WEB_RELEASES
+        # releases — always including the one now pointed at by current.
         def cleanup_old_web_releases current_deploy_id, online:
-          keep_dataset = web_clone_dataset current_deploy_id
-          keep_device = web_device current_deploy_id
+          success, list = @host.exec "zfs list -H -o name -r guests/web"
+          return unless success
+
+          pattern = %r{\Aguests/web/#{Regexp.escape(@guest.name)}-(\d+)\z}
+          release_ids = list.to_s.split("\n").filter_map { |dataset| dataset[pattern, 1] }.sort
+          keep_ids = (release_ids.last(KEPT_WEB_RELEASES) + [current_deploy_id.to_s]).uniq
 
           if online
             success, devices = @host.exec "lxc config device list #{@lxc.name.shellescape}"
             if success
               devices.to_s.split("\n").map(&:strip).each do |dev|
                 next unless dev.start_with? "#{WEB_DEVICE}-"
-                next if dev == keep_device
+                next if keep_ids.include? dev.delete_prefix("#{WEB_DEVICE}-")
                 @host.exec "lxc config device remove #{@lxc.name.shellescape} #{dev.shellescape}"
               end
             end
           end
 
-          success, list = @host.exec "zfs list -H -o name -r guests/web"
-          if success
-            list.to_s.split("\n").each do |dataset|
-              next unless dataset =~ %r{\Aguests/web/#{Regexp.escape(@guest.name)}-\d+\z}
-              next if dataset == keep_dataset
-              @host.exec "zfs destroy -r #{dataset.shellescape}"
-            end
+          (release_ids - keep_ids).each do |id|
+            @host.exec "zfs destroy -r #{web_clone_dataset(id).shellescape}"
           end
         end
 

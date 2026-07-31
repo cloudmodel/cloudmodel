@@ -83,6 +83,55 @@ describe CloudModel::Workers::Services::NginxWorker do
     end
   end
 
+  describe '.cleanup_old_web_releases' do
+    let(:zfs_list) do
+      [
+        'guests/web',
+        'guests/web/test-guest-20260101000000',
+        'guests/web/test-guest-20260102000000',
+        'guests/web/test-guest-20260103000000',
+        'guests/web/test-guest-20260104000000',
+        'guests/web/other-guest-20260101000000'
+      ].join("\n")
+    end
+
+    before do
+      guest.name = 'test-guest'
+      allow(host).to receive(:exec).with('zfs list -H -o name -r guests/web').and_return([true, zfs_list])
+    end
+
+    it 'should destroy all but the newest KEPT_WEB_RELEASES clones' do
+      expect(host).to receive(:exec).with('zfs destroy -r guests/web/test-guest-20260101000000')
+      subject.cleanup_old_web_releases '20260104000000', online: false
+    end
+
+    it 'should not touch kept releases or other guests\' clones' do
+      expect(host).not_to receive(:exec).with(/zfs destroy -r guests\/web\/test-guest-2026010[234]/)
+      expect(host).not_to receive(:exec).with(/other-guest/)
+      subject.cleanup_old_web_releases '20260104000000', online: false
+    end
+
+    it 'should always keep the current release even when older than the newest ones' do
+      expect(host).not_to receive(:exec).with(/zfs destroy/)
+      subject.cleanup_old_web_releases '20260101000000', online: false
+    end
+
+    it 'should remove only devices of destroyed releases when online' do
+      allow(lxc).to receive(:name).and_return('test-container')
+      allow(host).to receive(:exec).with('lxc config device list test-container')
+        .and_return([true, "webapp-20260101000000\nwebapp-20260104000000\nroot\n"])
+      expect(host).to receive(:exec).with('lxc config device remove test-container webapp-20260101000000')
+      expect(host).not_to receive(:exec).with('lxc config device remove test-container webapp-20260104000000')
+      subject.cleanup_old_web_releases '20260104000000', online: true
+    end
+
+    it 'should do nothing when the zfs list fails' do
+      allow(host).to receive(:exec).with('zfs list -H -o name -r guests/web').and_return([false, ''])
+      expect(host).not_to receive(:exec).with(/zfs destroy/)
+      subject.cleanup_old_web_releases '20260104000000', online: false
+    end
+  end
+
   describe '.deploy_web_image' do
     let(:web_image) {double 'WebImage', name: 'test-image'}
 
