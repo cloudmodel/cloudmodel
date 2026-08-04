@@ -27,6 +27,11 @@ module CloudModel
       field :ssl_enforce, type: Mongoid::Boolean, default: false
       field :ssl_port, type: Integer, default: 443
       field :ssl_certbot, type: Mongoid::Boolean, default: false
+      # OCSP stapling in the vhost. Disable for certificates whose OCSP
+      # responder is not reachable from this network (e.g. customer-internal
+      # CAs) — the futile fetches during TLS handshakes can drop connections
+      # at strict CDNs/clients.
+      field :ssl_stapling, type: Mongoid::Boolean, default: true
       belongs_to :ssl_cert, class_name: CloudModel::Certificate, inverse_of: :services, optional: true
       # With Let's Encrypt the cert is certbot's business: no preselected
       # certificate — the deploy bootstraps a self-signed one so nginx comes
@@ -53,7 +58,7 @@ module CloudModel
       # next deploy. Changes to embedded location_overwrites are live-syncable
       # too; embedded web_locations are not (their app confs render at deploy).
       LIVE_SYNCABLE_ATTRIBUTES = %w(
-        ssl_only ssl_enforce
+        ssl_only ssl_enforce ssl_stapling
         unsafe_inline_script_allowed unsafe_eval_script_allowed
         google_analytics_supported hubspot_forms_supported pingdom_supported
         reverse_proxy_for passenger_env passenger_max_pool_size rails_cable_supported

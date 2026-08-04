@@ -15,6 +15,7 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:ssl_enforce).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:ssl_port).of_type(Integer).with_default_value_of(443) }
   it { expect(subject).to have_field(:ssl_certbot).of_type(Mongoid::Boolean).with_default_value_of(false) }
+  it { expect(subject).to have_field(:ssl_stapling).of_type(Mongoid::Boolean).with_default_value_of(true) }
   it { expect(subject).to belong_to(:ssl_cert).of_type(CloudModel::Certificate).with_optional.as_inverse_of :services }
 
   it { expect(subject).to have_field(:passenger_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
