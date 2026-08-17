@@ -231,12 +231,12 @@ module CloudModel
                     parts.shift # the word 'blocks'
                     hash[context]['devs'][dev]['disks_status'] = parts.pop
                     hash[context]['devs'][dev][parts.shift] = parts.shift
-                  elsif key =~ /recovery =/
-                    hash[context]['devs'][dev]['recovery'] = {}
-                    hash[context]['devs'][dev]['recovery']['percentage'] = key.scan(/recovery = (.*)%/).first.try :first
-                    hash[context]['devs'][dev]['recovery']['done'], hash[context][dev][:recovery][:total] = key..scan(/\((.*)\/(.*)\)/).first
-                    hash[context]['devs'][dev]['recovery']['finish'].scan(/finish=([^ ]*)/).first.try :first
-                    hash[context]['devs'][dev]['recovery']['speed'].scan(/speed=([^ ]*)/).first.try :first
+                  elsif key =~ /(recovery|resync) = /
+                    recovery = hash[context]['devs'][dev]['recovery'] = {}
+                    recovery['percentage'] = key.scan(/(?:recovery|resync) = ([^ ]*)%/).first.try :first
+                    recovery['done'], recovery['total'] = key.scan(/\(([0-9]+)\/([0-9]+)\)/).first
+                    recovery['finish'] = key.scan(/finish=([^ ]*)/).first.try :first
+                    recovery['speed'] = key.scan(/speed=([^ ]*)/).first.try :first
                   else
                     hash[context]['devs'][dev][:line2] = key
                   end

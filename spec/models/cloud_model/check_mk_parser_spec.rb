@@ -147,6 +147,30 @@ describe CloudModel::CheckMkParser do
         expect(result['md']['devs']['md0'][:line2]).to eq 'resync=DELAYED'
       end
 
+      it 'should parse a recovery progress line' do
+        input = "<<<md>>>\n" \
+                "md1 : active raid1 sdb5[2] sda5[0]\n" \
+                "      [==========>..........]  recovery = 51.3% (51664000/100597760) finish=143.8min speed=5668K/sec\n"
+        result = CloudModel::CheckMkParser.parse input
+        recovery = result['md']['devs']['md1']['recovery']
+        expect(recovery['percentage']).to eq '51.3'
+        expect(recovery['done']).to eq '51664000'
+        expect(recovery['total']).to eq '100597760'
+        expect(recovery['finish']).to eq '143.8min'
+        expect(recovery['speed']).to eq '5668K/sec'
+      end
+
+      it 'should parse a resync progress line' do
+        input = "<<<md>>>\n" \
+                "md1 : active raid1 sdb5[2] sda5[0]\n" \
+                "      [=>...................]  resync = 8.5% (8551168/100597760) finish=61.5min speed=24940K/sec\n"
+        result = CloudModel::CheckMkParser.parse input
+        recovery = result['md']['devs']['md1']['recovery']
+        expect(recovery['percentage']).to eq '8.5'
+        expect(recovery['done']).to eq '8551168'
+        expect(recovery['speed']).to eq '24940K/sec'
+      end
+
       it 'should parse status note in parentheses' do
         input = "<<<md>>>\n" \
                 "md0 : active (auto-read-only) raid1 sda1[0] sdb1[1]\n"
