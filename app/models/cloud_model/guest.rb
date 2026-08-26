@@ -174,6 +174,14 @@ module CloudModel
         )
       end
 
+      guest_certificates.each do |guest_certificate|
+        new_guest.guest_certificates.new(
+          certificate_id: guest_certificate.certificate_id,
+          path_to_crt: guest_certificate.path_to_crt,
+          path_to_key: guest_certificate.path_to_key
+        )
+      end
+
       services.each do |service|
         old_service_document = service.as_document
         new_service_document = {}

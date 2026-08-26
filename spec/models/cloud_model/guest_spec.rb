@@ -413,6 +413,21 @@ describe CloudModel::Guest do
       end
     end
 
+    context 'guest_certificates' do
+      it 'should copy guest certificates to new guest' do
+        certificate = Factory.build :certificate
+        subject.guest_certificates.build certificate_id: certificate.id, path_to_crt: '/etc/certs/example.crt', path_to_key: '/etc/certs/example.key'
+
+        new_guest = subject.copy_to_host target_host
+
+        expect(new_guest.guest_certificates.size).to eq 1
+        new_guest_certificate = new_guest.guest_certificates.first
+        expect(new_guest_certificate.certificate_id).to eq certificate.id
+        expect(new_guest_certificate.path_to_crt).to eq '/etc/certs/example.crt'
+        expect(new_guest_certificate.path_to_key).to eq '/etc/certs/example.key'
+      end
+    end
+
     context 'services' do
       it 'should copy services to new guest' do
         host2 = Factory :host
