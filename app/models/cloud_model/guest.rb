@@ -101,6 +101,31 @@ module CloudModel
       lxd_containers.where(id: current_lxd_container_id).first
     end
 
+    # Rootfs origin of the live container (see {LxdContainer::ROOTFS_IMAGE} /
+    # {LxdContainer::ROOTFS_TEMPLATE_VOLUME}); nil without a container or while
+    # unknown. `detect: true` asks the host once for containers that predate
+    # the field and persists the answer.
+    def rootfs_origin detect: false
+      container = current_lxd_container
+      return nil unless container
+
+      container.detect_rootfs_origin! if detect and not container.rootfs_origin_known?
+      container.rootfs_origin
+    end
+
+    # Guest still runs on the retired image/tarball layout: web image rollouts
+    # are refused until one full guest redeploy has moved it to the template
+    # volume layout. Unknown (no container, or not detectable) is not legacy.
+    def legacy_layout? detect: false
+      rootfs_origin(detect: detect) == CloudModel::LxdContainer::ROOTFS_IMAGE
+    end
+
+    # Guest's live container was cloned from a template volume — the layout
+    # the web image rollout requires.
+    def template_volume_layout? detect: false
+      rootfs_origin(detect: detect) == CloudModel::LxdContainer::ROOTFS_TEMPLATE_VOLUME
+    end
+
     def available_private_address_collection
       ([private_address] + host.available_private_address_collection - [nil])
     end

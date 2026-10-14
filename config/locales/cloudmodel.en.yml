@@ -110,6 +110,12 @@ en:
     running: Deploying
     finished: Finished
     failed: Failed to deploy
+    guest_redeploy_required: Guest redeploy required first
+
+  cloud_model/lxd_container/rootfs_origin:
+    template_volume: Template volume (ZFS clone)
+    image: Image (legacy layout)
+    unknown: Unknown
 
   cloud_model/services/nginx:
     deploy_mongodb_replication_set_manual: Manual MongoDB Configuration
@@ -359,6 +365,7 @@ en:
         name: Container Name
         guest_template: Guest Template
         current_lxd_container: Current Container?
+        rootfs_origin: Root Filesystem Origin
         status: Container Status
         pid: Process ID
         processes: Processes

@@ -94,6 +94,46 @@ describe CloudModel::Guest do
     end
   end
 
+  describe 'rootfs_origin / container layout' do
+    let(:container) { CloudModel::LxdContainer.new }
+
+    before do
+      allow(subject).to receive(:current_lxd_container).and_return(container)
+    end
+
+    it 'should be nil without a current container' do
+      allow(subject).to receive(:current_lxd_container).and_return(nil)
+      expect(subject.rootfs_origin).to be_nil
+      expect(subject.legacy_layout?).to eq false
+      expect(subject.template_volume_layout?).to eq false
+    end
+
+    it 'should report the container´s recorded origin without asking the host' do
+      container.rootfs_origin = 'template_volume'
+      expect(container).not_to receive(:detect_rootfs_origin!)
+
+      expect(subject.rootfs_origin(detect: true)).to eq 'template_volume'
+      expect(subject.template_volume_layout?).to eq true
+      expect(subject.legacy_layout?).to eq false
+    end
+
+    it 'should flag a container created from an image as legacy layout' do
+      container.rootfs_origin = 'image'
+      expect(subject.legacy_layout?).to eq true
+      expect(subject.template_volume_layout?).to eq false
+    end
+
+    it 'should not probe the host unless asked to' do
+      expect(container).not_to receive(:detect_rootfs_origin!)
+      expect(subject.rootfs_origin).to be_nil
+    end
+
+    it 'should probe the host once for containers with unknown origin' do
+      expect(container).to receive(:detect_rootfs_origin!) { container.rootfs_origin = 'image' }
+      expect(subject.legacy_layout?(detect: true)).to eq true
+    end
+  end
+
   describe 'available_private_address_collection' do
     it 'should return host´s available_private_address_collection and add it´s own private address' do
       subject.host = host

@@ -170,11 +170,57 @@ describe CloudModel::Workers::Services::NginxWorker do
       allow(guest).to receive(:exec).and_return([true, ''])
       allow(web_image).to receive(:append_to_build_log)
       allow(subject).to receive(:provision_web_volume)
+      allow(guest).to receive(:template_volume_layout?).with(detect: true).and_return(true)
     end
 
     it 'should return false if state is not pending and not forced' do
       allow(model).to receive(:redeploy_web_image_state).and_return(:finished)
       expect(subject.redeploy_web_image).to eq false
+    end
+
+    context 'on a guest still running the image-based container layout' do
+      before do
+        allow(guest).to receive(:template_volume_layout?).with(detect: true).and_return(false)
+        allow(guest).to receive(:legacy_layout?).and_return(true)
+      end
+
+      it 'should refuse the rollout and ask for a guest redeploy instead' do
+        expect(model).to receive(:update_attributes).with(
+          redeploy_web_image_state: :guest_redeploy_required,
+          redeploy_web_image_last_issue: /full guest redeploy is required once/,
+          redeploy_web_image_step: nil
+        )
+        expect(subject).not_to receive(:provision_web_volume)
+        expect(guest).not_to receive(:exec)
+
+        expect(subject.redeploy_web_image).to eq false
+      end
+
+      it 'should note the skip in the web image build log' do
+        expect(web_image).to receive(:append_to_build_log).with(/SKIPPED test-guest: Guest test-guest still runs the image-based container layout/)
+        subject.redeploy_web_image
+      end
+
+      it 'should refuse even when forced — the layout can not be worked around' do
+        expect(subject).not_to receive(:provision_web_volume)
+        expect(subject.redeploy_web_image(force: true)).to eq false
+      end
+    end
+
+    context 'on a guest whose container layout can not be determined' do
+      before do
+        allow(guest).to receive(:template_volume_layout?).with(detect: true).and_return(false)
+        allow(guest).to receive(:legacy_layout?).and_return(false)
+      end
+
+      it 'should refuse the rollout rather than guess' do
+        expect(model).to receive(:update_attributes).with(
+          redeploy_web_image_state: :guest_redeploy_required,
+          redeploy_web_image_last_issue: /Could not determine the container layout/,
+          redeploy_web_image_step: nil
+        )
+        expect(subject.redeploy_web_image).to eq false
+      end
     end
 
     it 'should proceed if forced even when state is not pending' do

@@ -116,6 +116,20 @@ namespace :cloudmodel do
     end
   end
 
+  namespace :zfs do
+    desc "Report the state of the move to ZFS-volume deploys: guests still on the legacy image layout (need one full redeploy before web image rollouts), template volumes missing on hosts, web images without artifacts. Read-only. PROBE=0 skips host access; HOST_ID=<id> limits to one host."
+    task :status => [:environment] do
+      hosts = if ENV['HOST_ID'].present?
+        [CloudModel::Host.find(ENV['HOST_ID'])]
+      else
+        CloudModel::Host.all.to_a.sort_by(&:name)
+      end
+      abort "No hosts found in #{Rails.env} database — forgot RAILS_ENV=production?" if hosts.empty?
+
+      CloudModel::ZfsRolloutStatus.new(hosts: hosts, probe: ENV['PROBE'] != '0').report
+    end
+  end
+
   namespace :cleanup do
     desc "Remove obsolete template tarballs (admin data dir + all hosts) and stale /cloud/build dirs. Dry run unless CONFIRM=1; keeps the newest KEEP (default 2) finished templates per type/arch plus everything referenced by deployed containers."
     task :templates => [:environment] do

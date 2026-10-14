@@ -45,6 +45,7 @@ describe CloudModel::Services::Nginx do
     0x01 => :running,
     0xf0 => :finished,
     0xf1 => :failed,
+    0xf2 => :guest_redeploy_required,
     0xff => :not_started
   ).with_default_value_of(:not_started) }
   it { expect(subject).to have_field(:redeploy_web_image_last_issue).of_type(String) }
@@ -277,7 +278,7 @@ describe CloudModel::Services::Nginx do
 
   describe '#redeployable_redeploy_web_image_states' do
     it 'should return finished, failed, and not_started' do
-      expect(CloudModel::Services::Nginx.redeployable_redeploy_web_image_states).to eq [:finished, :failed, :not_started]
+      expect(CloudModel::Services::Nginx.redeployable_redeploy_web_image_states).to eq [:finished, :failed, :guest_redeploy_required, :not_started]
     end
   end
 

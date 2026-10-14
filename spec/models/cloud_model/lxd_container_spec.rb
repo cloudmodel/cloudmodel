@@ -182,6 +182,74 @@ describe CloudModel::LxdContainer do
 
       subject.attach_template_volume
     end
+
+    it 'should record that the rootfs was cloned from the template volume' do
+      allow(host).to receive(:exec).with("cat #{mountpoint}/backup.yaml").and_return([false, 'no such file'])
+
+      subject.attach_template_volume
+
+      expect(subject.rootfs_origin).to eq 'template_volume'
+      expect(subject.template_volume_clone?).to eq true
+      expect(subject.legacy_layout?).to eq false
+    end
+  end
+
+  describe 'rootfs_origin' do
+    it { expect(subject).to have_field(:rootfs_origin).of_type String }
+
+    it 'should be unknown for containers predating the field' do
+      expect(subject.rootfs_origin_known?).to eq false
+      expect(subject.template_volume_clone?).to eq false
+      expect(subject.legacy_layout?).to eq false
+    end
+
+    it 'should be a legacy layout when created from an image' do
+      subject.rootfs_origin = 'image'
+      expect(subject.legacy_layout?).to eq true
+      expect(subject.template_volume_clone?).to eq false
+    end
+  end
+
+  describe 'detect_rootfs_origin!' do
+    before do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      allow(CloudModel.config).to receive(:build_dataset).and_return('guests/build')
+    end
+
+    it 'should detect a clone of a template build volume' do
+      expect(host).to receive(:exec).with('zfs get -H -o value origin guests/containers/some_guest-20200331133742').and_return([true, "guests/build/guest/5e8/@ready\n"])
+
+      expect(subject.detect_rootfs_origin!).to eq 'template_volume'
+      expect(subject.rootfs_origin).to eq 'template_volume'
+    end
+
+    it 'should detect an LXD image clone as legacy layout' do
+      allow(host).to receive(:exec).with(/zfs get -H -o value origin/).and_return([true, "guests/images/0123abcd@readonly\n"])
+
+      expect(subject.detect_rootfs_origin!).to eq 'image'
+      expect(subject.legacy_layout?).to eq true
+    end
+
+    it 'should treat a dataset without origin as legacy layout' do
+      allow(host).to receive(:exec).with(/zfs get -H -o value origin/).and_return([true, "-\n"])
+
+      expect(subject.detect_rootfs_origin!).to eq 'image'
+    end
+
+    it 'should leave the origin unknown when the host can not answer' do
+      allow(host).to receive(:exec).with(/zfs get -H -o value origin/).and_return([false, 'dataset does not exist'])
+
+      expect(subject.detect_rootfs_origin!).to be_nil
+      expect(subject.rootfs_origin_known?).to eq false
+    end
+
+    it 'should persist the result on a persisted container' do
+      allow(host).to receive(:exec).with(/zfs get -H -o value origin/).and_return([true, "-\n"])
+      allow(subject).to receive(:persisted?).and_return(true)
+
+      expect(subject).to receive(:set).with(rootfs_origin: 'image')
+      subject.detect_rootfs_origin!
+    end
   end
 
   describe 'destroy_container' do

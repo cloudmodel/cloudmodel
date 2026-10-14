@@ -17,6 +17,19 @@ module CloudModel
     embedded_in :guest, class_name: "CloudModel::Guest"
     belongs_to :guest_template, class_name: "CloudModel::GuestTemplate"
 
+    # Rootfs cloned from the guest template's ZFS build volume (current deploy
+    # path): web releases are ZFS clones attached as disk devices.
+    ROOTFS_TEMPLATE_VOLUME = 'template_volume'.freeze
+    # Rootfs created from an LXD image (the retired tarball path): web releases
+    # are plain directories inside the container, which the current web image
+    # rollout cannot update — the guest needs one full redeploy first.
+    ROOTFS_IMAGE = 'image'.freeze
+
+    # Where the container's rootfs came from (see the constants above). nil for
+    # containers that predate the field; {#detect_rootfs_origin!} resolves it
+    # from the dataset's ZFS origin.
+    field :rootfs_origin, type: String
+
     before_validation :ensure_template_is_set
     after_create :create_container
     before_destroy :before_destroy
@@ -100,6 +113,49 @@ module CloudModel
       # unshifted, so it remaps into the container's unprivileged range on
       # first start — preserving suid bits, caps, and ACLs like fuidshift.
       lxc! "config set #{name} volatile.last_state.idmap '[]'", "Failed to reset container idmap state"
+      record_rootfs_origin ROOTFS_TEMPLATE_VOLUME
+    end
+
+    def template_volume_clone?
+      rootfs_origin == ROOTFS_TEMPLATE_VOLUME
+    end
+
+    # True for containers still on the retired image/tarball layout.
+    def legacy_layout?
+      rootfs_origin == ROOTFS_IMAGE
+    end
+
+    def rootfs_origin_known?
+      rootfs_origin.present?
+    end
+
+    # Resolves the rootfs origin of an existing container from its dataset's
+    # ZFS `origin` property: a clone of a template build volume means the
+    # current layout, anything else (an LXD image clone, or no origin at all)
+    # the retired one. Persists the result; returns it, or nil if the host
+    # could not be asked.
+    def detect_rootfs_origin!
+      success, origin = host.exec "zfs get -H -o value origin #{root_dataset}"
+      return nil unless success
+
+      origin = origin.to_s.strip
+      return nil if origin.empty?
+
+      detected = if origin.start_with? "#{CloudModel.config.build_dataset}/"
+        ROOTFS_TEMPLATE_VOLUME
+      else
+        ROOTFS_IMAGE
+      end
+      record_rootfs_origin detected
+      detected
+    end
+
+    def record_rootfs_origin origin
+      self.rootfs_origin = origin
+      # Atomic $set: this also runs from the after_create callback, where a
+      # nested save would re-enter the callback chain.
+      set rootfs_origin: origin if persisted?
+      origin
     end
 
     def destroy_container

@@ -100,6 +100,11 @@ module CloudModel
         0x01 => :running,
         0xf0 => :finished,
         0xf1 => :failed,
+        # Rollout refused: the guest still runs the retired image layout, where
+        # releases are directories inside the container rather than attached
+        # ZFS clones. One full guest redeploy moves it over; until then the
+        # web image is not touched on this guest (see NginxWorker).
+        0xf2 => :guest_redeploy_required,
         0xff => :not_started
       }, default: :not_started
       field :redeploy_web_image_last_issue, type: String
@@ -390,7 +395,7 @@ module CloudModel
       end
 
       def self.redeployable_redeploy_web_image_states
-        [:finished, :failed, :not_started]
+        [:finished, :failed, :guest_redeploy_required, :not_started]
       end
 
       def redeployable?

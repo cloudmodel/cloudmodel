@@ -186,11 +186,38 @@ module CloudModel
           provision_web_volume online: false if @model.deploy_web_image
         end
 
+        # Why a live rollout needs the template volume layout: it attaches the
+        # new release as a disk device and swaps `current`; on a container
+        # built from an image, releases are directories in the rootfs — the
+        # old unpack path is gone, so there is no safe way to update them in
+        # place. A full guest redeploy (which deploys the web image offline)
+        # is the one-time migration, and this gate makes that explicit instead
+        # of failing half-way with a half-attached release.
+        def web_image_rollout_blocker
+          return nil if @guest.template_volume_layout? detect: true
+
+          if @guest.legacy_layout?
+            "Guest #{@guest.name} still runs the image-based container layout; " \
+            "a full guest redeploy is required once before web images can be rolled out to it."
+          else
+            "Could not determine the container layout of guest #{@guest.name} " \
+            "(ZFS origin of its root dataset not readable); refusing the rollout."
+          end
+        end
+
         def redeploy_web_image options={}
           return false unless options[:force] or (@model.deploy_web_image and @model.redeploy_web_image_state == :pending)
 
-          @model.update_attributes redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'transfer'
           web_image = @model.deploy_web_image
+
+          if blocker = web_image_rollout_blocker
+            comment_sub_step "Skip #{@guest.name}: #{blocker}"
+            web_image.try :append_to_build_log, "SKIPPED #{@guest.name}: #{blocker}\n"
+            @model.update_attributes redeploy_web_image_state: :guest_redeploy_required, redeploy_web_image_last_issue: blocker, redeploy_web_image_step: nil
+            return false
+          end
+
+          @model.update_attributes redeploy_web_image_state: :running, redeploy_web_image_last_issue: nil, redeploy_web_image_step: 'transfer'
           web_image.try :append_to_build_log, "Deploying to #{@guest.name} (#{@guest.host.name})…\n"
 
           comment_sub_step "Deploy to #{@guest.name}: #{@model.name}"
