@@ -79,6 +79,22 @@ describe CloudModel::ZfsRolloutStatus do
       expect(rows.first[:guests]).to match_array [legacy_guest, zfs_guest, unknown_guest]
     end
 
+    it 'reports guests whose stored config can not be resolved instead of aborting the run' do
+      allow_any_instance_of(CloudModel::Guest).to receive(:components_needed) do |guest|
+        raise Mongoid::Errors::UnrecognizedModelAlias.new('CloudModel::WebApps::GoneWebApp') if guest.name == 'old-guest'
+        []
+      end
+
+      rows = described_class.new(probe: false).template_rows
+      broken = rows.detect { |r| r[:error] }
+      expect(broken[:guests]).to eq [legacy_guest]
+      expect(broken[:error]).to include 'UnrecognizedModelAlias'
+      expect(rows.detect { |r| r[:template].nil? && !r[:error] }[:guests]).to match_array [zfs_guest, unknown_guest]
+
+      described_class.new(probe: false).report output: output
+      expect(output.string).to include 'old-guest: CAN NOT resolve template'
+    end
+
     context 'with a finished template for the guests´ type' do
       let!(:template) do
         type = CloudModel::GuestTemplateType.create! components: legacy_guest.components_needed, os_version: legacy_guest.os_version

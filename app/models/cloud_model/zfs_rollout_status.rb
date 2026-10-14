@@ -55,8 +55,19 @@ module CloudModel
         by_template = Hash.new { |h, k| h[k] = [] }
         untyped = []
 
+        unresolvable = []
+
         host.guests.to_a.sort_by(&:name).each do |guest|
-          template = next_template_for guest
+          template = begin
+            next_template_for guest
+          rescue => e
+            # e.g. a service referencing a web app class that no longer exists:
+            # that guest can not be redeployed as stored, which is exactly
+            # what the report is for — note it instead of aborting the run.
+            unresolvable << {guest: guest, error: "#{e.class}: #{e.message}"}
+            next
+          end
+
           if template
             by_template[template] << guest
           else
@@ -68,6 +79,9 @@ module CloudModel
           {host: host, template: template, guests: guests, volume_ready: template_volume_ready?(template, host)}
         end
         rows << {host: host, template: nil, guests: untyped, volume_ready: false} if untyped.any?
+        unresolvable.each do |entry|
+          rows << {host: host, template: nil, guests: [entry[:guest]], volume_ready: false, error: entry[:error]}
+        end
         rows
       end
     end
@@ -112,7 +126,9 @@ module CloudModel
       output.puts "== Templates a redeploy would clone (per host) =="
       template_rows.each do |row|
         names = row[:guests].map(&:name) * ', '
-        if row[:template].nil?
+        if row[:error]
+          output.puts "  #{row[:host].name}: #{names}: CAN NOT resolve template — #{row[:error]}"
+        elsif row[:template].nil?
           output.puts "  #{row[:host].name}: NO finished template for #{names} — the redeploy builds one on this host first"
         else
           state = if !probe then 'not probed'
