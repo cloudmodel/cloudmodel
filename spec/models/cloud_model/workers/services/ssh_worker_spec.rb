@@ -58,8 +58,12 @@ describe CloudModel::Workers::Services::SshWorker do
       subject.write_config
     end
 
-    it 'should set owner of www client keys' do
-      expect(host).to receive(:exec!).with('chown -R 101001:101001 /var/lib/lxc/test/rootfs/var/www/.ssh', 'Failed to change owner of www client keys to user www')
+    it 'should set owner of www client keys by name inside the container, not by a host uid' do
+      # A raw host-side chown assumed the tarball-era uid shift; a chroot chown
+      # by name is right for both layouts (sshd StrictModes needs the owner).
+      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', 'chown -R www:www /var/www/.ssh', 'Failed to change owner of www client keys to user www')
+      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', 'chmod 700 /var/www/.ssh', 'Failed to set mode on www .ssh dir')
+      expect(host).not_to receive(:exec!).with(/chown -R 101001/, anything)
       subject.write_config
     end
   end

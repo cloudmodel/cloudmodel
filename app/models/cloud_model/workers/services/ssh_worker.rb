@@ -48,10 +48,15 @@ module CloudModel
           rescue Net::SFTP::StatusException => e
           end
 
-          # TODO: Reenable after config for nginx done
-          # chroot! @guest.deploy_path, "chown -R www:www /var/www/.ssh", "Failed to change owner of www client keys to user www (1001)"
           @host.exec! "chown -R 100000:100000 #{ssh_host_key_target.shellescape}/ssh", "Failed to change owner of server keys to user root"
-          @host.exec! "chown -R 101001:101001 #{ssh_target}", "Failed to change owner of www client keys to user www"
+          # Own the www client keys by name inside the container namespace, not
+          # with a raw host-side uid. The tarball-era chroot resolved the
+          # container's www (1001) to host 101001, so `chown 101001` worked; a
+          # ZFS-volume deploy does not shift the same way, and the raw chown
+          # then lands as literal 101001 inside, so sshd StrictModes rejects the
+          # keys (not owned by their user). Chowning by name is correct either way.
+          chroot! @guest.deploy_path, "chown -R www:www /var/www/.ssh", "Failed to change owner of www client keys to user www"
+          chroot! @guest.deploy_path, "chmod 700 /var/www/.ssh", "Failed to set mode on www .ssh dir"
         end
 
         def service_name

@@ -415,7 +415,6 @@ module CloudModel
             ssh_dir = File.expand_path("var/www/.ssh", @guest.deploy_path)
             ssh_target = File.expand_path("authorized_keys", ssh_dir)
             mkdir_p "#{ssh_dir}"
-            @host.exec "chown -R 101001:101001 #{ssh_dir}"
             @host.exec "rm -f #{ssh_target.shellescape}"
 
             puts ssh_target
@@ -429,7 +428,12 @@ module CloudModel
             @host.sftp.file.open("#{ssh_target}", 'w') do |f|
               f.write ssh_keys.uniq * "\n"
             end
-            @host.exec "chown -R 101001:101001 #{ssh_target}"
+            # Own by name in the container namespace (www = 1001), not via a raw
+            # host uid: the tarball-era chroot mapped www to host 101001, but
+            # ZFS-volume deploys don't shift the same way, so `chown 101001`
+            # lands as literal 101001 inside and breaks sshd StrictModes.
+            chroot! @guest.deploy_path, "chown -R www:www /var/www/.ssh", "Failed to own capistrano deploy keys"
+            chroot! @guest.deploy_path, "chmod 700 /var/www/.ssh && chmod 600 /var/www/.ssh/authorized_keys", "Failed to set mode on capistrano deploy keys"
           end
 
           # Cleanup

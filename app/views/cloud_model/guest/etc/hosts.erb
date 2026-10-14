@@ -1,5 +1,9 @@
 127.0.0.1 localhost
 127.0.1.1 <%= container_name %>
+<%- (CloudModel.config.additional_hosts || {}).each do |name, ip| -%>
+<%- next if name.to_s.strip.empty? || ip.to_s.strip.empty? -%>
+<%= ip %> <%= name %>
+<%- end -%>
 
 # The following lines are desirable for IPv6 capable hosts
 ::1     ip6-localhost ip6-loopback
