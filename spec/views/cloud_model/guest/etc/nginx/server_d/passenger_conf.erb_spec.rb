@@ -31,6 +31,16 @@ RSpec.describe 'cloud_model/guest/etc/nginx/server_d/passenger_conf', type: :vie
     CONF
   end
 
+  it 'quotes passenger_env_var values so spaces and quotes survive' do
+    model.passenger_env_vars = {'APP_TITLE' => 'My "Hub" \\ here', 'bad key' => 'x', 'MULTI' => "a\nb;c"}
+
+    render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
+
+    expect(rendered).to include 'passenger_env_var                 APP_TITLE "My \\"Hub\\" \\\\ here";'
+    expect(rendered).to include 'passenger_env_var                 MULTI "a b;c";'
+    expect(rendered).not_to include 'bad key'
+  end
+
   it 'renders custom base location' do
     allow(model).to receive(:www_root).and_return '/home/www/app_beta'
 
@@ -142,16 +152,16 @@ RSpec.describe 'cloud_model/guest/etc/nginx/server_d/passenger_conf', type: :vie
 
     render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
 
-    expect(rendered).to include 'passenger_env_var                 AUTH_HOST auth.dev.example.com;'
+    expect(rendered).to include 'passenger_env_var                 AUTH_HOST "auth.dev.example.com";'
   end
 
-  it 'skips passenger_env_vars with unsafe keys and strips value control chars' do
+  it 'skips passenger_env_vars with unsafe keys and keeps values on one line' do
     model.passenger_env_vars = { 'bad key;' => 'x', 'OK_VAR' => "val;\ninjected" }
 
     render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
 
     expect(rendered).not_to include 'bad key'
-    expect(rendered).to include 'passenger_env_var                 OK_VAR valinjected;'
+    expect(rendered).to include 'passenger_env_var                 OK_VAR "val; injected";'
   end
 
 end

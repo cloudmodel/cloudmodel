@@ -43,6 +43,23 @@ describe CloudModel::Mixins::HasZfsBuildVolume do
       expect(subject.claim_build!).to eq false
     end
 
+    it 'should take over a claim whose build died (no state change for hours)' do
+      subject.update_attributes build_state: :running
+      subject.set updated_at: 4.hours.ago
+
+      expect(subject.build_claimable?).to eq true
+      expect(subject.claim_build!).to eq true
+      expect(subject.reload.build_state).to eq :pending
+    end
+
+    it 'should not take over a claim that is still being worked on' do
+      subject.update_attributes build_state: :running
+      subject.set updated_at: 10.minutes.ago
+
+      expect(subject.build_claimable?).to eq false
+      expect(subject.claim_build!).to eq false
+    end
+
     it 'should let exactly one of two concurrent claimers win' do
       other_handle = CloudModel::GuestTemplate.find subject.id
 
@@ -140,7 +157,8 @@ describe CloudModel::Mixins::HasZfsBuildVolume do
       allow(CloudModel.config).to receive(:data_directory).and_return('/data')
       allow(source_host).to receive(:ssh_address).and_return('10.0.0.1')
       allow(host).to receive(:ssh_address).and_return('10.0.0.2')
-      # target has no copy of the dataset yet → full stream
+      # target has no copy of the dataset yet → full stream; nothing moved aside
+      allow(host).to receive(:exec).and_return([false, ''])
       allow(host).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([false, ''])
       allow(subject).to receive(:provision_zfs_sync_key!).and_return(false)
     end

@@ -12,7 +12,11 @@ describe CloudModel::Mixins::ZfsDatasetSync do
     allow(target).to receive(:ssh_address).and_return('10.42.0.2')
     allow(CloudModel.config).to receive(:ssh_key_file).and_return('/data/keys/id_rsa')
     allow(syncer).to receive(:local_exec!)
-    # default: the target has no copy of the dataset yet → full stream
+    allow(target).to receive(:private_address).and_return('10.42.0.2')
+    # default: the target has no copy of the dataset yet → full stream; no
+    # moved-aside datasets to clean up
+    allow(target).to receive(:exec).and_return([false, ''])
+    allow(source).to receive(:exec).and_return([false, ''])
     allow(target).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([false, "dataset does not exist\n"])
     allow(source).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([true, "guests/build/type1/tmpl1@ready\n"])
   end
@@ -36,10 +40,14 @@ describe CloudModel::Mixins::ZfsDatasetSync do
       syncer.sync_zfs_dataset! source, target, 'guests/build/web/img1/amd64', snapshot: 'guests/build/web/img1/amd64@v3'
     end
 
-    it 'replaces a leftover dataset without a common snapshot before sending a full stream' do
-      allow(target).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([true, "guests/build/type1/tmpl1@partial\n"])
+    it 'moves a dataset without a common snapshot aside (clones stay valid) and sends a full stream' do
+      allow(target).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([true, "guests/build/type1/tmpl1@pruned\n"])
+      allow(Time).to receive(:now).and_return(Time.utc(2026, 10, 14, 12, 0, 0))
 
-      expect(target).to receive(:exec!).with('zfs destroy -r guests/build/type1/tmpl1', /cannot be replaced/).ordered
+      expect(target).to receive(:exec!).with(
+        'zfs rename guests/build/type1/tmpl1 guests/build/type1/tmpl1-stale-20261014120000 && zfs set canmount=off guests/build/type1/tmpl1-stale-20261014120000',
+        /could not be moved aside/
+      ).ordered
       expect(syncer).to receive(:local_exec!).with(/zfs list guests\/build\/type1 /, anything).ordered
       expect(syncer).to receive(:local_exec!).with(/'zfs send -p guests\/build\/type1\/tmpl1@ready \| ssh /, anything).ordered
 
@@ -48,17 +56,27 @@ describe CloudModel::Mixins::ZfsDatasetSync do
 
     it 'treats an existing dataset without snapshots as a leftover too' do
       allow(target).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([true, ""])
-      expect(target).to receive(:exec!).with('zfs destroy -r guests/build/type1/tmpl1', anything)
+      expect(target).to receive(:exec!).with(/^zfs rename guests\/build\/type1\/tmpl1 guests\/build\/type1\/tmpl1-stale-/, anything)
 
       syncer.sync_zfs_dataset! source, target, 'guests/build/type1/tmpl1'
     end
 
-    it 'fails loudly when the leftover cannot be destroyed (clones depend on it)' do
-      allow(target).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([true, "guests/build/type1/tmpl1@partial\n"])
-      allow(target).to receive(:exec!).and_raise('guests/build/type1/tmpl1 exists on deployhost without a snapshot in common with buildhost and cannot be replaced (clones depend on it?): has dependent clones')
-      expect(syncer).not_to receive(:local_exec!)
+    it 'cleans up moved-aside datasets nothing depends on any more after a sync' do
+      allow(target).to receive(:exec).with('zfs list -H -o name -d 1 -t filesystem guests/build/type1')
+        .and_return([true, "guests/build/type1\nguests/build/type1/tmpl1\nguests/build/type1/tmpl1-stale-20260101000000\nguests/build/type1/other\n"])
+      expect(target).to receive(:exec).with('zfs destroy -r guests/build/type1/tmpl1-stale-20260101000000').and_return([false, 'has dependent clones'])
+      expect(target).not_to receive(:exec).with(/zfs destroy -r guests\/build\/type1\/other/)
 
-      expect { syncer.sync_zfs_dataset! source, target, 'guests/build/type1/tmpl1' }.to raise_error(/cannot be replaced/)
+      syncer.sync_zfs_dataset! source, target, 'guests/build/type1/tmpl1'
+    end
+
+    it 'addresses the peer by its private address, not the controller´s route to it' do
+      allow(target).to receive(:ssh_address).and_return('203.0.113.7')
+      # the controller's own hop may use its route (public); the peer hop stays private
+      expect(syncer).to receive(:local_exec!).with(/^ssh -i \/data\/keys\/id_rsa root@203.0.113.7 'zfs list/, anything)
+      expect(syncer).to receive(:local_exec!).with(/root@10.42.0.1 'zfs send .* root@10.42.0.2 "zfs receive/, anything)
+
+      syncer.sync_zfs_dataset! source, target, 'guests/build/type1/tmpl1'
     end
   end
 

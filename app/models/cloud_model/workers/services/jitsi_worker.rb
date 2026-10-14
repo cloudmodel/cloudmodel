@@ -263,7 +263,9 @@ module CloudModel
 
         # Rewrites a `KEY: 'value'` entry in interface_config.js in place.
         def set_interface_value key, value
-          esc = value.to_s.gsub("'", "\\\\'")
+          # JS string: escape quotes. sed replacement: `&` (whole match),
+          # `|` (our delimiter) and `\` are special; newlines end the s///.
+          esc = value.to_s.gsub(/[\r\n]/, ' ').gsub("'", "\\\\'").gsub(/[&|\\]/) { "\\#{$&}" }
           chroot! @guest.deploy_path,
             "sed -i \"s|^\\s*#{key}:.*|    #{key}: '#{esc}',|\" #{INTERFACE_CONFIG}",
             "Failed to set jitsi interface value #{key}"

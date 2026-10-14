@@ -67,7 +67,11 @@ module CloudModel
 
       def ensure_lxd_custom_volumes
         guest.lxd_custom_volumes.each do |volume|
-          unless volume.volume_exists?
+          if volume.volume_exists?
+            # ZFS properties (primarycache) may have been changed since the
+            # volume was created — a redeploy is where they get applied.
+            volume.apply_zfs_properties!
+          else
             volume.create_volume!
           end
         end

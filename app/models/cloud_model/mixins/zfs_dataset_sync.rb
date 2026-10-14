@@ -47,6 +47,7 @@ module CloudModel
         else
           sync_zfs_dataset_via_controller! source_host, target_host, dataset, send_args
         end
+        destroy_stale_zfs_datasets target_host, dataset
         true
       end
 
@@ -85,10 +86,13 @@ module CloudModel
 
       # Decides between a full and an incremental stream. A full stream can
       # only land where the dataset does not exist. If it exists on the
-      # target, the newest snapshot there is the incremental base — it came
-      # from this source, so the source still has it (web image builds never
-      # drop snapshots a deployed guest clones from). Otherwise the target's
-      # dataset is a leftover that nothing may depend on, and is replaced.
+      # target, the newest snapshot there is the incremental base as long as
+      # the source still has it. Otherwise (the source pruned it, or the
+      # target holds a leftover) the target's dataset is moved aside under a
+      # `-stale-<ts>` name: release clones hanging off its snapshots stay
+      # valid (a rename keeps clone origins), the fresh name takes a full
+      # stream, and {#destroy_stale_zfs_datasets} removes moved-aside
+      # datasets once nothing depends on them any more.
       def zfs_send_args(source_host, target_host, dataset, snapshot)
         target_snaps = zfs_snapshots_on target_host, dataset
         return "-p #{snapshot}" if target_snaps.nil?
@@ -97,9 +101,21 @@ module CloudModel
         if base and (zfs_snapshots_on(source_host, dataset) || []).include?(base)
           "-p -i #{base} #{snapshot}"
         else
-          target_host.exec! "zfs destroy -r #{dataset}",
-            "#{dataset} exists on #{target_host.name} without a snapshot in common with #{source_host.name} and cannot be replaced (clones depend on it?)"
+          stale = "#{dataset}-stale-#{Time.now.utc.strftime('%Y%m%d%H%M%S')}"
+          target_host.exec! "zfs rename #{dataset} #{stale} && zfs set canmount=off #{stale}",
+            "#{dataset} on #{target_host.name} has no snapshot in common with #{source_host.name} and could not be moved aside"
           "-p #{snapshot}"
+        end
+      end
+
+      # Destroys moved-aside `<dataset>-stale-*` datasets on `host` whose
+      # clones are all gone; the ones still in use are left for next time.
+      def destroy_stale_zfs_datasets(host, dataset)
+        success, list = host.exec "zfs list -H -o name -d 1 -t filesystem #{File.dirname dataset}"
+        return unless success
+        list.to_s.split("\n").map(&:strip).each do |stale|
+          next unless stale.start_with? "#{dataset}-stale-"
+          host.exec "zfs destroy -r #{stale}"
         end
       end
 
@@ -110,14 +126,16 @@ module CloudModel
       # The controller only drives: it prepares the parent dataset on the
       # target and tells the source to stream. The stream itself takes one
       # hop, source → target, under the restricted key (which permits exactly
-      # this receive into the build tree). No -C: build volumes are already
-      # lz4/zstd compressed, and the hop stays on the private network.
+      # this receive into the build tree). The peer is addressed by its
+      # private (VPN) address — ssh_address is the controller's own route to
+      # the host, which may be the public one. No -C: build volumes are
+      # already lz4/zstd compressed, and the hop stays on the private network.
       def sync_zfs_dataset_direct!(source_host, target_host, dataset, send_args)
         parent_dataset = File.dirname dataset
         local_exec! "#{controller_ssh(target_host)} 'zfs list #{parent_dataset} >/dev/null 2>&1 || zfs create -p #{parent_dataset}'",
           "Failed to create parent dataset on #{target_host.name}"
 
-        peer_ssh = "ssh -i #{CloudModel::ZfsSyncKey::REMOTE_KEY_PATH} -o BatchMode=yes -o StrictHostKeyChecking=accept-new root@#{target_host.ssh_address}"
+        peer_ssh = "ssh -i #{CloudModel::ZfsSyncKey::REMOTE_KEY_PATH} -o BatchMode=yes -o StrictHostKeyChecking=accept-new root@#{target_host.private_address}"
         local_exec! "#{controller_ssh(source_host)} 'zfs send #{send_args} | #{peer_ssh} \"zfs receive -u -F #{dataset}\"'",
           "Failed to sync build volume #{dataset} from #{source_host.name} to #{target_host.name} (direct)"
       end

@@ -102,6 +102,7 @@ describe CloudModel::Workers::WebImageWorker do
       expect(subject).to receive(:transfer_source).ordered
       expect(subject).to receive(:chroot!).at_least(:once)
       # versioned snapshot, workspace NOT destroyed, only the build system is
+      expect(host).to receive(:exec!).with('zfs set mountpoint=none guests/build/web/web42/MOS6502', anything).ordered
       expect(host).to receive(:exec!).with(/zfs snapshot .*web42\/MOS6502@v\d+/, anything).ordered
       expect(web_image).to receive(:record_artifact_version).with('MOS6502', /\A\d{14}\z/)
       expect(buildsys_volume).to receive(:destroy!).ordered

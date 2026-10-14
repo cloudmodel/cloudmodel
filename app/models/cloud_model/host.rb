@@ -16,7 +16,7 @@ module CloudModel
   #
   # All remote operations (command execution, file transfer, LXD control) go
   # through an SSH connection established via {#ssh_connection}. CloudModel
-  # authenticates using an RSA key at `{Config#data_directory}/keys/id_rsa`.
+  # authenticates using the key at `CloudModel.config.ssh_key_file`.
   #
   # @example Connect and run a command
   #   success, output = host.exec('uname -r')
@@ -343,7 +343,7 @@ module CloudModel
 
         begin
           Net::SSH.start(host_ip, "root",
-            keys: ["#{CloudModel.config.data_directory}/keys/id_rsa"],
+            keys: [CloudModel.config.ssh_key_file],
             keys_only: true,
             password: '',
             **SSH_OPTIONS
@@ -353,7 +353,7 @@ module CloudModel
           # Since SSH_OPTIONS sets timeout:, Net::SSH raises its own
           # ConnectionTimeout instead of the OS-level Errno::ETIMEDOUT.
           Net::SSH.start(primary_address.ip, "root",
-            keys: ["#{CloudModel.config.data_directory}/keys/id_rsa"],
+            keys: [CloudModel.config.ssh_key_file],
             keys_only: true,
             password: '',
             **SSH_OPTIONS
@@ -378,7 +378,7 @@ module CloudModel
     end
 
     def shell
-      puts "ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa root@#{ssh_address}"
+      puts "ssh -i #{CloudModel.config.ssh_key_file.shellescape} root@#{ssh_address}"
     end
 
     def sync_inst_images
@@ -387,18 +387,20 @@ module CloudModel
       end
 
       # TODO: make work with initial root pw
-      command = "rsync -avz -e 'ssh -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa' #{CloudModel.config.data_directory.shellescape}/cloud/ root@#{ssh_address.to_s.shellescape}:/cloud"
+      command = "rsync -avz -e 'ssh -i #{CloudModel.config.ssh_key_file.shellescape}' #{CloudModel.config.data_directory.shellescape}/cloud/ root@#{ssh_address.to_s.shellescape}:/cloud"
       Rails.logger.debug command
       `#{command}`
     end
 
-    def exec command
-      Rails.logger.debug "EXEC: #{command}"
+    # @param quiet [Boolean] don't echo the command into the live console
+    #   (for commands that carry secrets; the output is still streamed)
+    def exec command, quiet: false
+      Rails.logger.debug "EXEC: #{quiet ? '(quiet command)' : command}"
       # Echo the remote command into the running flow's console — with only
       # the step names the live log gives no clue WHAT a step was doing when
       # it failed. Outside a capture (monitoring, rails console) stay quiet.
       stream_output = $stdout.is_a? CloudModel::StdoutTee
-      puts "\n      $ #{command}" if stream_output
+      puts "\n      $ #{command}" if stream_output and not quiet
       # Long-running commands (debootstrap, apt) stream their output LIVE
       # into the console line by line; \r counts as a line break so apt
       # progress updates don't buffer forever.
@@ -466,8 +468,8 @@ module CloudModel
       return [success, stdout]
     end
 
-    def exec! command, message
-      success, data = exec command
+    def exec! command, message, quiet: false
+      success, data = exec command, quiet: quiet
 
       unless success
         raise "#{message}:\n\n#{data}"

@@ -302,6 +302,11 @@ module CloudModel
         comment_sub_step "Snapshot artifact version"
         cleanup_chroot buildsys_volume.rootfs_path
         app_volume.unmount!
+        # Its mountpoint pointed into this build's throwaway build system;
+        # left as is, a host reboot would auto-mount the workspace there and
+        # the next build's build-system clone would mount over it. The next
+        # build sets the mountpoint afresh before mounting.
+        @host.exec! "zfs set mountpoint=none #{app_volume.dataset_name.shellescape}", "Failed to detach workspace mountpoint"
         # Versioned snapshot (never a fixed @ready): a rebuild adds a new @v<ts>
         # and never has to destroy a snapshot a deployed guest still clones from.
         # Build scratch (.git, caches, ext target) stays in the workspace for

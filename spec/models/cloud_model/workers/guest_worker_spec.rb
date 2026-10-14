@@ -248,6 +248,8 @@ describe CloudModel::Workers::GuestWorker do
       allow(guest).to receive(:lxd_custom_volumes).and_return([missing, existing])
       expect(missing).to receive(:create_volume!)
       expect(existing).not_to receive(:create_volume!)
+      # changed ZFS properties (primarycache) reach existing volumes on redeploy
+      expect(existing).to receive(:apply_zfs_properties!)
 
       subject.ensure_lxd_custom_volumes
     end

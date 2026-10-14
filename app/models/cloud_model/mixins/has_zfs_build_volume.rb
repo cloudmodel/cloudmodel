@@ -43,8 +43,13 @@ module CloudModel
       # wins; everybody else gets false and should wait.
       # @return [Boolean] true if this caller may build
       def claim_build!
-        claimed = self.class.where(:id => id, :build_state_id.in => CLAIMABLE_BUILD_STATE_IDS)
-          .find_one_and_update({'$set' => {build_state_id: 0x00}})
+        claimed = self.class.where(
+          :id => id,
+          '$or' => [
+            {build_state_id: {'$in' => CLAIMABLE_BUILD_STATE_IDS}},
+            {build_state_id: {'$nin' => CLAIMABLE_BUILD_STATE_IDS}, updated_at: {'$lt' => Time.now - STALE_CLAIM_AFTER}}
+          ]
+        ).find_one_and_update({'$set' => {build_state_id: 0x00, updated_at: Time.now}})
 
         if claimed
           self.build_state = :pending
@@ -53,6 +58,12 @@ module CloudModel
           false
         end
       end
+
+      # A build claim older than this with no state change since is
+      # considered abandoned (the building process died) and may be taken
+      # over; otherwise one crashed build would block every deploy needing
+      # the template until someone resets build_state by hand.
+      STALE_CLAIM_AFTER = 3.hours
 
       # Makes sure this template's volume is ready on `host`: syncs it from
       # a host that has it, builds it (claimed atomically, preferring the
@@ -101,9 +112,12 @@ module CloudModel
         volume
       end
 
-      # True while no build of this template is running (current DB state)
+      # True while no build of this template is running (current DB state),
+      # or the running one is abandoned (see STALE_CLAIM_AFTER)
       def build_claimable?
-        CLAIMABLE_BUILD_STATE_IDS.include? reload.build_state_id
+        reload
+        CLAIMABLE_BUILD_STATE_IDS.include?(build_state_id) or
+          (updated_at.present? and updated_at < Time.now - STALE_CLAIM_AFTER)
       end
 
       # Copies the ready volume from a host that has it to `target_host` via

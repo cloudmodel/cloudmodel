@@ -58,9 +58,15 @@ describe CloudModel::Workers::Services::NginxWorker do
       subject.unroll_web_image('/deploy/path')
     end
 
-    it 'should write master key if present' do
+    it 'should write the master key over sftp so it never shows up in a logged command' do
       allow(web_image).to receive(:master_key).and_return('secret123')
-      expect(host).to receive(:exec!).with("echo -n 'secret123' >/deploy/path/config/master.key", 'Failed to set master key')
+      sftp_file = double 'sftp_file'
+      file_handle = double 'file_handle'
+      allow(host).to receive(:sftp).and_return(double('sftp', file: sftp_file))
+      expect(sftp_file).to receive(:open).with('/deploy/path/config/master.key', 'w').and_yield(file_handle)
+      expect(file_handle).to receive(:write).with('secret123')
+      expect(host).not_to receive(:exec!).with(/secret123/, anything)
+      expect(host).to receive(:exec!).with('chmod 600 /deploy/path/config/master.key', 'Failed to protect master key')
       subject.unroll_web_image('/deploy/path')
     end
 

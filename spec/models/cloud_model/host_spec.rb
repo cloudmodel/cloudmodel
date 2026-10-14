@@ -569,12 +569,17 @@ describe CloudModel::Host do
 
   describe 'exec!' do
     it 'should call exec with same command' do
-      expect(subject).to receive(:exec).with('command').and_return [true, 'true']
+      expect(subject).to receive(:exec).with('command', quiet: false).and_return [true, 'true']
       expect(subject.exec! 'command', 'message').to eq 'true'
     end
 
+    it 'should forward quiet so secret-carrying commands stay out of the console' do
+      expect(subject).to receive(:exec).with('command', quiet: true).and_return [true, 'true']
+      subject.exec! 'command', 'message', quiet: true
+    end
+
     it 'should raise error with given message if exec fails' do
-      expect(subject).to receive(:exec).with('command').and_return [false, 'An error occured']
+      expect(subject).to receive(:exec).with('command', quiet: false).and_return [false, 'An error occured']
       expect { subject.exec! 'command', 'message' }.to raise_error(RuntimeError, "message:\n\nAn error occured")
     end
   end

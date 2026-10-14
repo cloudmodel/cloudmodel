@@ -38,6 +38,23 @@ describe CloudModel::Workers::Services::JitsiWorker do
     end
   end
 
+  describe 'set_interface_value' do
+    before { allow(guest).to receive(:deploy_path).and_return('/var/lib/lxc/test/rootfs') }
+
+    it 'escapes what sed and the JS string would otherwise interpret' do
+      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs',
+        "sed -i \"s|^\\s*PROVIDER_NAME:.*|    PROVIDER_NAME: 'Meet \\& Greet \\| Co \\\\ Ltd\\\\'s',|\" /usr/share/jitsi-meet/interface_config.js",
+        'Failed to set jitsi interface value PROVIDER_NAME')
+
+      subject.send :set_interface_value, 'PROVIDER_NAME', "Meet & Greet | Co \\ Ltd's"
+    end
+
+    it 'keeps a multi-line value on one line' do
+      expect(subject).to receive(:chroot!).with(anything, /PROVIDER_NAME: 'one two',/, anything)
+      subject.send :set_interface_value, 'PROVIDER_NAME', "one\ntwo"
+    end
+  end
+
   describe 'service_name' do
     it 'should return jitsi' do
       expect(subject.service_name).to eq 'jitsi'

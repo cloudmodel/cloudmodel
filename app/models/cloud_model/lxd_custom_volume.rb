@@ -403,7 +403,7 @@ module CloudModel
     end
 
     def ssh_command
-      "ssh -o StrictHostKeyChecking=no -i #{CloudModel.config.data_directory.shellescape}/keys/id_rsa"
+      "ssh -o StrictHostKeyChecking=no -i #{CloudModel.config.ssh_key_file.shellescape}"
     end
 
     # Incremental base for the next send, or nil to force a full send.

@@ -52,7 +52,10 @@ module CloudModel
           end
 
           if @model.deploy_web_image.master_key
-            @host.exec! "echo -n '#{@model.deploy_web_image.master_key}' >#{deploy_path}/config/master.key", "Failed to set master key"
+            # Written over SFTP: a shell command would echo the key into the
+            # live console and the build log (Host#exec streams commands).
+            @host.sftp.file.open("#{deploy_path}/config/master.key", 'w') { |f| f.write @model.deploy_web_image.master_key }
+            @host.exec! "chmod 600 #{deploy_path.shellescape}/config/master.key", "Failed to protect master key"
           end
 
 

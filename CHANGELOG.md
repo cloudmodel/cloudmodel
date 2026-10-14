@@ -26,8 +26,14 @@ the hosts, so read the migration notes before updating a running cloud.
   `rake cloudmodel:host:deploy_zfs_sync_key` rolls the key out ahead of time.
   A dataset the target already holds (an earlier web-image artifact with
   release clones on it) receives new versions incrementally from its newest
-  snapshot; a transfer failure surfaces as such instead of triggering a
-  rebuild.
+  snapshot; one without a snapshot in common is moved aside as
+  `<dataset>-stale-<ts>` (its clones stay valid) and removed once nothing
+  depends on it. A transfer failure surfaces as such instead of triggering
+  a rebuild, and a build claim with no state change for three hours is
+  treated as abandoned and taken over.
+- **Secrets stay out of the console.** `Host#exec` echoes commands into the
+  live log; commands carrying secrets pass `quiet: true`, and the Rails
+  master key is written over SFTP.
 - **Controller keys are created on demand.** The controller's host key and the
   sync key pair are generated when first needed (`SshKeyPair`).
 - **`www`'s SSH directory is owned by name** inside the container; the raw
