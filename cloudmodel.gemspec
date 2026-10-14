@@ -18,10 +18,10 @@ Gem::Specification.new do |spec|
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/cloudmodel/cloudmodel"
-  spec.metadata["changelog_uri"] = "https://github.com/cloudmodel/cloudmodel/commits/master"
+  spec.metadata["changelog_uri"] = "https://github.com/cloudmodel/cloudmodel/blob/master/CHANGELOG.md"
 
 
-  spec.files = Dir["{app,config,db,lib}/**/*", "LICENSE", "Rakefile", "README.md"]
+  spec.files = Dir["{app,config,db,lib}/**/*", "LICENSE", "Rakefile", "README.md", "CHANGELOG.md"]
 
   spec.add_dependency 'rails', '~> 8.0'
   spec.add_dependency 'mongoid',  '>= 7.1.2'

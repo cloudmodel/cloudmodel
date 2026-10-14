@@ -7,6 +7,10 @@ CloudModel
 CloudModel is a Ruby on Rails engine gem that provides ActiveModel representations for cloud infrastructure management. It models physical/virtual **hosts**, LXD **guests** (containers), **services** running inside containers, reusable software **components**, and **templates** — and ships workers that deploy and configure all of them over SSH.
 
 > As of v0.3.0, Rails 7.2 is required.
+>
+> v0.5.0 moves templates, containers and web-image releases to ZFS volumes
+> and changes what lives on the hosts — see the [changelog](CHANGELOG.md)
+> for the migration steps before updating a running cloud.
 
 Table of Contents
 -----------------
