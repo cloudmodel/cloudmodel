@@ -646,7 +646,8 @@ module CloudModel
 
           print "Creating mountpoint on guest root... "
           host.exec "mkdir #{guest_dir}"
-          host.exec "chown 100000:100000 #{guest_dir}"
+          # mountpoint inside a container that has run: on-disk ids are mapped
+          host.exec "chown #{current_lxd_container.host_uid(0)}:#{current_lxd_container.host_uid(0)} #{guest_dir}"
           puts '[Done]'
 
           print "Unmounting volume... "

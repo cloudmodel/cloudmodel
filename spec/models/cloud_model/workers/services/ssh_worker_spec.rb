@@ -53,8 +53,8 @@ describe CloudModel::Workers::Services::SshWorker do
       subject.write_config
     end
 
-    it 'should set owner of server keys to root' do
-      expect(host).to receive(:exec!).with('chown -R 100000:100000 /var/lib/lxc/test/rootfs/etc/ssh', 'Failed to change owner of server keys to user root')
+    it 'should leave the server keys root-owned (uid 0 in the unshifted rootfs)' do
+      expect(host).not_to receive(:exec!).with(/chown -R 100000/, anything)
       subject.write_config
     end
 

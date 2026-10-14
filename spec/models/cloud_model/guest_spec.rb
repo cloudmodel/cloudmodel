@@ -1378,6 +1378,7 @@ describe CloudModel::Guest do
       container = double 'container', name: 'test-container'
       allow(container).to receive(:lxc)
       allow(subject).to receive(:current_lxd_container).and_return(container)
+      allow(container).to receive(:host_uid).with(0).and_return(100000)
       allow(subject).to receive(:name).and_return('test')
       allow(subject).to receive(:host).and_return(host)
       allow(host).to receive(:exec)

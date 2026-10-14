@@ -103,10 +103,12 @@ module CloudModel
 
           # The clone IS the Rails root; only the instance config is layered on.
           unroll_web_image mount
-          # The artifact is already owned by the container's www user (host
-          # 101001 ↔ container 1001, see WebImageWorker#finalize_app_volume);
-          # only what unroll_web_image just wrote needs owning. A recursive
-          # chown over the whole tree would touch every inode of the clone.
+          # The artifact is already owned by the container's www user (see
+          # WebImageWorker#finalize_app_volume); only what unroll_web_image
+          # just wrote needs owning. A recursive chown over the whole tree
+          # would touch every inode of the clone — done only if the idmap
+          # base of this container differs from the one the artifact assumes.
+          ensure_web_release_owner mount
           own_web_release_config mount
 
           attach_web_release deploy_id, mount
@@ -141,13 +143,32 @@ module CloudModel
           %w(config tmp)
         end
 
-        # Owns the per-guest config files as the container's www user (host
-        # 101001 ↔ container 1001). Only these paths changed since the
-        # artifact was built, so only they are touched.
+        # Container uid of the app user (www) and its host-side id through
+        # the container's idmap — the release clone is attached as a raw disk
+        # device, so its host-side owners must already be the mapped ones.
+        WWW_UID = 1001
+
+        def www_host_uid
+          @lxc.host_uid WWW_UID
+        end
+
+        # Owns the per-guest config files as the container's www user. Only
+        # these paths changed since the artifact was built, so only they are
+        # touched (see #ensure_web_release_owner for the rest).
         def own_web_release_config mount
           paths = web_release_config_paths.map { |p| "#{mount}/#{p}".shellescape } * ' '
-          @host.exec! "for p in #{paths}; do if [ -e \"$p\" ]; then chown -R 101001:101001 \"$p\" || exit 1; fi; done",
+          @host.exec! "for p in #{paths}; do if [ -e \"$p\" ]; then chown -R #{www_host_uid}:#{www_host_uid} \"$p\" || exit 1; fi; done",
             "Failed to own web app config"
+        end
+
+        # The artifact was built with the usual idmap base in mind; when this
+        # container maps www elsewhere (another base), re-own the clone once.
+        def ensure_web_release_owner mount
+          success, owner = @host.exec "stat -c %u #{mount.shellescape}"
+          return unless success
+          return if owner.to_s.strip.to_i == www_host_uid
+          comment_sub_step "Re-own release for idmap base #{@lxc.idmap_base}"
+          @host.exec! "chown -R #{www_host_uid}:#{www_host_uid} #{mount.shellescape}", "Failed to own web app volume"
         end
 
         # Attaches the cloned release read/write at releases/<id> in the container.
@@ -320,9 +341,7 @@ module CloudModel
               remote_file = "#{@guest.deploy_path}#{dst[0]}"
               render_to_remote src, remote_file, dst[1], guest: @guest, service: @model, web_location: web_location, model: web_app
               if dst[2]
-                uid = dst[2][:uid] || 100000
-                gid = dst[2][:gid] || 100000
-                host.exec! "chown -R #{uid}:#{gid} #{remote_file}", "failed to set owner for #{remote_file}"
+                own_in_rootfs remote_file, uid: dst[2][:uid] || 0, gid: dst[2][:gid] || 0
               end
             end
 
@@ -461,15 +480,14 @@ module CloudModel
             chroot! @guest.deploy_path, "chmod 700 /var/www/.ssh && chmod 600 /var/www/.ssh/authorized_keys", "Failed to set mode on capistrano deploy keys"
           end
 
-          # Cleanup
+          # Cleanup — www by name inside the unshifted rootfs (container ids)
           @host.exec "chmod -R 2775 #{@guest.deploy_path}#{@model.www_root}"
-          @host.exec "chown -R 101001:101001 #{@guest.deploy_path}#{@model.www_root}"
-          @host.exec "chown -R 100000:100000 #{@guest.deploy_path}/etc/nginx/ssl #{@guest.deploy_path}/etc/default/rails"
+          chroot! @guest.deploy_path, "chown -R www:www #{@model.www_root}", "Failed to own www root"
 
           log_dir_path = "/var/log/nginx"
           mkdir_p "#{@guest.deploy_path}#{log_dir_path}"
           @host.exec  "chmod -R 2770 #{@guest.deploy_path}#{log_dir_path}"
-          @host.exec  "chown -R 101001:101001 #{@guest.deploy_path}#{log_dir_path}"
+          chroot! @guest.deploy_path, "chown -R www:www #{log_dir_path}", "Failed to own nginx log dir"
 
           # Baseline for later live syncs: record what was deployed, so
           # sync_config can tell manual edits on the guest from drift.
@@ -612,7 +630,6 @@ module CloudModel
         def auto_start
           mkdir_p overlay_path
           render_to_remote "/cloud_model/guest/etc/systemd/system/nginx.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf", 644, guest: @guest, model: @model
-          @host.exec  "chown -R 100000:100000 #{overlay_path}"
           # TODO: Resolve dependencies
           # Services::Ssh.new(@host, @options).write_config
 

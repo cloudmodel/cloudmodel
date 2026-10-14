@@ -148,8 +148,8 @@ describe CloudModel::Workers::Services::TomcatWorker do
       subject.auto_start
     end
 
-    it 'should chown overlay path' do
-      expect(host).to receive(:exec).with("chown -R 100000:100000 #{subject.overlay_path}")
+    it 'should leave the overlay root-owned (unshifted rootfs)' do
+      expect(host).not_to receive(:exec).with(/chown/)
       subject.auto_start
     end
   end

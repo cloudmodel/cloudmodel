@@ -170,6 +170,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       allow(host).to receive(:exec!)
       allow(subject).to receive(:strip_web_release)
       allow(subject).to receive(:unroll_web_image)
+      allow(subject).to receive(:ensure_web_release_owner)
       allow(subject).to receive(:own_web_release_config)
       allow(subject).to receive(:attach_web_release)
       allow(subject).to receive(:activate_web_release)
@@ -182,12 +183,32 @@ describe CloudModel::Workers::Services::NginxWorker do
   end
 
   describe '.own_web_release_config' do
-    it 'should own only the config paths written per guest, not the whole clone' do
+    before { allow(lxc).to receive(:host_uid).with(1001).and_return(101001) }
+
+    it 'should own only the config paths written per guest, as www through the container´s idmap' do
       expect(host).to receive(:exec!).with(
         'for p in /cloud/web/g-1/config /cloud/web/g-1/tmp; do if [ -e "$p" ]; then chown -R 101001:101001 "$p" || exit 1; fi; done',
         'Failed to own web app config'
       )
       subject.own_web_release_config '/cloud/web/g-1'
+    end
+  end
+
+  describe '.ensure_web_release_owner' do
+    before { allow(lxc).to receive(:host_uid).with(1001).and_return(101001) }
+
+    it 'should not touch a clone already owned through the expected idmap' do
+      allow(host).to receive(:exec).with('stat -c %u /cloud/web/g-1').and_return([true, "101001\n"])
+      expect(host).not_to receive(:exec!).with(/chown -R/, anything)
+      subject.ensure_web_release_owner '/cloud/web/g-1'
+    end
+
+    it 'should re-own the whole clone once when the container maps www elsewhere' do
+      allow(lxc).to receive(:host_uid).with(1001).and_return(1001001)
+      allow(lxc).to receive(:idmap_base).and_return(1000000)
+      allow(host).to receive(:exec).with('stat -c %u /cloud/web/g-1').and_return([true, "101001\n"])
+      expect(host).to receive(:exec!).with('chown -R 1001001:1001001 /cloud/web/g-1', 'Failed to own web app volume')
+      subject.ensure_web_release_owner '/cloud/web/g-1'
     end
   end
 
@@ -416,7 +437,8 @@ describe CloudModel::Workers::Services::NginxWorker do
       expect(subject).to receive(:render_to_remote).with(
         "cloud_model/web_apps/test_web_app/foo_bar",
         "/path/to/install/foo/bar", 0640, guest: guest, service: model, web_location: model.web_locations.first, model: web_app)
-      expect(host).to receive(:exec!).with("chown -R 101001:100000 /path/to/install/foo/bar", "failed to set owner for /path/to/install/foo/bar")
+      # legacy host-range notation in the web app definition → container ids in the unshifted rootfs
+      expect(host).to receive(:exec!).with("chown -R 1001:0 /path/to/install/foo/bar", "failed to set owner for /path/to/install/foo/bar")
 
       expect(web_app).to receive(:config_files_to_render).and_return(
         'cloud_model/web_apps/test_web_app/foo_bar' => ["/foo/bar",0640, uid: '101001'],
@@ -428,7 +450,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       expect(subject).to receive(:render_to_remote).with(
         "cloud_model/web_apps/test_web_app/foo_bar",
         "/path/to/install/foo/bar", 0640, guest: guest, service: model, web_location: model.web_locations.first, model: web_app)
-      expect(host).to receive(:exec!).with("chown -R 100000:101001 /path/to/install/foo/bar", "failed to set owner for /path/to/install/foo/bar")
+      expect(host).to receive(:exec!).with("chown -R 0:1001 /path/to/install/foo/bar", "failed to set owner for /path/to/install/foo/bar")
 
       expect(web_app).to receive(:config_files_to_render).and_return(
         'cloud_model/web_apps/test_web_app/foo_bar' => ["/foo/bar",0640, gid: '101001'],
@@ -440,7 +462,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       expect(subject).to receive(:render_to_remote).with(
         "cloud_model/web_apps/test_web_app/foo_bar",
         "/path/to/install/foo/bar", 0640, guest: guest, service: model, web_location: model.web_locations.first, model: web_app)
-      expect(host).to receive(:exec!).with("chown -R 101020:101001 /path/to/install/foo/bar", "failed to set owner for /path/to/install/foo/bar")
+      expect(host).to receive(:exec!).with("chown -R 1020:1001 /path/to/install/foo/bar", "failed to set owner for /path/to/install/foo/bar")
 
       expect(web_app).to receive(:config_files_to_render).and_return(
         'cloud_model/web_apps/test_web_app/foo_bar' => ["/foo/bar",0640, uid: '101020', gid: '101001'],
@@ -539,8 +561,8 @@ describe CloudModel::Workers::Services::NginxWorker do
       subject.auto_start
     end
 
-    it 'should chown overlay path' do
-      expect(host).to receive(:exec).with("chown -R 100000:100000 #{subject.overlay_path}")
+    it 'should leave the overlay root-owned (unshifted rootfs)' do
+      expect(host).not_to receive(:exec).with(/chown/)
       subject.auto_start
     end
 

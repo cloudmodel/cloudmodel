@@ -27,7 +27,6 @@ module CloudModel
           render_to_remote "/cloud_model/guest/etc/systemd/system/rake.timer", "#{@guest.deploy_path}/etc/systemd/system/rake-#{rake_service.rake_task}.timer", 644, service: rake_service
           render_to_remote "/cloud_model/guest/etc/systemd/system/rake.service", "#{@guest.deploy_path}/etc/systemd/system/rake-#{rake_service.rake_task}.service", 644, service: rake_service
           @host.exec "ln -sf /etc/systemd/system/rake-#{rake_service.rake_task}.timer #{@guest.deploy_path.shellescape}/etc/systemd/system/timers.target.wants/"
-          @host.exec "chown -R 100000:100000 #{@guest.deploy_path}/etc/systemd/system/rake-#{rake_service.rake_task}.service #{@guest.deploy_path}/etc/systemd/system/rake-#{rake_service.rake_task}.timer #{@guest.deploy_path.shellescape}/etc/systemd/system/timers.target.wants/rake-#{rake_service.rake_task}.timer"
         end
       end
     end

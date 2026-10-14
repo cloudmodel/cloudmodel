@@ -30,12 +30,9 @@ module CloudModel
           @host
         end
 
-        # Creates a directory on the host and sets LXD container UID ownership.
-        # @param path [String] remote directory path
-        def mkdir_p path
-          super path
-          host.exec! "chown -R 100000:100000 #{path}", "failed to set owner for #{path}"
-        end
+        # Directories and rendered files in the offline rootfs are root-owned
+        # as written (unshifted clone, see Workers::BaseWorker#own_in_rootfs);
+        # the old host-range chown is neither needed nor correct there.
 
         # Uploads raw content string into the running LXD container via `lxc file push`.
         # @param content [String] file content to write
@@ -71,11 +68,6 @@ module CloudModel
           upload_to_guest content, remote_file, perm
         end
 
-        def render_to_remote template, remote_file, *param_array
-          super template, remote_file, *param_array
-          host.exec! "chown -R 100000:100000 #{remote_file}", "failed to set owner for #{remote_file}"
-        end
-
         # Writes all configuration files for this service into the container rootfs.
         # Override in subclasses to render templates and run chroot commands.
         def write_config
@@ -105,7 +97,6 @@ module CloudModel
             mkdir_p overlay_path
             render_to_remote "/cloud_model/support/etc/systemd/unit.d/restart.conf", "#{overlay_path}/restart.conf", 644
           end
-          @host.exec  "chown -R 100000:100000 #{overlay_path}"
         end
 
       end

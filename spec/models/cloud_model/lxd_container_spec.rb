@@ -210,6 +210,33 @@ describe CloudModel::LxdContainer do
     end
   end
 
+  describe 'idmap_base / host_uid' do
+    before { subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time }
+
+    it 'reads the base of the uid map from LXD and keeps it' do
+      allow(host).to receive(:exec).with(/lxc config get some_guest-20200331133742 volatile.idmap.current/)
+        .and_return([true, '[{"Isuid":true,"Isgid":false,"Hostid":1000000,"Nsid":0,"Maprange":1000000000},{"Isuid":false,"Isgid":true,"Hostid":1000000,"Nsid":0,"Maprange":1000000000}]'])
+
+      expect(subject.idmap_base).to eq 1000000
+      expect(subject.host_uid(1001)).to eq 1001001
+      expect(host).not_to receive(:exec)
+      expect(subject.idmap_base).to eq 1000000
+    end
+
+    it 'falls back to the next map before the container ever started' do
+      allow(host).to receive(:exec).with(/volatile.idmap.current/).and_return([true, "\n"])
+      allow(host).to receive(:exec).with(/volatile.idmap.next/)
+        .and_return([true, '[{"Isuid":true,"Isgid":true,"Hostid":100000,"Nsid":0,"Maprange":65536}]'])
+
+      expect(subject.host_uid(0)).to eq 100000
+    end
+
+    it 'assumes the usual base when LXD gives no answer' do
+      allow(host).to receive(:exec).and_return([false, ''])
+      expect(subject.idmap_base).to eq 100000
+    end
+  end
+
   describe 'detect_rootfs_origin!' do
     before do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time

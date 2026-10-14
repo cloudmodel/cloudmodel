@@ -36,8 +36,14 @@ the hosts, so read the migration notes before updating a running cloud.
   master key is written over SFTP.
 - **Controller keys are created on demand.** The controller's host key and the
   sync key pair are generated when first needed (`SshKeyPair`).
-- **`www`'s SSH directory is owned by name** inside the container; the raw
-  host-uid chown of the tarball era does not survive the new layout.
+- **File ownership uses container ids.** The template-volume clone is
+  unshifted when the deploy writes into it (LXD maps it on first start), so
+  rendered files are left root-owned and non-root owners (`www`, config
+  owners from web app definitions, Solr's user) are set with container ids
+  or by name. The old host-range chowns (`100000 + id`) would have landed
+  as foreign ids inside the container. The web release clone, attached as a
+  raw disk device, is owned through the container's actual idmap base
+  (read from LXD); an artifact built for another base is re-owned once.
 - The guest's `/etc/hosts` carries `config.additional_hosts`.
 
 ### Behaviour changes

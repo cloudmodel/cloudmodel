@@ -105,8 +105,8 @@ describe CloudModel::Workers::Services::RedisWorker do
       subject.auto_start
     end
 
-    it 'should chown redis_server overlay path' do
-      expect(host).to receive(:exec).with('chown -R 100000:100000 /var/lib/lxc/test/rootfs/etc/systemd/system/redis_server.service.d')
+    it 'should leave the redis_server overlay root-owned (unshifted rootfs)' do
+      expect(host).not_to receive(:exec).with(/chown/)
       subject.auto_start
     end
 
@@ -130,8 +130,8 @@ describe CloudModel::Workers::Services::RedisWorker do
         subject.auto_start
       end
 
-      it 'should chown redis_sentinel overlay path' do
-        expect(host).to receive(:exec).with('chown -R 100000:100000 /var/lib/lxc/test/rootfs/etc/systemd/system/redis_sentinel.service.d')
+      it 'should leave the redis_sentinel overlay root-owned (unshifted rootfs)' do
+        expect(host).not_to receive(:exec).with(/chown/)
         subject.auto_start
       end
     end

@@ -150,6 +150,47 @@ module CloudModel
       detected
     end
 
+    # Host-side uid the container's id 0 maps to (its unprivileged idmap
+    # base). Needed for files the container sees through raw disk devices
+    # (web release clones): those are not shifted by LXD, so their host-side
+    # owners must already be the mapped ids. Read from LXD once and kept.
+    DEFAULT_IDMAP_BASE = 100_000
+
+    field :idmap_base, type: Integer
+
+    def idmap_base
+      self[:idmap_base] || detect_idmap_base! || DEFAULT_IDMAP_BASE
+    end
+
+    # @return [Integer, nil] base read from the container's idmap, nil if
+    #   LXD gave no usable answer
+    def detect_idmap_base!
+      %w(volatile.idmap.current volatile.idmap.next volatile.idmap.base).each do |key|
+        success, raw = lxc "config get #{name} #{key}"
+        next unless success and raw.to_s.strip.present?
+
+        base = if key == 'volatile.idmap.base'
+          raw.to_s.strip.to_i
+        else
+          entries = JSON.parse(raw) rescue next
+          entry = entries.find { |e| e['Isuid'] and e['Nsid'].to_i == 0 }
+          entry && entry['Hostid'].to_i
+        end
+        next unless base and base > 0
+
+        self[:idmap_base] = base
+        set idmap_base: base if persisted?
+        return base
+      end
+      nil
+    end
+
+    # @param container_uid [Integer] a uid as seen inside the container
+    # @return [Integer] that uid as seen on the host
+    def host_uid container_uid
+      idmap_base + container_uid.to_i
+    end
+
     def record_rootfs_origin origin
       self.rootfs_origin = origin
       # Atomic $set: this also runs from the after_create callback, where a

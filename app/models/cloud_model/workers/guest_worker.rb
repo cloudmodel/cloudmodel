@@ -27,15 +27,9 @@ module CloudModel
         guest
       end
 
-      def mkdir_p path
-        super path
-        host.exec! "chown -R 100000:100000 #{path}", "failed to set owner for #{path}"
-      end
-
-      def render_to_remote template, remote_file, *param_array
-        super template, remote_file, *param_array
-        host.exec! "chown -R 100000:100000 #{remote_file}", "failed to set owner for #{remote_file}"
-      end
+      # Files and directories are written as root into the unshifted
+      # template-volume clone; LXD maps uid 0 to the container's root on
+      # first start, so no host-range chown is needed (or correct) here.
 
       # Makes sure the guest's template is available as a ZFS volume on the
       # guest's host, so the container can be cloned from its ready snapshot.
@@ -121,13 +115,9 @@ module CloudModel
 
       # Refresh the monitoring plugin set in the container's rootfs: the guest
       # template may be older than the current plugin set, and a (re)deploy
-      # must not silently downgrade monitoring. Ownership is shifted to the
-      # unprivileged container's root (same pattern as the certificates).
+      # must not silently downgrade monitoring.
       def update_check_mk_plugins
         render_check_mk_guest_plugins guest.deploy_path
-
-        host.exec! "chown -R 100000:100000 #{guest.deploy_path.shellescape}/usr/lib/check_mk_agent #{guest.deploy_path.shellescape}/usr/sbin/cgroup_load_writer",
-          'Failed to chown check_mk agent plugins'
       end
 
       def config_guest_certificates
@@ -138,7 +128,6 @@ module CloudModel
             @host.sftp.file.open(crt_file, 'w') do |f|
               f.write cert.certificate.crt
             end
-            host.exec! "chown 100000:100000 #{crt_file}", "failed to set owner for #{crt_file}"
           end
 
           unless cert.path_to_key.blank?
@@ -147,7 +136,6 @@ module CloudModel
             @host.sftp.file.open(key_file, 'w') do |f|
               f.write cert.certificate.key
             end
-            host.exec! "chown 100000:100000 #{key_file}", "failed to set owner for #{key_file}"
             host.exec! "chmod 0700 #{key_file}", "failed to limit rights for #{key_file}"
           end
         end

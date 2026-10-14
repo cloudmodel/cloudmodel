@@ -42,9 +42,9 @@ module CloudModel
           mkdir_p "#{config_path.shellescape}/cache"
           mkdir_p "#{config_path.shellescape}/data"
 
-          @host.exec! "chown -R 100999:100999  #{config_path.shellescape}", "Failed to setup rights"
-
-          @host.exec!("lxc file push #{config_path.shellescape}/ #{@lxc.name}/var/ -p -r && rm -rf #{config_path.shellescape}", "Failed to upload SOLR Config to container")
+          # Pushed into the running container with the container's solr ids
+          # (lxc file push maps them), not a raw host-range chown.
+          @host.exec!("lxc file push #{config_path.shellescape}/ #{@lxc.name}/var/ -p -r --uid 999 --gid 999 && rm -rf #{config_path.shellescape}", "Failed to upload SOLR Config to container")
 
           render_to_guest "/cloud_model/guest/etc/systemd/system/solr.service", "/etc/systemd/system/solr.service", 0755, guest: @guest, model: @model
         end

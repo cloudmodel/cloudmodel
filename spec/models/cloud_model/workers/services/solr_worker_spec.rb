@@ -69,13 +69,9 @@ describe CloudModel::Workers::Services::SolrWorker do
       subject.write_config
     end
 
-    it 'should set ownership on solr config' do
-      expect(host).to receive(:exec!).with('chown -R 100999:100999  /tmp/solr', 'Failed to setup rights')
-      subject.write_config
-    end
-
-    it 'should push solr config to container' do
-      expect(host).to receive(:exec!).with("lxc file push /tmp/solr/ #{lxc.name}/var/ -p -r && rm -rf /tmp/solr", 'Failed to upload SOLR Config to container')
+    it 'should push solr config into the container owned by its solr user' do
+      expect(host).not_to receive(:exec!).with(/chown -R 100999/, anything)
+      expect(host).to receive(:exec!).with("lxc file push /tmp/solr/ #{lxc.name}/var/ -p -r --uid 999 --gid 999 && rm -rf /tmp/solr", 'Failed to upload SOLR Config to container')
       subject.write_config
     end
 

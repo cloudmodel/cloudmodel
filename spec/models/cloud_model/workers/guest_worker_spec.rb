@@ -163,23 +163,23 @@ describe CloudModel::Workers::GuestWorker do
   end
 
   describe 'mkdir_p' do
-    it 'should create the dir and chown it to the container uid range' do
+    it 'should create the dir root-owned — the offline rootfs is unshifted, no host-range chown' do
       expect(host).to receive(:exec!).with('mkdir -p /some/path', 'Failed to make directory /some/path')
-      expect(host).to receive(:exec!).with('chown -R 100000:100000 /some/path', 'failed to set owner for /some/path')
+      expect(host).not_to receive(:exec!).with(/chown/, anything)
 
       subject.mkdir_p '/some/path'
     end
   end
 
   describe 'render_to_remote' do
-    it 'should render via super and chown the remote file to the container uid range' do
+    it 'should render via super and leave the file root-owned (uid 0 is the container´s root)' do
       sftp = double 'sftp'
       sftp_file = double 'sftp_file'
       allow(host).to receive(:sftp).and_return(sftp)
       allow(sftp).to receive(:file).and_return(sftp_file)
       allow(sftp_file).to receive(:open)
       allow(subject).to receive(:render).and_return('content')
-      expect(host).to receive(:exec!).with('chown -R 100000:100000 /etc/foo', 'failed to set owner for /etc/foo')
+      expect(host).not_to receive(:exec!).with(/chown/, anything)
 
       subject.render_to_remote '/cloud_model/some/template', '/etc/foo', guest: guest
     end
@@ -320,8 +320,7 @@ describe CloudModel::Workers::GuestWorker do
 
       expect(sftp_file).to receive(:open).with('/deploy/etc/ssl/cert.crt', 'w').and_yield(file_handle)
       expect(sftp_file).to receive(:open).with('/deploy/etc/ssl/cert.key', 'w').and_yield(file_handle)
-      expect(host).to receive(:exec!).with('chown 100000:100000 /deploy/etc/ssl/cert.crt', 'failed to set owner for /deploy/etc/ssl/cert.crt')
-      expect(host).to receive(:exec!).with('chown 100000:100000 /deploy/etc/ssl/cert.key', 'failed to set owner for /deploy/etc/ssl/cert.key')
+      expect(host).not_to receive(:exec!).with(/chown/, anything)
       expect(host).to receive(:exec!).with('chmod 0700 /deploy/etc/ssl/cert.key', 'failed to limit rights for /deploy/etc/ssl/cert.key')
 
       subject.config_guest_certificates

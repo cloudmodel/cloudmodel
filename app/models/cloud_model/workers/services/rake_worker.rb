@@ -27,10 +27,7 @@ module CloudModel
             render_to_remote "/cloud_model/guest/etc/systemd/system/rake_restart.path", "#{@guest.deploy_path}/etc/systemd/system/rake-restart-#{@model.rake_task}.path", 644, service: @model
             render_to_remote "/cloud_model/guest/etc/systemd/system/rake_restart.service", "#{@guest.deploy_path}/etc/systemd/system/rake-restart-#{@model.rake_task}.service", 644, service: @model
             @host.exec "ln -sf /etc/systemd/system/rake-restart-#{@model.rake_task.shellescape}.path #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/"
-            @host.exec "chown -R 100000:100000 #{@guest.deploy_path}/etc/systemd/system/rake-restart-#{@model.rake_task.shellescape}.path #{@guest.deploy_path}/etc/systemd/system/rake-restart-#{@model.rake_task.shellescape}.service"
           end
-
-          @host.exec "chown -R 100000:100000 #{@guest.deploy_path}/etc/systemd/system/rake-#{@model.rake_task.shellescape}.service #{@guest.deploy_path.shellescape}/etc/systemd/system/multi-user.target.wants/rake-#{@model.rake_task.shellescape}.service"
         end
 
         def auto_start_timer
@@ -38,7 +35,6 @@ module CloudModel
           mkdir_p "#{@guest.deploy_path}/etc/systemd/system/timers.target.wants"
           render_to_remote "/cloud_model/guest/etc/systemd/system/rake.timer", "#{@guest.deploy_path}/etc/systemd/system/rake-#{@model.rake_task}.timer", 644, service: @model
           @host.exec "ln -sf /etc/systemd/system/rake-#{@model.rake_task.shellescape}.timer #{@guest.deploy_path.shellescape}/etc/systemd/system/timers.target.wants/"
-          @host.exec "chown -R 100000:100000 #{@guest.deploy_path}/etc/systemd/system/rake-#{@model.rake_task.shellescape}.service #{@guest.deploy_path}/etc/systemd/system/rake-#{@model.rake_task.shellescape}.timer #{@guest.deploy_path.shellescape}/etc/systemd/system/timers.target.wants/rake-#{@model.rake_task.shellescape}.timer"
         end
       end
     end

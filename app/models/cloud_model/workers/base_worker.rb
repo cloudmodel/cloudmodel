@@ -28,6 +28,25 @@ module CloudModel
         @options = options
       end
 
+      # Ownership of files written into a container rootfs OFFLINE (the
+      # template-volume clone before its first start) uses plain container
+      # ids: the clone is unshifted and LXD maps everything into the
+      # container's id range on first start. Files written as root over
+      # SFTP/chroot are therefore already right; only non-root owners need
+      # a chown. Legacy web-app definitions still name owners in the old
+      # pre-shifted host notation (100000 + id); translate that.
+      LEGACY_HOST_ID_BASE = 100_000
+
+      def container_id id
+        id = id.to_i
+        id >= LEGACY_HOST_ID_BASE ? id - LEGACY_HOST_ID_BASE : id
+      end
+
+      # chown inside an offline rootfs with container ids (see above).
+      def own_in_rootfs path, uid:, gid: uid, recursive: true
+        @host.exec! "chown #{recursive ? '-R ' : ''}#{container_id uid}:#{container_id gid} #{path}", "failed to set owner for #{path}"
+      end
+
       # @return [CloudModel::Host] the host this worker operates on
       def host
         @host

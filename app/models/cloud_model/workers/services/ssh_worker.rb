@@ -48,7 +48,7 @@ module CloudModel
           rescue Net::SFTP::StatusException => e
           end
 
-          @host.exec! "chown -R 100000:100000 #{ssh_host_key_target.shellescape}/ssh", "Failed to change owner of server keys to user root"
+          # Host keys stay root-owned (unshifted rootfs: uid 0 IS the container's root).
           # Own the www client keys by name inside the container namespace, not
           # with a raw host-side uid. The tarball-era chroot resolved the
           # container's www (1001) to host 101001, so `chown 101001` worked; a

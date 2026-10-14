@@ -294,9 +294,11 @@ module CloudModel
 
       def finalize_app_volume
         comment_sub_step "Set ownership"
-        # Container 'www' runs as uid 1001; unprivileged LXD maps that to host
-        # 101001. Owning the workspace as 101001 lets the deploy clone attach
-        # without id-shifting and Passenger read/write immediately.
+        # Container 'www' runs as uid 1001; with the usual idmap base of
+        # 100000 that is host 101001. Owning the workspace that way lets the
+        # deploy clone attach as a raw disk device with no per-deploy chown;
+        # a container with another base gets re-owned once at provision
+        # (NginxWorker#ensure_web_release_owner).
         @host.exec! "chown -R 101001:101001 #{app_build_host_path.shellescape}", "Failed to set app ownership"
 
         comment_sub_step "Snapshot artifact version"
