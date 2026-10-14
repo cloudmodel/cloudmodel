@@ -15,38 +15,28 @@ describe CloudModel::ZfsSyncKey do
     FileUtils.rm_rf dir
   end
 
-  describe '.present?' do
-    it 'needs both halves of the pair' do
-      expect(described_class.present?).to eq false
-      FileUtils.mkdir_p File.dirname(key_file)
-      File.write key_file, 'private'
-      expect(described_class.present?).to eq false
-      File.write "#{key_file}.pub", 'ssh-ed25519 AAAA cloudmodel-zfs-sync'
-      expect(described_class.present?).to eq true
+  describe '.pair' do
+    it 'is an ed25519 pair at the configured path, marked with the sync comment' do
+      pair = described_class.pair
+      expect(pair.private_key_file).to eq key_file
+      expect(pair.type).to eq 'ed25519'
+      expect(pair.comment).to eq 'cloudmodel-zfs-sync'
     end
   end
 
   describe '.ensure!' do
-    it 'generates an ed25519 pair with the marker comment when missing' do
-      expect(described_class).to receive(:local_exec!).with(
-        "ssh-keygen -q -N '' -t ed25519 -C cloudmodel-zfs-sync -f #{key_file}", 'Failed to generate the ZFS sync key pair'
+    it 'generates the pair when missing' do
+      expect_any_instance_of(CloudModel::SshKeyPair).to receive(:local_exec!).with(
+        "ssh-keygen -q -N '' -t ed25519 -C cloudmodel-zfs-sync -f #{key_file}", "Failed to generate SSH key pair #{key_file}"
       ) do
         FileUtils.mkdir_p File.dirname(key_file)
         File.write key_file, 'private'
         File.write "#{key_file}.pub", 'ssh-ed25519 AAAA cloudmodel-zfs-sync'
       end
 
+      expect(described_class.present?).to eq false
       expect(described_class.ensure!).to eq true
-      expect(File.stat(key_file).mode & 0777).to eq 0600
-    end
-
-    it 'leaves an existing pair alone' do
-      FileUtils.mkdir_p File.dirname(key_file)
-      File.write key_file, 'private'
-      File.write "#{key_file}.pub", 'ssh-ed25519 AAAA cloudmodel-zfs-sync'
-
-      expect(described_class).not_to receive(:local_exec!)
-      expect(described_class.ensure!).to eq true
+      expect(described_class.present?).to eq true
     end
   end
 

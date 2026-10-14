@@ -51,11 +51,28 @@ describe CloudModel::Workers::HostWorker do
   end
 
   describe 'set_authorized_keys' do
-    it 'should upload public key via sftp' do
-      sftp = double 'sftp'
+    let(:sftp) { double 'sftp' }
+
+    before do
       allow(host).to receive(:sftp).and_return(sftp)
+      allow(sftp).to receive(:upload!)
       allow(CloudModel.config).to receive(:data_directory).and_return('/data')
+    end
+
+    it 'should upload public key via sftp' do
+      allow_any_instance_of(CloudModel::SshKeyPair).to receive(:ensure!).and_return(true)
       expect(sftp).to receive(:upload!).with('/data/keys/id_rsa.pub', '/root/.ssh/authorized_keys')
+
+      subject.set_authorized_keys
+    end
+
+    it 'should create the controller´s rsa key pair first when it does not exist yet' do
+      expect_any_instance_of(CloudModel::SshKeyPair).to receive(:ensure!) do |pair|
+        expect(pair.private_key_file).to eq '/data/keys/id_rsa'
+        expect(pair.type).to eq 'rsa'
+        expect(pair.bits).to eq 4096
+        true
+      end
 
       subject.set_authorized_keys
     end

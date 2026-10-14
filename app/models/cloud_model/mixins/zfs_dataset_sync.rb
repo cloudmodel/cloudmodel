@@ -33,7 +33,7 @@ module CloudModel
           raise "Refusing to sync ZFS dataset with unexpected name #{name.inspect}" unless name =~ ZFS_NAME
         end
 
-        if direct_zfs_sync?(source_host, target_host)
+        if direct_zfs_sync?(source_host, target_host) or provision_zfs_sync_key!(source_host, target_host)
           sync_zfs_dataset_direct! source_host, target_host, dataset, snapshot
         else
           sync_zfs_dataset_via_controller! source_host, target_host, dataset, snapshot
@@ -44,6 +44,24 @@ module CloudModel
       # Both ends carry the sync key: the source can push straight to the target.
       def direct_zfs_sync?(source_host, target_host)
         source_host.zfs_sync_key_deployed? and target_host.zfs_sync_key_deployed?
+      end
+
+      # Pushes the sync key to whichever of the two hosts lacks it, so the
+      # first sync between them already goes direct — no separate rollout
+      # step. A host that cannot be prepared (unreachable, push failed) is
+      # logged and leaves this sync on the controller route.
+      # @return [Boolean] true if both hosts now carry the key
+      def provision_zfs_sync_key!(source_host, target_host)
+        [source_host, target_host].each do |host|
+          next if host.zfs_sync_key_deployed?
+          begin
+            CloudModel::Workers::HostWorker.new(host).deploy_zfs_sync_key
+          rescue Exception => e
+            Rails.logger.warn "ZfsDatasetSync: could not push the sync key to #{host.name}, syncing via controller: #{e.class}: #{e.message}"
+            CloudModel.log_exception e
+          end
+        end
+        direct_zfs_sync? source_host, target_host
       end
 
       private

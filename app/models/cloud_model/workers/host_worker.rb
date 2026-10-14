@@ -47,9 +47,16 @@ module CloudModel
         render_to_remote '/cloud_model/host/etc/modprobe.d/zfs', "#{root}/etc/modprobe.d/zfs.conf", host: @host
       end
 
+      # The controller's own key pair for reaching hosts as root
+      # (CloudModel.config.ssh_key_file); created when a deploy first needs it.
+      def controller_ssh_key
+        CloudModel::SshKeyPair.new CloudModel.config.ssh_key_file, type: 'rsa', bits: 4096
+      end
+
       def set_authorized_keys options={}
         #prepare_chroot root
-        @host.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "/root/.ssh/authorized_keys"
+        controller_ssh_key.ensure!
+        @host.sftp.upload! controller_ssh_key.public_key_file, "/root/.ssh/authorized_keys"
         # TODO: Add mode where no initial_root_pw is given, but external ip is used
         # @host.update_attribute :initial_root_pw, nil
       end
@@ -393,15 +400,11 @@ module CloudModel
 
         comment_sub_step 'config ssh keys'
         # Config /root/.ssh/authorized_keys
-        unless File.exist?("#{CloudModel.config.data_directory}/keys/id_rsa")
-          # Create key pair if non exists
-          local_exec "mkdir -p #{CloudModel.config.data_directory.shellescape}/keys"
-          local_exec "ssh-keygen -N '' -t rsa -b 4096 -f #{CloudModel.config.data_directory.shellescape}/keys/id_rsa"
-        end
+        controller_ssh_key.ensure!
         ssh_dir = "#{root}/root/.ssh"
         mkdir_p ssh_dir
 
-        @host.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "#{ssh_dir}/authorized_keys"
+        @host.sftp.upload! controller_ssh_key.public_key_file, "#{ssh_dir}/authorized_keys"
         # Host-to-host build volume sync (appends its restricted key line)
         deploy_zfs_sync_key root
 

@@ -198,7 +198,7 @@ namespace :cloudmodel do
       abort "#{failures} host(s) failed" if failures > 0
     end
 
-    desc "Push the host-to-host ZFS sync key to live hosts (private key, forced-command wrapper, restricted authorized_keys entry) so build volumes stream directly between hosts instead of through this machine. Generates the key pair on first use. Set HOST_ID=<id> to target a single host."
+    desc "Push the host-to-host ZFS sync key to live hosts ahead of time (private key, forced-command wrapper, restricted authorized_keys entry). Optional: the first sync between two hosts pushes it on demand; this just does it for all hosts at once. Generates the key pair on first use. Set HOST_ID=<id> to target a single host."
     task :deploy_zfs_sync_key => [:environment] do
       hosts = if ENV['HOST_ID'].present?
         [CloudModel::Host.find(ENV['HOST_ID'])]
