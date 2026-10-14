@@ -915,6 +915,7 @@ describe CloudModel::Host do
       expect(CloudModel::Host.build_host).to be_nil
     end
 
+
     it 'is nil when the configured build host is unknown' do
       allow(CloudModel.config).to receive(:build_host_name).and_return('missing')
 
@@ -953,12 +954,14 @@ describe CloudModel::Host do
       expect(CloudModel::Host.default_build_arch).to be_nil
     end
 
-    it 'applies a plain string configuration to any arch' do
-      host = Factory :host, name: 'buildhost'
+    it 'applies a plain string configuration to its own arch only' do
+      host = Factory :host, name: 'buildhost', arch: 'amd64'
       allow(CloudModel.config).to receive(:build_host_name).and_return('buildhost')
 
+      expect(CloudModel::Host.build_host).to eq host
       expect(CloudModel::Host.build_host('amd64')).to eq host
-      expect(CloudModel::Host.build_host('arm64')).to eq host
+      # cannot build arm64 natively → no build host, the caller builds on the target
+      expect(CloudModel::Host.build_host('arm64')).to be_nil
     end
   end
 

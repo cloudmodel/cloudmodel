@@ -183,6 +183,17 @@ module CloudModel
         @host.exec! "cp /etc/resolv.conf #{build_path}/etc", "Failed to copy resolve conf"
       end
 
+      # Resuming with skip_to past the clone step: keep the half-built volume
+      # of the aborted run instead of re-cloning the bare core (which would
+      # silently drop the already installed components from the result).
+      def reuse_build_volume
+        unless zfs_volume.dataset_exists? and not zfs_volume.ready?
+          raise "Cannot resume: no unfinished build volume #{zfs_volume.dataset_name} on #{@host.name} — start the build from the beginning"
+        end
+        zfs_volume.mount!
+        @host.exec! "cp /etc/resolv.conf #{build_path}/etc", "Failed to copy resolve conf"
+      end
+
       def install_components
         chroot! build_path, "apt-get update", "Failed to update package lists"
 
@@ -206,7 +217,7 @@ module CloudModel
         template.update_attributes build_state: :running
 
         steps = [
-          ["Clone core template #{template.core_template.try(:id)}", :clone_core_template, no_skip: true],
+          ["Clone core template #{template.core_template.try(:id)}", :clone_core_template, on_skip: :reuse_build_volume],
           ["Install Components", :install_components],
           ["Write LXD metadata", :write_lxd_metadata],
           # A skipped cleanup would silently commit a template with shared

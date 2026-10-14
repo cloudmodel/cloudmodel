@@ -30,8 +30,9 @@ module CloudModel
 
         # Writes the per-guest runtime config into an already-populated app tree
         # (the cloned artifact). No unpacking any more — the code is the ZFS
-        # clone; only the instance-specific config is layered on. The host app
-        # (core-admin) prepends further writes via `super deploy_path`.
+        # clone; only the instance-specific config is layered on. A host app
+        # adds its own writes by overriding this and calling `super deploy_path`
+        # (keep them under {#web_release_config_paths}).
         def unroll_web_image deploy_path
           return false unless @model.deploy_web_image
 
@@ -79,14 +80,19 @@ module CloudModel
           web_image = @model.deploy_web_image
           arch = @host.arch
 
-          web_image.ensure_web_volume! @host, arch
+          unless web_image.ensure_web_volume!(@host, arch) and web_image.build_snapshot(arch)
+            raise "No #{arch} artifact of web image #{web_image.name} on #{@host.name}: " \
+                  "#{web_image.build_last_issue.presence || 'build or sync failed — see the web image build log'}"
+          end
 
           deploy_id = make_deploy_web_image_id
           dataset = web_clone_dataset deploy_id
           mount = web_clone_mount deploy_id
 
           comment_sub_step "Clone WebImage #{web_image.name} for #{@guest.name}"
-          @host.exec! "zfs destroy -r #{dataset.shellescape}" if @host.exec("zfs list #{dataset.shellescape}").first
+          if @host.exec("zfs list #{dataset.shellescape}").first
+            @host.exec! "zfs destroy -r #{dataset.shellescape}", "Failed to remove leftover release clone #{dataset}"
+          end
           @host.exec! "zfs clone -p -o mountpoint=#{mount.shellescape} -o compression=#{CloudModel.config.zfs_compression.shellescape} #{web_image.build_snapshot(arch).shellescape} #{dataset.shellescape}",
             "Failed to clone web image #{web_image.name}"
 
@@ -94,10 +100,11 @@ module CloudModel
 
           # The clone IS the Rails root; only the instance config is layered on.
           unroll_web_image mount
-          # Own the whole clone as the container's www user (unprivileged LXD
-          # maps host 101001 → container 1001), so the raw disk device needs no
-          # id-shifting and Passenger can read/write immediately.
-          @host.exec! "chown -R 101001:101001 #{mount.shellescape}", "Failed to own web app volume"
+          # The artifact is already owned by the container's www user (host
+          # 101001 ↔ container 1001, see WebImageWorker#finalize_app_volume);
+          # only what unroll_web_image just wrote needs owning. A recursive
+          # chown over the whole tree would touch every inode of the clone.
+          own_web_release_config mount
 
           attach_web_release deploy_id, mount
           activate_web_release deploy_id, online: online
@@ -123,6 +130,21 @@ module CloudModel
             "rm -rf bundle/ruby/*/bundler/gems/*/.git; " \
             "rm -rf bundle/ruby/*/gems/*/ext/*/target bundle/ruby/*/bundler/gems/*/ext/*/target; " \
             "true"
+        end
+
+        # Paths (relative to the release root) that {#unroll_web_image} writes
+        # into; a host app that writes elsewhere in its override adds them here.
+        def web_release_config_paths
+          %w(config tmp)
+        end
+
+        # Owns the per-guest config files as the container's www user (host
+        # 101001 ↔ container 1001). Only these paths changed since the
+        # artifact was built, so only they are touched.
+        def own_web_release_config mount
+          paths = web_release_config_paths.map { |p| "#{mount}/#{p}".shellescape } * ' '
+          @host.exec! "for p in #{paths}; do if [ -e \"$p\" ]; then chown -R 101001:101001 \"$p\" || exit 1; fi; done",
+            "Failed to own web app config"
         end
 
         # Attaches the cloned release read/write at releases/<id> in the container.

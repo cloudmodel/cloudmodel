@@ -286,10 +286,16 @@ module CloudModel
     #   build host (building must target a specific platform) → nil.
     # @return [CloudModel::Host, nil] nil if not configured or unknown
     def self.build_host arch = nil
-      name = CloudModel.config.build_host_name
-      name = (arch ? (name[arch.to_s] || name[arch.to_s.to_sym]) : nil) if name.is_a? Hash
+      config = CloudModel.config.build_host_name
+      name = config.is_a?(Hash) ? (arch ? (config[arch.to_s] || config[arch.to_s.to_sym]) : nil) : config
       return nil if name.blank?
-      where(name: name).first
+      host = where(name: name).first
+      # A plain-string config names one host for everything; it can only
+      # build natively for its own arch. For any other arch there is no
+      # build host (the caller then builds on the target host itself). A
+      # per-arch hash states the mapping explicitly and is trusted.
+      return nil if host and arch and !config.is_a?(Hash) and host.arch.to_s != arch.to_s
+      host
     end
 
     # The arch an arch-agnostic caller should build for by default: the first

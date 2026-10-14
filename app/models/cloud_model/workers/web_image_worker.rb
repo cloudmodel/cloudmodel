@@ -62,7 +62,10 @@ module CloudModel
       # Builds the app artifact for one arch on this build host.
       def build_app_volume(arch, options = {})
         @arch = arch
-        @web_image.update_attributes build_state: :running, build_last_issue: nil, build_log: ''
+        # The log is cleared once per build run (WebImage#build!), not per
+        # arch — a multi-arch run keeps every arch's output, failures included.
+        @web_image.update_attributes build_state: :running, build_last_issue: nil
+        @web_image.append_to_build_log "\n$ Build for #{arch} on #{@host.name}\n"
 
         with_build_log do
           begin

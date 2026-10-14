@@ -78,6 +78,7 @@ describe CloudModel::Workers::WebImageWorker do
       allow(web_image).to receive(:update_attribute)
       allow(web_image).to receive(:record_artifact_size)
       allow(web_image).to receive(:record_artifact_version)
+      allow(web_image).to receive(:append_to_build_log)
       allow(build_env).to receive(:ensure_build_volume!)
       allow(host).to receive(:exec!)
       allow(host).to receive(:exec).and_return([true, '123456'])

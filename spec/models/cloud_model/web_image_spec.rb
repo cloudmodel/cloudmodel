@@ -264,10 +264,40 @@ describe CloudModel::WebImage do
 
     it 'should build every arch target on its arch build host' do
       allow(subject).to receive(:buildable?).and_return true
-      expect(worker).to receive(:build_app_volume).with('MOS6502', {})
+      expect(worker).to receive(:build_app_volume).with('MOS6502', {}).and_return true
 
       expect(subject.build!).to eq true
       expect(subject.build_state).to eq :pending
+    end
+
+    it 'should start every run with an empty build log (per-arch builds append)' do
+      allow(subject).to receive(:buildable?).and_return true
+      allow(worker).to receive(:build_app_volume).and_return true
+      subject.build_log = 'old output'
+
+      subject.build!
+      expect(subject.build_log).to eq ''
+    end
+
+    it 'should fail the image when any arch build fails, even if a later one succeeds' do
+      allow(subject).to receive(:buildable?).and_return true
+      allow(subject).to receive(:build_targets).and_return ['MOS6502', 'Z80']
+      z80_host = double CloudModel::Host
+      z80_worker = double CloudModel::Workers::WebImageWorker
+      allow(CloudModel::Host).to receive(:build_host).with('Z80').and_return z80_host
+      allow(subject).to receive(:worker).with(z80_host).and_return z80_worker
+      expect(worker).to receive(:build_app_volume).with('MOS6502', {}) do
+        subject.update_attributes build_state: :failed, build_last_issue: 'bundle install failed'
+        false
+      end
+      expect(z80_worker).to receive(:build_app_volume).with('Z80', {}) do
+        subject.update_attributes build_state: :finished, build_last_issue: nil
+        true
+      end
+
+      expect(subject.build!).to eq false
+      expect(subject.build_state).to eq :failed
+      expect(subject.build_last_issue).to eq 'Build failed for MOS6502: bundle install failed'
     end
 
     it 'should return false and not run worker if not buildable' do
@@ -280,7 +310,7 @@ describe CloudModel::WebImage do
 
     it 'should allow to force build if not buildable' do
       allow(subject).to receive(:buildable?).and_return false
-      expect(worker).to receive(:build_app_volume).with('MOS6502', {force: true})
+      expect(worker).to receive(:build_app_volume).with('MOS6502', {force: true}).and_return true
 
       expect(subject.build! force: true).to eq true
     end

@@ -67,16 +67,34 @@ describe CloudModel::Mixins::HasZfsBuildVolume do
 
     it 'should sync the volume over when another host has it' do
       allow(volume).to receive(:ready?).and_return(false, true)
-      expect(subject).to receive(:sync_build_volume_to).with(host).and_return(true)
+      expect(subject).to receive(:sync_build_volume_to).with(host).and_return(:synced)
       expect(subject).not_to receive(:build_on!)
 
       expect(subject.ensure_build_volume!(host)).to eq volume
     end
 
+    it 'should not rebuild when a source exists but the transfer fails — the error surfaces instead' do
+      allow(volume).to receive(:ready?).and_return(false)
+      allow(subject).to receive(:sync_build_volume_to).with(host).and_raise('Failed to sync build volume: broken pipe')
+      expect(subject).not_to receive(:build_on!)
+
+      expect { subject.ensure_build_volume! host }.to raise_error(/broken pipe/)
+    end
+
+    it 'should build on the target host itself when syncing is disabled' do
+      build_host = Factory :host, name: 'build-host'
+      allow(CloudModel::Host).to receive(:build_host).and_return(build_host)
+      allow(volume).to receive(:ready?).and_return(false, true)
+      allow(subject).to receive(:sync_build_volume_to).and_return(:skipped)
+      expect(subject).to receive(:build_on!).with(host)
+
+      subject.ensure_build_volume! host
+    end
+
     it 'should claim and build on the target host when no build host is configured' do
       allow(CloudModel::Host).to receive(:build_host).and_return(nil)
       allow(volume).to receive(:ready?).and_return(false, true)
-      allow(subject).to receive(:sync_build_volume_to).and_return(false)
+      allow(subject).to receive(:sync_build_volume_to).and_return(:no_source)
       expect(subject).to receive(:build_on!).with(host)
 
       subject.ensure_build_volume! host
@@ -87,7 +105,7 @@ describe CloudModel::Mixins::HasZfsBuildVolume do
       build_host = Factory :host, name: 'build-host'
       allow(CloudModel::Host).to receive(:build_host).and_return(build_host)
       allow(volume).to receive(:ready?).and_return(false, true)
-      allow(subject).to receive(:sync_build_volume_to).and_return(false)
+      allow(subject).to receive(:sync_build_volume_to).and_return(:no_source)
       expect(subject).to receive(:build_on!).with(build_host)
 
       subject.ensure_build_volume! host
@@ -107,7 +125,7 @@ describe CloudModel::Mixins::HasZfsBuildVolume do
     it 'should raise when a concurrent build does not finish in time' do
       subject.update_attributes build_state: :running
       allow(volume).to receive(:ready?).and_return(false)
-      allow(subject).to receive(:sync_build_volume_to).and_return(false)
+      allow(subject).to receive(:sync_build_volume_to).and_return(:no_source)
       allow(Time).to receive(:now).and_return(Time.new(2026, 7, 9, 12, 0), Time.new(2026, 7, 9, 15, 0))
 
       expect { subject.ensure_build_volume! host }.to raise_error(/Timeout waiting for concurrent build/)
@@ -122,18 +140,21 @@ describe CloudModel::Mixins::HasZfsBuildVolume do
       allow(CloudModel.config).to receive(:data_directory).and_return('/data')
       allow(source_host).to receive(:ssh_address).and_return('10.0.0.1')
       allow(host).to receive(:ssh_address).and_return('10.0.0.2')
+      # target has no copy of the dataset yet → full stream
+      allow(host).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([false, ''])
+      allow(subject).to receive(:provision_zfs_sync_key!).and_return(false)
     end
 
-    it 'should skip when skip_sync_images is configured' do
+    it 'should report when skip_sync_images is configured' do
       allow(CloudModel.config).to receive(:skip_sync_images).and_return(true)
 
-      expect(subject.sync_build_volume_to(host)).to eq false
+      expect(subject.sync_build_volume_to(host)).to eq :skipped
     end
 
-    it 'should return false when no host has the volume' do
+    it 'should report when no host has the volume' do
       allow(subject).to receive(:build_volume_source_host).and_return(nil)
 
-      expect(subject.sync_build_volume_to(host)).to eq false
+      expect(subject.sync_build_volume_to(host)).to eq :no_source
     end
 
     it 'should pipe compressed zfs send through the admin machine to the target host' do
@@ -148,15 +169,14 @@ describe CloudModel::Mixins::HasZfsBuildVolume do
         /Failed to sync build volume/
       )
 
-      expect(subject.sync_build_volume_to(host)).to eq true
+      expect(subject.sync_build_volume_to(host)).to eq :synced
     end
 
-    it 'should log and return false when the sync fails' do
+    it 'should raise when the sync itself fails (a rebuild would not help)' do
       allow(subject).to receive(:build_volume_source_host).and_return(source_host)
       allow(subject).to receive(:local_exec!).and_raise('broken pipe')
-      expect(CloudModel).to receive(:log_exception)
 
-      expect(subject.sync_build_volume_to(host)).to eq false
+      expect { subject.sync_build_volume_to(host) }.to raise_error('broken pipe')
     end
   end
 

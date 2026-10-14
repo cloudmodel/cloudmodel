@@ -436,11 +436,53 @@ describe CloudModel::Workers::GuestTemplateWorker do
       end
     end
 
+    describe 'reuse_build_volume (resuming with skip_to past the clone)' do
+      before do
+        allow(subject).to receive(:zfs_volume).and_return(zfs_volume)
+        allow(zfs_volume).to receive(:dataset_name).and_return('guests/build/type1/tmpl1')
+        allow(host).to receive(:name).and_return('host23')
+      end
+
+      it 'should keep the half-built volume instead of re-cloning the bare core' do
+        allow(zfs_volume).to receive(:dataset_exists?).and_return(true)
+        allow(zfs_volume).to receive(:ready?).and_return(false)
+        expect(zfs_volume).not_to receive(:prepare_from!)
+        expect(zfs_volume).to receive(:mount!)
+        expect(host).to receive(:exec!).with("cp /etc/resolv.conf #{subject.build_path}/etc", "Failed to copy resolve conf")
+
+        subject.reuse_build_volume
+      end
+
+      it 'should refuse to resume without an unfinished build volume' do
+        allow(zfs_volume).to receive(:dataset_exists?).and_return(false)
+        expect(zfs_volume).not_to receive(:mount!)
+
+        expect { subject.reuse_build_volume }.to raise_error(/Cannot resume: no unfinished build volume/)
+      end
+
+      it 'should refuse to resume onto an already committed volume' do
+        allow(zfs_volume).to receive(:dataset_exists?).and_return(true)
+        allow(zfs_volume).to receive(:ready?).and_return(true)
+
+        expect { subject.reuse_build_volume }.to raise_error(/Cannot resume/)
+      end
+    end
+
     describe 'build_template' do
       before do
         allow(subject).to receive(:zfs_volume).and_return(zfs_volume)
         allow(template).to receive(:update_attributes)
         allow(subject).to receive(:run_steps)
+      end
+
+      it 'should reuse the build volume instead of re-cloning when skipping past the clone step' do
+        expect(subject).to receive(:run_steps) do |_name, steps, _options|
+          clone_step = steps.detect { |s| s[1] == :clone_core_template }
+          expect(clone_step[2]).to eq(on_skip: :reuse_build_volume)
+        end
+        allow(template).to receive(:build_state).and_return(:pending)
+
+        subject.build_template template
       end
 
       it 'should return false if template is not pending and force is not set' do

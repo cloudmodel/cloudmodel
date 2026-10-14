@@ -139,22 +139,6 @@ module CloudModel
         status
       end
 
-      private
-
-      def monitoring_http_get url, timeout: 5
-        uri = URI(url)
-        Net::HTTP.start(uri.host, uri.port,
-          open_timeout: timeout, read_timeout: timeout) do |http|
-          http.request Net::HTTP::Get.new(uri.request_uri)
-        end
-      end
-
-      def monitoring_tcp_open? host, port, timeout: 3
-        Socket.tcp(host, port, connect_timeout: timeout) { true }
-      rescue Exception
-        false
-      end
-
     end
   end
 end

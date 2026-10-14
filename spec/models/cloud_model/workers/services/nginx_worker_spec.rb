@@ -132,6 +132,59 @@ describe CloudModel::Workers::Services::NginxWorker do
     end
   end
 
+  describe '.provision_web_volume' do
+    let(:web_image) {double 'WebImage', name: 'test-image', build_last_issue: 'bundle install failed'}
+
+    before do
+      allow(model).to receive(:deploy_web_image).and_return(web_image)
+      allow(host).to receive(:arch).and_return('amd64')
+      allow(host).to receive(:name).and_return('host23')
+      allow(guest).to receive(:name).and_return('test-guest')
+    end
+
+    it 'should fail with the build issue instead of cloning a missing artifact' do
+      allow(web_image).to receive(:ensure_web_volume!).with(host, 'amd64').and_return(false)
+      expect(host).not_to receive(:exec!).with(/zfs clone/, anything)
+
+      expect { subject.provision_web_volume online: true }.to raise_error(/No amd64 artifact of web image test-image on host23: bundle install failed/)
+    end
+
+    it 'should fail when the image claims success but has no snapshot for the arch' do
+      allow(web_image).to receive(:ensure_web_volume!).and_return(true)
+      allow(web_image).to receive(:build_snapshot).with('amd64').and_return(nil)
+
+      expect { subject.provision_web_volume online: true }.to raise_error(/No amd64 artifact/)
+    end
+
+    it 'should remove a leftover release clone with a proper error message' do
+      allow(web_image).to receive(:ensure_web_volume!).and_return(true)
+      allow(web_image).to receive(:build_snapshot).with('amd64').and_return('guests/build/web/img1/amd64@v1')
+      allow(subject).to receive(:make_deploy_web_image_id).and_return('20260101000000')
+      allow(host).to receive(:exec).with('zfs list guests/web/test-guest-20260101000000').and_return([true, 'exists'])
+      allow(host).to receive(:exec!)
+      allow(subject).to receive(:strip_web_release)
+      allow(subject).to receive(:unroll_web_image)
+      allow(subject).to receive(:own_web_release_config)
+      allow(subject).to receive(:attach_web_release)
+      allow(subject).to receive(:activate_web_release)
+      allow(subject).to receive(:cleanup_old_web_releases)
+
+      expect(host).to receive(:exec!).with('zfs destroy -r guests/web/test-guest-20260101000000', 'Failed to remove leftover release clone guests/web/test-guest-20260101000000')
+
+      subject.provision_web_volume online: true
+    end
+  end
+
+  describe '.own_web_release_config' do
+    it 'should own only the config paths written per guest, not the whole clone' do
+      expect(host).to receive(:exec!).with(
+        'for p in /cloud/web/g-1/config /cloud/web/g-1/tmp; do if [ -e "$p" ]; then chown -R 101001:101001 "$p" || exit 1; fi; done',
+        'Failed to own web app config'
+      )
+      subject.own_web_release_config '/cloud/web/g-1'
+    end
+  end
+
   describe '.deploy_web_image' do
     let(:web_image) {double 'WebImage', name: 'test-image'}
 

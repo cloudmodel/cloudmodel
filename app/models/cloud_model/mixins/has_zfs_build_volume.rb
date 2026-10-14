@@ -75,13 +75,22 @@ module CloudModel
           # it. While another process builds, just wait (the host scan in
           # sync_build_volume_to costs SSH round trips per host).
           if build_claimable?
-            if sync_build_volume_to host
+            case sync_build_volume_to host
+            when :synced
               next
-            elsif claim_build!
-              # Build on the build host configured for the template's arch;
-              # the next loop pass syncs the result over. Without one, build
-              # directly on the target (which by definition has the arch).
-              build_on! CloudModel::Host.build_host(arch) || host
+            when :no_source
+              if claim_build!
+                # Build on the build host configured for the template's arch;
+                # the next loop pass syncs the result over. Without one, build
+                # directly on the target (which by definition has the arch).
+                build_on! CloudModel::Host.build_host(arch) || host
+                next
+              end
+            when :skipped
+              # Syncing is switched off: a volume can only come from a build
+              # on the target host itself (a build elsewhere could never get
+              # here, and would be repeated on every pass).
+              build_on! host if claim_build!
               next
             end
           end
@@ -98,19 +107,19 @@ module CloudModel
       end
 
       # Copies the ready volume from a host that has it to `target_host` via
-      # `zfs send | zfs receive`, piped through the admin machine (hosts don't
-      # SSH to each other — same route the tarball scp sync took).
-      # @return [Boolean] true if a source was found and the sync succeeded
+      # `zfs send | zfs receive` (see Mixins::ZfsDatasetSync for the route).
+      # @return [Symbol] :synced, :no_source (no host has the volume) or
+      #   :skipped (sync disabled by skip_sync_images)
+      # @raise [RuntimeError] when a source exists but the transfer fails —
+      #   that is not a reason to rebuild, so it is not swallowed
       def sync_build_volume_to target_host
-        return false if CloudModel.config.skip_sync_images
+        return :skipped if CloudModel.config.skip_sync_images
 
         source_host = build_volume_source_host exclude: target_host
-        return false unless source_host
+        return :no_source unless source_host
 
         sync_zfs_dataset! source_host, target_host, build_dataset
-      rescue Exception => e
-        CloudModel.log_exception e
-        false
+        :synced
       end
 
       # Finds a host that has this template's volume ready — the recorded

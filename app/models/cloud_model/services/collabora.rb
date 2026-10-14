@@ -61,18 +61,6 @@ module CloudModel
         status
       end
 
-      private
-
-      # Minimal HTTP GET for monitoring, with short timeouts so a hung service
-      # never stalls the monitoring run.
-      def monitoring_http_get url, timeout: 5
-        uri = URI(url)
-        Net::HTTP.start(uri.host, uri.port,
-          open_timeout: timeout, read_timeout: timeout) do |http|
-          http.request Net::HTTP::Get.new(uri.request_uri)
-        end
-      end
-
     end
   end
 end

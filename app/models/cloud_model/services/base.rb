@@ -216,6 +216,23 @@ module CloudModel
 
       private
 
+      # Short-timeout HTTP GET for monitoring probes of a service endpoint.
+      # @return [Net::HTTPResponse]
+      def monitoring_http_get url, timeout: 5
+        uri = URI(url)
+        Net::HTTP.start(uri.host, uri.port,
+          open_timeout: timeout, read_timeout: timeout) do |http|
+          http.request Net::HTTP::Get.new(uri.request_uri)
+        end
+      end
+
+      # True if a TCP connect to host:port succeeds within the timeout.
+      def monitoring_tcp_open? host, port, timeout: 3
+        Socket.tcp(host, port, connect_timeout: timeout) { true }
+      rescue Exception
+        false
+      end
+
       # Validation: forbid marking a non-exposable service as a public service.
       def public_service_must_be_allowed
         if public_service && !allow_public_service?

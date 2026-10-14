@@ -318,15 +318,20 @@ module CloudModel
       return true if web_volume_ready?(host, arch)
       return true if sync_web_volume_to(host, arch) && web_volume_ready?(host, arch)
 
+      # Nothing has the current version yet: build it (on the arch's build
+      # host, or here) and bring it over.
       build_host = CloudModel::Host.build_host(arch) || host
-      worker(build_host).build_app_volume arch, options
+      return false unless worker(build_host).build_app_volume(arch, options)
       sync_web_volume_to host, arch unless web_volume_ready?(host, arch)
       web_volume_ready?(host, arch)
     end
 
     # Copies the current artifact version's snapshot from a host that already
     # has it to `target_host` (via {ZfsDatasetSync#sync_zfs_dataset!}).
-    # @return [Boolean] true if a source was found and the sync succeeded
+    # @return [Boolean] true if a source was found and the sync succeeded;
+    #   false when sync is disabled or no host has the version yet
+    # @raise [RuntimeError] when a source exists but the transfer fails — a
+    #   rebuild would not help, so the error is not swallowed
     def sync_web_volume_to(target_host, arch)
       return false if CloudModel.config.skip_sync_images
       snap = build_snapshot(arch)
@@ -344,9 +349,6 @@ module CloudModel
       return false unless source_host
 
       sync_zfs_dataset! source_host, target_host, build_dataset(arch), snapshot: snap
-    rescue Exception => e
-      CloudModel.log_exception e
-      false
     end
 
     def self.build_state_id_for build_state
@@ -398,13 +400,26 @@ module CloudModel
         return false
       end
 
+      # One build log for the whole run: the per-arch builds append to it.
+      update_attribute :build_log, ''
+
+      failed = []
       targets.each do |arch|
         host = CloudModel::Host.build_host(arch)
         unless host
           update_attributes build_state: :failed, build_last_issue: "No build host configured for arch '#{arch}'."
           return false
         end
-        worker(host).build_app_volume arch, options
+        unless worker(host).build_app_volume(arch, options)
+          failed << "#{arch}: #{build_last_issue}"
+        end
+      end
+
+      if failed.any?
+        # A later arch's success must not paper over an earlier failure: the
+        # image is only usable when every target arch has a fresh artifact.
+        update_attributes build_state: :failed, build_last_issue: "Build failed for #{failed * '; '}"
+        return false
       end
 
       true

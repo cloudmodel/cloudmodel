@@ -24,6 +24,10 @@ the hosts, so read the migration notes before updating a running cloud.
   `zfs receive`, `zfs create -p` and `zfs list` inside the build dataset tree.
   Hosts that cannot be prepared keep the old route through the controller.
   `rake cloudmodel:host:deploy_zfs_sync_key` rolls the key out ahead of time.
+  A dataset the target already holds (an earlier web-image artifact with
+  release clones on it) receives new versions incrementally from its newest
+  snapshot; a transfer failure surfaces as such instead of triggering a
+  rebuild.
 - **Controller keys are created on demand.** The controller's host key and the
   sync key pair are generated when first needed (`SshKeyPair`).
 - **`www`'s SSH directory is owned by name** inside the container; the raw

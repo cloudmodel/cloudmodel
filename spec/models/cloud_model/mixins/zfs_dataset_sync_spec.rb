@@ -12,6 +12,54 @@ describe CloudModel::Mixins::ZfsDatasetSync do
     allow(target).to receive(:ssh_address).and_return('10.42.0.2')
     allow(CloudModel.config).to receive(:ssh_key_file).and_return('/data/keys/id_rsa')
     allow(syncer).to receive(:local_exec!)
+    # default: the target has no copy of the dataset yet → full stream
+    allow(target).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([false, "dataset does not exist\n"])
+    allow(source).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([true, "guests/build/type1/tmpl1@ready\n"])
+  end
+
+  describe '#zfs_send_args (full vs incremental)' do
+    before do
+      source.zfs_sync_key_deployed_at = Time.now
+      target.zfs_sync_key_deployed_at = Time.now
+    end
+
+    it 'sends incrementally from the target´s newest snapshot when the source still has it' do
+      allow(target).to receive(:exec).with('zfs list -H -o name -t snapshot -d 1 -s creation guests/build/web/img1/amd64')
+        .and_return([true, "guests/build/web/img1/amd64@v1\nguests/build/web/img1/amd64@v2\n"])
+      allow(source).to receive(:exec).with('zfs list -H -o name -t snapshot -d 1 -s creation guests/build/web/img1/amd64')
+        .and_return([true, "guests/build/web/img1/amd64@v1\nguests/build/web/img1/amd64@v2\nguests/build/web/img1/amd64@v3\n"])
+
+      expect(target).not_to receive(:exec!)
+      expect(syncer).to receive(:local_exec!).with(/zfs list guests\/build\/web\/img1/, anything).ordered
+      expect(syncer).to receive(:local_exec!).with(/'zfs send -p -i guests\/build\/web\/img1\/amd64@v2 guests\/build\/web\/img1\/amd64@v3 \| ssh .* "zfs receive -u -F guests\/build\/web\/img1\/amd64"'/, anything).ordered
+
+      syncer.sync_zfs_dataset! source, target, 'guests/build/web/img1/amd64', snapshot: 'guests/build/web/img1/amd64@v3'
+    end
+
+    it 'replaces a leftover dataset without a common snapshot before sending a full stream' do
+      allow(target).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([true, "guests/build/type1/tmpl1@partial\n"])
+
+      expect(target).to receive(:exec!).with('zfs destroy -r guests/build/type1/tmpl1', /cannot be replaced/).ordered
+      expect(syncer).to receive(:local_exec!).with(/zfs list guests\/build\/type1 /, anything).ordered
+      expect(syncer).to receive(:local_exec!).with(/'zfs send -p guests\/build\/type1\/tmpl1@ready \| ssh /, anything).ordered
+
+      syncer.sync_zfs_dataset! source, target, 'guests/build/type1/tmpl1'
+    end
+
+    it 'treats an existing dataset without snapshots as a leftover too' do
+      allow(target).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([true, ""])
+      expect(target).to receive(:exec!).with('zfs destroy -r guests/build/type1/tmpl1', anything)
+
+      syncer.sync_zfs_dataset! source, target, 'guests/build/type1/tmpl1'
+    end
+
+    it 'fails loudly when the leftover cannot be destroyed (clones depend on it)' do
+      allow(target).to receive(:exec).with(/zfs list -H -o name -t snapshot/).and_return([true, "guests/build/type1/tmpl1@partial\n"])
+      allow(target).to receive(:exec!).and_raise('guests/build/type1/tmpl1 exists on deployhost without a snapshot in common with buildhost and cannot be replaced (clones depend on it?): has dependent clones')
+      expect(syncer).not_to receive(:local_exec!)
+
+      expect { syncer.sync_zfs_dataset! source, target, 'guests/build/type1/tmpl1' }.to raise_error(/cannot be replaced/)
+    end
   end
 
   describe '#direct_zfs_sync?' do
