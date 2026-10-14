@@ -111,6 +111,13 @@ module CloudModel
           ensure_web_release_owner mount
           own_web_release_config mount
 
+          # Attaching a device to a stopped container makes LXD rewrite its
+          # backup.yaml, for which it (re)mounts and unmounts the container
+          # volume; chroot submounts (proc, sys, dev) left from earlier
+          # config steps make that unmount fail with "device busy". Drop
+          # them first — the next chroot command re-prepares what it needs.
+          cleanup_chroot @guest.deploy_path unless online
+
           attach_web_release deploy_id, mount
           activate_web_release deploy_id, online: online
           cleanup_old_web_releases deploy_id, online: online

@@ -180,6 +180,29 @@ describe CloudModel::Workers::Services::NginxWorker do
 
       subject.provision_web_volume online: true
     end
+
+    it 'should drop chroot submounts before attaching to a stopped container (LXD remounts the volume)' do
+      allow(web_image).to receive(:ensure_web_volume!).and_return(true)
+      allow(web_image).to receive(:build_snapshot).with('amd64').and_return('guests/build/web/img1/amd64@v1')
+      allow(host).to receive(:exec).and_return([false, ''])
+      allow(host).to receive(:exec!)
+      %i(strip_web_release unroll_web_image ensure_web_release_owner own_web_release_config activate_web_release cleanup_old_web_releases).each { |m| allow(subject).to receive(m) }
+      expect(subject).to receive(:cleanup_chroot).with('/path/to/install').ordered
+      expect(subject).to receive(:attach_web_release).ordered
+
+      subject.provision_web_volume online: false
+    end
+
+    it 'should not touch chroot mounts on a live rollout' do
+      allow(web_image).to receive(:ensure_web_volume!).and_return(true)
+      allow(web_image).to receive(:build_snapshot).with('amd64').and_return('guests/build/web/img1/amd64@v1')
+      allow(host).to receive(:exec).and_return([false, ''])
+      allow(host).to receive(:exec!)
+      %i(strip_web_release unroll_web_image ensure_web_release_owner own_web_release_config attach_web_release activate_web_release cleanup_old_web_releases).each { |m| allow(subject).to receive(m) }
+      expect(subject).not_to receive(:cleanup_chroot)
+
+      subject.provision_web_volume online: true
+    end
   end
 
   describe '.own_web_release_config' do
