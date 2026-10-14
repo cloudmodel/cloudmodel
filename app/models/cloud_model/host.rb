@@ -457,9 +457,11 @@ module CloudModel
       success = exit_status == 0
       Rails.logger.debug [success, stdout_data, stderr_data, exit_status, exit_signal]
 
-      stdout = stdout_data
+      # Net::SSH hands over raw bytes; what we return ends up in live logs,
+      # error messages and Mongo documents, which need valid UTF-8.
+      stdout = stdout_data.dup.force_encoding('UTF-8').scrub('?')
       unless success
-        stdout += "\n\n" + stderr_data.values * "\n"
+        stdout += "\n\n" + stderr_data.values.map { |e| e.dup.force_encoding('UTF-8').scrub('?') } * "\n"
       end
 
       # Flush a trailing partial line of the live stream

@@ -26,6 +26,25 @@ describe CloudModel::Workers::Components::RustComponentWorker do
       allow(subject).to receive :chroot!
       allow(subject).to receive :mkdir_p
       allow(host).to receive :exec
+      allow(host).to receive :exec!
+    end
+
+    it 'should export the toolchain homes for every shell in the build root' do
+      expect(host).to receive(:exec!).with(
+        "printf '%s\\n' 'export CARGO_HOME=/usr/local/cargo' 'export RUSTUP_HOME=/usr/local/rustup' 'export PATH=/usr/local/cargo/bin:$PATH' > /tmp/build/etc/profile.d/rust.sh && chmod 644 /tmp/build/etc/profile.d/rust.sh",
+        'Failed to write the Rust environment'
+      )
+      subject.build '/tmp/build'
+    end
+
+    it 'should link the proxies and homes inside the build root, not on the host' do
+      expect(subject).to receive(:chroot!).with(
+        '/tmp/build',
+        'ln -sf /usr/local/cargo/bin/cargo /usr/local/bin/cargo && ln -sf /usr/local/cargo/bin/rustc /usr/local/bin/rustc && ln -sfn /usr/local/rustup /root/.rustup && ln -sfn /usr/local/cargo /root/.cargo',
+        'Failed to link the Rust toolchain'
+      )
+      expect(host).not_to receive(:exec).with(/ln -sf/)
+      subject.build '/tmp/build'
     end
 
     it 'should install the rust toolchain via rustup with the default toolchain' do
@@ -55,28 +74,8 @@ describe CloudModel::Workers::Components::RustComponentWorker do
       subject.build '/tmp/build'
     end
 
-    it 'should write the rust.sh profile script' do
-      expect(host).to receive(:exec).with("echo 'export PATH=/usr/local/cargo/bin:$PATH' > /tmp/build/etc/profile.d/rust.sh")
 
-      subject.build '/tmp/build'
-    end
 
-    it 'should make the rust.sh profile script readable' do
-      expect(host).to receive(:exec).with("chmod 644 /tmp/build/etc/profile.d/rust.sh")
 
-      subject.build '/tmp/build'
-    end
-
-    it 'should symlink cargo into /usr/local/bin' do
-      expect(host).to receive(:exec).with("ln -sf /usr/local/cargo/bin/cargo /usr/local/bin/cargo")
-
-      subject.build '/tmp/build'
-    end
-
-    it 'should symlink rustc into /usr/local/bin' do
-      expect(host).to receive(:exec).with("ln -sf /usr/local/cargo/bin/rustc /usr/local/bin/rustc")
-
-      subject.build '/tmp/build'
-    end
   end
 end

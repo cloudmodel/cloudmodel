@@ -174,22 +174,23 @@ module CloudModel
         @chroot_prepared ||= {}
         chroot_dir = chroot_dir.gsub(/[\/]$/, '') # Remove tailing slashes from path
 
-        if @host.mounted_at? "#{chroot_dir}/dev/pts"
-          @host.exec! "umount #{chroot_dir}/dev/pts", 'Failed to unmount dev/pts from build system'
-        end
-        if @host.mounted_at? "#{chroot_dir}/dev"
-          @host.exec! "umount #{chroot_dir}/dev", 'Failed to unmount dev from build system'
-        end
-        if @host.mounted_at? "#{chroot_dir}/sys"
-          @host.exec! "umount #{chroot_dir}/sys", 'Failed to unmount sys from build system'
-        end
-        if @host.mounted_at? "#{chroot_dir}/proc"
-          @host.exec! "umount #{chroot_dir}/proc", 'Failed to unmount proc from build system'
+        # Innermost first. A mount that is still busy (a straggling process,
+        # a submount the listing missed) is detached lazily — the kernel
+        # drops it once it is free — rather than raised: cleanup runs on the
+        # error path too, and a raise here would replace the real failure.
+        clean = true
+        %w(dev/pts dev sys proc).each do |sub|
+          mountpoint = "#{chroot_dir}/#{sub}"
+          next unless @host.mounted_at? mountpoint
+          next if @host.exec("umount #{mountpoint}").first
+          detached, out = @host.exec "umount -l #{mountpoint}"
+          clean &&= detached
+          Rails.logger.warn "cleanup_chroot: #{mountpoint} was busy, #{detached ? 'detached lazily' : "could not be unmounted: #{out}"}"
         end
 
         @chroot_prepared[chroot_dir] = false
 
-        true
+        clean
       end
 
       # Executes a shell command inside a chroot by rendering a wrapper script,

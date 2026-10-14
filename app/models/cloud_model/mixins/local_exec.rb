@@ -8,7 +8,7 @@ module CloudModel
       # @return [String] combined stdout/stderr output
       def local_exec command
         Rails.logger.debug "LOKAL EXEC: #{command}"
-        result = %x(#{command} 2>&1)
+        result = %x(#{command} 2>&1).force_encoding('UTF-8').scrub('?')
         Rails.logger.debug "    #{result}"
         result
       end

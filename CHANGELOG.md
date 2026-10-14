@@ -99,6 +99,10 @@ them.
 - Backups: per-subject state tracking and on-demand backup jobs.
 - Live console for deploys and template/image builds.
 - Polymorphic web app classes are eager-loaded so rake tasks resolve them.
+- Rust build environments export `RUSTUP_HOME`/`CARGO_HOME` for every shell
+  (the rustup proxies found no default toolchain otherwise); command output
+  is returned as valid UTF-8; a busy chroot mount is detached lazily on
+  cleanup instead of masking the real error.
 
 ## 0.4.0
 

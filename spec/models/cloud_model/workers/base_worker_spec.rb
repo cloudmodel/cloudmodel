@@ -85,11 +85,33 @@ describe CloudModel::Workers::BaseWorker do
     end
 
 
-    it 'should unmount all chroot mounts' do
+    it 'should unmount all chroot mounts, innermost first' do
       allow(host).to receive(:mounted_at?).and_return(true)
-      expect(host).to receive(:exec!).exactly(4).times
+      expect(host).to receive(:exec).with('umount /mnt/root/dev/pts').ordered.and_return([true, ''])
+      expect(host).to receive(:exec).with('umount /mnt/root/dev').ordered.and_return([true, ''])
+      expect(host).to receive(:exec).with('umount /mnt/root/sys').ordered.and_return([true, ''])
+      expect(host).to receive(:exec).with('umount /mnt/root/proc').ordered.and_return([true, ''])
 
       expect(subject.cleanup_chroot('/mnt/root')).to eq true
+    end
+
+    it 'should detach a busy mount lazily instead of raising (cleanup runs on the error path)' do
+      allow(host).to receive(:mounted_at?).and_return(true)
+      allow(host).to receive(:exec).and_return([true, ''])
+      allow(host).to receive(:exec).with('umount /mnt/root/dev').and_return([false, 'target is busy'])
+      expect(host).to receive(:exec).with('umount -l /mnt/root/dev').and_return([true, ''])
+      expect(host).not_to receive(:exec!)
+
+      expect(subject.cleanup_chroot('/mnt/root')).to eq true
+    end
+
+    it 'should report a mount that could not be detached at all, still without raising' do
+      allow(host).to receive(:mounted_at?).and_return(true)
+      allow(host).to receive(:exec).and_return([true, ''])
+      allow(host).to receive(:exec).with('umount /mnt/root/proc').and_return([false, 'busy'])
+      allow(host).to receive(:exec).with('umount -l /mnt/root/proc').and_return([false, 'still busy'])
+
+      expect(subject.cleanup_chroot('/mnt/root')).to eq false
     end
   end
 
