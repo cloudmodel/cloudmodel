@@ -61,6 +61,55 @@ describe CloudModel::Workers::HostWorker do
     end
   end
 
+  describe 'deploy_zfs_sync_key' do
+    let(:sftp) { double 'sftp' }
+
+    before do
+      allow(host).to receive(:sftp).and_return(sftp)
+      allow(sftp).to receive(:upload!)
+      allow(subject).to receive(:render_to_remote)
+      allow(subject).to receive(:mkdir_p)
+      allow(CloudModel::ZfsSyncKey).to receive(:ensure!).and_return(true)
+      allow(CloudModel::ZfsSyncKey).to receive(:private_key_file).and_return('/data/keys/zfs_sync')
+      allow(CloudModel::ZfsSyncKey).to receive(:authorized_keys_line).and_return('restrict,command="/usr/local/sbin/zfs-receive-only" ssh-ed25519 AAAA cloudmodel-zfs-sync')
+    end
+
+    it 'should make sure the key pair exists' do
+      expect(CloudModel::ZfsSyncKey).to receive(:ensure!)
+      subject.deploy_zfs_sync_key
+    end
+
+    it 'should upload the private key with tight permissions' do
+      expect(sftp).to receive(:upload!).with('/data/keys/zfs_sync', '/root/.ssh/zfs_sync')
+      expect(host).to receive(:exec!).with('chmod 600 /root/.ssh/zfs_sync', 'Failed to set mode on the ZFS sync key')
+      subject.deploy_zfs_sync_key
+    end
+
+    it 'should render the forced-command wrapper executable' do
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/host/usr/local/sbin/zfs-receive-only', '/usr/local/sbin/zfs-receive-only', 0755)
+      subject.deploy_zfs_sync_key
+    end
+
+    it 'should replace the key´s authorized_keys entry idempotently and keep other keys' do
+      expect(host).to receive(:exec!).with(
+        %r{\Atouch /root/.ssh/authorized_keys && grep -v cloudmodel-zfs-sync /root/.ssh/authorized_keys > /root/.ssh/authorized_keys.tmp; echo restrict,command.*zfs-receive-only.*cloudmodel-zfs-sync >> /root/.ssh/authorized_keys.tmp && mv /root/.ssh/authorized_keys.tmp /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys\z},
+        'Failed to authorize the ZFS sync key'
+      )
+      subject.deploy_zfs_sync_key
+    end
+
+    it 'should write into the deploy root during a host deploy' do
+      expect(sftp).to receive(:upload!).with('/data/keys/zfs_sync', "#{@root}/root/.ssh/zfs_sync")
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/host/usr/local/sbin/zfs-receive-only', "#{@root}/usr/local/sbin/zfs-receive-only", 0755)
+      subject.deploy_zfs_sync_key @root
+    end
+
+    it 'should record the push on the host' do
+      expect(host).to receive(:update_attribute).with(:zfs_sync_key_deployed_at, kind_of(Time))
+      subject.deploy_zfs_sync_key
+    end
+  end
+
   describe 'detect_arch' do
     it 'corrects the arch field when the machine reports a different one' do
       host.update_attributes arch: 'amd64'
@@ -502,6 +551,8 @@ describe CloudModel::Workers::HostWorker do
       allow(sftp).to receive(:upload!)
       allow(host).to receive(:system_disks).and_return(['sda'])
       subject.instance_variable_set(:@timestamp, Time.now)
+      # pushes the host-to-host sync key into the deploy root
+      expect(subject).to receive(:deploy_zfs_sync_key).with(@root)
 
       subject.config_deploy_root
     end

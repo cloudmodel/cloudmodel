@@ -54,6 +54,40 @@ module CloudModel
         # @host.update_attribute :initial_root_pw, nil
       end
 
+      # Installs the host-to-host ZFS sync key (see {CloudModel::ZfsSyncKey}):
+      # the private key so this host can push build volumes to its peers, the
+      # forced-command wrapper, and the restricted authorized_keys entry so it
+      # can receive them. Idempotent; `base_path` is the deploy root during a
+      # host deploy and '' for a live push to a running host.
+      def deploy_zfs_sync_key base_path = ''
+        CloudModel::ZfsSyncKey.ensure!
+
+        ssh_dir = "#{base_path}/root/.ssh"
+        mkdir_p ssh_dir
+        @host.exec! "chmod 700 #{ssh_dir.shellescape}", 'Failed to set mode on /root/.ssh'
+
+        key_path = "#{base_path}#{CloudModel::ZfsSyncKey::REMOTE_KEY_PATH}"
+        @host.sftp.upload! CloudModel::ZfsSyncKey.private_key_file, key_path
+        @host.exec! "chmod 600 #{key_path.shellescape}", 'Failed to set mode on the ZFS sync key'
+
+        wrapper_path = "#{base_path}#{CloudModel::ZfsSyncKey::WRAPPER_PATH}"
+        mkdir_p File.dirname(wrapper_path)
+        render_to_remote "/cloud_model/host#{CloudModel::ZfsSyncKey::WRAPPER_PATH}", wrapper_path, 0755
+
+        # Replace any previous entry for this key (matched by its comment),
+        # keep everything else, then append the current restricted line.
+        authorized_keys = "#{ssh_dir}/authorized_keys"
+        line = CloudModel::ZfsSyncKey.authorized_keys_line
+        @host.exec! "touch #{authorized_keys.shellescape} && " \
+          "grep -v #{CloudModel::ZfsSyncKey::COMMENT.shellescape} #{authorized_keys.shellescape} > #{authorized_keys.shellescape}.tmp; " \
+          "echo #{line.shellescape} >> #{authorized_keys.shellescape}.tmp && " \
+          "mv #{authorized_keys.shellescape}.tmp #{authorized_keys.shellescape} && " \
+          "chmod 600 #{authorized_keys.shellescape}",
+          'Failed to authorize the ZFS sync key'
+
+        @host.update_attribute :zfs_sync_key_deployed_at, Time.now
+      end
+
       # The machine's real architecture wins over whatever was set on host
       # creation — a wrong arch would select the wrong templates and build
       # hosts for everything deployed onto it.
@@ -368,6 +402,8 @@ module CloudModel
         mkdir_p ssh_dir
 
         @host.sftp.upload! "#{CloudModel.config.data_directory}/keys/id_rsa.pub", "#{ssh_dir}/authorized_keys"
+        # Host-to-host build volume sync (appends its restricted key line)
+        deploy_zfs_sync_key root
 
         render_to_remote "/cloud_model/host/etc/ssh/sshd_config", "#{root}/etc/ssh/sshd_config", host: @host
 

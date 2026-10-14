@@ -104,6 +104,10 @@ module CloudModel
     field :mac_address_prefix, type: String
     field :system_disks, type: Array, default: ['sda', 'sdb']
     field :zfs_arc_max, type: Integer # bytes; nil = auto, see #effective_zfs_arc_max
+    # When the host-to-host ZFS sync key + forced command were last pushed
+    # (see ZfsSyncKey); nil = volumes to/from this host still route through
+    # the controller.
+    field :zfs_sync_key_deployed_at, type: Time
     embeds_many :extra_zpools, class_name: "CloudModel::Zpool", inverse_of: :host
     accepts_nested_attributes_for :extra_zpools, allow_destroy: true
 
@@ -354,6 +358,12 @@ module CloudModel
 
     def sftp
       ssh_connection.sftp
+    end
+
+    # Host can take part in direct host-to-host build volume syncs (as source
+    # or target) — see ZfsSyncKey and Mixins::ZfsDatasetSync.
+    def zfs_sync_key_deployed?
+      zfs_sync_key_deployed_at.present?
     end
 
     def ssh_address

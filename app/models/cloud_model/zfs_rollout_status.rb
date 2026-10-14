@@ -106,7 +106,10 @@ module CloudModel
     end
 
     def report output: $stdout
-      output.puts "Hosts: #{hosts.map(&:name) * ', '}" if hosts.any?
+      if hosts.any?
+        labels = hosts.map { |h| "#{h.name} (#{h.zfs_sync_key_deployed? ? 'direct sync' : 'sync via controller'})" }
+        output.puts "Hosts: #{labels * ', '}"
+      end
       output.puts '(database only — PROBE=1 asks the hosts)' unless probe
       output.puts
 

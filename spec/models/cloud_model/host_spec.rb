@@ -11,6 +11,15 @@ describe CloudModel::Host do
   it { expect(subject).to have_field(:cpu_name).of_type(String) }
   it { expect(subject).to have_field(:cpu_count).of_type(Integer).with_default_value_of -1 }
   it { expect(subject).to have_field(:arch).of_type(String).with_default_value_of 'amd64' }
+  it { expect(subject).to have_field(:zfs_sync_key_deployed_at).of_type Time }
+
+  describe 'zfs_sync_key_deployed?' do
+    it 'should be false until the sync key was pushed' do
+      expect(subject.zfs_sync_key_deployed?).to eq false
+      subject.zfs_sync_key_deployed_at = Time.now
+      expect(subject.zfs_sync_key_deployed?).to eq true
+    end
+  end
   it { expect(subject).to have_field(:mac_address_prefix).of_type String }
   it { expect(subject).to have_field(:system_disks).of_type(Array).with_default_value_of ['sda', 'sdb'] }
   it { expect(subject).to embed_many(:extra_zpools).of_type CloudModel::Zpool }

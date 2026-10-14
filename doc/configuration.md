@@ -58,6 +58,7 @@ Notes:
 | Option | Default | Purpose |
 |---|---|---|
 | `ssh_key_file` | `#{data_directory}/keys/id_rsa` | SSH private key the controller uses to reach hosts as `root`. |
+| `zfs_sync_key_file` | `#{data_directory}/keys/zfs_sync` | Private key of the host-to-host ZFS sync pair (public key beside it as `.pub`). Generated on first use; `rake cloudmodel:host:deploy_zfs_sync_key` installs it on hosts (private key, forced-command wrapper `zfs-receive-only`, restricted `authorized_keys` entry). Build volumes then stream directly between two hosts that both have it; otherwise through the controller. |
 | `git_ssh_key_file` | `~/.ssh/id_rsa` | **Unencrypted** deploy key that can read the private git-source gems in a WebImage's `Gemfile`. Copied into the throwaway build chroot for `bundle install`, then destroyed with it. Point it at a dedicated read-only key (e.g. `data/keys/git_deploy`); an agent-encrypted key cannot be used. |
 
 ## OS image builds

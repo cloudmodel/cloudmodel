@@ -1,0 +1,45 @@
+#!/bin/sh
+# Forced command for the CloudModel ZFS sync key (see /root/.ssh/authorized_keys).
+#
+# Another host holding the sync key may do exactly one thing here: receive a
+# build volume into the build dataset tree, plus the `zfs create -p` / `zfs
+# list` of the parent that a receive needs. Everything else is refused. The
+# request arrives in SSH_ORIGINAL_COMMAND; it is parsed, validated and
+# re-issued with fixed flags — never evaluated as a shell string.
+set -eu
+
+cmd="${SSH_ORIGINAL_COMMAND:-}"
+build_root="<%= CloudModel.config.build_dataset %>"
+
+case "$cmd" in
+  "zfs receive -u -F "*) op=receive; ds="${cmd#zfs receive -u -F }" ;;
+  "zfs create -p "*)     op=create;  ds="${cmd#zfs create -p }" ;;
+  "zfs list "*)          op=list;    ds="${cmd#zfs list }" ;;
+  *)
+    echo "zfs-receive-only: refused: ${cmd}" >&2
+    exit 2
+    ;;
+esac
+
+# One dataset name: letters, digits, . _ - / only; nothing else.
+case "$ds" in
+  ""|*[!A-Za-z0-9._/-]*)
+    echo "zfs-receive-only: refused dataset name: ${ds}" >&2
+    exit 2
+    ;;
+esac
+
+# Only inside the build dataset tree (the root itself for `create`/`list`).
+case "$ds" in
+  "$build_root"|"$build_root"/*) ;;
+  *)
+    echo "zfs-receive-only: dataset outside ${build_root}: ${ds}" >&2
+    exit 2
+    ;;
+esac
+
+case "$op" in
+  receive) exec zfs receive -u -F "$ds" ;;
+  create)  exec zfs create -p "$ds" ;;
+  list)    exec zfs list "$ds" ;;
+esac

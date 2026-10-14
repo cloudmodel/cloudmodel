@@ -145,6 +145,7 @@ describe CloudModel::ZfsRolloutStatus do
     it 'prints the legacy guests and what to do about them' do
       described_class.new(probe: false).report output: output
 
+      expect(output.string).to include 'Hosts: host01 (sync via controller)'
       expect(output.string).to include 'host01/old-guest: IMAGE (legacy) — one full guest redeploy required'
       expect(output.string).to include 'host01/new-guest: template volume'
       expect(output.string).to include 'host01/unknown-guest: unknown'

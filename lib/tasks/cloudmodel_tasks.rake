@@ -198,6 +198,34 @@ namespace :cloudmodel do
       abort "#{failures} host(s) failed" if failures > 0
     end
 
+    desc "Push the host-to-host ZFS sync key to live hosts (private key, forced-command wrapper, restricted authorized_keys entry) so build volumes stream directly between hosts instead of through this machine. Generates the key pair on first use. Set HOST_ID=<id> to target a single host."
+    task :deploy_zfs_sync_key => [:environment] do
+      hosts = if ENV['HOST_ID'].present?
+        [CloudModel::Host.find(ENV['HOST_ID'])]
+      else
+        CloudModel::Host.all.reject { |host| [:booting, :not_started].include? host.deploy_state }
+      end
+
+      if hosts.empty?
+        abort "No hosts found in #{Rails.env} database — forgot RAILS_ENV=production?"
+      end
+
+      failures = 0
+      hosts.each do |host|
+        print "#{host.name}: "
+        begin
+          CloudModel::Workers::HostWorker.new(host).deploy_zfs_sync_key
+          puts "\e[32mOK\e[39m"
+        rescue => e
+          failures += 1
+          puts "\e[31mFAILED\e[39m (#{e.class}: #{e.message})"
+        end
+      end
+
+      puts "\nDeployed the ZFS sync key to #{hosts.size - failures}/#{hosts.size} host(s). Syncs between two hosts that both have it now go direct."
+      abort "#{failures} host(s) failed" if failures > 0
+    end
+
     desc "Make sure the guest templates used on a host exist as ZFS build volumes there (migration from tarball-built templates; builds on the configured build host and syncs via zfs send/receive). Set HOST_ID=<id> to target a single host."
     task :prepare_zfs_templates => [:environment] do
       hosts = if ENV['HOST_ID'].present?

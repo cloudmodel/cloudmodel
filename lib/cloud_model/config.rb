@@ -23,6 +23,10 @@ module CloudModel
     attr_writer :zfs_compression
     # SSH private key used to reach hosts from the controller machine
     attr_writer :ssh_key_file
+    # Key pair hosts use among themselves to stream build volumes directly
+    # (zfs send | zfs receive) instead of through the controller. Generated on
+    # first use; distributed with `rake cloudmodel:host:deploy_zfs_sync_key`.
+    attr_writer :zfs_sync_key_file
     # SSH private key that can read the private git repos referenced as
     # git-source gems in a WebImage's Gemfile. Copied into the throwaway build
     # system chroot for `bundle install`, then destroyed with it.
@@ -105,6 +109,12 @@ module CloudModel
 
     def git_ssh_key_file
       @git_ssh_key_file || File.expand_path('~/.ssh/id_rsa')
+    end
+
+    # Private key of the host-to-host ZFS sync pair (public key beside it as
+    # `.pub`). See {CloudModel::ZfsSyncKey}.
+    def zfs_sync_key_file
+      @zfs_sync_key_file || "#{data_directory}/keys/zfs_sync"
     end
 
     # ZFS compression for build volumes (templates + web-image artifacts).
