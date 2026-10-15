@@ -52,7 +52,7 @@ describe CloudModel::Workers::Components::JitsiComponentWorker do
     end
 
     it 'should install lua 5.2' do
-      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install lua5.2 -y', 'Failed to install lua 5.2')
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'apt-get install -y lua5.2', 'Failed to install lua 5.2')
 
       subject.build '/tmp/build'
     end

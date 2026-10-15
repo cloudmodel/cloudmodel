@@ -40,8 +40,8 @@ describe CloudModel::Components::JitsiComponent do
   end
 
   describe 'requirements' do
-    it 'should require nginx and Java 11' do
-      expect(subject.requirements).to eq [:nginx, :'java@11']
+    it 'should require nginx and Java 17 (what current jitsi-meet packages run on)' do
+      expect(subject.requirements).to eq [:nginx, :'java@17']
     end
   end
 end

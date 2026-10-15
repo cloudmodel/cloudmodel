@@ -105,12 +105,19 @@ describe CloudModel::Services::Redis do
   end
 
   describe 'redis_sentinel_slave?' do
-    it 'should return inverse of redis_sentinel_master?' do
+    it 'should be the non-master member of a sentinel set' do
+      allow(subject).to receive(:redis_sentinel_set).and_return(double('set'))
       allow(subject).to receive(:redis_sentinel_master?).and_return(true)
       expect(subject.redis_sentinel_slave?).to eq false
 
       allow(subject).to receive(:redis_sentinel_master?).and_return(false)
       expect(subject.redis_sentinel_slave?).to eq true
+    end
+
+    it 'should be false for a standalone redis (no sentinel set — never emit slaveof)' do
+      allow(subject).to receive(:redis_sentinel_set).and_return(nil)
+      allow(subject).to receive(:redis_sentinel_master?).and_return(false)
+      expect(subject.redis_sentinel_slave?).to eq false
     end
   end
 
