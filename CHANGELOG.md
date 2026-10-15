@@ -32,8 +32,9 @@ the hosts, so read the migration notes before updating a running cloud.
   a rebuild, and a build claim with no state change for three hours is
   treated as abandoned and taken over.
 - **Secrets stay out of the console.** `Host#exec` echoes commands into the
-  live log; commands carrying secrets pass `quiet: true`, and the Rails
-  master key is written over SFTP.
+  live log, so the Rails master key is written over SFTP instead of through
+  a shell command; `Host#exec(quiet: true)` is there for any command that
+  has to carry a secret.
 - **Controller keys are created on demand.** The controller's host key and the
   sync key pair are generated when first needed (`SshKeyPair`).
 - **File ownership uses container ids.** The template-volume clone is

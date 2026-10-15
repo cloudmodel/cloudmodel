@@ -73,7 +73,7 @@ module CloudModel
           "wget https://download.nextcloud.com/server/releases/#{nextcloud_version}.tar.bz2",
           "tar xjf #{nextcloud_version}.tar.bz2",
           "rm #{nextcloud_version}.tar.bz2",
-          'chown -R 100000:100000 /opt/web-app/nextcloud'
+          'chown -R root:root /opt/web-app/nextcloud'
         ] * ' && '
       end
 

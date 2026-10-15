@@ -105,13 +105,37 @@ describe CloudModel::Workers::BaseWorker do
       expect(subject.cleanup_chroot('/mnt/root')).to eq true
     end
 
-    it 'should report a mount that could not be detached at all, still without raising' do
+    it 'should raise when a mount cannot even be detached lazily (what follows would run over a live bind mount)' do
       allow(host).to receive(:mounted_at?).and_return(true)
       allow(host).to receive(:exec).and_return([true, ''])
       allow(host).to receive(:exec).with('umount /mnt/root/proc').and_return([false, 'busy'])
       allow(host).to receive(:exec).with('umount -l /mnt/root/proc').and_return([false, 'still busy'])
 
-      expect(subject.cleanup_chroot('/mnt/root')).to eq false
+      expect { subject.cleanup_chroot('/mnt/root') }.to raise_error(/Failed to detach \/mnt\/root\/proc/)
+    end
+  end
+
+  describe '.cleanup_chroot_quietly' do
+    it 'should log instead of raising, for rescue paths that must keep the original error' do
+      allow(subject).to receive(:cleanup_chroot).and_raise('Failed to detach /mnt/root/dev')
+      expect(Rails.logger).to receive(:warn).with(/cleanup_chroot after a failure/)
+
+      expect(subject.cleanup_chroot_quietly('/mnt/root')).to eq false
+    end
+  end
+
+  describe '.heartbeat_live_log_subject' do
+    it 'should touch the live-log subject´s updated_at so a long build keeps its claim' do
+      template = double 'template', updated_at: 1.hour.ago
+      allow(CloudModel).to receive(:current_live_log_subject).and_return(template)
+      expect(template).to receive(:set).with(updated_at: kind_of(Time))
+
+      subject.heartbeat_live_log_subject
+    end
+
+    it 'should do nothing without a subject' do
+      allow(CloudModel).to receive(:current_live_log_subject).and_return(nil)
+      expect { subject.heartbeat_live_log_subject }.not_to raise_error
     end
   end
 

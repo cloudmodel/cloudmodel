@@ -276,6 +276,18 @@ describe CloudModel::Services::Nginx do
     end
   end
 
+  describe 'passenger_env_vars validation' do
+    it 'refuses values with a dollar sign (nginx would expand it as a variable)' do
+      subject.passenger_env_vars = {'DB_PASSWORD' => 'pa$$word'}
+      subject.valid?
+      expect(subject.errors[:passenger_env_vars].first).to match(/DB_PASSWORD must not contain '\$'/)
+
+      subject.passenger_env_vars = {'DB_PASSWORD' => 'plain'}
+      subject.valid?
+      expect(subject.errors[:passenger_env_vars]).to be_empty
+    end
+  end
+
   describe '#redeployable_redeploy_web_image_states' do
     it 'should return finished, failed, and not_started' do
       expect(CloudModel::Services::Nginx.redeployable_redeploy_web_image_states).to eq [:finished, :failed, :guest_redeploy_required, :not_started]

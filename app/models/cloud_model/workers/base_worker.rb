@@ -33,18 +33,9 @@ module CloudModel
       # ids: the clone is unshifted and LXD maps everything into the
       # container's id range on first start. Files written as root over
       # SFTP/chroot are therefore already right; only non-root owners need
-      # a chown. Legacy web-app definitions still name owners in the old
-      # pre-shifted host notation (100000 + id); translate that.
-      LEGACY_HOST_ID_BASE = 100_000
-
-      def container_id id
-        id = id.to_i
-        id >= LEGACY_HOST_ID_BASE ? id - LEGACY_HOST_ID_BASE : id
-      end
-
-      # chown inside an offline rootfs with container ids (see above).
+      # a chown — with the ids the container itself knows (www = 1001).
       def own_in_rootfs path, uid:, gid: uid, recursive: true
-        @host.exec! "chown #{recursive ? '-R ' : ''}#{container_id uid}:#{container_id gid} #{path}", "failed to set owner for #{path}"
+        @host.exec! "chown #{recursive ? '-R ' : ''}#{uid.to_i}:#{gid.to_i} #{path}", "failed to set owner for #{path}"
       end
 
       # @return [CloudModel::Host] the host this worker operates on
@@ -176,21 +167,31 @@ module CloudModel
 
         # Innermost first. A mount that is still busy (a straggling process,
         # a submount the listing missed) is detached lazily — the kernel
-        # drops it once it is free — rather than raised: cleanup runs on the
-        # error path too, and a raise here would replace the real failure.
-        clean = true
+        # drops it once it is free. One that cannot even be detached must
+        # stop the caller: what follows (rm -rf of the build path, a snapshot,
+        # a container start) would otherwise run over a live bind mount of
+        # the host's /dev. Error paths use {#cleanup_chroot_quietly}.
         %w(dev/pts dev sys proc).each do |sub|
           mountpoint = "#{chroot_dir}/#{sub}"
           next unless @host.mounted_at? mountpoint
           next if @host.exec("umount #{mountpoint}").first
           detached, out = @host.exec "umount -l #{mountpoint}"
-          clean &&= detached
-          Rails.logger.warn "cleanup_chroot: #{mountpoint} was busy, #{detached ? 'detached lazily' : "could not be unmounted: #{out}"}"
+          raise "Failed to detach #{mountpoint} from the build system: #{out}" unless detached
+          Rails.logger.warn "cleanup_chroot: #{mountpoint} was busy, detached lazily"
         end
 
         @chroot_prepared[chroot_dir] = false
 
-        clean
+        true
+      end
+
+      # For rescue paths: never replace the error being handled with a
+      # cleanup error — log it and carry on.
+      def cleanup_chroot_quietly chroot_dir
+        cleanup_chroot chroot_dir
+      rescue => e
+        Rails.logger.warn "cleanup_chroot after a failure: #{e.message}"
+        false
       end
 
       # Executes a shell command inside a chroot by rendering a wrapper script,
@@ -401,6 +402,17 @@ module CloudModel
         print "#{' ' * (current_indent + comment_indent)}* #{message} "
       end
 
+      # A long build (hours on an emulated dev host) must not look abandoned:
+      # the stale-claim takeover in HasZfsBuildVolume keys on updated_at, and
+      # live-log writes use atomic $set that leave it alone. Touch it per step.
+      def heartbeat_live_log_subject
+        subject = CloudModel.current_live_log_subject
+        return unless subject.respond_to?(:set) and subject.respond_to?(:updated_at)
+        subject.set updated_at: Time.now
+      rescue => e
+        Rails.logger.debug "heartbeat: #{e.message}"
+      end
+
       def run_steps stage, steps, options={}
         set_indent options[:indent]
 
@@ -428,6 +440,7 @@ module CloudModel
           # top level — nested counters read "3.1" instead.
           CloudModel.current_live_log_subject&.set_live_log_step step[0],
             counter: "#{counter_prefix}#{counter}", total: (counter_prefix.blank? ? steps.size : nil)
+          heartbeat_live_log_subject
 
           if skip_to > counter and not (step[2] and step[2][:no_skip])
             if step[2] and step[2][:on_skip]

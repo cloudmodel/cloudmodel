@@ -341,7 +341,7 @@ module CloudModel
       end
 
       def cleanup_build_env
-        cleanup_chroot buildsys_volume.rootfs_path if @buildsys_volume
+        cleanup_chroot_quietly buildsys_volume.rootfs_path if @buildsys_volume
         # Keep the workspace (persistent, incremental) — only tear down this
         # build's throwaway build system.
         @app_volume&.unmount!

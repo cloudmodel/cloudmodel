@@ -114,7 +114,7 @@ module CloudModel
           "tar xzf roundcubemail-#{rcm_version}-complete.tar.gz",
           "rm roundcubemail-#{rcm_version}-complete.tar.gz",
           "mv roundcubemail-#{rcm_version} roundcubemail",
-          'chown -R 100000:100000 /opt/web-app/roundcubemail'
+          'chown -R root:root /opt/web-app/roundcubemail'
         ] * ' && '
       end
 

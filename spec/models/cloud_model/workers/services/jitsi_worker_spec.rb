@@ -41,12 +41,19 @@ describe CloudModel::Workers::Services::JitsiWorker do
   describe 'set_interface_value' do
     before { allow(guest).to receive(:deploy_path).and_return('/var/lib/lxc/test/rootfs') }
 
-    it 'escapes what sed and the JS string would otherwise interpret' do
-      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs',
-        "sed -i \"s|^\\s*PROVIDER_NAME:.*|    PROVIDER_NAME: 'Meet \\& Greet \\| Co \\\\ Ltd\\\\'s',|\" /usr/share/jitsi-meet/interface_config.js",
-        'Failed to set jitsi interface value PROVIDER_NAME')
+    # What bash makes of a double-quoted word (\\ \" \$ \` are the escapes it honours)
+    def bash_dq(str) = str.gsub(/\\([\\"$`])/) { $1 }
+    # What GNU sed puts into the output for a replacement text (\\, \&, \| → literal)
+    def sed_replacement(str) = str.gsub(/\\([\\&|])/) { $1 }
 
-      subject.send :set_interface_value, 'PROVIDER_NAME', "Meet & Greet | Co \\ Ltd's"
+    it 'escapes for the JS string, the sed replacement and the shell layer the program passes through' do
+      command = nil
+      expect(subject).to receive(:chroot!) { |_dir, cmd, _msg| command = cmd }
+      subject.send :set_interface_value, 'PROVIDER_NAME', "Meet & Greet | Co \\ Ltd's $HOME"
+
+      program = command[/sed -i "(.*)" \/usr\/share\/jitsi-meet\/interface_config.js\z/, 1]
+      replacement = bash_dq(program)[%r{\|    PROVIDER_NAME: '(.*)',\|\z}, 1]
+      expect(sed_replacement(replacement)).to eq "Meet & Greet | Co \\ Ltd\\'s $HOME"
     end
 
     it 'keeps a multi-line value on one line' do

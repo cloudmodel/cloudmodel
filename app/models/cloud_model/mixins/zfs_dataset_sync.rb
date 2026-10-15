@@ -108,13 +108,16 @@ module CloudModel
         end
       end
 
-      # Destroys moved-aside `<dataset>-stale-*` datasets on `host` whose
-      # clones are all gone; the ones still in use are left for next time.
+      # Destroys every moved-aside `*-stale-<ts>` dataset next to `dataset`
+      # on `host` whose clones are all gone (a destroy with dependents just
+      # fails and leaves it for next time). Sweeping the whole parent means a
+      # leftover is reclaimed by any later sync into that tree, not only by
+      # one of the same dataset.
       def destroy_stale_zfs_datasets(host, dataset)
         success, list = host.exec "zfs list -H -o name -d 1 -t filesystem #{File.dirname dataset}"
         return unless success
         list.to_s.split("\n").map(&:strip).each do |stale|
-          next unless stale.start_with? "#{dataset}-stale-"
+          next unless stale =~ /-stale-\d+\z/
           host.exec "zfs destroy -r #{stale}"
         end
       end

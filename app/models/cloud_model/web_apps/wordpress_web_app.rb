@@ -124,14 +124,14 @@ module CloudModel
           'wget https://wordpress.org/latest.tar.gz',
           'tar xzf latest.tar.gz',
           'rm latest.tar.gz',
-          'chown -R 100000:100000 /opt/web-app/wordpress'
+          'chown -R root:root /opt/web-app/wordpress'
         ] * ' && '
       end
 
       def config_files_to_render
         {
           'cloud_model/web_apps/wordpress_web_app/wp-config.php' => ["#{self.class.app_folder}/wp-config.php", 0644],
-          'cloud_model/web_apps/wordpress_web_app/htpasswd' => ["/etc/nginx/.htpasswd-#{id}-wordpress",0640, gid: '101001'],
+          'cloud_model/web_apps/wordpress_web_app/htpasswd' => ["/etc/nginx/.htpasswd-#{id}-wordpress",0640, gid: 1001], # gid 1001 = www, as the container sees it
           'cloud_model/web_apps/wordpress_web_app/init_mysql.sql' => ["/root/init_wordpress_user.sql", 0600] # TODO: Find better way to init mysql
         }
       end

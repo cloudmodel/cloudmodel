@@ -211,7 +211,7 @@ module CloudModel
         begin
           run_steps :deploy, steps, options
         rescue Exception => e
-          cleanup_chroot guest.deploy_path
+          cleanup_chroot_quietly guest.deploy_path
           @lxc.unmount unless @lxc.blank?
           raise e
         end

@@ -63,9 +63,11 @@ describe CloudModel::Mixins::ZfsDatasetSync do
 
     it 'cleans up moved-aside datasets nothing depends on any more after a sync' do
       allow(target).to receive(:exec).with('zfs list -H -o name -d 1 -t filesystem guests/build/type1')
-        .and_return([true, "guests/build/type1\nguests/build/type1/tmpl1\nguests/build/type1/tmpl1-stale-20260101000000\nguests/build/type1/other\n"])
+        .and_return([true, "guests/build/type1\nguests/build/type1/tmpl1\nguests/build/type1/tmpl1-stale-20260101000000\nguests/build/type1/other\nguests/build/type1/other-stale-20250101000000\n"])
       expect(target).to receive(:exec).with('zfs destroy -r guests/build/type1/tmpl1-stale-20260101000000').and_return([false, 'has dependent clones'])
-      expect(target).not_to receive(:exec).with(/zfs destroy -r guests\/build\/type1\/other/)
+      # a leftover of a sibling dataset is reclaimed by this sync as well
+      expect(target).to receive(:exec).with('zfs destroy -r guests/build/type1/other-stale-20250101000000').and_return([true, ''])
+      expect(target).not_to receive(:exec).with('zfs destroy -r guests/build/type1/other')
 
       syncer.sync_zfs_dataset! source, target, 'guests/build/type1/tmpl1'
     end

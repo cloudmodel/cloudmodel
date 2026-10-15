@@ -210,7 +210,17 @@ describe CloudModel::Workers::Services::NginxWorker do
   end
 
   describe '.own_web_release_config' do
-    before { allow(lxc).to receive(:host_uid).with(1001).and_return(101001) }
+    before do
+      allow(lxc).to receive(:detect_idmap_base!)
+      allow(lxc).to receive(:host_uid).with(1001).and_return(101001)
+    end
+
+    it 'should re-read the container´s idmap once before using it' do
+      expect(lxc).to receive(:detect_idmap_base!).once
+      allow(host).to receive(:exec!)
+      subject.own_web_release_config '/cloud/web/g-1'
+      subject.own_web_release_config '/cloud/web/g-1'
+    end
 
     it 'should own only the config paths written per guest, as www through the container´s idmap' do
       expect(host).to receive(:exec!).with(
@@ -222,7 +232,10 @@ describe CloudModel::Workers::Services::NginxWorker do
   end
 
   describe '.ensure_web_release_owner' do
-    before { allow(lxc).to receive(:host_uid).with(1001).and_return(101001) }
+    before do
+      allow(lxc).to receive(:detect_idmap_base!)
+      allow(lxc).to receive(:host_uid).with(1001).and_return(101001)
+    end
 
     it 'should not touch a clone already owned through the expected idmap' do
       allow(host).to receive(:exec).with('stat -c %u /cloud/web/g-1').and_return([true, "101001\n"])
@@ -464,11 +477,11 @@ describe CloudModel::Workers::Services::NginxWorker do
       expect(subject).to receive(:render_to_remote).with(
         "cloud_model/web_apps/test_web_app/foo_bar",
         "/path/to/install/foo/bar", 0640, guest: guest, service: model, web_location: model.web_locations.first, model: web_app)
-      # legacy host-range notation in the web app definition → container ids in the unshifted rootfs
+      # container ids, as the unshifted rootfs needs them
       expect(host).to receive(:exec!).with("chown -R 1001:0 /path/to/install/foo/bar", "failed to set owner for /path/to/install/foo/bar")
 
       expect(web_app).to receive(:config_files_to_render).and_return(
-        'cloud_model/web_apps/test_web_app/foo_bar' => ["/foo/bar",0640, uid: '101001'],
+        'cloud_model/web_apps/test_web_app/foo_bar' => ["/foo/bar",0640, uid: 1001],
       )
       subject.deploy_web_locations
     end
@@ -480,7 +493,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       expect(host).to receive(:exec!).with("chown -R 0:1001 /path/to/install/foo/bar", "failed to set owner for /path/to/install/foo/bar")
 
       expect(web_app).to receive(:config_files_to_render).and_return(
-        'cloud_model/web_apps/test_web_app/foo_bar' => ["/foo/bar",0640, gid: '101001'],
+        'cloud_model/web_apps/test_web_app/foo_bar' => ["/foo/bar",0640, gid: 1001],
       )
       subject.deploy_web_locations
     end
@@ -492,7 +505,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       expect(host).to receive(:exec!).with("chown -R 1020:1001 /path/to/install/foo/bar", "failed to set owner for /path/to/install/foo/bar")
 
       expect(web_app).to receive(:config_files_to_render).and_return(
-        'cloud_model/web_apps/test_web_app/foo_bar' => ["/foo/bar",0640, uid: '101020', gid: '101001'],
+        'cloud_model/web_apps/test_web_app/foo_bar' => ["/foo/bar",0640, uid: 1020, gid: 1001],
       )
       subject.deploy_web_locations
     end

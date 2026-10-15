@@ -161,7 +161,12 @@ module CloudModel
         WWW_UID = 1001
 
         def www_host_uid
-          @lxc.host_uid WWW_UID
+          # Re-read the container's idmap once per run: a host's subuid range
+          # or an isolation setting may have changed since it was recorded.
+          @www_host_uid ||= begin
+            @lxc.detect_idmap_base! if @lxc.respond_to?(:detect_idmap_base!)
+            @lxc.host_uid WWW_UID
+          end
         end
 
         # Owns the per-guest config files as the container's www user. Only
@@ -173,13 +178,15 @@ module CloudModel
             "Failed to own web app config"
         end
 
-        # The artifact was built with the usual idmap base in mind; when this
-        # container maps www elsewhere (another base), re-own the clone once.
+        # The artifact is built owned for the usual idmap base (100000). A
+        # container that maps www elsewhere gets each of its release clones
+        # re-owned at provision — a full walk of the clone, so such a host
+        # pays that on every deploy; it is logged so the cost is visible.
         def ensure_web_release_owner mount
           success, owner = @host.exec "stat -c %u #{mount.shellescape}"
           return unless success
           return if owner.to_s.strip.to_i == www_host_uid
-          comment_sub_step "Re-own release for idmap base #{@lxc.idmap_base}"
+          comment_sub_step "Re-own release for idmap base #{@lxc.idmap_base} (artifact owned for base 100000; full chown on every deploy of this container)"
           @host.exec! "chown -R #{www_host_uid}:#{www_host_uid} #{mount.shellescape}", "Failed to own web app volume"
         end
 

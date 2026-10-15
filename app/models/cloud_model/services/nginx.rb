@@ -73,6 +73,7 @@ module CloudModel
       # roughly 400MB per app process.
       field :passenger_max_pool_size, type: Integer, default: 6
       validates :passenger_max_pool_size, numericality: {only_integer: true, greater_than: 0}
+      validate :passenger_env_vars_without_nginx_variables
       # Extra environment variables exposed to the Passenger app, rendered as
       # `passenger_env_var KEY VALUE;`. Keys must look like environment variable
       # names; anything else is skipped at render time. Useful to let a single
@@ -392,6 +393,14 @@ module CloudModel
 
       def www_root
         "#{www_home}/rails"
+      end
+
+      # nginx expands `$name` inside double-quoted directive values and offers
+      # no escape for a literal dollar, so such values cannot be passed.
+      def passenger_env_vars_without_nginx_variables
+        (passenger_env_vars || {}).each do |key, value|
+          errors.add :passenger_env_vars, "value of #{key} must not contain '$' (nginx would expand it as a variable)" if value.to_s.include?('$')
+        end
       end
 
       def self.redeployable_redeploy_web_image_states

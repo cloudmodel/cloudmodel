@@ -41,6 +41,15 @@ RSpec.describe 'cloud_model/guest/etc/nginx/server_d/passenger_conf', type: :vie
     expect(rendered).not_to include 'bad key'
   end
 
+  it 'leaves out values nginx would variable-expand (refused by the model anyway)' do
+    model.passenger_env_vars = {'DB_PASSWORD' => 'pa$$word', 'OK' => 'fine'}
+
+    render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
+
+    expect(rendered).not_to include 'DB_PASSWORD'
+    expect(rendered).to include 'passenger_env_var                 OK "fine";'
+  end
+
   it 'renders custom base location' do
     allow(model).to receive(:www_root).and_return '/home/www/app_beta'
 

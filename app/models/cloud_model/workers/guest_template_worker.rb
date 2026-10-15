@@ -248,7 +248,7 @@ module CloudModel
         rescue Exception => e
           CloudModel.log_exception e
           @template.update_attributes build_state: :failed, build_last_issue: "#{e}"
-          cleanup_chroot build_path
+          cleanup_chroot_quietly build_path
           zfs_volume.fail!
           raise failure_message
         end
