@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.1 — review fixes before the first ZFS rollout
+
+Three review rounds over 0.5.0, each fix with a spec:
+
+- Volume sync: incremental sends from the target's newest snapshot; a
+  dataset without a common snapshot is moved aside (clones stay valid) and
+  reclaimed later; transfer failures surface instead of triggering rebuilds;
+  the direct hop addresses the peer by its private address.
+- Builds: a failed arch fails the image; build claims are kept alive per
+  step and abandoned ones taken over after three hours; a resumed template
+  build keeps its half-built volume; the workspace detaches its mountpoint.
+- Deploys: files in the unshifted clone are owned by container ids, the
+  attached release clone through the container's idmap; a leftover clone
+  is removed with a proper error; chroot mounts are dropped before LXD
+  attaches a device and the volume is re-mounted afterwards; an
+  undetachable mount stops the flow instead of being walked over.
+- Config safety: the master key is written over SFTP, command output is
+  UTF-8, Jitsi branding and nginx env values are escaped or refused,
+  config.ssh_key_file is honoured everywhere, primarycache reaches
+  existing volumes, a plain-string build host serves only its own arch.
+- Rust build environments export RUSTUP_HOME/CARGO_HOME.
+
 ## 0.5.0 — ZFS-volume deploys
 
 Guest templates, guest containers and web-image releases moved from image
