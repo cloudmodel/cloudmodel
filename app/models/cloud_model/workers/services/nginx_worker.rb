@@ -119,6 +119,11 @@ module CloudModel
           cleanup_chroot @guest.deploy_path unless online
 
           attach_web_release deploy_id, mount
+          # LXD may leave the container volume unmounted after rewriting its
+          # backup.yaml; every later offline write (certs, deploy keys,
+          # `current` symlink) must land in the volume, not on the bare
+          # mountpoint directory.
+          @lxc.mount unless online
           activate_web_release deploy_id, online: online
           cleanup_old_web_releases deploy_id, online: online
           deploy_id
