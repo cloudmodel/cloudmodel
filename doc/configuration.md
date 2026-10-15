@@ -69,7 +69,7 @@ Notes:
 | `ubuntu_deb_src` | `true` | Enable `deb-src` lines in Ubuntu sources. |
 | `ubuntu_version` | `22.04.4` | Default Ubuntu point release (`ubuntu_major_version` derives `22.04`). |
 | `debian_version` | `12` | Default Debian release. |
-| `unattended_upgrades` | `true` | Install `unattended-upgrades` on hosts and guests, limited to the distribution's security suite, no automatic reboot; hosts additionally never update ZFS or the kernel this way. Baked into templates, pushable to running systems with `rake cloudmodel:host:deploy_unattended_upgrades` / `cloudmodel:guest:deploy_unattended_upgrades`. |
+| `unattended_upgrades` | `true` | Install `unattended-upgrades` on hosts and guests, limited to the distribution's security suite, no automatic reboot; hosts additionally never update ZFS or the kernel this way. Installed into templates, re-applied on every host and guest (re)deploy (so templates built before the feature need no rebuild), pushable to running systems with `rake cloudmodel:host:deploy_unattended_upgrades` / `cloudmodel:guest:deploy_unattended_upgrades`. |
 
 ## Networking & DNS
 

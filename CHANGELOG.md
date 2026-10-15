@@ -102,8 +102,8 @@ them.
 - Polymorphic web app classes are eager-loaded so rake tasks resolve them.
 - **Unattended security upgrades** on hosts and guests (`unattended-upgrades`,
   Debian and Ubuntu security suites only, no automatic reboot; hosts never
-  update ZFS or the kernel this way). Baked into the core templates, pushed
-  to running systems with `rake cloudmodel:host:deploy_unattended_upgrades`
+  update ZFS or the kernel this way). Installed into the core templates,
+  re-applied on every host and guest (re)deploy, pushed to running systems with `rake cloudmodel:host:deploy_unattended_upgrades`
   and `rake cloudmodel:guest:deploy_unattended_upgrades`; change reports
   go to `config.admin_email`. `config.unattended_upgrades = false` switches
   it off.

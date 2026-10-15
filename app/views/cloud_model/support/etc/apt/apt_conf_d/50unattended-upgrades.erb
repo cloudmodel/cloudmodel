@@ -22,6 +22,12 @@ Unattended-Upgrade::Package-Blacklist {
         "zfsutils-linux";
         "zfs-initramfs";
         "zfs-zed";
+        // the (= version) libraries of zfsutils-linux, held back explicitly
+        // rather than only by the dependency check
+        "libzfs";
+        "libzpool";
+        "libnvpair";
+        "libuutil";
         "linux-image-";
         "linux-headers-";
 };
@@ -29,10 +35,9 @@ Unattended-Upgrade::Package-Blacklist {
 
 Unattended-Upgrade::Automatic-Reboot "false";
 Unattended-Upgrade::Remove-Unused-Kernel-Packages "false";
-Unattended-Upgrade::Remove-Unused-Dependencies "true";
 Unattended-Upgrade::MinimalSteps "true";
 Unattended-Upgrade::InstallOnShutdown "false";
 <%- if CloudModel.config.admin_email.present? -%>
-Unattended-Upgrade::Mail "<%= CloudModel.config.admin_email %>";
+Unattended-Upgrade::Mail "<%== CloudModel.config.admin_email %>";
 Unattended-Upgrade::MailReport "on-change";
 <%- end -%>

@@ -121,6 +121,12 @@ module CloudModel
         render_check_mk_guest_plugins guest.deploy_path
       end
 
+      # Same reason as the plugins: the template behind the clone may predate
+      # unattended security upgrades, or carry an older configuration.
+      def ensure_unattended_upgrades
+        refresh_unattended_upgrades guest.deploy_path, role: :guest
+      end
+
       def config_guest_certificates
         guest.guest_certificates.each do |cert|
           unless cert.path_to_crt.blank?
@@ -195,6 +201,7 @@ module CloudModel
           ['Config LXD container', :config_lxd_container],
           ['Config guest services', :config_services],
           ['Update check_mk agent plugins', :update_check_mk_plugins],
+          ['Ensure unattended security upgrades', :ensure_unattended_upgrades],
           ['Config guest certificates', :config_guest_certificates],
           ['Config network', :config_network],
           ['Config firewall', :config_firewall],
