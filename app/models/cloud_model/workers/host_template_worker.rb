@@ -7,6 +7,7 @@ module CloudModel
     # and grub, then tarballs the result for use when provisioning bare-metal
     # or virtual hosts.
     class HostTemplateWorker < TemplateWorker
+      include CloudModel::Workers::Mixins::UnattendedUpgrades
       include CloudModel::Workers::Mixins::CheckMkAgentPlugins
 
       def build_path
@@ -19,6 +20,10 @@ module CloudModel
 
       def error_log_object
         @template
+      end
+
+      def install_host_unattended_upgrades
+        install_unattended_upgrades build_path, role: :host
       end
 
       def install_utils
@@ -144,6 +149,7 @@ module CloudModel
           ["Install LXD virtualizer", :install_lxd],
           ["Install mailer (exim) for mail out", :install_exim],
           ["Install check_mk agent for monitoring", :install_check_mk_agent],
+          ["Enable unattended security upgrades", :install_host_unattended_upgrades],
           ["Install bootloader grub", :install_grub],
           ["Pack template tarball", :pack_template],
           ["Download template tarball", :download_new_template],

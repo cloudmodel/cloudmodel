@@ -36,6 +36,9 @@ module CloudModel
     attr_writer :dns_servers, :job_queue, :additional_hosts
 
     attr_writer :ubuntu_mirror, :ubuntu_deb_src, :ubuntu_version
+    # Unattended installation of the distribution's security updates on
+    # hosts and guests (templates + live push). true by default.
+    attr_writer :unattended_upgrades
     attr_writer :debian_version
     attr_writer :php_version, :ruby_version
 
@@ -153,6 +156,10 @@ module CloudModel
 
     def ubuntu_version
       @ubuntu_version || "22.04.4"
+    end
+
+    def unattended_upgrades
+      @unattended_upgrades.nil? ? true : @unattended_upgrades
     end
 
     def debian_version

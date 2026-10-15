@@ -12,6 +12,7 @@ module CloudModel
     # writes the LXD metadata, and commits. Deploys then `zfs clone` the
     # committed snapshot — no tarballs are packed or synced.
     class GuestTemplateWorker < TemplateWorker
+      include CloudModel::Workers::Mixins::UnattendedUpgrades
       include CloudModel::Workers::Mixins::CheckMkAgentGuestPlugins
 
       def zfs_volume
@@ -90,6 +91,10 @@ module CloudModel
         #chroot! build_path, "ln -s /etc/systemd/system/dhclient.service /etc/systemd/system/multi-user.target.wants/dhclient.service", "Failed to enable dhclient service"
       end
 
+      def install_guest_unattended_upgrades
+        install_unattended_upgrades build_path, role: :guest
+      end
+
       def install_check_mk_agent
         #chroot! build_path, "apt-get install check-mk-agent -y", "Failed to install CheckMKAgent"
 
@@ -152,6 +157,7 @@ module CloudModel
           ["Install network utils", :install_network],
           ["Install SSH server", :install_ssh],
           ["Install check_mk agent for monitoring", :install_check_mk_agent],
+          ["Enable unattended security upgrades", :install_guest_unattended_upgrades],
           ["Commit build volume", :commit_build_volume, no_skip: true]
         ]
 

@@ -420,6 +420,10 @@ GUEST_ID=<mongo_id> bundle exec rake cloudmodel:guest:backup
 # Backup all guests with backup-enabled services
 bundle exec rake cloudmodel:guest:backup_all
 
+# Install unattended security upgrades on running hosts / guests
+rake cloudmodel:host:deploy_unattended_upgrades    # HOST_ID=<id> for one host
+rake cloudmodel:guest:deploy_unattended_upgrades   # GUEST_ID=<id> for one guest
+
 # Sync tinc VPN host key files across all hosts
 HOST_ID=<mongo_id> bundle exec rake cloudmodel:host:update_tinc_host_files
 

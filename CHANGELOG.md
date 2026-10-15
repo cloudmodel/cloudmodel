@@ -1,27 +1,5 @@
 # Changelog
 
-## 0.5.1 — review fixes before the first ZFS rollout
-
-Three review rounds over 0.5.0, each fix with a spec:
-
-- Volume sync: incremental sends from the target's newest snapshot; a
-  dataset without a common snapshot is moved aside (clones stay valid) and
-  reclaimed later; transfer failures surface instead of triggering rebuilds;
-  the direct hop addresses the peer by its private address.
-- Builds: a failed arch fails the image; build claims are kept alive per
-  step and abandoned ones taken over after three hours; a resumed template
-  build keeps its half-built volume; the workspace detaches its mountpoint.
-- Deploys: files in the unshifted clone are owned by container ids, the
-  attached release clone through the container's idmap; a leftover clone
-  is removed with a proper error; chroot mounts are dropped before LXD
-  attaches a device and the volume is re-mounted afterwards; an
-  undetachable mount stops the flow instead of being walked over.
-- Config safety: the master key is written over SFTP, command output is
-  UTF-8, Jitsi branding and nginx env values are escaped or refused,
-  config.ssh_key_file is honoured everywhere, primarycache reaches
-  existing volumes, a plain-string build host serves only its own arch.
-- Rust build environments export RUSTUP_HOME/CARGO_HOME.
-
 ## 0.5.0 — ZFS-volume deploys
 
 Guest templates, guest containers and web-image releases moved from image
@@ -122,6 +100,21 @@ them.
 - Backups: per-subject state tracking and on-demand backup jobs.
 - Live console for deploys and template/image builds.
 - Polymorphic web app classes are eager-loaded so rake tasks resolve them.
+- **Unattended security upgrades** on hosts and guests (`unattended-upgrades`,
+  Debian and Ubuntu security suites only, no automatic reboot; hosts never
+  update ZFS or the kernel this way). Baked into the core templates, pushed
+  to running systems with `rake cloudmodel:host:deploy_unattended_upgrades`
+  and `rake cloudmodel:guest:deploy_unattended_upgrades`; change reports
+  go to `config.admin_email`. `config.unattended_upgrades = false` switches
+  it off.
+- Three review rounds before the first rollout, each fix with a spec:
+  incremental volume sync with moved-aside leftovers, honest multi-arch
+  build results, abandoned build claims taken over after three hours while
+  live builds keep theirs, resumed template builds keep their volume,
+  container-id ownership throughout, chroot mounts dropped before LXD
+  attaches a device and the volume re-mounted after, undetachable mounts
+  stop the flow, secrets written over SFTP, UTF-8 command output, escaped
+  Jitsi/nginx values, config.ssh_key_file honoured everywhere.
 - Rust build environments export `RUSTUP_HOME`/`CARGO_HOME` for every shell
   (the rustup proxies found no default toolchain otherwise); command output
   is returned as valid UTF-8; a busy chroot mount is detached lazily on

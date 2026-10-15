@@ -8,6 +8,7 @@ module CloudModel
     # network/firewall → container start.
     # Each phase is a named step that can be skipped via the `skip_to` option.
     class GuestWorker < BaseWorker
+      include CloudModel::Workers::Mixins::UnattendedUpgrades
       include CloudModel::Workers::Mixins::CheckMkAgentGuestPlugins
 
       def initialize(guest)

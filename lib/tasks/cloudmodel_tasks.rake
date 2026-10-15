@@ -198,6 +198,30 @@ namespace :cloudmodel do
       abort "#{failures} host(s) failed" if failures > 0
     end
 
+    desc "Install unattended security upgrades on live hosts (package + apt.conf.d, no reboot, ZFS/kernel excluded). Set HOST_ID=<id> to target a single host."
+    task :deploy_unattended_upgrades => [:environment] do
+      hosts = if ENV['HOST_ID'].present?
+        [CloudModel::Host.find(ENV['HOST_ID'])]
+      else
+        CloudModel::Host.all.reject { |host| [:booting, :not_started].include? host.deploy_state }
+      end
+      abort "No hosts found in #{Rails.env} database — forgot RAILS_ENV=production?" if hosts.empty?
+
+      failures = 0
+      hosts.each do |host|
+        print "#{host.name}: "
+        begin
+          CloudModel::Workers::HostWorker.new(host).deploy_unattended_upgrades_to_host
+          puts "\e[32mOK\e[39m"
+        rescue => e
+          failures += 1
+          puts "\e[31mFAILED\e[39m (#{e.class}: #{e.message})"
+        end
+      end
+      puts "\nUnattended security upgrades on #{hosts.size - failures}/#{hosts.size} host(s)."
+      abort "#{failures} host(s) failed" if failures > 0
+    end
+
     desc "Push the host-to-host ZFS sync key to live hosts ahead of time (private key, forced-command wrapper, restricted authorized_keys entry). Optional: the first sync between two hosts pushes it on demand; this just does it for all hosts at once. Generates the key pair on first use. Set HOST_ID=<id> to target a single host."
     task :deploy_zfs_sync_key => [:environment] do
       hosts = if ENV['HOST_ID'].present?
@@ -339,6 +363,30 @@ namespace :cloudmodel do
     desc "Backup guest"
     task :backup => [:environment, :load_guest] do
       @guest_worker.guest.backup
+    end
+
+    desc "Install unattended security upgrades in running guests (package + apt.conf.d, no reboot). Set GUEST_ID=<id> to target a single guest."
+    task :deploy_unattended_upgrades => [:environment] do
+      guests = if ENV['GUEST_ID'].present?
+        [CloudModel::Guest.find(ENV['GUEST_ID'])]
+      else
+        CloudModel::Guest.all.select { |guest| guest.up_state == :started }
+      end
+      abort "No running guests found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
+
+      failures = 0
+      guests.each do |guest|
+        print "#{guest.name} @ #{guest.host.name}: "
+        begin
+          CloudModel::Workers::GuestWorker.new(guest).deploy_unattended_upgrades_to_guest
+          puts "\e[32mOK\e[39m"
+        rescue => e
+          failures += 1
+          puts "\e[31mFAILED\e[39m (#{e.class}: #{e.message})"
+        end
+      end
+      puts "\nUnattended security upgrades in #{guests.size - failures}/#{guests.size} guest(s)."
+      abort "#{failures} guest(s) failed" if failures > 0
     end
 
     desc "Push check_mk agent plugins into live guest containers via lxc file push (no image rebuild/redeploy). Set GUEST_ID=<id> to target a single guest."

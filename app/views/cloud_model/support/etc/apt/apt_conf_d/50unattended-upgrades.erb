@@ -1,0 +1,38 @@
+// Written by CloudModel. Security updates only: the regular updates suite is
+// left to template rebuilds and redeploys, so a routine deploy is the only
+// thing that changes application-level packages. Nothing reboots on its own.
+Unattended-Upgrade::Origins-Pattern {
+        // Debian
+        "origin=Debian,codename=${distro_codename},label=Debian-Security";
+        "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+        // Ubuntu (incl. ESM when enabled)
+        // (Origins-Pattern takes key=value pairs only; the "Ubuntu:jammy-security"
+        // shorthand belongs to Allowed-Origins and makes the parser abort.)
+        "origin=Ubuntu,archive=${distro_codename}-security";
+        "origin=UbuntuESMApps,archive=${distro_codename}-apps-security";
+        "origin=UbuntuESM,archive=${distro_codename}-infra-security";
+};
+<%- if role.to_s == 'host' -%>
+
+// Hosts: the ZFS module is built by dkms against the running kernel; a
+// rebuild from an unattended update must not race a deploy or a scrub.
+// ZFS (and the kernel it is built for) change with a host redeploy only.
+Unattended-Upgrade::Package-Blacklist {
+        "zfs-dkms";
+        "zfsutils-linux";
+        "zfs-initramfs";
+        "zfs-zed";
+        "linux-image-";
+        "linux-headers-";
+};
+<%- end -%>
+
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "false";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::MinimalSteps "true";
+Unattended-Upgrade::InstallOnShutdown "false";
+<%- if CloudModel.config.admin_email.present? -%>
+Unattended-Upgrade::Mail "<%= CloudModel.config.admin_email %>";
+Unattended-Upgrade::MailReport "on-change";
+<%- end -%>
