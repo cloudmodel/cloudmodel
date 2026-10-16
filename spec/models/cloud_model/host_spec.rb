@@ -565,6 +565,77 @@ describe CloudModel::Host do
       expect(ssh_session).to receive(:instance_variable_set).with('@sftp', nil)
       subject.exec 'command'
     end
+
+    it 'should return valid UTF-8 whatever bytes the command printed' do
+      story_with_new_channel do |channel|
+        channel.sends_exec "command"
+        channel.gets_data "ok \xF0\x9F\x99\x8F broken \xF0".b
+        channel.gets_exit_status 0
+      end
+
+      script_with_connection do
+        success, out = subject.exec 'command'
+        expect(success).to eq true
+        expect(out).to eq 'ok 🙏 broken ?'
+        expect(out.encoding).to eq Encoding::UTF_8
+      end
+    end
+
+    it 'should stream scrubbed lines into a captured console and never let the console abort the dispatch' do
+      story_with_new_channel do |channel|
+        channel.sends_exec "command"
+        channel.gets_data "one \xF0\ntwo".b
+        channel.gets_exit_status 0
+      end
+
+      seen = +''
+      sink = lambda do |text|
+        seen << text
+        raise Encoding::UndefinedConversionError, 'terminal broken' if text.include? 'one'
+      end
+
+      script_with_connection do
+        CloudModel::StdoutTee.capture sink, passthrough: false do
+          expect(subject.exec 'command').to eq [true, "one ?\ntwo"]
+        end
+      end
+
+      expect(seen).to include "one ?\n"
+      expect(seen).to include "two"
+    end
+
+    it 'should drop the connection when the event loop is torn down by an exception' do
+      ssh_session = double 'Net::SSH::Session', open_channel: true
+      allow(ssh_session).to receive(:instance_variable_set)
+      allow(ssh_session).to receive(:loop).and_raise(Encoding::UndefinedConversionError, 'boom')
+      subject.instance_variable_set '@ssh_connection', ssh_session
+
+      expect(ssh_session).to receive(:shutdown!)
+      expect { subject.exec 'command' }.to raise_error(Encoding::UndefinedConversionError, 'boom')
+      expect(subject.instance_variable_get '@ssh_connection').to be_nil
+    end
+  end
+
+  describe 'drop_ssh_connection!' do
+    it 'forgets the connection and shuts its socket' do
+      ssh_session = double 'Net::SSH::Session'
+      subject.instance_variable_set '@ssh_connection', ssh_session
+      expect(ssh_session).to receive(:shutdown!)
+      subject.drop_ssh_connection!
+      expect(subject.instance_variable_get '@ssh_connection').to be_nil
+    end
+
+    it 'does nothing without a connection' do
+      expect { subject.drop_ssh_connection! }.not_to raise_error
+    end
+
+    it 'swallows a failing shutdown — the point is to forget the connection' do
+      ssh_session = double 'Net::SSH::Session'
+      allow(ssh_session).to receive(:shutdown!).and_raise(IOError, 'closed stream')
+      subject.instance_variable_set '@ssh_connection', ssh_session
+      expect { subject.drop_ssh_connection! }.not_to raise_error
+      expect(subject.instance_variable_get '@ssh_connection').to be_nil
+    end
   end
 
   describe 'exec!' do
@@ -585,41 +656,42 @@ describe CloudModel::Host do
   end
 
   describe 'mounted_at?' do
-    it 'should return true if a filesystem is mounted at the given mountpoint' do
-      mount = <<~OUT
-        sysfs on /sys type sysfs (rw,relatime)
-        proc on /proc type proc (rw,relatime)
-        guests/custom/app on /var/lib/lxd/storage-pools/default/custom/app type zfs (rw,xattr,noacl)
-      OUT
-
-      expect(subject).to receive(:exec).with('mount').and_return [true, mount]
+    it 'should ask mountpoint(8) quietly and return true when it is one' do
+      expect(subject).to receive(:exec).with('mountpoint -q /var/lib/lxd/storage-pools/default/custom/app', quiet: true).and_return [true, '']
 
       expect(subject.mounted_at? '/var/lib/lxd/storage-pools/default/custom/app').to eq true
+    end
+
+    it 'should return false when nothing is mounted there' do
+      expect(subject).to receive(:exec).with('mountpoint -q /mnt/nothing', quiet: true).and_return [false, '']
+
+      expect(subject.mounted_at? '/mnt/nothing').to eq false
+    end
+
+    it 'should join root and mountpoint without doubled slashes and shell-escape the path' do
+      expect(subject).to receive(:exec).with('mountpoint -q /cloud/build/x/rootfs/dev/pts', quiet: true).and_return [true, '']
+      expect(subject.mounted_at? 'dev/pts', '/cloud/build/x/rootfs/').to eq true
+
+      expect(subject).to receive(:exec).with('mountpoint -q /mnt/odd\\ name', quiet: true).and_return [true, '']
+      expect(subject.mounted_at? '/mnt/odd name').to eq true
     end
   end
 
   describe 'boot_fs_mounted?' do
     it 'should return true if /boot is mounted' do
-      expect(subject).to receive(:exec).with('mount').and_return [
-        true,
-        "rootfs on / type rootfs (rw)\n" +
-        "/dev/md126 on /boot type ext2 (rw,noatime)" +
-        "proc on /proc type proc (rw,relatime)\n" +
-        "udev on /dev type devtmpfs (rw,nosuid,relatime,size=10240k,nr_inodes=8144813,mode=755)\n"
-      ]
+      expect(subject).to receive(:exec).with('mountpoint -q /boot', quiet: true).and_return [true, '']
       expect(subject.boot_fs_mounted?).to eq true
     end
 
     it 'should return false if /boot is not mounted' do
-      expect(subject).to receive(:exec).with('mount').and_return [
-        true,
-        "rootfs on / type rootfs (rw)\n" +
-        "proc on /proc type proc (rw,relatime)\n" +
-        "udev on /dev type devtmpfs (rw,nosuid,relatime,size=10240k,nr_inodes=8144813,mode=755)\n"
-      ]
+      expect(subject).to receive(:exec).with('mountpoint -q /boot', quiet: true).and_return [false, '']
       expect(subject.boot_fs_mounted?).to eq false
     end
 
+    it 'should probe below the given root' do
+      expect(subject).to receive(:exec).with('mountpoint -q /mnt/root/boot', quiet: true).and_return [true, '']
+      expect(subject.boot_fs_mounted? '/mnt/root').to eq true
+    end
   end
 
   describe 'mount_boot_fs' do

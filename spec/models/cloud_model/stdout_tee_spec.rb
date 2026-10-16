@@ -50,4 +50,27 @@ describe CloudModel::StdoutTee do
       described_class.capture(sink) { $stdout.write 'x' }
     }.not_to raise_error
   end
+
+  it 'hands on valid UTF-8 only, to the sink and to the terminal' do
+    captured = +''
+    written = +''
+    allow($stdout).to receive(:write) { |text| written << text; text.bytesize }
+
+    described_class.capture ->(text) { captured << text } do
+      $stdout.write "ok \xF0\x9F\x99\x8F broken \xF0".b
+    end
+
+    expect(captured).to eq 'ok 🙏 broken ?'
+    expect(captured.encoding).to eq Encoding::UTF_8
+    expect(written).to eq 'ok 🙏 broken ?'
+  end
+
+  it 'never lets a failing terminal break the flow' do
+    allow($stdout).to receive(:write).and_raise(Encoding::UndefinedConversionError, 'terminal broken')
+    captured = +''
+    expect {
+      described_class.capture(->(text) { captured << text }) { $stdout.write 'x' }
+    }.not_to raise_error
+    expect(captured).to eq 'x'
+  end
 end

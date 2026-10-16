@@ -403,14 +403,21 @@ module CloudModel
       puts "\n      $ #{command}" if stream_output and not quiet
       # Long-running commands (debootstrap, apt) stream their output LIVE
       # into the console line by line; \r counts as a line break so apt
-      # progress updates don't buffer forever.
-      stream_buffer = +''
+      # progress updates don't buffer forever. The bytes are scrubbed to
+      # valid UTF-8 per complete line (so a multi-byte character split across
+      # two SSH packets survives), and nothing the console does may escape
+      # this callback: it runs inside Net::SSH's packet dispatch, and an
+      # exception there leaves the connection mid-dispatch — every later
+      # channel on it (the next SFTP session, say) then waits forever.
+      stream_buffer = ''.b
       stream_lines = lambda do |data|
-        stream_buffer << data
+        stream_buffer << data.b
         while i = stream_buffer.index(/[\r\n]/)
           line = stream_buffer.slice!(0..i)
-          puts "        #{line.chomp("\n").chomp("\r")}"
+          puts "        #{console_text line.chomp("\n").chomp("\r")}"
         end
+      rescue => e
+        Rails.logger.warn "Host#exec: console stream failed: #{e.class}: #{e.message}"
       end
 
       stdout_data = ''
@@ -423,51 +430,75 @@ module CloudModel
       sftp.close_channel
       ssh_connection.instance_variable_set('@sftp', nil)
 
-      ssh_connection.open_channel do |channel|
-        channel.exec(command) do |ch, success|
-          unless success
-            abort "FAILED: couldn't execute command (ssh.channel.exec)"
-          end
-          channel.on_data do |ch,data|
-            Rails.logger.debug "  STDOUT: #{data}"
-            stdout_data += data
-            stream_lines.call data if stream_output
-          end
+      begin
+        ssh_connection.open_channel do |channel|
+          channel.exec(command) do |ch, success|
+            unless success
+              abort "FAILED: couldn't execute command (ssh.channel.exec)"
+            end
+            channel.on_data do |ch,data|
+              Rails.logger.debug "  STDOUT: #{data}"
+              stdout_data += data
+              stream_lines.call data if stream_output
+            end
 
-          channel.on_extended_data do |ch,type,data|
-            Rails.logger.debug "  STDERR: (#{type}): #{data}"
-            stderr_data[type] ||= ''
-            stderr_data[type] += data
-            stream_lines.call data if stream_output
-          end
+            channel.on_extended_data do |ch,type,data|
+              Rails.logger.debug "  STDERR: (#{type}): #{data}"
+              stderr_data[type] ||= ''
+              stderr_data[type] += data
+              stream_lines.call data if stream_output
+            end
 
-          channel.on_request("exit-status") do |ch,data|
-            exit_status = data.read_long
-            Rails.logger.debug "  exit-status: #{exit_status}"
-          end
+            channel.on_request("exit-status") do |ch,data|
+              exit_status = data.read_long
+              Rails.logger.debug "  exit-status: #{exit_status}"
+            end
 
-          channel.on_request("exit-signal") do |ch, data|
-            exit_signal = data.read_long
-            Rails.logger.debug "  exit-signal: #{exit_signal}"
+            channel.on_request("exit-signal") do |ch, data|
+              exit_signal = data.read_long
+              Rails.logger.debug "  exit-signal: #{exit_signal}"
+            end
           end
         end
+        ssh_connection.loop
+      rescue Exception
+        # Whatever tore us out of the event loop (a callback failure, an
+        # interrupt, a dropped peer) leaves Net::SSH mid-dispatch; reusing
+        # that connection hangs the next channel. Reconnect on the next call.
+        drop_ssh_connection!
+        raise
       end
-      ssh_connection.loop
 
       success = exit_status == 0
       Rails.logger.debug [success, stdout_data, stderr_data, exit_status, exit_signal]
 
       # Net::SSH hands over raw bytes; what we return ends up in live logs,
       # error messages and Mongo documents, which need valid UTF-8.
-      stdout = stdout_data.dup.force_encoding('UTF-8').scrub('?')
+      stdout = console_text stdout_data
       unless success
-        stdout += "\n\n" + stderr_data.values.map { |e| e.dup.force_encoding('UTF-8').scrub('?') } * "\n"
+        stdout += "\n\n" + stderr_data.values.map { |e| console_text e } * "\n"
       end
 
       # Flush a trailing partial line of the live stream
-      puts "        #{stream_buffer}" if stream_output and not stream_buffer.empty?
+      puts "        #{console_text stream_buffer}" if stream_output and not stream_buffer.empty?
 
       return [success, stdout]
+    end
+
+    # Raw command output as valid UTF-8 (undecodable bytes become '?').
+    def console_text bytes
+      bytes.to_s.dup.force_encoding(Encoding::UTF_8).scrub('?')
+    end
+
+    # Forgets the cached SSH connection and closes its socket, so the next
+    # {#ssh_connection} opens a fresh one. For connections whose event loop
+    # was aborted (see {#exec}) — Net::SSH offers no way to resync them.
+    def drop_ssh_connection!
+      connection = @ssh_connection
+      @ssh_connection = nil
+      connection&.shutdown!
+    rescue => e
+      Rails.logger.warn "Host#drop_ssh_connection!: #{e.class}: #{e.message}"
     end
 
     def exec! command, message, quiet: false
@@ -479,12 +510,14 @@ module CloudModel
       data
     end
 
+    # Whether something is mounted at `mountpoint` (below `root`). Asks the
+    # kernel through mountpoint(8) rather than grepping `mount`, whose output
+    # on a host with a hundred containers is a screenful per probe — and
+    # prepare_chroot probes four times per chroot. Quiet: the probe is noise
+    # in a build console, and it prints nothing anyway.
     def mounted_at? mountpoint, root=''
-      if exec('mount')[1].match(/on #{root.gsub(/[\/]$/, '')}\/#{mountpoint.gsub(/^[\/]/, '')} type/)
-        true
-      else
-        false
-      end
+      path = "#{root.gsub(/[\/]$/, '')}/#{mountpoint.gsub(/^[\/]/, '')}"
+      exec("mountpoint -q #{path.shellescape}", quiet: true).first
     end
 
     def boot_fs_mounted? root=''

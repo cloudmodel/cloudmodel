@@ -28,13 +28,27 @@ module CloudModel
 
     def write *args
       args.sum do |arg|
-        text = arg.to_s
+        # Worker output arrives as raw bytes (Net::SSH) and may carry anything
+        # a remote tool prints — the RVM installer's "🙏", for one. Hand on
+        # valid UTF-8 only: a console stdout with an internal encoding
+        # (the Rails console) raises Encoding::UndefinedConversionError on
+        # raw high bytes, and nothing written here may ever fail the flow.
+        text = arg.to_s.dup.force_encoding(Encoding::UTF_8).scrub('?')
         begin
           @sink.call text
         rescue => e
           Rails.logger.warn "StdoutTee sink failed: #{e.message}"
         end
-        @passthrough ? @original.write(text) : text.bytesize
+        if @passthrough
+          begin
+            @original.write text
+          rescue => e
+            Rails.logger.warn "StdoutTee passthrough failed: #{e.message}"
+            text.bytesize
+          end
+        else
+          text.bytesize
+        end
       end
     end
 
