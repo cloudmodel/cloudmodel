@@ -80,10 +80,7 @@ module CloudModel
 
     def create_container
       Rails.logger.debug "Create lxd container #{name} from ZFS volume #{guest_template.build_dataset}"
-      # -s adds a root disk from the storage pool to the instance itself;
-      # relying on the host's default profile fails with "No root device
-      # could be found" on hosts where lxd init didn't add one.
-      lxc! "init #{name} --empty -s default", "Failed to init LXD container"
+      init_empty_container
       begin
         attach_template_volume
       rescue Exception => e
@@ -91,6 +88,24 @@ module CloudModel
         lxc "delete #{name}"
         raise e
       end
+    end
+
+    # Registers the container with LXD without any rootfs content of its own
+    # — attach_template_volume swaps the dataset in right after. -s adds a
+    # root disk from the storage pool to the instance itself; relying on the
+    # host's default profile fails with "No root device could be found" on
+    # hosts where lxd init didn't add one.
+    #
+    # `lxc init --empty` is LXD 4.x+. On an older LXD (3.0 on the Ubuntu
+    # 18.04 hosts) the same thing is done from a once-imported empty image:
+    # the container then starts life as a clone of that (empty) image
+    # dataset, which the swap destroys anyway.
+    def init_empty_container
+      success, out = lxc "init #{name} --empty -s default"
+      return if success
+      raise "Failed to init LXD container:\n\n#{out}" unless out.to_s =~ /unknown flag: --empty/
+
+      lxc! "init #{host.ensure_lxd_empty_image!} #{name} -s default", "Failed to init LXD container from the empty image"
     end
 
     # Swaps the empty container's root dataset for a clone of the guest
@@ -231,12 +246,35 @@ module CloudModel
 
     def mount
       mountpoint # to init mountpoint
-      host.exec! "zfs mount #{root_dataset}", "Failed to mount containers fs" unless mounted?
-      return [true, mountpoint]
+      return [true, mountpoint] if mounted?
+
+      success, out = host.exec "zfs mount #{root_dataset}"
+      unless success
+        # LXD switches its datasets to mountpoint=legacy whenever it mounts
+        # them itself (e.g. to rewrite backup.yaml after a device was added),
+        # and zfs then refuses to mount them ("use mount(8)"). Mount it the
+        # legacy way at the path LXD uses, so the offline deploy steps keep
+        # writing into the volume.
+        raise "Failed to mount containers fs:\n\n#{out}" unless out =~ /legacy mountpoint/
+        host.exec! "mkdir -p #{mountpoint.shellescape} && mount -t zfs #{root_dataset.shellescape} #{mountpoint.shellescape}",
+          "Failed to mount containers fs (legacy mountpoint)"
+      end
+
+      [true, mountpoint]
     end
 
     def unmount
-      host.exec "zfs unmount #{root_dataset}"
+      success, out = host.exec "zfs unmount #{root_dataset}"
+      return [success, out] if success
+
+      # LXD creates its datasets with mountpoint=legacy, and zfs refuses to
+      # unmount those ("use umount(8)"). Find where it is mounted and umount
+      # it there — the failure path of a deploy must not leave the half-built
+      # container's rootfs mounted.
+      target = host.exec("findmnt -n -o TARGET -S #{root_dataset.shellescape}")[1].to_s.strip
+      return [success, out] if target.empty?
+
+      host.exec "umount #{target.shellescape}"
     end
 
     def mountpoint

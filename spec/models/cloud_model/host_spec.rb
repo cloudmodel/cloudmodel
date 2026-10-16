@@ -655,6 +655,31 @@ describe CloudModel::Host do
     end
   end
 
+  describe 'ensure_lxd_empty_image!' do
+    it 'should return the alias without importing when the image is registered' do
+      expect(subject).to receive(:exec).with('lxc image info cloudmodel-empty', quiet: true).and_return [true, 'Fingerprint: abc']
+      expect(subject).not_to receive(:exec!)
+
+      expect(subject.ensure_lxd_empty_image!).to eq 'cloudmodel-empty'
+    end
+
+    it 'should build and import the metadata + empty rootfs tarballs once' do
+      expect(subject).to receive(:exec).with('lxc image info cloudmodel-empty', quiet: true).and_return [false, 'Error: not found']
+      expect(subject).to receive(:exec!) do |command, message|
+        expect(command).to include 'architecture: %s'
+        expect(command).to include '"$(uname -m)"'
+        expect(command).to include 'tar -czf metadata.tar.gz metadata.yaml'
+        expect(command).to include 'tar -czf rootfs.tar.gz -C rootfs .'
+        expect(command).to include 'lxc image import metadata.tar.gz rootfs.tar.gz --alias cloudmodel-empty'
+        expect(command).to end_with 'rm -rf "$d"'
+        expect(message).to match(/empty LXD image/)
+        ''
+      end
+
+      expect(subject.ensure_lxd_empty_image!).to eq 'cloudmodel-empty'
+    end
+  end
+
   describe 'mounted_at?' do
     it 'should ask mountpoint(8) quietly and return true when it is one' do
       expect(subject).to receive(:exec).with('mountpoint -q /var/lib/lxd/storage-pools/default/custom/app', quiet: true).and_return [true, '']

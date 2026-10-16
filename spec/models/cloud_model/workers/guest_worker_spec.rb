@@ -311,6 +311,7 @@ describe CloudModel::Workers::GuestWorker do
       allow(file_handle).to receive(:write)
       allow(subject).to receive(:mkdir_p)
       allow(guest).to receive(:deploy_path).and_return('/deploy')
+      allow(guest).to receive(:services).and_return([])
     end
 
     it 'should write crt and key files and set ownership/permissions' do
@@ -332,6 +333,46 @@ describe CloudModel::Workers::GuestWorker do
       expect(sftp_file).not_to receive(:open)
 
       subject.config_guest_certificates
+    end
+
+    context 'with a certificate inside the web release' do
+      let(:nginx) { double 'nginx', www_root: '/var/www/rails', deploy_web_image: double('web image') }
+      let(:lxc) { double 'lxc' }
+      let(:certificate) { double 'certificate', crt: 'CRT', key: 'KEY' }
+      let(:cert) { double 'cert', path_to_crt: '/var/www/rails/current/config/ssl/oauth/staging.crt', path_to_key: '', certificate: certificate }
+
+      before do
+        allow(guest).to receive(:services).and_return([nginx])
+        allow(guest).to receive(:guest_certificates).and_return([cert])
+        subject.instance_variable_set :@lxc, lxc
+        allow(lxc).to receive(:host_uid).with(1001).and_return 101001
+      end
+
+      it 'should write into the release clone the current symlink points to and own it as www' do
+        expect(host).to receive(:exec).with('readlink /deploy/var/www/rails/current').and_return [true, "/var/www/rails/releases/20261016212000\n"]
+        expect(subject).to receive(:mkdir_p).with('/cloud/web/test-guest-20261016212000/config/ssl/oauth')
+        expect(sftp_file).to receive(:open).with('/cloud/web/test-guest-20261016212000/config/ssl/oauth/staging.crt', 'w').and_yield(file_handle)
+        expect(host).to receive(:exec!).with('chown 101001:101001 /cloud/web/test-guest-20261016212000/config/ssl/oauth/staging.crt', /own/)
+
+        subject.config_guest_certificates
+      end
+
+      it 'should fall back to the rootfs when current is no release symlink' do
+        expect(host).to receive(:exec).with('readlink /deploy/var/www/rails/current').and_return [false, '']
+        expect(sftp_file).to receive(:open).with('/deploy/var/www/rails/current/config/ssl/oauth/staging.crt', 'w').and_yield(file_handle)
+        expect(host).not_to receive(:exec!).with(/chown/, anything)
+
+        subject.config_guest_certificates
+      end
+
+      it 'should leave paths outside the release alone' do
+        other = double 'cert', path_to_crt: '/etc/ssl/cert.crt', path_to_key: '', certificate: certificate
+        allow(guest).to receive(:guest_certificates).and_return([other])
+        expect(host).not_to receive(:exec).with(/readlink/)
+        expect(sftp_file).to receive(:open).with('/deploy/etc/ssl/cert.crt', 'w').and_yield(file_handle)
+
+        subject.config_guest_certificates
+      end
     end
   end
 

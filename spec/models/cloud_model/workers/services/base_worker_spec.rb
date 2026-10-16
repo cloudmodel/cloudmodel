@@ -43,4 +43,31 @@ describe CloudModel::Workers::Services::BaseWorker do
       subject.auto_start
     end
   end
+
+  describe 'upload_to_guest' do
+    let(:sftp_file) { double 'sftp file' }
+
+    before do
+      allow(lxc).to receive(:name).and_return 'test-20200331133742'
+      allow(host).to receive(:sftp).and_return double('sftp', file: sftp_file)
+      allow(sftp_file).to receive(:open).and_yield double('f', puts: nil)
+      allow(host).to receive(:exec!)
+      allow(BSON::ObjectId).to receive(:new).and_return 'tmpid'
+    end
+
+    it 'should push the content via lxc file push and remove the temp file' do
+      expect(host).to receive(:exec!).with("lxc file push /tmp/cloudmodel_tmpid test-20200331133742//etc/motd -p --mode 0644", 'Failed to upload /etc/motd')
+      expect(host).to receive(:exec).with('rm /tmp/cloudmodel_tmpid')
+      allow(lxc).to receive(:mount)
+
+      expect(subject.upload_to_guest 'hello', '/etc/motd', '0644').to eq true
+    end
+
+    it 'should remount the container afterwards — LXD unmounts a stopped container after the push' do
+      expect(host).to receive(:exec!).ordered
+      expect(lxc).to receive(:mount).ordered
+
+      subject.upload_to_guest 'hello', '/etc/motd'
+    end
+  end
 end

@@ -25,7 +25,14 @@ module CloudModel
         end
 
         def web_clone_mount deploy_id
-          "/cloud/web/#{@guest.name}-#{deploy_id}"
+          self.class.web_clone_mount @guest, deploy_id
+        end
+
+        # Host mountpoint of a guest's release clone — also for other workers
+        # that must write into a release while the guest is offline (the
+        # guest worker's certificate step, via the `current` symlink).
+        def self.web_clone_mount guest, deploy_id
+          "/cloud/web/#{guest.name}-#{deploy_id}"
         end
 
         # Writes the per-guest runtime config into an already-populated app tree

@@ -48,6 +48,14 @@ module CloudModel
 
           host.exec!("lxc file push #{tmp_file.shellescape} #{@lxc.name}/#{remote_file.shellescape} -p --mode #{perm}", "Failed to upload #{remote_file}")
           host.exec("rm #{tmp_file.shellescape}")
+
+          # For a stopped container LXD mounts the volume for the push and
+          # unmounts it afterwards (unless chroot submounts of an earlier step
+          # happen to keep it busy), switching it to mountpoint=legacy on the
+          # way. Everything this worker then writes straight into the rootfs
+          # (render_to_remote, chroot) must land in the volume, not on the
+          # bare mountpoint directory — so remount. A no-op while it runs.
+          @lxc.mount
           true
         end
 

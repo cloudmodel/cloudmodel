@@ -130,22 +130,57 @@ module CloudModel
       def config_guest_certificates
         guest.guest_certificates.each do |cert|
           unless cert.path_to_crt.blank?
-            crt_file = "#{guest.deploy_path}#{cert.path_to_crt}"
+            crt_file, in_release = offline_file_path cert.path_to_crt
             mkdir_p File.dirname(crt_file)
             @host.sftp.file.open(crt_file, 'w') do |f|
               f.write cert.certificate.crt
             end
+            own_as_www crt_file if in_release
           end
 
           unless cert.path_to_key.blank?
-            key_file = "#{guest.deploy_path}#{cert.path_to_key}"
+            key_file, in_release = offline_file_path cert.path_to_key
             mkdir_p File.dirname(key_file)
             @host.sftp.file.open(key_file, 'w') do |f|
               f.write cert.certificate.key
             end
+            own_as_www key_file if in_release
             host.exec! "chmod 0700 #{key_file}", "failed to limit rights for #{key_file}"
           end
         end
+      end
+
+      # Where a container path is written during an offline deploy: normally
+      # below the rootfs. A path inside a web release (`<www_root>/current/…`)
+      # is the exception — `current` is a symlink to `releases/<id>`, a disk
+      # device LXD only mounts when the container starts, so on the host the
+      # link dangles and writing through it fails. Such a path goes to the
+      # release clone's host mountpoint, which is what that device serves.
+      # @return [Array(String, Boolean)] host path and whether it is in a release
+      def offline_file_path container_path
+        guest.services.each do |service|
+          next unless service.respond_to?(:www_root) and service.try(:deploy_web_image)
+
+          current = "#{service.www_root}/current"
+          next unless container_path.start_with? "#{current}/"
+
+          success, link = @host.exec "readlink #{"#{guest.deploy_path}#{current}".shellescape}"
+          deploy_id = link.to_s.strip[%r{/releases/(\d+)\z}, 1] if success
+          next unless deploy_id
+
+          mount = CloudModel::Workers::Services::NginxWorker.web_clone_mount guest, deploy_id
+          return ["#{mount}#{container_path.delete_prefix current}", true]
+        end
+
+        ["#{guest.deploy_path}#{container_path}", false]
+      end
+
+      # Files in a release clone are read by the app as www; the clone is not
+      # id-shifted by LXD, so own them by the container's mapped uid (see
+      # Services::NginxWorker#own_web_release_config).
+      def own_as_www file
+        uid = @lxc.host_uid CloudModel::Workers::Services::NginxWorker::WWW_UID
+        @host.exec! "chown #{uid}:#{uid} #{file.shellescape}", "Failed to own #{file}"
       end
 
       def config_network

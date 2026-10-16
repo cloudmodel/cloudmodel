@@ -104,14 +104,35 @@ describe CloudModel::LxdContainer do
   end
 
   describe 'create_container' do
-    it 'should init an empty container and attach the template volume' do
+    before do
       subject.guest_template = template
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+    end
 
-      expect(subject).to receive(:lxc!).with("init some_guest-20200331133742 --empty -s default", 'Failed to init LXD container').ordered
+    it 'should init an empty container and attach the template volume' do
+      expect(subject).to receive(:lxc).with("init some_guest-20200331133742 --empty -s default").ordered.and_return [true, '']
       expect(subject).to receive(:attach_template_volume).ordered
 
       subject.create_container
+    end
+
+    it 'should fall back to the empty image on an LXD without --empty' do
+      expect(subject).to receive(:lxc).with("init some_guest-20200331133742 --empty -s default").ordered
+        .and_return [false, "Error: unknown flag: --empty\n"]
+      expect(host).to receive(:ensure_lxd_empty_image!).ordered.and_return 'cloudmodel-empty'
+      expect(subject).to receive(:lxc!).with("init cloudmodel-empty some_guest-20200331133742 -s default", /empty image/).ordered
+      expect(subject).to receive(:attach_template_volume).ordered
+
+      subject.create_container
+    end
+
+    it 'should raise any other init failure as is' do
+      expect(subject).to receive(:lxc).with("init some_guest-20200331133742 --empty -s default")
+        .and_return [false, "Error: No storage pool found"]
+      expect(host).not_to receive(:ensure_lxd_empty_image!)
+      expect(subject).not_to receive(:attach_template_volume)
+
+      expect { subject.create_container }.to raise_error(RuntimeError, /Failed to init LXD container.*No storage pool found/m)
     end
 
     it 'should be called when container is created' do
@@ -120,10 +141,7 @@ describe CloudModel::LxdContainer do
     end
 
     it 'should delete the LXD container again when attaching the volume fails' do
-      subject.guest_template = template
-      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
-
-      allow(subject).to receive(:lxc!)
+      allow(subject).to receive(:lxc).with(/^init /).and_return [true, '']
       allow(subject).to receive(:attach_template_volume).and_raise('clone failed')
       expect(subject).to receive(:lxc).with('delete some_guest-20200331133742')
 
@@ -405,22 +423,74 @@ describe CloudModel::LxdContainer do
   end
 
   describe 'mount' do
-    it 'should mount zfs container´s fs' do
-      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
-      expect(host).to receive(:exec!).with('zfs mount guests/containers/some_guest-20200331133742', "Failed to mount containers fs")
+    let(:dataset) { 'guests/containers/some_guest-20200331133742' }
+    let(:path) { '/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742' }
 
-      subject.mount
+    before do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      allow(subject).to receive(:mountpoint).and_return path
+    end
+
+    it 'should mount zfs container´s fs' do
+      allow(subject).to receive(:mounted?).and_return false
+      expect(host).to receive(:exec).with("zfs mount #{dataset}").and_return [true, '']
+      expect(host).not_to receive(:exec!)
+
+      expect(subject.mount).to eq [true, path]
+    end
+
+    it 'should not mount twice' do
+      allow(subject).to receive(:mounted?).and_return true
+      expect(host).not_to receive(:exec).with(/zfs mount/)
+
+      expect(subject.mount).to eq [true, path]
+    end
+
+    it 'should fall back to mount(8) when LXD turned the dataset into a legacy mountpoint' do
+      allow(subject).to receive(:mounted?).and_return false
+      expect(host).to receive(:exec).with("zfs mount #{dataset}")
+        .and_return [false, "cannot mount '#{dataset}': legacy mountpoint\nuse mount(8) to mount this filesystem"]
+      expect(host).to receive(:exec!).with("mkdir -p #{path} && mount -t zfs #{dataset} #{path}", /legacy mountpoint/)
+
+      expect(subject.mount).to eq [true, path]
+    end
+
+    it 'should raise on any other zfs mount failure' do
+      allow(subject).to receive(:mounted?).and_return false
+      expect(host).to receive(:exec).with("zfs mount #{dataset}").and_return [false, 'dataset does not exist']
+      expect(host).not_to receive(:exec!)
+
+      expect { subject.mount }.to raise_error(RuntimeError, /Failed to mount containers fs.*dataset does not exist/m)
     end
   end
 
   describe 'unmount' do
-    it 'should unmount zfs container´s fs' do
-      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
-      expect(host).to receive(:exec).with('zfs unmount guests/containers/some_guest-20200331133742')
+    before { subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time }
 
-      subject.unmount
+    it 'should unmount zfs container´s fs' do
+      expect(host).to receive(:exec).with('zfs unmount guests/containers/some_guest-20200331133742').and_return [true, '']
+      expect(host).not_to receive(:exec).with(/umount/)
+
+      expect(subject.unmount).to eq [true, '']
     end
 
+    it 'should umount a legacy-mountpoint dataset where it is mounted' do
+      expect(host).to receive(:exec).with('zfs unmount guests/containers/some_guest-20200331133742')
+        .and_return [false, "cannot unmount 'guests/containers/some_guest-20200331133742': legacy mountpoint\nuse umount(8) to unmount this filesystem"]
+      expect(host).to receive(:exec).with('findmnt -n -o TARGET -S guests/containers/some_guest-20200331133742')
+        .and_return [true, "/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742\n"]
+      expect(host).to receive(:exec).with('umount /var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742').and_return [true, '']
+
+      expect(subject.unmount).to eq [true, '']
+    end
+
+    it 'should report the zfs failure when the dataset is not mounted at all' do
+      expect(host).to receive(:exec).with('zfs unmount guests/containers/some_guest-20200331133742').and_return [false, 'not currently mounted']
+      expect(host).to receive(:exec).with(/findmnt/).and_return [false, '']
+      expect(host).not_to receive(:exec).with(/^umount/)
+
+      expect(subject.unmount).to eq [false, 'not currently mounted']
+    end
   end
 
   describe 'mountpoint' do

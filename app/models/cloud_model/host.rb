@@ -510,6 +510,34 @@ module CloudModel
       data
     end
 
+    # Alias of the content-less LXD image that stands in for `lxc init
+    # --empty` on LXD versions without it (see LxdContainer#init_empty_container).
+    LXD_EMPTY_IMAGE_ALIAS = 'cloudmodel-empty'
+
+    # Makes sure the empty image is registered with this host's LXD and
+    # returns its alias. The image is a metadata tarball (architecture from
+    # the host kernel, which LXD accepts under its own alias names) plus a
+    # rootfs tarball holding nothing but the top-level directory — a few
+    # hundred bytes, imported once; every later init reuses it.
+    # @return [String] the image alias
+    def ensure_lxd_empty_image!
+      return LXD_EMPTY_IMAGE_ALIAS if exec("lxc image info #{LXD_EMPTY_IMAGE_ALIAS}", quiet: true).first
+
+      exec! [
+        'd=$(mktemp -d)',
+        'cd "$d"',
+        %(printf 'architecture: %s\\ncreation_date: %s\\nproperties:\\n  description: cloudmodel empty image (template volume attached after init)\\n' "$(uname -m)" "$(date +%s)" > metadata.yaml),
+        'tar -czf metadata.tar.gz metadata.yaml',
+        'mkdir rootfs',
+        'tar -czf rootfs.tar.gz -C rootfs .',
+        "lxc image import metadata.tar.gz rootfs.tar.gz --alias #{LXD_EMPTY_IMAGE_ALIAS}",
+        'cd /',
+        'rm -rf "$d"'
+      ] * ' && ', "Failed to import the empty LXD image"
+
+      LXD_EMPTY_IMAGE_ALIAS
+    end
+
     # Whether something is mounted at `mountpoint` (below `root`). Asks the
     # kernel through mountpoint(8) rather than grepping `mount`, whose output
     # on a host with a hundred containers is a screenful per probe — and
