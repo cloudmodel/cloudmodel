@@ -75,8 +75,11 @@ module CloudModel
             @web_image.update_attribute :build_state, :bundling
             prepare_build_env
             configure_git_credentials
-            bundle_image
+            # Pin before bundling: RVM reads .ruby-version on `cd` into the
+            # app, and the app's own pin (a patch level the build environment
+            # does not ship) would make it complain and fall back silently.
             pin_ruby_version
+            bundle_image
             write_bundle_config
             yarn_install
 
@@ -170,6 +173,22 @@ module CloudModel
         @host.sftp.file.open("#{ssh_dir}/config", 'w', 0600) do |f|
           f.write "Host github.com\n  User git\n  IdentityFile /root/.ssh/id_git\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n"
         end
+
+        # Say which identity the build system will clone with — `bundle install`
+        # only reports "Permission denied (publickey)" after four retries, and
+        # the build system is gone by then. github answers `ssh -T` with the
+        # account name and exit status 1, so this is informational only. The
+        # verbose lines name the key file ssh loaded, whether it offered it
+        # and whether the server took it — enough to tell a key github does
+        # not know from one ssh refused to use.
+        comment_sub_step "Verify git deploy key"
+        _ok, out = chroot buildsys_volume.rootfs_path, [
+          "ssh -V 2>&1",
+          "ssh-keygen -lf /root/.ssh/id_git 2>&1",
+          "ssh -v -i /root/.ssh/id_git -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -T git@github.com 2>&1" \
+            " | grep -E '^Hi |identity file|Offering public key|Server accepts key|no mutual signature|Permissions [0-7]+ for|Load key|denied'"
+        ] * '; '
+        puts out.to_s.strip.gsub(/^/, '        ')
       end
 
       def bundle_image
@@ -215,10 +234,12 @@ module CloudModel
           @host.exec! "printf %s #{rv.shellescape} > #{app_build_host_path.shellescape}/.ruby-version",
             "Unable to pin ruby version"
         else
-          # Fall back to whatever Ruby the build environment provides.
+          # Fall back to whatever Ruby the build environment provides. No `cd`
+          # into the app first: RVM's cd hook would read the app's own pin and
+          # complain that that version is not installed.
           comment_sub_step "Pin .ruby-version to the build environment's ruby"
           chroot! buildsys_volume.rootfs_path,
-            "cd #{CHROOT_APP_ROOT} && ruby -e 'print RUBY_VERSION' > .ruby-version",
+            "ruby -e 'print RUBY_VERSION' > #{CHROOT_APP_ROOT}/.ruby-version",
             "Unable to pin ruby version"
         end
       end

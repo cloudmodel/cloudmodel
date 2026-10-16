@@ -111,6 +111,20 @@ describe CloudModel::Workers::WebImageWorker do
       expect(subject.build_app_volume('MOS6502')).to eq true
     end
 
+    it 'pins the ruby version before bundling, so RVM bundles on the ruby the artifact runs on' do
+      allow(subject).to receive(:chroot!).and_call_original
+      allow(subject).to receive(:prepare_chroot)
+      allow(subject).to receive(:render_to_remote)
+      allow(host).to receive(:sftp).and_return double(remove!: true)
+      allow(web_image).to receive(:ruby_version).and_return '3.4.8'
+
+      expect(host).to receive(:exec!).with(/printf %s 3.4.8 > .*\.ruby-version/, anything).ordered
+      expect(host).to receive(:exec).with(/chroot .* \/root\/chroot-.*\.sh/).ordered.and_return [true, '']
+      allow(host).to receive(:exec!).with(/zfs|cp /, anything)
+
+      subject.build_app_volume('MOS6502')
+    end
+
     it 'reuses an existing workspace incrementally (mount, not wipe)' do
       allow(app_volume).to receive(:dataset_exists?).and_return true
       expect(app_volume).to receive(:mount!)
