@@ -168,7 +168,6 @@ describe CloudModel::Workers::Services::NginxWorker do
       allow(subject).to receive(:make_deploy_web_image_id).and_return('20260101000000')
       allow(host).to receive(:exec).with('zfs list guests/web/test-guest-20260101000000').and_return([true, 'exists'])
       allow(host).to receive(:exec!)
-      allow(subject).to receive(:strip_web_release)
       allow(subject).to receive(:unroll_web_image)
       allow(subject).to receive(:ensure_web_release_owner)
       allow(subject).to receive(:own_web_release_config)
@@ -186,7 +185,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       allow(web_image).to receive(:build_snapshot).with('amd64').and_return('guests/build/web/img1/amd64@v1')
       allow(host).to receive(:exec).and_return([false, ''])
       allow(host).to receive(:exec!)
-      %i(strip_web_release unroll_web_image ensure_web_release_owner own_web_release_config cleanup_old_web_releases).each { |m| allow(subject).to receive(m) }
+      %i(unroll_web_image ensure_web_release_owner own_web_release_config cleanup_old_web_releases).each { |m| allow(subject).to receive(m) }
       expect(subject).to receive(:cleanup_chroot).with('/path/to/install').ordered
       expect(subject).to receive(:attach_web_release).ordered
       # LXD may have unmounted the volume while rewriting backup.yaml
@@ -201,7 +200,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       allow(web_image).to receive(:build_snapshot).with('amd64').and_return('guests/build/web/img1/amd64@v1')
       allow(host).to receive(:exec).and_return([false, ''])
       allow(host).to receive(:exec!)
-      %i(strip_web_release unroll_web_image ensure_web_release_owner own_web_release_config attach_web_release activate_web_release cleanup_old_web_releases).each { |m| allow(subject).to receive(m) }
+      %i(unroll_web_image ensure_web_release_owner own_web_release_config attach_web_release activate_web_release cleanup_old_web_releases).each { |m| allow(subject).to receive(m) }
       expect(subject).not_to receive(:cleanup_chroot)
       expect(lxc).not_to receive(:mount)
 

@@ -132,10 +132,93 @@ describe CloudModel::Workers::WebImageWorker do
       subject.build_app_volume('MOS6502')
     end
 
-    it 'records the artifact size after snapshot' do
-      allow(host).to receive(:exec).with(/zfs list -H -p -o used/).and_return([true, "789\n"])
+    it 'records the artifact size after snapshot — the dataset alone, without snapshots and the cache child' do
+      allow(host).to receive(:exec).with('zfs list -H -p -o usedbydataset guests/build/web/web42/MOS6502').and_return([true, "789\n"])
       expect(web_image).to receive(:record_artifact_size).with('MOS6502', 789)
       subject.build_app_volume('MOS6502')
+    end
+
+    describe 'build cache (child dataset, never in the artifact)' do
+      let(:cache) { 'guests/build/web/web42/MOS6502/.build-cache' }
+      let(:cache_path) { '/cloud/build/web/web42/MOS6502-buildenv/rootfs/webimage/.build-cache' }
+
+      it 'creates the cache dataset on the first build and mounts it on every one' do
+        allow(host).to receive(:exec).with("zfs list #{cache}").and_return [false, 'does not exist']
+        allow(host).to receive(:exec).with("zfs get -H -o value mounted #{cache}").and_return [true, "no\n"]
+        expect(host).to receive(:exec!).with(/\Azfs create -p( -o compression=\S+)? #{Regexp.escape cache}\z/, anything).ordered
+        expect(host).to receive(:exec!).with("zfs mount #{cache}", anything).ordered
+        expect(host).to receive(:exec!).with("mkdir -p #{cache_path}/cargo #{cache_path}/cargo-target #{cache_path}/yarn #{cache_path}/git", anything).ordered
+
+        subject.build_app_volume('MOS6502')
+      end
+
+      it 'reuses an existing, mounted cache without touching zfs' do
+        allow(host).to receive(:exec).with("zfs list #{cache}").and_return [true, cache]
+        allow(host).to receive(:exec).with("zfs get -H -o value mounted #{cache}").and_return [true, "yes\n"]
+        expect(host).not_to receive(:exec!).with(/zfs (create|mount) /, anything)
+
+        subject.build_app_volume('MOS6502')
+      end
+
+      it 'detaches the cache, strips the workspace and owns it before the snapshot' do
+        expect(host).to receive(:exec!).with("zfs unmount #{cache}", anything).ordered
+        expect(host).to receive(:exec!).with("rmdir #{cache_path}", anything).ordered
+        expect(host).to receive(:exec!).with(/\Acd \/cloud\/build\/web\/web42\/MOS6502-buildenv\/rootfs\/webimage && rm -rf \.git .*bundle\/ruby\/\*\/cache.*ext\/\*\/target/, anything).ordered
+        expect(host).to receive(:exec!).with(/\Achown -R 101001:101001 /, anything).ordered
+        expect(host).to receive(:exec!).with(/\Azfs snapshot /, anything).ordered
+
+        subject.build_app_volume('MOS6502')
+      end
+
+      it 'points the toolchain caches into the cache dataset for bundling and assets' do
+        allow(web_image).to receive(:has_assets).and_return true
+        expect(subject).to receive(:chroot!).with(anything, /bundle install/, anything) do |_dir, cmd, _msg|
+          expect(cmd).to include 'CARGO_HOME=/webimage/.build-cache/cargo'
+          expect(cmd).to include 'CARGO_TARGET_DIR=/webimage/.build-cache/cargo-target'
+          expect(cmd).to include 'RUSTUP_HOME=/usr/local/rustup'
+        end
+        expect(subject).to receive(:chroot!).with(anything, /assets:precompile/, anything) do |_dir, cmd, _msg|
+          expect(cmd).to include 'CARGO_HOME=/webimage/.build-cache/cargo'
+        end
+        allow(subject).to receive(:chroot!).with(anything, /ruby -e|yarn install/, anything)
+
+        subject.build_app_volume('MOS6502')
+      end
+
+      it 'unmounts the cache before the workspace when a build fails' do
+        subject.instance_variable_set :@app_volume, app_volume   # memoized in a real run
+        allow(subject).to receive(:bundle_image).and_raise('boom')
+        expect(host).to receive(:exec).with("zfs unmount #{cache}").ordered
+        expect(app_volume).to receive(:unmount!).ordered
+
+        expect(subject.build_app_volume('MOS6502')).to eq false
+      end
+    end
+
+    describe 'git dir for the build (transfer_git_dir)' do
+      before do
+        allow(subject).to receive(:transfer_source).and_call_original
+        allow(subject).to receive(:local_exec!)
+        allow(CloudModel.config).to receive(:ssh_key_file).and_return '/keys/id_rsa'
+      end
+
+      it 'rsyncs .git into the cache dataset and points a gitdir file at it' do
+        allow(File).to receive(:directory?).with('/tmp/web_build/web42/.git').and_return true
+        expect(subject).to receive(:local_exec!).with(%r{\Arsync -a --delete --exclude=}, anything).ordered
+        expect(subject).to receive(:local_exec!).with(%r{\Arsync -a --delete -e .* /tmp/web_build/web42/\.git/ root@10\.0\.0\.23:/cloud/build/web/web42/MOS6502-buildenv/rootfs/webimage/\.build-cache/git/\z}, anything).ordered
+        expect(host).to receive(:exec!).with("printf 'gitdir: %s\\n' .build-cache/git > /cloud/build/web/web42/MOS6502-buildenv/rootfs/webimage/.git", anything)
+        expect(subject).to receive(:chroot!).with(buildsys_volume.rootfs_path, 'git config --global --add safe.directory /webimage', anything)
+
+        subject.build_app_volume('MOS6502')
+      end
+
+      it 'does nothing without a .git in the checkout' do
+        allow(File).to receive(:directory?).with('/tmp/web_build/web42/.git').and_return false
+        expect(subject).not_to receive(:local_exec!).with(%r{\.git/ root@}, anything)
+        expect(host).not_to receive(:exec!).with(/gitdir/, anything)
+
+        subject.build_app_volume('MOS6502')
+      end
     end
 
     it 'marks the image failed and cleans up on error' do

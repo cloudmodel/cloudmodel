@@ -106,9 +106,9 @@ module CloudModel
           @host.exec! "zfs clone -p -o mountpoint=#{mount.shellescape} -o compression=#{CloudModel.config.zfs_compression.shellescape} #{web_image.build_snapshot(arch).shellescape} #{dataset.shellescape}",
             "Failed to clone web image #{web_image.name}"
 
-          strip_web_release mount
-
-          # The clone IS the Rails root; only the instance config is layered on.
+          # The clone IS the Rails root (already stripped of build scratch
+          # when the artifact was snapshotted); only the instance config is
+          # layered on.
           unroll_web_image mount
           # The artifact is already owned by the container's www user (see
           # WebImageWorker#finalize_app_volume); only what unroll_web_image
@@ -134,26 +134,6 @@ module CloudModel
           activate_web_release deploy_id, online: online
           cleanup_old_web_releases deploy_id, online: online
           deploy_id
-        end
-
-        # Slims a fresh deploy clone — the ZFS-clone equivalent of the old
-        # tarball PACKAGE_EXCLUDES. The workspace snapshot keeps this scratch for
-        # incremental rebuilds; each per-guest clone drops it here. Runtime
-        # output stays: public/vite, public/assets, the compiled .so in each
-        # gem's lib/, node_modules, and .cache/puppeteer (Chromium).
-        def strip_web_release mount
-          comment_sub_step "Strip build artifacts from release"
-          # Anchored globs only — NEVER a bare `-name cache`/`-name doc`, which
-          # would also delete runtime code (e.g. activesupport's own
-          # lib/active_support/cache/coder.rb) and break the app. Mirrors the
-          # old tarball PACKAGE_EXCLUDES.
-          @host.exec "cd #{mount.shellescape} && " \
-            "rm -rf .git .gitignore .rspec tmp log spec test features doc .playwright-mcp vendor/cache solr; " \
-            "rm -f db/*.sqlite3 gems/*.zip; " \
-            "rm -rf bundle/ruby/*/cache bundle/ruby/*/doc; " \
-            "rm -rf bundle/ruby/*/bundler/gems/*/.git; " \
-            "rm -rf bundle/ruby/*/gems/*/ext/*/target bundle/ruby/*/bundler/gems/*/ext/*/target; " \
-            "true"
         end
 
         # Paths (relative to the release root) that {#unroll_web_image} writes

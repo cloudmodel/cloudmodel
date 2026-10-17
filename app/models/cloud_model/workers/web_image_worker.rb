@@ -40,15 +40,52 @@ module CloudModel
       # `current` symlinks to it).
       CHROOT_APP_ROOT = '/webimage'
 
+      # Build caches that must survive between builds but never ship: a child
+      # dataset of the workspace, mounted at this path inside the app root.
+      # A snapshot of the workspace does not contain its child datasets, so
+      # the deploy clone sees only the (empty) mountpoint directory — which
+      # finalize removes before snapshotting. Holds the cargo registry and
+      # target dir, the yarn cache and the app's git dir (see
+      # #transfer_git_dir); bundler's own download cache lives inside the
+      # bundle path and is simply stripped.
+      BUILD_CACHE_DIR = '.build-cache'
+
+      # Build-time environment pointing the toolchain caches into the cache
+      # dataset. CARGO_HOME moves the crate registry/git caches there; the
+      # rustup proxies stay reachable through the explicit PATH entry and find
+      # the toolchain via RUSTUP_HOME. Without RUSTUP_HOME rustup looks in
+      # root's empty ~/.rustup and fails ("could not choose a version of cargo").
+      CACHE_ENV = "CARGO_HOME=#{CHROOT_APP_ROOT}/#{BUILD_CACHE_DIR}/cargo " \
+                  "CARGO_TARGET_DIR=#{CHROOT_APP_ROOT}/#{BUILD_CACHE_DIR}/cargo-target " \
+                  "RUSTUP_HOME=/usr/local/rustup " \
+                  "YARN_CACHE_FOLDER=#{CHROOT_APP_ROOT}/#{BUILD_CACHE_DIR}/yarn " \
+                  "PATH=\"/usr/local/cargo/bin:$PATH\""
+
       # Excluded when transferring the git checkout to the build host: VCS/dev
       # cruft, plus artifacts rebuilt inside the chroot (bundle/, node_modules/,
       # compiled assets). node_modules and bundle are DELIBERATELY rebuilt there
-      # (native, correct arch) and kept in the final artifact.
+      # (native, correct arch) and kept in the final artifact. .git goes
+      # separately into the cache dataset (#transfer_git_dir).
       APP_TRANSFER_EXCLUDES = %w(
         .git .gitignore .rspec tmp log spec test features doc
         .playwright-mcp vendor/cache node_modules bundle .cache
         public/assets public/vite
       ).freeze
+
+      # Removed from the workspace right before it is snapshotted as the
+      # artifact — once per build, so every deploy clone starts out clean.
+      # Anchored globs only: NEVER a bare `-name cache`/`-name doc`, which
+      # would also delete runtime code (e.g. activesupport's own
+      # lib/active_support/cache/coder.rb) and break the app. The next build
+      # re-transfers the small development files and bundler re-downloads
+      # only what changed; the expensive caches live in BUILD_CACHE_DIR.
+      WORKSPACE_STRIP = [
+        "rm -rf .git .gitignore .rspec tmp log spec test features doc .playwright-mcp vendor/cache solr",
+        "rm -f db/*.sqlite3 gems/*.zip",
+        "rm -rf bundle/ruby/*/cache bundle/ruby/*/doc",
+        "rm -rf bundle/ruby/*/bundler/gems/*/.git",
+        "rm -rf bundle/ruby/*/gems/*/ext/*/target bundle/ruby/*/bundler/gems/*/ext/*/target"
+      ].freeze
 
       def initialize(host, web_image)
         @host = host
@@ -135,27 +172,70 @@ module CloudModel
 
         comment_sub_step "Prepare workspace"
         if app_volume.dataset_exists?
-          # Persistent workspace across builds — bundle/, node_modules/, the
-          # git-gem caches and puppeteer's Chromium survive, so rebuilds are
-          # incremental. Just remount it into this build's fresh build system.
+          # Persistent workspace across builds — bundle/ and node_modules/
+          # survive, so rebuilds are incremental. Just remount it into this
+          # build's fresh build system.
           @host.exec! "zfs set mountpoint=#{app_volume.mountpoint.shellescape} #{app_volume.dataset_name.shellescape}", "Failed to set workspace mountpoint"
           app_volume.mount!
         else
           app_volume.prepare!
         end
         @host.exec! "mkdir -p #{app_build_host_path.shellescape}", "Failed to create app directory"
+        ensure_build_cache
 
         comment_sub_step "Transfer source to build host"
         transfer_source
+        transfer_git_dir
+      end
+
+      # The cache child dataset (see BUILD_CACHE_DIR): created on the first
+      # build, mounted on every one. Its mountpoint is inherited, so it
+      # follows the workspace wherever the current build system mounts it.
+      def ensure_build_cache
+        unless @host.exec("zfs list #{build_cache_dataset.shellescape}").first
+          opts = CloudModel.config.zfs_compression.to_s.empty? ? '' : " -o compression=#{CloudModel.config.zfs_compression.shellescape}"
+          @host.exec! "zfs create -p#{opts} #{build_cache_dataset.shellescape}", "Failed to create build cache dataset"
+        end
+        unless @host.exec("zfs get -H -o value mounted #{build_cache_dataset.shellescape}")[1].to_s.strip == 'yes'
+          @host.exec! "zfs mount #{build_cache_dataset.shellescape}", "Failed to mount build cache dataset"
+        end
+        @host.exec! "mkdir -p #{%w(cargo cargo-target yarn git).map { |d| "#{build_cache_host_path}/#{d}".shellescape } * ' '}",
+          "Failed to create build cache directories"
       end
 
       # rsync the local checkout into the app volume on the build host. bundle/
       # node_modules/assets are excluded here and rebuilt natively in the chroot.
       def transfer_source
         excludes = APP_TRANSFER_EXCLUDES.map { |e| "--exclude=#{e.shellescape}" } * ' '
-        ssh = "ssh -i #{CloudModel.config.ssh_key_file.shellescape} -o StrictHostKeyChecking=no"
-        local_exec! "rsync -a --delete #{excludes} -e #{ssh.shellescape} #{@web_image.build_path.shellescape}/ root@#{@host.ssh_address}:#{app_build_host_path.shellescape}/",
+        local_exec! "rsync -a --delete #{excludes} -e #{transfer_ssh.shellescape} #{@web_image.build_path.shellescape}/ root@#{@host.ssh_address}:#{app_build_host_path.shellescape}/",
           "Failed to transfer source to build host"
+      end
+
+      # Gives the build a git checkout to ask (`git log`, `git describe`):
+      # apps freeze their revision into a file at assets:precompile, which
+      # used to run on the admin machine inside the checkout. The git dir is
+      # rsynced into the cache dataset and the app root gets a `.git` FILE
+      # pointing there (git's own gitdir indirection, as used by worktrees
+      # and submodules) — so the workspace stays a valid checkout for every
+      # tool, nothing of it is in the artifact, and bundler's git operations
+      # are untouched (unlike a global GIT_DIR). Skipped without a .git.
+      def transfer_git_dir
+        return unless File.directory? "#{@web_image.build_path}/.git"
+
+        local_exec! "rsync -a --delete -e #{transfer_ssh.shellescape} #{@web_image.build_path.shellescape}/.git/ root@#{@host.ssh_address}:#{"#{build_cache_host_path}/git".shellescape}/",
+          "Failed to transfer git dir to build host"
+        @host.exec! "printf 'gitdir: %s\\n' #{"#{BUILD_CACHE_DIR}/git".shellescape} > #{"#{app_build_host_path}/.git".shellescape}",
+          "Failed to link git dir"
+        # The workspace is owned by the app user from the previous build's
+        # finalize, while the build runs as root; git (2.35.2+) refuses to
+        # read a repository owned by someone else. The build system's root
+        # gitconfig is as throwaway as the build system itself.
+        chroot! buildsys_volume.rootfs_path, "git config --global --add safe.directory #{CHROOT_APP_ROOT}",
+          "Failed to mark the app root as a safe git directory"
+      end
+
+      def transfer_ssh
+        "ssh -i #{CloudModel.config.ssh_key_file.shellescape} -o StrictHostKeyChecking=no"
       end
 
       # Copies the git deploy key into the throwaway build system so
@@ -203,11 +283,8 @@ module CloudModel
         chroot! buildsys_volume.rootfs_path, [
           "cd #{CHROOT_APP_ROOT}",
           "export #{GIT_SSH_COMMAND}",
-          # Point rustup/cargo at the toolchain the template installed (with its
-          # default set) — without RUSTUP_HOME/CARGO_HOME rustup looks in root's
-          # empty ~/.rustup and fails ("could not choose a version of cargo").
-          # Needed for Rust-native gems.
-          "export CARGO_HOME=/usr/local/cargo RUSTUP_HOME=/usr/local/rustup PATH=\"/usr/local/cargo/bin:$PATH\"",
+          # Toolchain caches in the cache dataset (Rust-native gems).
+          "export #{CACHE_ENV}",
           # BUNDLE_JOBS=1 (in BUNDLE_ENV): serialize install so bundler doesn't
           # unshallow the same git repo (referenced by several gems) from
           # parallel workers, which races on git's shallow.lock.
@@ -297,6 +374,7 @@ module CloudModel
         # arm64 Linux build to fetch).
         chroot! buildsys_volume.rootfs_path, [
           "cd #{CHROOT_APP_ROOT}",
+          "export #{CACHE_ENV}",
           "export PUPPETEER_SKIP_DOWNLOAD=1",
           "export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1",
           "command -v yarn >/dev/null 2>&1 || npm install -g yarn",
@@ -310,10 +388,22 @@ module CloudModel
         # ones). SECRET_KEY_BASE: a throwaway value just so the app can boot to
         # compile assets (Rails requires one in production even when the real key
         # comes from credentials/ENV at runtime). Never used at runtime.
-        chroot! buildsys_volume.rootfs_path, "cd #{CHROOT_APP_ROOT} && export #{BUNDLE_ENV} && SECRET_KEY_BASE=assets_build RAILS_ENV=production RAILS_GROUPS=assets bundle exec rake assets:precompile", "Unable to build assets"
+        # CACHE_ENV: an app that (re)builds native extensions from here finds
+        # the cached crate registry.
+        chroot! buildsys_volume.rootfs_path, "cd #{CHROOT_APP_ROOT} && export #{CACHE_ENV} && export #{BUNDLE_ENV} && SECRET_KEY_BASE=assets_build RAILS_ENV=production RAILS_GROUPS=assets bundle exec rake assets:precompile", "Unable to build assets"
       end
 
       def finalize_app_volume
+        comment_sub_step "Detach build cache"
+        # Out of the way before chown/strip/snapshot: a recursive chown would
+        # otherwise crawl the cargo target dir, strip must not touch it, and
+        # the snapshot must not even carry its mountpoint directory.
+        @host.exec! "zfs unmount #{build_cache_dataset.shellescape}", "Failed to unmount build cache dataset"
+        @host.exec! "rmdir #{build_cache_host_path.shellescape}", "Failed to remove build cache mountpoint"
+
+        comment_sub_step "Strip build scratch from artifact"
+        @host.exec! "cd #{app_build_host_path.shellescape} && #{WORKSPACE_STRIP * ' && '}", "Failed to strip workspace"
+
         comment_sub_step "Set ownership"
         # Container 'www' runs as uid 1001; with the usual idmap base of
         # 100000 that is host 101001. Owning the workspace that way lets the
@@ -332,13 +422,13 @@ module CloudModel
         @host.exec! "zfs set mountpoint=none #{app_volume.dataset_name.shellescape}", "Failed to detach workspace mountpoint"
         # Versioned snapshot (never a fixed @ready): a rebuild adds a new @v<ts>
         # and never has to destroy a snapshot a deployed guest still clones from.
-        # Build scratch (.git, caches, ext target) stays in the workspace for
-        # incremental rebuilds and is stripped from the per-guest deploy clone.
         ts = Time.now.utc.strftime("%Y%m%d%H%M%S")
         @host.exec! "zfs snapshot #{@web_image.build_dataset(@arch).shellescape}@v#{ts}", "Failed to snapshot artifact version"
         @web_image.record_artifact_version @arch, ts
 
-        _success, used = @host.exec "zfs list -H -p -o used #{@web_image.build_dataset(@arch).shellescape}"
+        # usedbydataset: the artifact's own data — not its snapshots, not the
+        # cache child dataset.
+        _success, used = @host.exec "zfs list -H -p -o usedbydataset #{@web_image.build_dataset(@arch).shellescape}"
         @web_image.record_artifact_size @arch, used.to_s.strip.to_i
 
         comment_sub_step "Destroy build system (workspace kept)"
@@ -364,7 +454,9 @@ module CloudModel
       def cleanup_build_env
         cleanup_chroot_quietly buildsys_volume.rootfs_path if @buildsys_volume
         # Keep the workspace (persistent, incremental) — only tear down this
-        # build's throwaway build system.
+        # build's throwaway build system. The cache child must go first, or
+        # the workspace cannot be unmounted.
+        @host.exec "zfs unmount #{build_cache_dataset.shellescape}" if @app_volume
         @app_volume&.unmount!
         @buildsys_volume&.destroy!
       rescue Exception => e
@@ -395,6 +487,15 @@ module CloudModel
       # Host path to the Rails app root inside the build system.
       def app_build_host_path
         "#{buildsys_volume.rootfs_path}#{CHROOT_APP_ROOT}"
+      end
+
+      # The workspace's cache child dataset and where it shows up on the host.
+      def build_cache_dataset
+        "#{@web_image.build_dataset(@arch)}/#{BUILD_CACHE_DIR}"
+      end
+
+      def build_cache_host_path
+        "#{app_build_host_path}/#{BUILD_CACHE_DIR}"
       end
 
       # ---- redeploy orchestration (rolls the built artifact out per service) ----
