@@ -204,7 +204,8 @@ describe CloudModel::Workers::WebImageWorker do
 
       it 'rsyncs .git into the cache dataset and points a gitdir file at it' do
         allow(File).to receive(:directory?).with('/tmp/web_build/web42/.git').and_return true
-        expect(subject).to receive(:local_exec!).with(%r{\Arsync -a --delete --exclude=}, anything).ordered
+        # --delete must spare the cache mountpoint, which has no counterpart in the checkout
+        expect(subject).to receive(:local_exec!).with(%r{\Arsync -a --delete --exclude=.* --exclude=\.build-cache -e }, anything).ordered
         expect(subject).to receive(:local_exec!).with(%r{\Arsync -a --delete -e .* /tmp/web_build/web42/\.git/ root@10\.0\.0\.23:/cloud/build/web/web42/MOS6502-buildenv/rootfs/webimage/\.build-cache/git/\z}, anything).ordered
         expect(host).to receive(:exec!).with("printf 'gitdir: %s\\n' .build-cache/git > /cloud/build/web/web42/MOS6502-buildenv/rootfs/webimage/.git", anything)
         expect(subject).to receive(:chroot!).with(buildsys_volume.rootfs_path, 'git config --global --add safe.directory /webimage', anything)

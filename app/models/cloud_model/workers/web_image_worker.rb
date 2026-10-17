@@ -65,11 +65,14 @@ module CloudModel
       # cruft, plus artifacts rebuilt inside the chroot (bundle/, node_modules/,
       # compiled assets). node_modules and bundle are DELIBERATELY rebuilt there
       # (native, correct arch) and kept in the final artifact. .git goes
-      # separately into the cache dataset (#transfer_git_dir).
-      APP_TRANSFER_EXCLUDES = %w(
+      # separately into the cache dataset (#transfer_git_dir). The cache
+      # mountpoint is listed so `--delete` leaves it alone (an excluded path
+      # is never deleted on the receiver): it has no counterpart in the
+      # checkout, and rsync cannot remove a mountpoint anyway.
+      APP_TRANSFER_EXCLUDES = %W(
         .git .gitignore .rspec tmp log spec test features doc
         .playwright-mcp vendor/cache node_modules bundle .cache
-        public/assets public/vite
+        public/assets public/vite #{BUILD_CACHE_DIR}
       ).freeze
 
       # Removed from the workspace right before it is snapshotted as the
