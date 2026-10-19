@@ -209,10 +209,13 @@ module CloudModel
       end
 
       def config_firewall
-        #comment_sub_step "Configure Firewall"
-        #CloudModel::Workers::FirewallWorker.new(host).write_scripts
+        # The host firewall covers every guest of the host; a batch redeploy
+        # (Guest.redeploy_batch!) restarts it once at the end instead.
+        if (@deploy_options || {})[:skip_firewall]
+          comment_sub_step "Firewall restart deferred to the end of the batch"
+          return
+        end
         comment_sub_step "Restart Firewall"
-        #host.exec! "/etc/cloud_model/firewall_stop && /etc/cloud_model/firewall_start", "Failed to restart Firewall!"
         host.restart_firewall
       end
 
@@ -224,6 +227,7 @@ module CloudModel
 
       def deploy options={}
         return false unless guest.deploy_state == :pending or options[:force]
+        @deploy_options = options
 
         guest.update_attributes deploy_state: :running, deploy_last_issue: nil
 

@@ -778,6 +778,74 @@ describe CloudModel::Guest do
     end
   end
 
+  describe '.redeploy_batch!' do
+    let(:host_a) { double CloudModel::Host, name: 'host-a' }
+    let(:host_b) { double CloudModel::Host, name: 'host-b' }
+    let(:guest_a) { double CloudModel::Guest, deploy_state: :pending, host_id: 'a', host: host_a, name: 'guest-a' }
+    let(:guest_b) { double CloudModel::Guest, deploy_state: :pending, host_id: 'a', host: host_a, name: 'guest-b' }
+    let(:guest_c) { double CloudModel::Guest, deploy_state: :pending, host_id: 'b', host: host_b, name: 'guest-c' }
+    let(:guest_running) { double CloudModel::Guest, deploy_state: :running, host_id: 'a', host: host_a, name: 'guest-d' }
+    let(:criteria) { double 'Criteria' }
+
+    before do
+      allow(CloudModel::Guest).to receive(:puts)
+      [guest_a, guest_b, guest_c, guest_running].each { |g| allow(g).to receive(:with_live_log).and_yield }
+      allow(CloudModel::Guest).to receive(:where).with(:id.in => %w[a b c d]).and_return(criteria)
+      allow(criteria).to receive(:to_a).and_return([guest_a, guest_b, guest_c, guest_running])
+    end
+
+    it 'redeploys the pending guests host by host, defers the firewall and restarts it once per host' do
+      workers = {}
+      [guest_a, guest_b, guest_c].each do |g|
+        workers[g] = double "worker #{g.name}"
+        allow(CloudModel::Workers::GuestWorker).to receive(:new).with(g).and_return(workers[g])
+      end
+      expect(CloudModel::Workers::GuestWorker).not_to receive(:new).with(guest_running)
+
+      expect(workers[guest_a]).to receive(:redeploy).with({ force: true, skip_firewall: true }).ordered
+      expect(workers[guest_b]).to receive(:redeploy).with({ force: true, skip_firewall: true }).ordered
+      expect(host_a).to receive(:restart_firewall).once.ordered
+      expect(workers[guest_c]).to receive(:redeploy).with({ force: true, skip_firewall: true }).ordered
+      expect(host_b).to receive(:restart_firewall).once.ordered
+
+      result = CloudModel::Guest.redeploy_batch! %w[a b c d], force: true
+      expect(result).to eq(deployed: %w[guest-a guest-b guest-c], failed: {})
+    end
+
+    it 'carries on after a failed guest and still restarts the firewall' do
+      worker_a = double 'worker a'
+      worker_b = double 'worker b'
+      allow(CloudModel::Workers::GuestWorker).to receive(:new).with(guest_a).and_return(worker_a)
+      allow(CloudModel::Workers::GuestWorker).to receive(:new).with(guest_b).and_return(worker_b)
+      allow(CloudModel::Workers::GuestWorker).to receive(:new).with(guest_c).and_return(double('worker c', redeploy: true))
+      allow(CloudModel).to receive(:log_exception)
+      allow(host_b).to receive(:restart_firewall)
+
+      expect(worker_a).to receive(:redeploy).and_raise('Failed to configure service Nginx')
+      expect(worker_b).to receive(:redeploy)
+      expect(host_a).to receive(:restart_firewall).once
+
+      result = CloudModel::Guest.redeploy_batch! %w[a b c d]
+      expect(result[:deployed]).to eq %w[guest-b guest-c]
+      expect(result[:failed]).to eq('guest-a' => 'Failed to configure service Nginx')
+    end
+  end
+
+  describe '.redeploy!' do
+    it 'marks the guests pending and runs the batch inline' do
+      subject = Factory :guest, name: 'batch-guest', private_address: '10.42.0.77'
+      expect(CloudModel::Guest).to receive(:redeploy_batch!).with([subject.id.to_s], { force: true }).and_return(deployed: [subject.name], failed: {})
+
+      expect(CloudModel::Guest.redeploy!([subject.id], force: true)).to eq(deployed: [subject.name], failed: {})
+      expect(subject.reload.deploy_state).to eq :pending
+    end
+
+    it 'does nothing for unknown ids' do
+      expect(CloudModel::Guest).not_to receive(:redeploy_batch!)
+      expect(CloudModel::Guest.redeploy!(['000000000000000000000000'])).to eq false
+    end
+  end
+
   describe 'redeploy!' do
     it 'should call worker to deploy Guest' do
       worker = double CloudModel::Workers::GuestWorker, redeploy: true

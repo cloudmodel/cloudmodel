@@ -415,6 +415,62 @@ module CloudModel
       end
     end
 
+    # Inline counterpart of {.redeploy} (no job): marks the guests pending and
+    # runs {.redeploy_batch!} right here — for console runs.
+    def self.redeploy!(ids, options = {})
+      criteria = self.where(:id.in => ids.map(&:to_s))
+      valid_ids = criteria.pluck(:_id).map(&:to_s)
+      return false if valid_ids.empty? and not options[:force]
+
+      criteria.update_all deploy_state_id: deploy_state_id_for(:pending),
+        live_log: '', live_log_step: nil, live_log_step_counter: nil, live_log_step_total: nil
+
+      redeploy_batch! valid_ids, options
+    end
+
+    # Redeploys the pending guests among `ids` one after another, grouped by
+    # host. What is per host is done once per host instead of once per
+    # guest: the firewall (whose rules cover every guest of the host) is
+    # restarted after the host's batch, not after each guest. A guest that
+    # fails keeps its previous container running and does not stop the
+    # batch; the failures are reported at the end.
+    # @return [Hash] `{ deployed: [names], failed: { name => message } }`
+    def self.redeploy_batch!(ids, options = {})
+      result = { deployed: [], failed: {} }
+      guests = self.where(:id.in => ids.map(&:to_s)).to_a.select { |g| g.deploy_state == :pending }
+
+      guests.group_by(&:host_id).each do |host_id, host_guests|
+        host = host_guests.first.host
+        puts "** Deploy on Host #{host.name}"
+        begin
+          host_guests.each do |guest|
+            puts "=> Redeploy Guest '#{guest.name}'"
+            begin
+              guest.with_live_log verbose: true do
+                CloudModel::Workers::GuestWorker.new(guest).redeploy options.merge(skip_firewall: true)
+              end
+              result[:deployed] << guest.name
+            rescue Exception => e
+              CloudModel.log_exception e
+              result[:failed][guest.name] = e.message
+              puts "!! Redeploy of '#{guest.name}' failed: #{e.message.lines.first.to_s.strip}"
+            end
+          end
+        ensure
+          puts "** Restart firewall on #{host.name} (once for the batch)"
+          begin
+            host.restart_firewall
+          rescue Exception => e
+            CloudModel.log_exception e
+            result[:failed]["#{host.name} firewall"] = e.message
+          end
+        end
+      end
+
+      puts "** Batch done: #{result[:deployed].size} deployed, #{result[:failed].size} failed"
+      result
+    end
+
     def check_mk_agent
       if Net::Ping::TCP.new(private_address, 6556).ping
         begin

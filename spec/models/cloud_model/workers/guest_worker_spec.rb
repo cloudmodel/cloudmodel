@@ -129,6 +129,14 @@ describe CloudModel::Workers::GuestWorker do
 
       subject.config_firewall
     end
+
+    it 'should defer the restart in a batch redeploy (skip_firewall)' do
+      subject.instance_variable_set :@deploy_options, { skip_firewall: true }
+      expect(subject).to receive(:comment_sub_step).with(/deferred/)
+      expect(host).not_to receive(:restart_firewall)
+
+      subject.config_firewall
+    end
   end
 
   describe 'activate_address_resolution' do
