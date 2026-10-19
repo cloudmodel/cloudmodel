@@ -28,6 +28,11 @@ module CloudModel
         ([:mariadb] + super).uniq
       end
 
+      # Holds data: let it flush and close cleanly before the container is killed.
+      def stop_timeout
+        60
+      end
+
       def service_status
         begin
           client = Mysql2::Client.new(host: guest.private_address, username: 'monitoring');

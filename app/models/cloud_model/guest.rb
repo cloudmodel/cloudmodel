@@ -64,6 +64,7 @@ module CloudModel
       0x00 => :pending,
       0x01 => :running,
       0xe0 => :booting,
+      0xe1 => :prepared,
       0xf0 => :finished,
       0xf1 => :failed,
       0xff => :not_started
@@ -71,6 +72,8 @@ module CloudModel
 
     field :deploy_last_issue, type: String
     field :last_deploy_finished_at, type: Time
+    # Set while a new container waits for its switch-over (deploy_state :prepared)
+    field :deploy_prepared_at, type: Time
     field :deploy_path, type: String
 
     enum_field :up_state, {
@@ -418,56 +421,138 @@ module CloudModel
     # Inline counterpart of {.redeploy} (no job): marks the guests pending and
     # runs {.redeploy_batch!} right here — for console runs.
     def self.redeploy!(ids, options = {})
-      criteria = self.where(:id.in => ids.map(&:to_s))
-      valid_ids = criteria.pluck(:_id).map(&:to_s)
+      valid_ids = mark_pending! ids
       return false if valid_ids.empty? and not options[:force]
-
-      criteria.update_all deploy_state_id: deploy_state_id_for(:pending),
-        live_log: '', live_log_step: nil, live_log_step_counter: nil, live_log_step_total: nil
-
       redeploy_batch! valid_ids, options
     end
 
-    # Redeploys the pending guests among `ids` one after another, grouped by
-    # host. What is per host is done once per host instead of once per
-    # guest: the firewall (whose rules cover every guest of the host) is
-    # restarted after the host's batch, not after each guest. A guest that
-    # fails keeps its previous container running and does not stop the
-    # batch; the failures are reported at the end.
+    # Redeploys the pending guests among `ids`: full deploy including the
+    # switch-over, one guest after another per host (hosts in parallel), the
+    # host firewall restarted once per host at the end. A guest that fails
+    # keeps its previous container running and does not stop the batch.
     # @return [Hash] `{ deployed: [names], failed: { name => message } }`
     def self.redeploy_batch!(ids, options = {})
-      result = { deployed: [], failed: {} }
-      guests = self.where(:id.in => ids.map(&:to_s)).to_a.select { |g| g.deploy_state == :pending }
+      run_batch(pending_guests(ids), 'Redeploy', firewall: true) do |guest|
+        guest.with_live_log verbose: true do
+          CloudModel::Workers::GuestWorker.new(guest).redeploy options.merge(skip_firewall: true)
+        end
+      end
+    end
 
-      guests.group_by(&:host_id).each do |host_id, host_guests|
-        host = host_guests.first.host
-        puts "** Deploy on Host #{host.name}"
-        begin
-          host_guests.each do |guest|
-            puts "=> Redeploy Guest '#{guest.name}'"
-            begin
-              guest.with_live_log verbose: true do
-                CloudModel::Workers::GuestWorker.new(guest).redeploy options.merge(skip_firewall: true)
-              end
-              result[:deployed] << guest.name
-            rescue Exception => e
-              CloudModel.log_exception e
-              result[:failed][guest.name] = e.message
-              puts "!! Redeploy of '#{guest.name}' failed: #{e.message.lines.first.to_s.strip}"
-            end
+    # Phase one of a two-phase rollout: builds every guest's new container
+    # (all deploy steps but the switch-over) while the old ones keep
+    # serving. Guests end up :prepared; {.launch_prepared!} switches them
+    # later, e.g. off-hours. No firewall restart — the switch does it.
+    # @return [Hash] `{ deployed: [names], failed: { name => message } }`
+    def self.prepare_batch!(ids, options = {})
+      valid_ids = mark_pending! ids
+      return { deployed: [], failed: {} } if valid_ids.empty?
+      run_batch(pending_guests(valid_ids), 'Prepare', firewall: false) do |guest|
+        guest.with_live_log verbose: true do
+          CloudModel::Workers::GuestWorker.new(guest).redeploy options.merge(launch: false, skip_firewall: true)
+        end
+      end
+    end
+
+    # Phase two: switches the prepared guests over to their new containers —
+    # per host strictly one after another, each waited for until its
+    # services answer again (or `ready_timeout` passes, which counts as a
+    # failure but does not stop the batch), ordered by {#switch_group} so
+    # the nodes of one group change close together; hosts in parallel; the
+    # firewall restarted once per host at the end. A guest whose
+    # configuration changed since it was prepared is skipped: its new
+    # container would not reflect it (prepare it again).
+    # @param ids [Array, nil] guests to switch; nil = every prepared guest
+    # @return [Hash] `{ deployed: [names], failed: { name => message } }`
+    def self.launch_prepared!(ids = nil, options = {})
+      guests = (ids ? where(:id.in => ids.map(&:to_s)) : all).to_a.select { |g| g.deploy_state == :prepared }
+      ready_timeout = options.fetch(:ready_timeout, 120)
+
+      run_batch(guests, 'Switch', firewall: true, order: ->(g) { [g.switch_group, g.name] }) do |guest|
+        if (reason = guest.prepared_stale_reason)
+          raise "skipped: #{reason}"
+        end
+        guest.with_live_log verbose: true do
+          CloudModel::Workers::GuestWorker.new(guest).launch_prepared! options
+          puts "Waiting for #{guest.name} to answer (up to #{ready_timeout}s)…"
+          unless guest.wait_until_ready timeout: ready_timeout
+            raise "switched, but not answering after #{ready_timeout}s — check the guest before going on"
           end
-        ensure
-          puts "** Restart firewall on #{host.name} (once for the batch)"
+          puts "#{guest.name} is up"
+        end
+      end
+    end
+
+    # Guests whose switch-over should happen close together (the nodes one
+    # hostname is served by, say). A host application overrides this; by
+    # default every guest is its own group.
+    def switch_group
+      name
+    end
+
+    # Why a prepared container must not be switched to any more: the guest
+    # or one of its services was changed after the preparation.
+    # @return [String, nil]
+    def prepared_stale_reason
+      return nil unless deploy_prepared_at
+      changed = ([self] + services.to_a).select { |doc| doc.updated_at && doc.updated_at > deploy_prepared_at + 1.second }
+      return nil if changed.empty?
+      "configuration changed after preparation (#{changed.map { |d| d.is_a?(CloudModel::Guest) ? 'guest' : d.name }.join(', ')}) — prepare again"
+    end
+
+    def self.mark_pending!(ids)
+      criteria = where(:id.in => ids.map(&:to_s))
+      valid_ids = criteria.pluck(:_id).map(&:to_s)
+      criteria.update_all deploy_state_id: deploy_state_id_for(:pending),
+        live_log: '', live_log_step: nil, live_log_step_counter: nil, live_log_step_total: nil unless valid_ids.empty?
+      valid_ids
+    end
+
+    def self.pending_guests(ids)
+      where(:id.in => ids.map(&:to_s)).to_a.select { |g| g.deploy_state == :pending }
+    end
+
+    # Runs `block` for each guest, one after another per host, the hosts in
+    # parallel threads (each host its own SSH connection, so the per-host
+    # pace — and the load — stays sequential while hosts don't wait for
+    # each other). Failures are collected, not raised; with `firewall:` the
+    # host's firewall is restarted once after its guests, whatever happened.
+    def self.run_batch(guests, label, firewall:, order: ->(g) { g.name })
+      result = { deployed: [], failed: {} }
+      mutex = Mutex.new
+
+      threads = guests.group_by(&:host_id).map do |_host_id, host_guests|
+        Thread.new do
+          host = host_guests.first.host
+          puts "** #{label} on host #{host.name}: #{host_guests.size} guest(s)"
           begin
-            host.restart_firewall
-          rescue Exception => e
-            CloudModel.log_exception e
-            result[:failed]["#{host.name} firewall"] = e.message
+            host_guests.sort_by(&order).each do |guest|
+              puts "=> #{label} '#{guest.name}'"
+              begin
+                yield guest
+                mutex.synchronize { result[:deployed] << guest.name }
+              rescue Exception => e
+                CloudModel.log_exception e unless e.message.start_with? 'skipped:'
+                mutex.synchronize { result[:failed][guest.name] = e.message }
+                puts "!! #{label} of '#{guest.name}' failed: #{e.message.lines.first.to_s.strip}"
+              end
+            end
+          ensure
+            if firewall
+              puts "** Restart firewall on #{host.name} (once for the batch)"
+              begin
+                host.restart_firewall
+              rescue Exception => e
+                CloudModel.log_exception e
+                mutex.synchronize { result[:failed]["#{host.name} firewall"] = e.message }
+              end
+            end
           end
         end
       end
+      threads.each(&:join)
 
-      puts "** Batch done: #{result[:deployed].size} deployed, #{result[:failed].size} failed"
+      puts "** #{label} batch done: #{result[:deployed].size} done, #{result[:failed].size} failed"
       result
     end
 
@@ -658,6 +743,29 @@ module CloudModel
         return false
       end
       true
+    end
+
+    # Seconds a stop lets the container shut down before it is killed: the
+    # longest grace period any of the guest's services asks for (data
+    # services 60s, stateless ones 5s), 10s without services.
+    def stop_timeout
+      [services.map(&:stop_timeout).max || 10, 1].max
+    end
+
+    # All services answer again (see Services::Base#ready?).
+    def ready?
+      services.all?(&:ready?)
+    end
+
+    # Polls {#ready?} until it holds or the timeout passes.
+    # @return [Boolean] ready within the timeout
+    def wait_until_ready timeout: 120, interval: 3
+      deadline = Time.now + timeout
+      loop do
+        return true if ready?
+        return false if Time.now > deadline
+        sleep interval
+      end
     end
 
     def fix_lxd_custom_volumes

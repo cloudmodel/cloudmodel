@@ -17,6 +17,11 @@ module CloudModel
         ([:neo4j] + super).uniq
       end
 
+      # Holds data: let it flush and close cleanly before the container is killed.
+      def stop_timeout
+        60
+      end
+
       def service_status
         {}
       end

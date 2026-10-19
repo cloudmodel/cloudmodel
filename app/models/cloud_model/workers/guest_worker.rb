@@ -225,6 +225,12 @@ module CloudModel
         end
       end
 
+      # Builds the guest's new container and, unless `launch: false`, switches
+      # the guest over to it. With `launch: false` everything up to the switch
+      # is done — the new container sits ready beside the running old one,
+      # the guest is marked :prepared — and {#launch_prepared!} does the
+      # switch later (e.g. in a batch, off-hours). `skip_firewall` leaves the
+      # host firewall restart to the caller (a batch does it once per host).
       def deploy options={}
         return false unless guest.deploy_state == :pending or options[:force]
         @deploy_options = options
@@ -245,15 +251,12 @@ module CloudModel
           ['Config network', :config_network],
           ['Config firewall', :config_firewall],
           ['Activate Address Resolution', :activate_address_resolution],
-          ['Launch LXD container', :start_lxd_container]
-
-          # ['Prepare volume for new system', :make_deploy_root, on_skip: :use_last_deploy_root],
-         #  ['Populate volume with new system image', :populate_deploy_root],
-         #  ['Make crypto keys', :make_keys],
-         #  ['Config new system', :config_deploy_root],
-         #  # TODO: apply existing guests and restore backups
-         #  ['Write boot config and reboot', :boot_deploy_root],
         ]
+        if options[:launch] == false
+          steps << ['Leave container prepared (switch-over deferred)', :leave_prepared]
+        else
+          steps << ['Launch LXD container', :start_lxd_container]
+        end
 
         begin
           run_steps :deploy, steps, options
@@ -263,21 +266,65 @@ module CloudModel
           raise e
         end
 
-        #guest.update_attributes deploy_state: :finished
-        guest.collection.update_one({_id:  guest.id}, '$set' => { 'deploy_state_id': 0xf0, 'last_deploy_finished_at': Time.now })
-        #guest.update_attribute :deploy_state, :finished
-
-        # The fresh deploy reflects the stored config — clear staged markers.
-        guest.services.each do |service|
-          service.set config_staged_at: nil, config_staged_deploy_required: false, config_staged_changes: [] if service.config_staged?
+        if options[:launch] == false
+          guest.collection.update_one({_id: guest.id}, '$set' => { 'deploy_state_id': 0xe1, 'deploy_prepared_at': Time.now })
+          puts "Prepared container #{@lxc.name} in #{distance_of_time_in_words_to_now build_start_at}; the guest keeps running on #{guest.current_lxd_container.try(:name) || 'its current container'} until the switch-over"
+          Rails.logger.debug "GUEST_WORKER: Prepared guest #{guest.name} container #{@lxc.name} in #{Time.now - build_start_at}"
+          return
         end
 
+        mark_deployed
         puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"
         Rails.logger.debug "GUEST_WORKER: Deploy guest #{guest.name} on container #{@lxc.name} done in #{Time.now - build_start_at}"
       end
 
       def redeploy options={}
         deploy options
+      end
+
+      # The deferred half of a `launch: false` deploy: switches the guest over
+      # to the container prepared last (the newest), i.e. stops the running
+      # one and starts the new one. Everything else was done at preparation.
+      # @raise [RuntimeError] unless the guest is :prepared
+      def launch_prepared! options={}
+        unless guest.deploy_state == :prepared or options[:force]
+          raise "Guest #{guest.name} has no prepared container (deploy_state #{guest.deploy_state})"
+        end
+        @deploy_options = options
+        @lxc = guest.lxd_containers.desc(:created_at).first
+        raise "Guest #{guest.name} has no container to switch to" if @lxc.blank?
+        guest.deploy_path = "#{@lxc.mountpoint}/rootfs"
+
+        start_at = Time.now
+        guest.update_attributes deploy_state: :running, deploy_last_issue: nil
+        begin
+          run_steps :launch, [['Launch LXD container', :start_lxd_container]], options
+        rescue Exception => e
+          guest.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
+          raise e
+        end
+
+        mark_deployed
+        puts "Switched #{guest.name} to #{@lxc.name} in #{distance_of_time_in_words_to_now start_at}"
+      end
+
+      private
+
+      # Last preparation step in place of the launch: drop the chroot
+      # submounts and unmount the new container's rootfs, as the launch would
+      # have done before starting it.
+      def leave_prepared
+        cleanup_chroot guest.deploy_path
+        @lxc.unmount
+      end
+
+      def mark_deployed
+        guest.collection.update_one({_id: guest.id}, '$set' => { 'deploy_state_id': 0xf0, 'last_deploy_finished_at': Time.now, 'deploy_prepared_at': nil })
+
+        # The fresh deploy reflects the stored config — clear staged markers.
+        guest.services.each do |service|
+          service.set config_staged_at: nil, config_staged_deploy_required: false, config_staged_changes: [] if service.config_staged?
+        end
       end
     end
   end

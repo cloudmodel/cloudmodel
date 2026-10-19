@@ -199,6 +199,26 @@ module CloudModel
         "#{internal_uri}/nginx_status"
       end
 
+      # URL a batch switch-over polls to see the service back up; the root by
+      # default — any HTTP answer there means nginx is up and, with Passenger,
+      # the app has spawned (its first response is the slow one). A host
+      # application may point this at its own health endpoint instead.
+      def ready_uri
+        internal_uri
+      end
+
+      # Any HTTP response counts, including 3xx/4xx/5xx: those come from the
+      # application, a connection failure does not.
+      def ready?
+        uri = URI(ready_uri)
+        Net::HTTP.start(uri.host, uri.port, use_ssl: ssl_supported,
+            verify_mode: OpenSSL::SSL::VERIFY_NONE, open_timeout: 5, read_timeout: 30) do |http|
+          http.request(Net::HTTP::Get.new(uri.request_uri)).is_a?(Net::HTTPResponse)
+        end
+      rescue Exception
+        false
+      end
+
       def service_status
         data = {}
         uri = URI(status_uri)

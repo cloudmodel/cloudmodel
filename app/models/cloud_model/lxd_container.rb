@@ -235,7 +235,9 @@ module CloudModel
     def stop options={}
       if options[:force] or running?
         guest.update_attributes up_state: options[:up_state] || :stopped, last_downtime_at: Time.now, last_downtime_reason: options[:reason] || "Stopped"
-        lxc "stop #{name} -f --timeout=10"
+        # Graceful shutdown up to the guest's stop timeout (the longest its
+        # services ask for), then the kill.
+        lxc "stop #{name} -f --timeout=#{guest.stop_timeout}"
       end
     end
 

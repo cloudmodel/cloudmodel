@@ -35,6 +35,7 @@ de:
     pending: Geplant
     running: Wird installiert
     booting: Wird gestartet
+    prepared: Vorbereitet, wartet auf Umschaltung
     finished: Abgeschlossen
     failed: Fehlgeschlagen
 

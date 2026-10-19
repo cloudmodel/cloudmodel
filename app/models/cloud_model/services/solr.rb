@@ -53,6 +53,11 @@ module CloudModel
         end
       end
 
+      # Holds data: let it flush and close cleanly before the container is killed.
+      def stop_timeout
+        60
+      end
+
       def service_status
         #base_url = "http#{ssl_supported ? 's' : ''}://#{guest.private_address}:8080/solr/admin"
         base_url = "http://#{guest.private_address}:#{port}/solr/admin"

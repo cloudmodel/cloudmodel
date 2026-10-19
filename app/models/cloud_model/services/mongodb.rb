@@ -86,6 +86,11 @@ module CloudModel
         data
       end
 
+      # Holds data: let it flush and close cleanly before the container is killed.
+      def stop_timeout
+        60
+      end
+
       def service_status
         begin
           mongo_client = Mongo::Client.new(["#{server_uri}"], connect_timeout: 1, server_selection_timeout: 1, connect: :direct)

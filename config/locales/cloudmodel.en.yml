@@ -35,6 +35,7 @@ en:
     pending: Scheduled for execution
     running: Deploying
     booting: Booting
+    prepared: Prepared, waiting for switch-over
     finished: Finished
     failed: Failed to deploy
 

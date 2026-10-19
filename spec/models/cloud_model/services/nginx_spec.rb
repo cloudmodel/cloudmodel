@@ -150,6 +150,35 @@ describe CloudModel::Services::Nginx do
     end
   end
 
+  describe 'stop_timeout' do
+    it 'is short — the app needs no graceful shutdown, every second is downtime on a switch' do
+      expect(subject.stop_timeout).to eq 5
+    end
+  end
+
+  describe 'ready?' do
+    let(:http) { double 'http' }
+
+    before do
+      subject.ssl_supported = false
+      allow(subject).to receive(:ready_uri).and_return 'http://10.42.0.23:80/'
+    end
+
+    it 'is ready on any HTTP answer, a redirect included' do
+      expect(Net::HTTP).to receive(:start) do |host, port, **opts, &block|
+        expect([host, port, opts[:use_ssl], opts[:open_timeout]]).to eq ['10.42.0.23', 80, false, 5]
+        block.call http
+      end
+      allow(http).to receive(:request).and_return Net::HTTPFound.new('1.1', '302', 'Found')
+      expect(subject.ready?).to eq true
+    end
+
+    it 'is not ready while the connection is refused' do
+      expect(Net::HTTP).to receive(:start).and_raise(Errno::ECONNREFUSED)
+      expect(subject.ready?).to eq false
+    end
+  end
+
   describe 'service_status' do
     it 'should return parsed nginx status on success' do
       body = "Active connections: 42\nserver accepts handled requests\n 100 100 500\nReading: 1 Writing: 2 Waiting: 39\n"

@@ -27,6 +27,11 @@ module CloudModel
         ([:redis] + super).uniq
       end
 
+      # Holds data: let it flush and close cleanly before the container is killed.
+      def stop_timeout
+        60
+      end
+
       def service_status
         begin
           redis = ::Redis.new(host: guest.private_address, port: port, db: 0)

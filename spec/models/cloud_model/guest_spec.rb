@@ -31,6 +31,7 @@ describe CloudModel::Guest do
     0x00 => :pending,
     0x01 => :running,
     0xe0 => :booting,
+    0xe1 => :prepared,
     0xf0 => :finished,
     0xf1 => :failed,
     0xff => :not_started
@@ -778,13 +779,13 @@ describe CloudModel::Guest do
     end
   end
 
-  describe '.redeploy_batch!' do
+  describe 'batch deploys' do
     let(:host_a) { double CloudModel::Host, name: 'host-a' }
     let(:host_b) { double CloudModel::Host, name: 'host-b' }
-    let(:guest_a) { double CloudModel::Guest, deploy_state: :pending, host_id: 'a', host: host_a, name: 'guest-a' }
-    let(:guest_b) { double CloudModel::Guest, deploy_state: :pending, host_id: 'a', host: host_a, name: 'guest-b' }
-    let(:guest_c) { double CloudModel::Guest, deploy_state: :pending, host_id: 'b', host: host_b, name: 'guest-c' }
-    let(:guest_running) { double CloudModel::Guest, deploy_state: :running, host_id: 'a', host: host_a, name: 'guest-d' }
+    let(:guest_a) { double CloudModel::Guest, deploy_state: :pending, host_id: 'a', host: host_a, name: 'guest-a', switch_group: 'guest-a' }
+    let(:guest_b) { double CloudModel::Guest, deploy_state: :pending, host_id: 'a', host: host_a, name: 'guest-b', switch_group: 'guest-b' }
+    let(:guest_c) { double CloudModel::Guest, deploy_state: :pending, host_id: 'b', host: host_b, name: 'guest-c', switch_group: 'guest-c' }
+    let(:guest_running) { double CloudModel::Guest, deploy_state: :running, host_id: 'a', host: host_a, name: 'guest-d', switch_group: 'guest-d' }
     let(:criteria) { double 'Criteria' }
 
     before do
@@ -794,40 +795,169 @@ describe CloudModel::Guest do
       allow(criteria).to receive(:to_a).and_return([guest_a, guest_b, guest_c, guest_running])
     end
 
-    it 'redeploys the pending guests host by host, defers the firewall and restarts it once per host' do
-      workers = {}
-      [guest_a, guest_b, guest_c].each do |g|
-        workers[g] = double "worker #{g.name}"
-        allow(CloudModel::Workers::GuestWorker).to receive(:new).with(g).and_return(workers[g])
+    describe '.redeploy_batch!' do
+      it 'redeploys the pending guests host by host, defers the firewall and restarts it once per host' do
+        workers = {}
+        [guest_a, guest_b, guest_c].each do |g|
+          workers[g] = double "worker #{g.name}"
+          allow(CloudModel::Workers::GuestWorker).to receive(:new).with(g).and_return(workers[g])
+        end
+        expect(CloudModel::Workers::GuestWorker).not_to receive(:new).with(guest_running)
+
+        order_a = []
+        expect(workers[guest_a]).to receive(:redeploy).with({ force: true, skip_firewall: true }) { order_a << :a }
+        expect(workers[guest_b]).to receive(:redeploy).with({ force: true, skip_firewall: true }) { order_a << :b }
+        expect(host_a).to receive(:restart_firewall).once { order_a << :firewall }
+        expect(workers[guest_c]).to receive(:redeploy).with({ force: true, skip_firewall: true })
+        expect(host_b).to receive(:restart_firewall).once
+
+        result = CloudModel::Guest.redeploy_batch! %w[a b c d], force: true
+        expect(result[:deployed].sort).to eq %w[guest-a guest-b guest-c]
+        expect(result[:failed]).to eq({})
+        expect(order_a).to eq [:a, :b, :firewall]   # one host: strictly sequential, firewall last
       end
-      expect(CloudModel::Workers::GuestWorker).not_to receive(:new).with(guest_running)
 
-      expect(workers[guest_a]).to receive(:redeploy).with({ force: true, skip_firewall: true }).ordered
-      expect(workers[guest_b]).to receive(:redeploy).with({ force: true, skip_firewall: true }).ordered
-      expect(host_a).to receive(:restart_firewall).once.ordered
-      expect(workers[guest_c]).to receive(:redeploy).with({ force: true, skip_firewall: true }).ordered
-      expect(host_b).to receive(:restart_firewall).once.ordered
+      it 'carries on after a failed guest and still restarts the firewall' do
+        worker_a = double 'worker a'
+        worker_b = double 'worker b'
+        allow(CloudModel::Workers::GuestWorker).to receive(:new).with(guest_a).and_return(worker_a)
+        allow(CloudModel::Workers::GuestWorker).to receive(:new).with(guest_b).and_return(worker_b)
+        allow(CloudModel::Workers::GuestWorker).to receive(:new).with(guest_c).and_return(double('worker c', redeploy: true))
+        allow(CloudModel).to receive(:log_exception)
+        allow(host_b).to receive(:restart_firewall)
 
-      result = CloudModel::Guest.redeploy_batch! %w[a b c d], force: true
-      expect(result).to eq(deployed: %w[guest-a guest-b guest-c], failed: {})
+        expect(worker_a).to receive(:redeploy).and_raise('Failed to configure service Nginx')
+        expect(worker_b).to receive(:redeploy)
+        expect(host_a).to receive(:restart_firewall).once
+
+        result = CloudModel::Guest.redeploy_batch! %w[a b c d]
+        expect(result[:deployed].sort).to eq %w[guest-b guest-c]
+        expect(result[:failed]).to eq('guest-a' => 'Failed to configure service Nginx')
+      end
     end
 
-    it 'carries on after a failed guest and still restarts the firewall' do
-      worker_a = double 'worker a'
-      worker_b = double 'worker b'
-      allow(CloudModel::Workers::GuestWorker).to receive(:new).with(guest_a).and_return(worker_a)
-      allow(CloudModel::Workers::GuestWorker).to receive(:new).with(guest_b).and_return(worker_b)
-      allow(CloudModel::Workers::GuestWorker).to receive(:new).with(guest_c).and_return(double('worker c', redeploy: true))
-      allow(CloudModel).to receive(:log_exception)
-      allow(host_b).to receive(:restart_firewall)
+    describe '.prepare_batch!' do
+      it 'marks the guests pending, deploys without the switch-over and leaves the firewall alone' do
+        allow(CloudModel::Guest).to receive(:mark_pending!).with(%w[a b c d]).and_return(%w[a b c d])
+        [guest_a, guest_b, guest_c].each do |g|
+          worker = double "worker #{g.name}"
+          allow(CloudModel::Workers::GuestWorker).to receive(:new).with(g).and_return(worker)
+          expect(worker).to receive(:redeploy).with({ launch: false, skip_firewall: true })
+        end
+        expect(host_a).not_to receive(:restart_firewall)
+        expect(host_b).not_to receive(:restart_firewall)
 
-      expect(worker_a).to receive(:redeploy).and_raise('Failed to configure service Nginx')
-      expect(worker_b).to receive(:redeploy)
-      expect(host_a).to receive(:restart_firewall).once
+        result = CloudModel::Guest.prepare_batch! %w[a b c d]
+        expect(result[:deployed].sort).to eq %w[guest-a guest-b guest-c]
+      end
+    end
 
-      result = CloudModel::Guest.redeploy_batch! %w[a b c d]
-      expect(result[:deployed]).to eq %w[guest-b guest-c]
-      expect(result[:failed]).to eq('guest-a' => 'Failed to configure service Nginx')
+    describe '.launch_prepared!' do
+      let(:prepared_a) { double CloudModel::Guest, deploy_state: :prepared, host_id: 'a', host: host_a, name: 'node-a', switch_group: 'repo-1', prepared_stale_reason: nil }
+      let(:prepared_b) { double CloudModel::Guest, deploy_state: :prepared, host_id: 'a', host: host_a, name: 'node-b', switch_group: 'repo-0', prepared_stale_reason: nil }
+      let(:stale)      { double CloudModel::Guest, deploy_state: :prepared, host_id: 'a', host: host_a, name: 'node-stale', switch_group: 'repo-2', prepared_stale_reason: 'configuration changed after preparation (Graph) — prepare again' }
+      let(:finished)   { double CloudModel::Guest, deploy_state: :finished, host_id: 'a', host: host_a, name: 'node-done', switch_group: 'x' }
+
+      before do
+        [prepared_a, prepared_b, stale].each { |g| allow(g).to receive(:with_live_log).and_yield }
+        allow(CloudModel::Guest).to receive(:all).and_return(double('all', to_a: [prepared_a, prepared_b, stale, finished]))
+        allow(host_a).to receive(:restart_firewall)
+      end
+
+      it 'switches the prepared guests in switch-group order, waits for each to answer, skips stale ones' do
+        order = []
+        worker_a = double 'worker a'
+        worker_b = double 'worker b'
+        allow(CloudModel::Workers::GuestWorker).to receive(:new).with(prepared_a).and_return(worker_a)
+        allow(CloudModel::Workers::GuestWorker).to receive(:new).with(prepared_b).and_return(worker_b)
+        expect(CloudModel::Workers::GuestWorker).not_to receive(:new).with(stale)
+        expect(CloudModel::Workers::GuestWorker).not_to receive(:new).with(finished)
+
+        expect(worker_b).to receive(:launch_prepared!) { order << :b }
+        expect(prepared_b).to receive(:wait_until_ready).with(timeout: 120) { order << :b_ready; true }
+        expect(worker_a).to receive(:launch_prepared!) { order << :a }
+        expect(prepared_a).to receive(:wait_until_ready).with(timeout: 120) { order << :a_ready; true }
+        expect(host_a).to receive(:restart_firewall).once { order << :firewall }
+
+        result = CloudModel::Guest.launch_prepared!
+        expect(order).to eq [:b, :b_ready, :a, :a_ready, :firewall]   # repo-0 before repo-1, each awaited
+        expect(result[:deployed]).to eq %w[node-b node-a]
+        expect(result[:failed].keys).to eq %w[node-stale]
+        expect(result[:failed]['node-stale']).to match(/skipped: configuration changed/)
+      end
+
+      it 'counts a guest that does not answer in time as failed but goes on' do
+        allow(CloudModel::Workers::GuestWorker).to receive(:new).with(prepared_b).and_return(double('wb', launch_prepared!: true))
+        allow(CloudModel::Workers::GuestWorker).to receive(:new).with(prepared_a).and_return(double('wa', launch_prepared!: true))
+        allow(prepared_b).to receive(:wait_until_ready).and_return false
+        allow(prepared_a).to receive(:wait_until_ready).and_return true
+        allow(CloudModel).to receive(:log_exception)
+
+        result = CloudModel::Guest.launch_prepared! nil, ready_timeout: 120
+        expect(result[:deployed]).to eq %w[node-a]
+        expect(result[:failed]['node-b']).to match(/not answering after 120s/)
+      end
+    end
+  end
+
+  describe 'stop_timeout' do
+    it 'is 10 seconds without services' do
+      expect(subject.stop_timeout).to eq 10
+    end
+
+    it 'is the longest grace period among the services (data services 60s, stateless 5s)' do
+      subject.services << CloudModel::Services::Nginx.new(name: 'web')
+      expect(subject.stop_timeout).to eq 5
+      subject.services << CloudModel::Services::Mongodb.new(name: 'db')
+      expect(subject.stop_timeout).to eq 60
+    end
+  end
+
+  describe 'readiness' do
+    it 'is ready when every service is' do
+      web = double 'nginx', ready?: true
+      db = double 'mongodb', ready?: false
+      allow(subject).to receive(:services).and_return([web, db])
+      expect(subject.ready?).to eq false
+      allow(db).to receive(:ready?).and_return true
+      expect(subject.ready?).to eq true
+    end
+
+    it 'waits until ready, polling, and gives up after the timeout' do
+      allow(subject).to receive(:sleep)
+      answers = [false, false, true]
+      allow(subject).to receive(:ready?) { answers.shift }
+      expect(subject.wait_until_ready(timeout: 60, interval: 1)).to eq true
+
+      allow(subject).to receive(:ready?).and_return false
+      now = Time.now
+      allow(Time).to receive(:now).and_return(now, now, now + 61)
+      expect(subject.wait_until_ready(timeout: 60, interval: 1)).to eq false
+    end
+  end
+
+  describe 'prepared_stale_reason' do
+    it 'is nil without a preparation or when nothing changed since' do
+      expect(subject.prepared_stale_reason).to be_nil
+      subject.deploy_prepared_at = Time.now
+      subject.updated_at = Time.now - 60
+      expect(subject.prepared_stale_reason).to be_nil
+    end
+
+    it 'names what changed after the preparation' do
+      subject.deploy_prepared_at = Time.now - 3600
+      subject.updated_at = Time.now - 7200
+      service = CloudModel::Services::Nginx.new(name: 'Graph')
+      service.updated_at = Time.now
+      allow(subject).to receive(:services).and_return([service])
+      expect(subject.prepared_stale_reason).to eq 'configuration changed after preparation (Graph) — prepare again'
+    end
+  end
+
+  describe 'switch_group' do
+    it 'defaults to the guest name' do
+      subject.name = 'node-1'
+      expect(subject.switch_group).to eq 'node-1'
     end
   end
 

@@ -388,6 +388,15 @@ describe CloudModel::LxdContainer do
       subject.stop
     end
 
+    it 'should give the container the guest´s stop timeout (longest service grace period)' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      allow(subject).to receive(:running?).and_return true
+      allow(guest).to receive(:stop_timeout).and_return 60
+      expect(subject).to receive(:lxc).with("stop some_guest-20200331133742 -f --timeout=60").and_return [true, '']
+
+      subject.stop
+    end
+
     it 'should call lxc stop with given reason' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
       time_now = Time.now

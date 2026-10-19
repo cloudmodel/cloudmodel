@@ -29,6 +29,83 @@ describe CloudModel::Workers::GuestWorker do
 
       expect { subject.deploy }.to output(/Finished/).to_stdout
     end
+
+    context 'with launch: false (two-phase rollout)' do
+      let(:collection) { double 'collection' }
+      let(:lxc) { double 'lxc', name: 'test-lxc-new' }
+      let(:old_lxc) { double 'old lxc', name: 'test-lxc-old' }
+
+      before do
+        allow(guest).to receive(:deploy_state).and_return(:pending)
+        allow(guest).to receive(:update_attributes)
+        allow(guest).to receive(:collection).and_return(collection)
+        allow(guest).to receive(:id).and_return(BSON::ObjectId.new)
+        allow(guest).to receive(:services).and_return([])
+        allow(guest).to receive(:current_lxd_container).and_return(old_lxc)
+        allow(Rails.logger).to receive(:debug)
+        allow(subject).to receive(:puts)
+        subject.instance_variable_set(:@lxc, lxc)
+      end
+
+      it 'runs every step but the launch, leaves the container prepared and marks the guest :prepared' do
+        expect(subject).to receive(:run_steps) do |_stage, steps, _options|
+          names = steps.map(&:first)
+          expect(names).not_to include 'Launch LXD container'
+          expect(names.last).to match(/prepared/)
+          expect(steps.last[1]).to eq :leave_prepared
+        end
+        expect(collection).to receive(:update_one).with({ _id: guest.id }, { '$set' => hash_including(deploy_state_id: 0xe1) })
+        expect(collection).not_to receive(:update_one).with(anything, { '$set' => hash_including(deploy_state_id: 0xf0) })
+
+        subject.deploy launch: false
+      end
+
+      it 'leave_prepared drops the chroot submounts and unmounts the new container' do
+        allow(guest).to receive(:deploy_path).and_return('/deploy')
+        expect(subject).to receive(:cleanup_chroot).with('/deploy')
+        expect(lxc).to receive(:unmount)
+
+        subject.send :leave_prepared
+      end
+    end
+  end
+
+  describe 'launch_prepared!' do
+    let(:collection) { double 'collection', update_one: true }
+    let(:new_lxc) { double 'new lxc', name: 'test-new', mountpoint: '/var/lib/lxd/storage-pools/default/containers/test-new' }
+
+    before do
+      allow(guest).to receive(:update_attributes)
+      allow(guest).to receive(:collection).and_return(collection)
+      allow(guest).to receive(:id).and_return(BSON::ObjectId.new)
+      allow(guest).to receive(:services).and_return([])
+      allow(guest).to receive(:deploy_path=)
+      allow(guest).to receive(:lxd_containers).and_return(double('containers', desc: double('sorted', first: new_lxc)))
+      allow(subject).to receive(:puts)
+    end
+
+    it 'refuses a guest that is not prepared' do
+      allow(guest).to receive(:deploy_state).and_return(:finished)
+      expect { subject.launch_prepared! }.to raise_error(/no prepared container/)
+    end
+
+    it 'switches to the newest container, runs only the launch step and marks the guest finished' do
+      allow(guest).to receive(:deploy_state).and_return(:prepared)
+      expect(guest).to receive(:deploy_path=).with("#{new_lxc.mountpoint}/rootfs")
+      expect(subject).to receive(:run_steps).with(:launch, [['Launch LXD container', :start_lxd_container]], {})
+      expect(collection).to receive(:update_one).with({ _id: guest.id }, { '$set' => hash_including(deploy_state_id: 0xf0, deploy_prepared_at: nil) })
+
+      subject.launch_prepared!
+      expect(subject.instance_variable_get(:@lxc)).to eq new_lxc
+    end
+
+    it 'marks the guest failed when the launch raises' do
+      allow(guest).to receive(:deploy_state).and_return(:prepared)
+      allow(subject).to receive(:run_steps).and_raise('lxc start failed')
+      expect(guest).to receive(:update_attributes).with(deploy_state: :failed, deploy_last_issue: 'lxc start failed')
+
+      expect { subject.launch_prepared! }.to raise_error('lxc start failed')
+    end
   end
 
   describe 'redeploy' do

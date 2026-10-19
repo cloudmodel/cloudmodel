@@ -214,6 +214,24 @@ module CloudModel
         raise "Service has no restore"
       end
 
+      # Seconds the container gets to shut this service down cleanly before
+      # it is killed (the guest takes the longest of its services, see
+      # {Guest#stop_timeout}). Stateless services need next to none — a
+      # shorter stop is less downtime on every switch-over; services that
+      # hold data override this with a generous grace period.
+      def stop_timeout
+        5
+      end
+
+      # Whether the service answers after a (re)start — polled by a batch
+      # switch-over before the next guest of the host is restarted. The base
+      # has nothing to probe and counts as ready; services with a port or an
+      # HTTP endpoint override it. A host application may override it further
+      # (e.g. with an application health endpoint).
+      def ready?
+        true
+      end
+
       private
 
       # Short-timeout HTTP GET for monitoring probes of a service endpoint.
