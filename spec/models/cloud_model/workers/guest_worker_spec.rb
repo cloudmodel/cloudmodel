@@ -42,6 +42,8 @@ describe CloudModel::Workers::GuestWorker do
         allow(guest).to receive(:id).and_return(BSON::ObjectId.new)
         allow(guest).to receive(:services).and_return([])
         allow(guest).to receive(:current_lxd_container).and_return(old_lxc)
+        allow(guest).to receive(:reload).and_return(guest)
+        allow(guest).to receive(:deploy_config_fingerprints).and_return('guest' => 'abc')
         allow(Rails.logger).to receive(:debug)
         allow(subject).to receive(:puts)
         subject.instance_variable_set(:@lxc, lxc)
@@ -54,7 +56,7 @@ describe CloudModel::Workers::GuestWorker do
           expect(names.last).to match(/prepared/)
           expect(steps.last[1]).to eq :leave_prepared
         end
-        expect(collection).to receive(:update_one).with({ _id: guest.id }, { '$set' => hash_including(deploy_state_id: 0xe1) })
+        expect(collection).to receive(:update_one).with({ _id: guest.id }, { '$set' => hash_including(deploy_state_id: 0xe1, deploy_prepared_fingerprints: { 'guest' => 'abc' }) })
         expect(collection).not_to receive(:update_one).with(anything, { '$set' => hash_including(deploy_state_id: 0xf0) })
 
         subject.deploy launch: false

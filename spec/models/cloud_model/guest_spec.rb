@@ -937,20 +937,42 @@ describe CloudModel::Guest do
   end
 
   describe 'prepared_stale_reason' do
-    it 'is nil without a preparation or when nothing changed since' do
-      expect(subject.prepared_stale_reason).to be_nil
+    before do
+      subject.name = 'node'
+      subject.services << CloudModel::Services::Nginx.new(name: 'Graph', port: 80)
+    end
+
+    it 'is nil without recorded fingerprints (a preparation that could not be checked passes)' do
       subject.deploy_prepared_at = Time.now
-      subject.updated_at = Time.now - 60
       expect(subject.prepared_stale_reason).to be_nil
     end
 
-    it 'names what changed after the preparation' do
-      subject.deploy_prepared_at = Time.now - 3600
-      subject.updated_at = Time.now - 7200
-      service = CloudModel::Services::Nginx.new(name: 'Graph')
-      service.updated_at = Time.now
-      allow(subject).to receive(:services).and_return([service])
-      expect(subject.prepared_stale_reason).to eq 'configuration changed after preparation (Graph) — prepare again'
+    it 'ignores state, monitoring and log changes' do
+      subject.deploy_prepared_fingerprints = subject.deploy_config_fingerprints
+      subject.deploy_state = :running
+      subject.up_state = :stopped
+      subject.live_log = 'lots'
+      subject.services.first.monitoring_last_check_at = Time.now
+      subject.services.first.monitoring_last_check_result = { 'key' => 'x' }
+      subject.services.first.redeploy_web_image_state = :pending
+      subject.updated_at = Time.now
+      expect(subject.prepared_stale_reason).to be_nil
+    end
+
+    it 'names the part whose configuration changed' do
+      subject.deploy_prepared_fingerprints = subject.deploy_config_fingerprints
+      subject.services.first.port = 8080
+      expect(subject.prepared_stale_reason).to eq 'configuration changed after preparation (services) — prepare again'
+
+      subject.deploy_prepared_fingerprints = subject.deploy_config_fingerprints
+      subject.memory_size = 8 * 1024**3
+      expect(subject.prepared_stale_reason).to eq 'configuration changed after preparation (guest) — prepare again'
+    end
+
+    it 'does not count the container the preparation itself added' do
+      subject.deploy_prepared_fingerprints = subject.deploy_config_fingerprints
+      subject.lxd_containers.build(created_at: Time.now)
+      expect(subject.prepared_stale_reason).to be_nil
     end
   end
 

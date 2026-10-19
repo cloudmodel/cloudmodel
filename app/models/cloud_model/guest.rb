@@ -74,6 +74,10 @@ module CloudModel
     field :last_deploy_finished_at, type: Time
     # Set while a new container waits for its switch-over (deploy_state :prepared)
     field :deploy_prepared_at, type: Time
+    # Fingerprints of the deploy-relevant configuration at preparation time
+    # (see #deploy_config_fingerprints) — the switch-over refuses a prepared
+    # container whose configuration changed since.
+    field :deploy_prepared_fingerprints, type: Hash
     field :deploy_path, type: String
 
     enum_field :up_state, {
@@ -490,14 +494,37 @@ module CloudModel
       name
     end
 
-    # Why a prepared container must not be switched to any more: the guest
-    # or one of its services was changed after the preparation.
+    # Fields that change without the configuration changing: states, logs,
+    # monitoring results, backup bookkeeping, timestamps — and the embedded
+    # containers, which the preparation itself adds to.
+    VOLATILE_FIELD = /\A(monitoring_|live_log|backup_|backups_enabled_at|last_|config_staged|redeploy_web_image_|deploy_state_id|deploy_last_issue|deploy_path|deploy_prepared|up_state_id|current_lxd_container_id|lxd_containers|updated_at|created_at)/
+
+    # What a deploy renders from, condensed: one digest each for the guest
+    # itself, its services, volumes and certificates. Volatile fields are
+    # left out (VOLATILE_FIELD), so monitoring and state changes don't count
+    # as configuration changes while a change to any setting does.
+    # @return [Hash{String=>String}]
+    def deploy_config_fingerprints
+      digest = ->(docs, except = []) { Digest::SHA256.hexdigest(JSON.generate(docs.map { |d| d.attributes.reject { |k, _| k =~ VOLATILE_FIELD || except.include?(k) }.sort.to_h })) }
+      {
+        # the embedded documents are digested on their own below
+        'guest' => digest.call([self], %w(services lxd_custom_volumes guest_certificates)),
+        'services' => digest.call(services.to_a.sort_by { |x| x.id.to_s }),
+        'volumes' => digest.call(lxd_custom_volumes.to_a.sort_by { |x| x.id.to_s }),
+        'certificates' => digest.call(guest_certificates.to_a.sort_by { |x| x.id.to_s })
+      }
+    end
+
+    # Why a prepared container must not be switched to any more: the
+    # configuration it was rendered from has changed since (compared by
+    # #deploy_config_fingerprints; a preparation that recorded none cannot
+    # be checked and passes).
     # @return [String, nil]
     def prepared_stale_reason
-      return nil unless deploy_prepared_at
-      changed = ([self] + services.to_a).select { |doc| doc.updated_at && doc.updated_at > deploy_prepared_at + 1.second }
+      return nil if deploy_prepared_fingerprints.blank?
+      changed = deploy_config_fingerprints.select { |part, sha| deploy_prepared_fingerprints[part] != sha }.keys
       return nil if changed.empty?
-      "configuration changed after preparation (#{changed.map { |d| d.is_a?(CloudModel::Guest) ? 'guest' : d.name }.join(', ')}) — prepare again"
+      "configuration changed after preparation (#{changed.join(', ')}) — prepare again"
     end
 
     def self.mark_pending!(ids)

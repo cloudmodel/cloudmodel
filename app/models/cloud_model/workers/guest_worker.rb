@@ -267,7 +267,7 @@ module CloudModel
         end
 
         if options[:launch] == false
-          guest.collection.update_one({_id: guest.id}, '$set' => { 'deploy_state_id': 0xe1, 'deploy_prepared_at': Time.now })
+          guest.collection.update_one({_id: guest.id}, '$set' => { 'deploy_state_id': 0xe1, 'deploy_prepared_at': Time.now, 'deploy_prepared_fingerprints': guest.reload.deploy_config_fingerprints })
           puts "Prepared container #{@lxc.name} in #{distance_of_time_in_words_to_now build_start_at}; the guest keeps running on #{guest.current_lxd_container.try(:name) || 'its current container'} until the switch-over"
           Rails.logger.debug "GUEST_WORKER: Prepared guest #{guest.name} container #{@lxc.name} in #{Time.now - build_start_at}"
           return
@@ -322,7 +322,7 @@ module CloudModel
       end
 
       def mark_deployed
-        guest.collection.update_one({_id: guest.id}, '$set' => { 'deploy_state_id': 0xf0, 'last_deploy_finished_at': Time.now, 'deploy_prepared_at': nil })
+        guest.collection.update_one({_id: guest.id}, '$set' => { 'deploy_state_id': 0xf0, 'last_deploy_finished_at': Time.now, 'deploy_prepared_at': nil, 'deploy_prepared_fingerprints': nil })
 
         # The fresh deploy reflects the stored config — clear staged markers.
         guest.services.each do |service|
