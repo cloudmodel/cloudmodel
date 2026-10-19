@@ -82,12 +82,15 @@ module CloudModel
       # admin UI. By default the console stays quiet (watch the log on the
       # web); verbose: true additionally passes the output through to stdout
       # (interactive console runs, the delayed_job logfile).
-      def with_live_log verbose: false
+      # `restart: false` appends to the existing console instead of starting
+      # a new one — for the second half of a two-phase deploy, whose first
+      # half's log is worth keeping next to it.
+      def with_live_log verbose: false, restart: true
         # Restart lazily on the FIRST output: delayed_job retries a raised
         # flow, and the retry immediately refuses to run (state already
         # failed) — an eager restart would wipe the previous attempt's log,
         # which is exactly what you need to debug the failure.
-        @live_log_pending_restart = true
+        @live_log_pending_restart = restart
         previous_subject = CloudModel.current_live_log_subject
         CloudModel.current_live_log_subject = self
         CloudModel::StdoutTee.capture ->(text) { append_live_log text }, passthrough: verbose do

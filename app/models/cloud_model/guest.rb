@@ -472,7 +472,7 @@ module CloudModel
         if (reason = guest.prepared_stale_reason)
           raise "skipped: #{reason}"
         end
-        guest.with_live_log verbose: true do
+        guest.with_live_log verbose: true, restart: false do   # keep the prepare log
           CloudModel::Workers::GuestWorker.new(guest).launch_prepared! options
           puts "Waiting for #{guest.name} to answer (up to #{ready_timeout}s)…"
           unless guest.wait_until_ready timeout: ready_timeout
