@@ -68,7 +68,24 @@ module CloudModel
             volume.apply_zfs_properties!
           else
             volume.create_volume!
+            seed_custom_volume volume
           end
+        end
+      end
+
+      # A volume added to a guest that already runs starts out with what the
+      # running container keeps at its mount point (LxdCustomVolume
+      # #seed_from_rootfs) — copied while the old container still serves, so
+      # the switch-over finds the data in place.
+      def seed_custom_volume volume
+        return unless volume.seed_from_rootfs
+        previous = guest.current_lxd_container
+        previous ||= guest.lxd_containers.desc(:created_at).to_a.find { |c| c != @lxc }
+        return unless previous
+
+        comment_sub_step "Seed volume #{volume.name} from #{previous.name}:/#{volume.mount_point}"
+        unless volume.seed_from_container! previous
+          comment_sub_step "Nothing to seed: #{previous.name} has no /#{volume.mount_point}"
         end
       end
 

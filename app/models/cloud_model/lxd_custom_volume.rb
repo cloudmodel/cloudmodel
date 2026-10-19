@@ -31,6 +31,12 @@ module CloudModel
     # MongoDB/WiredTiger) so data blocks aren't double-cached in both the ARC
     # and the DB cache.
     field :primarycache, type: String
+    # When the volume is first created during a redeploy of a guest that
+    # already runs, copy the directory it will mount over from the running
+    # container's rootfs into it — so data an application kept in the
+    # container (an index, a database that never had a volume) survives the
+    # move to a persistent volume instead of starting empty.
+    field :seed_from_rootfs, type: Mongoid::Boolean, default: false
 
     validates :name, presence: true
     validates :name, uniqueness: { scope: :host }
@@ -90,6 +96,29 @@ module CloudModel
       dataset = zfs_dataset
       return true unless dataset
       host.exec "zfs set primarycache=#{primarycache.shellescape} #{dataset.shellescape}"
+    end
+
+    # Copies `mount_point` out of a (running or stopped) container's rootfs
+    # into this volume (see #seed_from_rootfs). The container's dataset is
+    # mounted on the host while it runs; the volume's dataset is mounted here
+    # if LXD left it unmounted after creation.
+    # @return [Boolean] whether anything was copied (false when the container
+    #   has no such directory)
+    def seed_from_container! container
+      source = "#{container.mountpoint}/rootfs/#{mount_point.to_s.sub(%r{\A/}, '')}"
+      return false unless host.exec("test -d #{source.shellescape}").first
+
+      mount_on_host!
+      host.exec! "rsync -a --delete #{source.shellescape}/ #{host_path.shellescape}", "Failed to seed volume #{name} from #{source}"
+      true
+    end
+
+    # Makes sure the volume's dataset is mounted at its host path (LXD keeps
+    # its custom volumes as legacy mountpoints, mounted on demand).
+    def mount_on_host!
+      dataset = zfs_dataset or raise "Volume #{name}: ZFS dataset not found on #{host.name}"
+      return if host.exec("findmnt -n -S #{dataset.shellescape}").first
+      host.exec! "mkdir -p #{host_path.shellescape} && mount -t zfs #{dataset.shellescape} #{host_path.shellescape}", "Failed to mount volume #{name}"
     end
 
     def destroy_volume

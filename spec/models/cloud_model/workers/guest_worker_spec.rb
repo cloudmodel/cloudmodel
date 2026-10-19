@@ -328,7 +328,7 @@ describe CloudModel::Workers::GuestWorker do
 
   describe 'ensure_lxd_custom_volumes' do
     it 'should create volumes that do not yet exist and skip existing ones' do
-      missing = double 'missing_volume', volume_exists?: false
+      missing = double 'missing_volume', volume_exists?: false, seed_from_rootfs: false
       existing = double 'existing_volume', volume_exists?: true
       allow(guest).to receive(:lxd_custom_volumes).and_return([missing, existing])
       expect(missing).to receive(:create_volume!)
@@ -336,6 +336,35 @@ describe CloudModel::Workers::GuestWorker do
       # changed ZFS properties (primarycache) reach existing volumes on redeploy
       expect(existing).to receive(:apply_zfs_properties!)
 
+      subject.ensure_lxd_custom_volumes
+    end
+
+    it 'should seed a new volume from the running container when asked to' do
+      previous = double 'previous container', name: 'test-old'
+      new_lxc = double 'new container', name: 'test-new'
+      subject.instance_variable_set(:@lxc, new_lxc)
+      volume = double 'volume', volume_exists?: false, seed_from_rootfs: true, name: 'test-var-www-shared', mount_point: 'var/www/shared'
+      allow(guest).to receive(:lxd_custom_volumes).and_return([volume])
+      allow(guest).to receive(:current_lxd_container).and_return(previous)
+      allow(subject).to receive(:comment_sub_step)
+
+      expect(volume).to receive(:create_volume!).ordered
+      expect(volume).to receive(:seed_from_container!).with(previous).ordered.and_return true
+
+      subject.ensure_lxd_custom_volumes
+    end
+
+    it 'should not seed volumes that do not ask for it, nor without a previous container' do
+      volume = double 'volume', volume_exists?: false, seed_from_rootfs: false, create_volume!: true
+      allow(guest).to receive(:lxd_custom_volumes).and_return([volume])
+      expect(volume).not_to receive(:seed_from_container!)
+      subject.ensure_lxd_custom_volumes
+
+      seeded = double 'volume', volume_exists?: false, seed_from_rootfs: true, create_volume!: true, name: 'v', mount_point: 'x'
+      allow(guest).to receive(:lxd_custom_volumes).and_return([seeded])
+      allow(guest).to receive(:current_lxd_container).and_return(nil)
+      allow(guest).to receive(:lxd_containers).and_return(double('containers', desc: double('sorted', to_a: [])))
+      expect(seeded).not_to receive(:seed_from_container!)
       subject.ensure_lxd_custom_volumes
     end
   end
