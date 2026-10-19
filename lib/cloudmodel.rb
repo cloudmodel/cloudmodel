@@ -70,12 +70,14 @@ module CloudModel
   # The subject whose live console (Mixins::LiveLog#with_live_log) is
   # currently capturing — BaseWorker#run_steps reports its numbered steps to
   # it so the admin UI can show "building — (3/12) Install basic utils".
+  # Thread-local: a batch runs one worker per host in parallel threads, each
+  # capturing into its own guest's console.
   def self.current_live_log_subject
-    @current_live_log_subject
+    Thread.current[:cloud_model_live_log_subject]
   end
 
   def self.current_live_log_subject= subject
-    @current_live_log_subject = subject
+    Thread.current[:cloud_model_live_log_subject] = subject
   end
 
   def self.current_backup_run= run

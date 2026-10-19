@@ -399,7 +399,7 @@ module CloudModel
       # Echo the remote command into the running flow's console — with only
       # the step names the live log gives no clue WHAT a step was doing when
       # it failed. Outside a capture (monitoring, rails console) stay quiet.
-      stream_output = $stdout.is_a? CloudModel::StdoutTee
+      stream_output = CloudModel::StdoutTee.capturing?
       puts "\n      $ #{command}" if stream_output and not quiet
       # Long-running commands (debootstrap, apt) stream their output LIVE
       # into the console line by line; \r counts as a line break so apt

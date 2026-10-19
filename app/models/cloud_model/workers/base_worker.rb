@@ -112,7 +112,7 @@ module CloudModel
 
         # Same visibility as Host#exec's command echo — config phases would
         # otherwise pass without a trace in the live console.
-        puts "\n      > write #{remote_file}" if $stdout.is_a? CloudModel::StdoutTee
+        puts "\n      > write #{remote_file}" if CloudModel::StdoutTee.capturing?
 
         @host.sftp.file.open(remote_file, 'w', perm) do |f|
           f.puts content

@@ -65,6 +65,35 @@ describe CloudModel::StdoutTee do
     expect(written).to eq 'ok 🙏 broken ?'
   end
 
+  it 'keeps the captures of parallel threads apart' do
+    allow($stdout).to receive(:write).and_return(0)
+    seen = { a: +'', b: +'' }
+    barrier = Queue.new
+
+    threads = %i(a b).map do |key|
+      Thread.new do
+        described_class.capture ->(text) { seen[key] << text }, passthrough: false do
+          barrier.pop                       # both threads capture at the same time
+          3.times { |i| $stdout.write "#{key}#{i} "; Thread.pass }
+        end
+      end
+    end
+    2.times { barrier.push true }
+    threads.each(&:join)
+
+    expect(seen[:a]).to eq 'a0 a1 a2 '
+    expect(seen[:b]).to eq 'b0 b1 b2 '
+  end
+
+  it 'reports whether the current thread is capturing' do
+    expect(described_class.capturing?).to eq false
+    described_class.capture(->(_) {}, passthrough: false) do
+      expect(described_class.capturing?).to eq true
+      expect(Thread.new { described_class.capturing? }.value).to eq false
+    end
+    expect(described_class.capturing?).to eq false
+  end
+
   it 'never lets a failing terminal break the flow' do
     allow($stdout).to receive(:write).and_raise(Encoding::UndefinedConversionError, 'terminal broken')
     captured = +''
