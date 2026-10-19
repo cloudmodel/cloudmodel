@@ -422,6 +422,26 @@ module CloudModel
       end
     end
 
+    # LXD shifts the rootfs into the container's uid range on the FIRST start
+    # ("Remapping container filesystem", a minute or two for a full rootfs)
+    # — a cost the switch-over of a prepared container would otherwise pay
+    # while the guest is down. So the preparation starts the container once
+    # with /bin/sleep as init: LXD does the shift, no service runs, no
+    # network is configured (that is the guest's own network.service), and
+    # the container is stopped again at once. The real start then finds the
+    # recorded idmap matching and starts in seconds.
+    def warm_up!
+      _ok, raw = lxc "config get #{name} raw.lxc"
+      raw = raw.to_s.strip
+      set_config 'raw.lxc', "#{raw}\nlxc.init.cmd = /bin/sleep 1d".strip
+      begin
+        lxc! "start #{name}", "Failed to warm up container #{name}"
+      ensure
+        lxc "stop #{name} -f --timeout=1"
+        raw.empty? ? unset_config('raw.lxc') : set_config('raw.lxc', raw)
+      end
+    end
+
     def set_config key, value
       lxc "config set #{name} #{key.to_s.shellescape} #{value.to_s.shellescape}"
     end

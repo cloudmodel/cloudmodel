@@ -473,6 +473,35 @@ describe CloudModel::LxdContainer do
     end
   end
 
+  describe 'warm_up!' do
+    before do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      allow(guest).to receive(:update_attributes)
+    end
+
+    it 'starts the container once with sleep as init, stops it and restores raw.lxc' do
+      order = []
+      expect(subject).to receive(:lxc).with('config get some_guest-20200331133742 raw.lxc').and_return [true, "lxc.mount.auto = cgroup\nlxc.apparmor.profile = unconfined\n"]
+      expect(subject).to receive(:set_config).with('raw.lxc', "lxc.mount.auto = cgroup\nlxc.apparmor.profile = unconfined\nlxc.init.cmd = /bin/sleep 1d") { order << :init_sleep }
+      expect(subject).to receive(:lxc!).with('start some_guest-20200331133742', /warm up/) { order << :start }
+      expect(subject).to receive(:lxc).with('stop some_guest-20200331133742 -f --timeout=1') { order << :stop; [true, ''] }
+      expect(subject).to receive(:set_config).with('raw.lxc', "lxc.mount.auto = cgroup\nlxc.apparmor.profile = unconfined") { order << :restore }
+
+      subject.warm_up!
+      expect(order).to eq %i(init_sleep start stop restore)
+    end
+
+    it 'unsets raw.lxc afterwards when there was none, and restores even when the start fails' do
+      expect(subject).to receive(:lxc).with(/config get/).and_return [true, '']
+      expect(subject).to receive(:set_config).with('raw.lxc', 'lxc.init.cmd = /bin/sleep 1d')
+      expect(subject).to receive(:lxc!).with(/^start /, anything).and_raise('Failed to warm up container')
+      expect(subject).to receive(:lxc).with(/^stop /).and_return [true, '']
+      expect(subject).to receive(:unset_config).with('raw.lxc')
+
+      expect { subject.warm_up! }.to raise_error(/warm up/)
+    end
+  end
+
   describe 'unmount' do
     before { subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time }
 

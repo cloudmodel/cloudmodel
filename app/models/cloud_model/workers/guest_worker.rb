@@ -312,10 +312,13 @@ module CloudModel
 
       # Last preparation step in place of the launch: drop the chroot
       # submounts and unmount the new container's rootfs, as the launch would
-      # have done before starting it.
+      # have done before starting it — then let LXD do its first-start uid
+      # shift now rather than during the switch-over (LxdContainer#warm_up!).
       def leave_prepared
         cleanup_chroot guest.deploy_path
         @lxc.unmount
+        comment_sub_step "Warm up: let LXD shift the rootfs now, not at the switch-over"
+        @lxc.warm_up!
       end
 
       def mark_deployed

@@ -60,10 +60,12 @@ describe CloudModel::Workers::GuestWorker do
         subject.deploy launch: false
       end
 
-      it 'leave_prepared drops the chroot submounts and unmounts the new container' do
+      it 'leave_prepared drops the chroot submounts, unmounts the new container and warms it up (uid shift now, not at the switch)' do
         allow(guest).to receive(:deploy_path).and_return('/deploy')
-        expect(subject).to receive(:cleanup_chroot).with('/deploy')
-        expect(lxc).to receive(:unmount)
+        allow(subject).to receive(:comment_sub_step)
+        expect(subject).to receive(:cleanup_chroot).with('/deploy').ordered
+        expect(lxc).to receive(:unmount).ordered
+        expect(lxc).to receive(:warm_up!).ordered
 
         subject.send :leave_prepared
       end
