@@ -141,6 +141,22 @@ namespace :cloudmodel do
       puts dry_run ? "\nDry run — nothing deleted. Re-run with CONFIRM=1 to delete." : "\nDone."
     end
 
+    desc "Remove the stopped old containers of guests, keeping the newest KEEP (default 3, the running one always among them). Dry run unless CONFIRM=1; HOST_ID=<id> or GUEST=<name> limit the scope."
+    task :containers => [:environment] do
+      guests = if ENV['GUEST'].present?
+        CloudModel::Guest.where(name: ENV['GUEST']).to_a
+      elsif ENV['HOST_ID'].present?
+        CloudModel::Host.find(ENV['HOST_ID']).guests.to_a
+      else
+        CloudModel::Guest.all.to_a
+      end
+      abort "No guests found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
+
+      dry_run = ENV['CONFIRM'] != '1'
+      puts "\e[33mDRY RUN — set CONFIRM=1 to actually remove.\e[39m" if dry_run
+      CloudModel::ContainerCleanup.new(keep: ENV.fetch('KEEP', 3)).cleanup! guests.sort_by(&:name), dry_run: dry_run
+    end
+
     desc "Remove dump backups of deleted guests/services/replica sets, apply retention to disabled/failing subjects, drop dangling latest links and empty dirs. Dry run unless CONFIRM=1."
     task :backups => [:environment] do
       dry_run = ENV['CONFIRM'] != '1'
