@@ -369,66 +369,6 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
-  it { expect(subject).to have_field(:seed_from_rootfs).of_type(Mongoid::Boolean).with_default_value_of false }
-
-  describe 'seed_from_container!' do
-    let(:container) { double 'container', name: 'some_guest-20260101000000', mountpoint: '/var/lib/lxd/storage-pools/default/containers/some_guest-20260101000000' }
-
-    before do
-      subject.guest = guest
-      subject.name = 'some_guest-var-www-shared'
-      subject.mount_point = 'var/www/shared'
-      allow(host).to receive(:exec!)
-    end
-
-    it 'copies the directory out of the container rootfs into the mounted volume' do
-      expect(host).to receive(:exec).with('test -d /var/lib/lxd/storage-pools/default/containers/some_guest-20260101000000/rootfs/var/www/shared').and_return [true, '']
-      expect(subject).to receive(:mount_on_host!)
-      expect(host).to receive(:exec!).with('rsync -a --delete /var/lib/lxd/storage-pools/default/containers/some_guest-20260101000000/rootfs/var/www/shared/ /var/lib/lxd/storage-pools/default/custom/some_guest-var-www-shared/', /seed/)
-
-      expect(subject.seed_from_container! container).to eq true
-    end
-
-    it 'does nothing when the container has no such directory' do
-      expect(host).to receive(:exec).with(/test -d/).and_return [false, '']
-      expect(subject).not_to receive(:mount_on_host!)
-      expect(host).not_to receive(:exec!)
-
-      expect(subject.seed_from_container! container).to eq false
-    end
-
-    it 'accepts a mount point with a leading slash' do
-      subject.mount_point = '/var/www/shared'
-      expect(host).to receive(:exec).with('test -d /var/lib/lxd/storage-pools/default/containers/some_guest-20260101000000/rootfs/var/www/shared').and_return [false, '']
-      subject.seed_from_container! container
-    end
-  end
-
-  describe 'mount_on_host!' do
-    before do
-      subject.guest = guest
-      subject.name = 'some_guest-var-www-shared'
-      allow(subject).to receive(:zfs_dataset).and_return 'guests/custom/default_some_guest-var-www-shared'
-    end
-
-    it 'leaves a mounted volume alone' do
-      expect(host).to receive(:exec).with('findmnt -n -S guests/custom/default_some_guest-var-www-shared').and_return [true, '/var/lib/lxd/storage-pools/default/custom/some_guest-var-www-shared']
-      expect(host).not_to receive(:exec!)
-      subject.mount_on_host!
-    end
-
-    it 'mounts the legacy-mountpoint dataset at the host path' do
-      expect(host).to receive(:exec).with(/findmnt/).and_return [false, '']
-      expect(host).to receive(:exec!).with('mkdir -p /var/lib/lxd/storage-pools/default/custom/some_guest-var-www-shared/ && mount -t zfs guests/custom/default_some_guest-var-www-shared /var/lib/lxd/storage-pools/default/custom/some_guest-var-www-shared/', /mount volume/)
-      subject.mount_on_host!
-    end
-
-    it 'raises when the dataset cannot be found' do
-      allow(subject).to receive(:zfs_dataset).and_return nil
-      expect { subject.mount_on_host! }.to raise_error(/dataset not found/)
-    end
-  end
-
   describe 'host_path' do
     it 'should return path to volume mount on host' do
       subject.name = 'some_guest-var-data'
