@@ -1,1 +1,4 @@
 RAILS_ENV=<%= model.passenger_env %>
+<%- (model.passenger_env_vars || {}).each do |env_key, env_value| -%>
+<%= env_key %>="<%== env_value.to_s.gsub(/["\\$`]/) { |c| "\\#{c}" } %>"
+<%- end -%>

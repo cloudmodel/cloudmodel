@@ -10,6 +10,9 @@ RemainAfterExit=no
 WorkingDirectory=<%= path %>
 PIDFile=/tmp/delayed_job.%i.pid
 
+# The app's own environment (passenger_env_vars) — the same the web app
+# and the rake services run with; optional, the unit starts without it.
+EnvironmentFile=-/etc/default/rails
 Environment = RAILS_ENV=<%= model.passenger_env %>
 ExecStart=/usr/local/rvm/bin/rvm default do <%= path %>/bin/delayed_job -i %i  --queue %i --pid_dir=/tmp/ start
 ExecStop=/usr/local/rvm/bin/rvm default do <%= path %>/bin/delayed_job -i %i --pid_dir=/tmp/ stop
