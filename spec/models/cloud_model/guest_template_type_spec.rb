@@ -52,19 +52,65 @@ describe CloudModel::GuestTemplateType do
   end
 
   describe '#last_useable' do
+    let(:build_host) { double CloudModel::Host, name: 'build', arch: 'MOS6502' }
+
+    before do
+      allow(CloudModel::Host).to receive(:build_host).with('MOS6502').and_return build_host
+    end
+
     it 'should get latest finished template for given host arch' do
       template = double CloudModel::GuestTemplate
-      expect(subject.templates).to receive(:where).with(arch: 'MOS6502', build_state_id: 0xf0).and_return [template]
+      expect(subject).to receive(:finished_template).with('MOS6502').and_return template
       expect(subject.last_useable host).to eq template
     end
 
-    it 'should build new template if non is found' do
-      template = double CloudModel::GuestTemplate
-      options = double
-      expect(subject.templates).to receive(:where).with(arch: 'MOS6502', build_state_id: 0xf0).and_return []
-      expect(subject).to receive(:build_new_template!).with(host, options).and_return template
+    it 'should return a template that is being built instead of building another one' do
+      building = double CloudModel::GuestTemplate
+      allow(subject).to receive(:finished_template).and_return nil
+      expect(subject).to receive(:building_template).with('MOS6502').and_return building
+      expect(subject).not_to receive(:new_template)
 
-      expect(subject.last_useable host, options).to eq template
+      expect(subject.last_useable host).to eq building
+    end
+
+    it 'should create, mark pending and build a new template on the build host if there is none' do
+      template = double CloudModel::GuestTemplate
+      allow(subject).to receive(:finished_template).and_return nil
+      allow(subject).to receive(:building_template).and_return nil
+      expect(subject).to receive(:new_template).with(host).and_return template
+      expect(template).to receive(:update_attribute).with(:build_state, :pending).ordered
+      expect(template).to receive(:build!).with(build_host, { force: true }).ordered
+      expect(template).to receive(:reload).and_return template
+
+      expect(subject.last_useable host).to eq template
+    end
+
+    it 'should build exactly one template when several threads ask at once' do
+      created = []
+      lock = Mutex.new
+      allow(subject).to receive(:finished_template).and_return nil
+      allow(subject).to receive(:building_template) { lock.synchronize { created.first } }
+      allow(subject).to receive(:new_template) do
+        t = double('template', update_attribute: true, reload: nil)
+        allow(t).to receive(:build!) { sleep 0.05 }
+        allow(t).to receive(:reload).and_return t
+        lock.synchronize { created << t }
+        t
+      end
+
+      results = 5.times.map { Thread.new { subject.last_useable host } }.map(&:value)
+      expect(created.size).to eq 1
+      expect(results.uniq).to eq created
+    end
+
+    it 'should build a new one with force_rebuild even if one is finished' do
+      template = double CloudModel::GuestTemplate, update_attribute: true
+      allow(subject).to receive(:finished_template).and_return double('old')
+      expect(subject).to receive(:new_template).and_return template
+      expect(template).to receive(:build!).with(build_host, { force_rebuild: true, force: true })
+      allow(template).to receive(:reload).and_return template
+
+      expect(subject.last_useable host, force_rebuild: true).to eq template
     end
   end
 

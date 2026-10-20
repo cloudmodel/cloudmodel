@@ -46,18 +46,52 @@ module CloudModel
       template
     end
 
+    # Serializes "is there a template, or do I create one" between the
+    # threads of one process: a batch deploy asks from one thread per host at
+    # the same moment, and each used to find no template and build its own.
+    LAST_USEABLE_MUTEX = Mutex.new
+
     # Returns the most recently finished template for `host`'s architecture.
-    # If none exists (or `force_rebuild: true`), triggers a fresh build first.
+    # If none exists yet but one is being built (and the build is not stale),
+    # that one is returned — the caller waits for its volume in
+    # HasZfsBuildVolume#ensure_build_volume! and gets it synced over instead
+    # of building the same thing again. Only when there is neither (or with
+    # `force_rebuild: true`) is a new template built, on the arch's build host.
     # @param host [CloudModel::Host]
     # @param options [Hash]
     # @option options [Boolean] :force_rebuild always build a new template
     # @return [CloudModel::GuestTemplate]
     def last_useable(host, options={})
-      template = templates.where(arch: host.arch, build_state_id: 0xf0).last
-      if template.blank? or options[:force_rebuild]
-        template = build_new_template! host, options
+      unless options[:force_rebuild]
+        finished = finished_template(host.arch)
+        return finished if finished
       end
-      template
+
+      template, created = LAST_USEABLE_MUTEX.synchronize do
+        existing = options[:force_rebuild] ? nil : (finished_template(host.arch) || building_template(host.arch))
+        if existing
+          [existing, false]
+        else
+          # Created in a non-terminal state right here, so a thread that comes
+          # next sees it as building and waits instead of creating another.
+          [new_template(host).tap { |t| t.update_attribute :build_state, :pending }, true]
+        end
+      end
+      return template unless created
+
+      template.build! CloudModel::Host.build_host(host.arch) || host, options.merge(force: true)
+      template.reload
+    end
+
+    def finished_template arch
+      templates.where(arch: arch, build_state_id: 0xf0).last
+    end
+
+    # A template of this type whose build is under way and alive (see
+    # HasZfsBuildVolume::STALE_CLAIM_AFTER).
+    def building_template arch
+      templates.where(arch: arch, :build_state_id.nin => CloudModel::TERMINAL_BUILD_STATE_IDS,
+        :updated_at.gte => Time.now - CloudModel::Mixins::HasZfsBuildVolume::STALE_CLAIM_AFTER).last
     end
 
     # Returns human-readable names for all components in this type.
