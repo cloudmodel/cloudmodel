@@ -1,5 +1,8 @@
 storage:
     dbPath: "/var/lib/mongodb"
+    wiredTiger:
+        engineConfig:
+            cacheSizeGB: <%= model.effective_wiredtiger_cache_size_gb %>
 
 net:
     port: <%= model.port %>

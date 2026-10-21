@@ -33,6 +33,62 @@ module CloudModel
       #     take their excludes from the associated WebImage)
       field :mongodb_backup_exclude_collection_prefixes, type: Array, default: []
 
+      # @!attribute [rw] wiredtiger_cache_size_gb
+      #   @return [Float, nil] WiredTiger cache in GB; nil derives it from the
+      #     guest's memory (see #effective_wiredtiger_cache_size_gb)
+      field :wiredtiger_cache_size_gb, type: Float
+
+      # The WiredTiger cache mongod runs with. mongod's own default (half of
+      # RAM minus 1 GB) is meant for a server shared with other software; in a
+      # container that runs nothing else it wastes most of the memory. Derived
+      # here as three quarters of the guest's memory, but leaving at least
+      # 1.5 GB: the rest is connections, mongod's own bookkeeping and the
+      # container's page cache — the only file cache the data gets when the
+      # volume runs with primarycache=metadata. Rounded down to 0.25 GB.
+      # @return [Float] cache size in GB
+      def effective_wiredtiger_cache_size_gb
+        return wiredtiger_cache_size_gb.to_f if wiredtiger_cache_size_gb.to_f > 0
+        memory_gb = guest&.memory_size.to_f / 1024**3
+        return 0.25 if memory_gb <= 0
+        cache = [memory_gb * 0.75, memory_gb - 1.5].min
+        [(cache * 4).floor / 4.0, 0.25].max
+      end
+
+      # Sets the WiredTiger cache of the running mongod to
+      # #effective_wiredtiger_cache_size_gb — no restart, mongod resizes the
+      # cache in place. The config file is updated by the caller (see
+      # Workers::Services::MongodbWorker#apply_wiredtiger_cache_live!).
+      # @return [Boolean] whether mongod accepted it
+      def set_runtime_wiredtiger_cache!
+        client = Mongo::Client.new(["#{guest.private_address}:#{port}"], direct_connection: true,
+          connect_timeout: 5, server_selection_timeout: 5, database: 'admin')
+        megabytes = (effective_wiredtiger_cache_size_gb * 1024).round
+        client.database.command(setParameter: 1, wiredTigerEngineRuntimeConfig: "cache_size=#{megabytes}M")
+        true
+      ensure
+        client&.close
+      end
+
+      # The cache mongod is actually running with, in GB.
+      def running_wiredtiger_cache_size_gb
+        client = Mongo::Client.new(["#{guest.private_address}:#{port}"], direct_connection: true,
+          connect_timeout: 5, server_selection_timeout: 5, database: 'admin')
+        bytes = client.database.command(serverStatus: 1).first.dig('wiredTiger', 'cache', 'maximum bytes configured')
+        (bytes.to_f / 1024**3).round(2)
+      ensure
+        client&.close
+      end
+
+      # Whether this member is the replica set's primary right now.
+      def running_primary?
+        client = Mongo::Client.new(["#{guest.private_address}:#{port}"], direct_connection: true,
+          connect_timeout: 5, server_selection_timeout: 5, database: 'admin')
+        doc = client.database.command(hello: 1).first
+        doc['isWritablePrimary'] || doc['ismaster']
+      ensure
+        client&.close
+      end
+
       # Accept a whitespace/comma-separated string from forms as well as an array.
       def mongodb_backup_exclude_collection_prefixes=(value)
         value = value.split(/[\s,]+/) if value.is_a?(String)

@@ -130,6 +130,67 @@ namespace :cloudmodel do
     end
   end
 
+  namespace :mongodb do
+    desc "Resize MongoDB guests in place: memory limit raised live, mongod.conf rewritten, WiredTiger cache set at runtime (no restart; RESTART=1 restarts — primary steps down first — only where mongod refuses). PLAN=<json> [{guest, host, memory_gb, cache_gb?}] or GUEST=<name> HOST=<name> MEMORY_GB=<n>. Shrinking needs SHRINK=1. Dry run unless CONFIRM=1."
+    task :resize => [:environment] do
+      confirm = ENV['CONFIRM'] == '1'
+      restart = ENV['RESTART'] == '1'
+      shrink = ENV['SHRINK'] == '1'
+      puts "\e[33mDRY RUN — set CONFIRM=1 to apply.\e[39m" unless confirm
+
+      plan = if ENV['PLAN'].present?
+        JSON.parse(File.read(ENV['PLAN']))
+      elsif ENV['GUEST'].present? and ENV['MEMORY_GB'].present?
+        [{ 'guest' => ENV['GUEST'], 'host' => ENV['HOST'], 'memory_gb' => ENV['MEMORY_GB'].to_f }]
+      else
+        abort "Give PLAN=<json> or GUEST=<name> MEMORY_GB=<n> [HOST=<name>]"
+      end
+
+      entries = plan.filter_map do |row|
+        guests = CloudModel::Guest.where(name: row['guest']).to_a
+        guests.select! { |g| g.host.name == row['host'] } if row['host'].present?
+        if guests.size != 1
+          puts "#{row['guest']}#{row['host'] ? "@#{row['host']}" : ''}: \e[31mskipped — #{guests.size} matching guests\e[39m"
+          next
+        end
+        service = guests.first.services.detect { |s| s.is_a?(CloudModel::Services::Mongodb) }
+        next puts("#{row['guest']}: \e[31mskipped — no MongoDB service\e[39m") unless service
+        [guests.first, service, row]
+      end
+
+      # Per replica set the secondaries first, the primary last.
+      entries.sort_by! do |guest, service, _row|
+        primary = (service.running_primary? rescue false)
+        [service.mongodb_replication_set_id.to_s, primary ? 1 : 0, guest.name]
+      end
+
+      entries.each do |guest, service, row|
+        target = (row['memory_gb'].to_f * 1024**3).to_i
+        current = guest.memory_size.to_i
+        label = "#{guest.name}@#{guest.host.name}"
+        if target < current and not shrink
+          puts "#{label}: #{current / 1024**3} GB → #{row['memory_gb']} GB would shrink a live container — skipped (SHRINK=1)"
+          next
+        end
+        service.wiredtiger_cache_size_gb = row['cache_gb'].to_f if row['cache_gb']
+        guest.memory_size = target
+        cache = service.effective_wiredtiger_cache_size_gb
+        running = (service.running_wiredtiger_cache_size_gb rescue '?')
+        puts "#{label}: memory #{current / 1024**3} → #{row['memory_gb']} GB, cache #{running} → #{cache} GB"
+        next unless confirm
+
+        begin
+          guest.save!      # raises limits.memory on the running container (Guest#apply_current_lxd_container_config)
+          worker = CloudModel::Workers::Services::MongodbWorker.new guest.current_lxd_container, service
+          how = worker.apply_wiredtiger_cache_live! restart: restart
+          puts "  \e[32m#{how}\e[39m: cache now #{service.running_wiredtiger_cache_size_gb} GB, limit #{guest.current_lxd_container.lxc("config get #{guest.current_lxd_container.name} limits.memory")[1].to_s.strip}"
+        rescue => e
+          puts "  \e[31mFAILED: #{e.message.lines.first.to_s.strip}\e[39m"
+        end
+      end
+    end
+  end
+
   namespace :cleanup do
     desc "Remove obsolete template tarballs (admin data dir + all hosts) and stale /cloud/build dirs. Dry run unless CONFIRM=1; keeps the newest KEEP (default 2) finished templates per type/arch plus everything referenced by deployed containers."
     task :templates => [:environment] do

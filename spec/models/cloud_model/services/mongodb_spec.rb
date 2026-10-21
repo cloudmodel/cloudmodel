@@ -14,6 +14,30 @@ describe CloudModel::Services::Mongodb do
 
   it {expect(subject).to validate_inclusion_of(:mongodb_replication_priority).to_allow(0..100)}
 
+  describe 'effective_wiredtiger_cache_size_gb' do
+    let(:guest) { CloudModel::Guest.new }
+
+    before { subject.guest = guest }
+
+    {2 => 0.5, 4 => 2.5, 6 => 4.5, 8 => 6.0, 12 => 9.0, 16 => 12.0}.each do |memory, cache|
+      it "gives #{cache} GB of cache to a #{memory} GB guest (3/4 of RAM, at least 1.5 GB left over)" do
+        guest.memory_size = memory * 1024**3
+        expect(subject.effective_wiredtiger_cache_size_gb).to eq cache
+      end
+    end
+
+    it 'takes an explicit size over the derived one' do
+      guest.memory_size = 8 * 1024**3
+      subject.wiredtiger_cache_size_gb = 3.0
+      expect(subject.effective_wiredtiger_cache_size_gb).to eq 3.0
+    end
+
+    it 'never goes below 0.25 GB' do
+      guest.memory_size = 1 * 1024**3
+      expect(subject.effective_wiredtiger_cache_size_gb).to eq 0.25
+    end
+  end
+
   describe 'kind' do
     it 'should return :mongodb' do
       expect(subject.kind).to eq :mongodb

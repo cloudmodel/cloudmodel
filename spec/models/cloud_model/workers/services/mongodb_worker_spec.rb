@@ -35,6 +35,39 @@ describe CloudModel::Workers::Services::MongodbWorker do
     end
   end
 
+  describe 'apply_wiredtiger_cache_live!' do
+    before do
+      allow(subject).to receive(:render).and_return('rendered_config')
+      allow(subject).to receive(:upload_to_guest)
+    end
+
+    it 'rewrites mongod.conf in the running container and resizes the cache in place' do
+      expect(subject).to receive(:upload_to_guest).with('rendered_config', '/etc/mongod.conf', '0644').ordered
+      expect(model).to receive(:set_runtime_wiredtiger_cache!).ordered.and_return true
+      expect(guest).not_to receive(:exec!)
+
+      expect(subject.apply_wiredtiger_cache_live!).to eq :live
+    end
+
+    it 'raises when mongod refuses and no restart is allowed' do
+      allow(model).to receive(:set_runtime_wiredtiger_cache!).and_raise('not allowed')
+      expect(guest).not_to receive(:exec!)
+      expect { subject.apply_wiredtiger_cache_live! }.to raise_error('not allowed')
+    end
+
+    it 'steps a primary down before restarting it when mongod refuses and restart is allowed' do
+      allow(model).to receive(:set_runtime_wiredtiger_cache!).and_raise('not allowed')
+      allow(CloudModel).to receive(:log_exception)
+      allow(model).to receive(:mongodb_replication_set).and_return double('rs')
+      allow(model).to receive(:running_primary?).and_return true
+      allow(model).to receive(:guest).and_return guest
+      expect(guest).to receive(:exec).with(/rs\.stepDown/).ordered
+      expect(guest).to receive(:exec!).with('/bin/systemctl restart mongod', anything).ordered
+
+      expect(subject.apply_wiredtiger_cache_live!(restart: true)).to eq :restarted
+    end
+  end
+
   describe 'service_name' do
     it 'should return mongodb' do
       expect(subject.service_name).to eq 'mongod'
