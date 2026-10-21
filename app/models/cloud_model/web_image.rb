@@ -150,6 +150,10 @@ module CloudModel
     # whole rebuild & redeploy flow, readable live on the admin page. Called
     # from the build worker (command output) and the service workers (rollout
     # steps).
+    # A rollout appends from one thread per host (WebImageWorker#redeploy):
+    # read-modify-write of the log must not interleave.
+    BUILD_LOG_MUTEX = Mutex.new
+
     def append_to_build_log text
       # Worker output can arrive as ASCII-8BIT (Net::SSH) or carry stray
       # non-UTF-8 bytes; scrub to valid UTF-8 so concatenation with the log
@@ -157,13 +161,15 @@ module CloudModel
       text = text.to_s.dup.force_encoding(Encoding::UTF_8).scrub('?')
       return if text.empty?
 
-      log = build_log.to_s
-      if log.bytesize > BUILD_LOG_LIMIT
-        return if log.end_with? "[log truncated]\n"
-        text = "…\n[log truncated]\n"
-      end
+      BUILD_LOG_MUTEX.synchronize do
+        log = build_log.to_s
+        if log.bytesize > BUILD_LOG_LIMIT
+          return if log.end_with? "[log truncated]\n"
+          text = "…\n[log truncated]\n"
+        end
 
-      update_attribute :build_log, log + text
+        update_attribute :build_log, log + text
+      end
     end
 
     def services

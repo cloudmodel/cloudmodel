@@ -503,6 +503,11 @@ module CloudModel
 
       # ---- redeploy orchestration (rolls the built artifact out per service) ----
 
+      # Rolls the built artifact out to every service of the image: one thread
+      # per host, the guests of a host one after another (Guest.run_batch) —
+      # the hosts don't wait for each other, and no host restarts more than
+      # one app at a time. A guest that fails doesn't stop the others; the
+      # image ends up :failed with the failures named when any did.
       def redeploy(options = {})
         unless @web_image.redeploy_state == :pending or options[:force]
           puts "Redeploy WebImage #{@web_image.name} failed, as it is not pending for redeploy: #{@web_image.redeploy_state}"
@@ -519,16 +524,27 @@ module CloudModel
               service.update_attributes redeploy_web_image_state: :pending
             end
           end
-          services.each do |service|
-            service.redeploy! options
+
+          by_guest = services.group_by(&:guest)
+          result = CloudModel::Guest.run_batch(by_guest.keys, 'Rollout', firewall: false) do |guest|
+            failed = by_guest[guest].reject { |service| service.redeploy! options }
+            raise "rollout failed: #{failed.map(&:name).join(', ')}" unless failed.empty?
           end
         rescue Exception => e
           CloudModel.log_exception e
           @web_image.update_attributes redeploy_state: :failed, redeploy_last_issue: "#{e}"
           return false
         end
-        @web_image.append_to_build_log "Rollout finished\n"
-        @web_image.update_attributes redeploy_state: :finished
+
+        if result[:failed].empty?
+          @web_image.append_to_build_log "Rollout finished\n"
+          @web_image.update_attributes redeploy_state: :finished
+        else
+          issue = result[:failed].map { |name, message| "#{name}: #{message.lines.first.to_s.strip}" }.join('; ')
+          @web_image.append_to_build_log "Rollout finished with #{result[:failed].size} failure(s): #{issue}\n"
+          @web_image.update_attributes redeploy_state: :failed, redeploy_last_issue: issue
+          false
+        end
       end
 
       # ---- logging ----

@@ -237,13 +237,52 @@ describe CloudModel::Workers::WebImageWorker do
       allow(web_image).to receive(:append_to_build_log)
     end
 
+    let(:host_a) { double 'host a', name: 'host-a' }
+    let(:host_b) { double 'host b', name: 'host-b' }
+    let(:guest_a1) { double 'guest a1', name: 'a1', host_id: 'a', host: host_a }
+    let(:guest_a2) { double 'guest a2', name: 'a2', host_id: 'a', host: host_a }
+    let(:guest_b1) { double 'guest b1', name: 'b1', host_id: 'b', host: host_b }
+
+    def service guest, ok = true
+      double("service #{guest.name}", guest: guest, name: 'Graph', redeployable?: true, update_attributes: true).tap do |s|
+        allow(s).to receive(:redeploy!).and_return ok
+      end
+    end
+
+    before { allow(CloudModel::Guest).to receive(:puts) }
+
     it 'sets each service pending and redeploys it' do
-      service = double 'service', redeployable?: true
-      allow(web_image).to receive(:services).and_return [service]
-      expect(service).to receive(:update_attributes).with(redeploy_web_image_state: :pending)
-      expect(service).to receive(:redeploy!)
+      s = service guest_a1
+      allow(web_image).to receive(:services).and_return [s]
+      expect(s).to receive(:update_attributes).with(redeploy_web_image_state: :pending)
+      expect(s).to receive(:redeploy!)
+      expect(web_image).to receive(:update_attributes).with(redeploy_state: :finished)
 
       subject.redeploy
+    end
+
+    it 'rolls out host by host in parallel, the guests of a host one after another' do
+      order = Queue.new
+      a1, a2, b1 = service(guest_a1), service(guest_a2), service(guest_b1)
+      allow(a1).to receive(:redeploy!) { order << :a1_start; sleep 0.05; order << :a1_end; true }
+      allow(a2).to receive(:redeploy!) { order << :a2_start; order << :a2_end; true }
+      allow(b1).to receive(:redeploy!) { order << :b1_start; order << :b1_end; true }
+      allow(web_image).to receive(:services).and_return [a1, a2, b1]
+
+      subject.redeploy
+      seq = []; seq << order.pop until order.empty?
+      expect(seq.index(:a1_end)).to be < seq.index(:a2_start)       # same host: sequential
+      expect(seq.index(:b1_start)).to be < seq.index(:a1_end)       # other host: in parallel
+    end
+
+    it 'goes on after a failed guest and marks the image failed, naming it' do
+      a1, b1 = service(guest_a1, false), service(guest_b1)
+      allow(web_image).to receive(:services).and_return [a1, b1]
+      allow(CloudModel).to receive(:log_exception)
+      expect(b1).to receive(:redeploy!).and_return true
+      expect(web_image).to receive(:update_attributes).with(redeploy_state: :failed, redeploy_last_issue: /a1: rollout failed: Graph/)
+
+      expect(subject.redeploy).to eq false
     end
   end
 
