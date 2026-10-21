@@ -205,6 +205,9 @@ en:
       cloud_model/web_apps/static_web_app:
         one: Static Pages
         other: Static Pages
+      cloud_model/web_apps/redirect_web_app:
+        one: Redirect
+        other: Redirects
       cloud_model/web_apps/php_web_app:
         one: PHP Application
         other: PHP Applications
@@ -513,6 +516,13 @@ en:
         needed_components: Needed Components
         used_in_guests: Used In Guests
         _type: Web App Type
+      cloud_model/web_apps/redirect_web_app:
+        target_url: Target URL
+        root_url: Front Page URL
+        status: Redirect Status
+        normalize_html: Normalize HTML Pages
+        path_mapping: Path Mapping
+        path_mapping_text: Path Mapping
       cloud_model/web_apps/nextcloud_web_app:
         mysql_host: Database Host
         mysql_port: Database Port

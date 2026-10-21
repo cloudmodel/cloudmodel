@@ -210,6 +210,9 @@ de:
       cloud_model/web_apps/static_web_app:
         one: Statische Seiten
         other: Statische Seiten
+      cloud_model/web_apps/redirect_web_app:
+        one: Umleitung
+        other: Umleitungen
       cloud_model/web_apps/php_web_app:
         one: PHP Anwendung
         other: PHP Anwendungen
@@ -515,6 +518,13 @@ de:
         needed_components: Benötigte Komponenten
         used_in_guests: In Gästen genutzt
         _type: Webanwendungsart
+      cloud_model/web_apps/redirect_web_app:
+        target_url: Ziel-URL
+        root_url: Startseiten-URL
+        status: Umleitungsstatus
+        normalize_html: HTML-Seiten normalisieren
+        path_mapping: Pfadzuordnung
+        path_mapping_text: Pfadzuordnung
       cloud_model/web_apps/nextcloud_web_app:
         mysql_host: Datenbankhost
         mysql_port: Datenbankport

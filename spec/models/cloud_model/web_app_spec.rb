@@ -9,6 +9,7 @@ describe CloudModel::WebApp do
     it 'should list the available apps' do
       expect(subject.class.registered_apps).to eq [
         CloudModel::WebApps::StaticWebApp,
+        CloudModel::WebApps::RedirectWebApp,
         CloudModel::WebApps::PhpWebApp,
         CloudModel::WebApps::WordpressWebApp,
         CloudModel::WebApps::RoundcubemailWebApp,

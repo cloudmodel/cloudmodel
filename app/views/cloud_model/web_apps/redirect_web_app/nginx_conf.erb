@@ -1,0 +1,11 @@
+<%- app = model.web_app -%>
+# Redirect "<%= app.name %>": everything below <%= model.location_with_leading_slash %> goes to <%= app.target_base %>
+location <%= model.location_with_leading_slash %> {
+<%- if app.root_url.present? -%>
+  location = <%= model.location_with_leading_slash %> {
+    return <%= app.status %> <%= app.root_url %>;
+  }
+
+<%- end -%>
+  return <%= app.status %> <%= app.target_expression %>;
+}

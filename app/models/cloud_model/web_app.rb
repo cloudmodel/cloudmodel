@@ -21,6 +21,7 @@ module CloudModel
     def self.registered_apps
       [
         CloudModel::WebApps::StaticWebApp,
+        CloudModel::WebApps::RedirectWebApp,
         CloudModel::WebApps::PhpWebApp,
         CloudModel::WebApps::WordpressWebApp,
         CloudModel::WebApps::RoundcubemailWebApp,

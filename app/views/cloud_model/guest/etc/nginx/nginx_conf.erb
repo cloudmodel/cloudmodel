@@ -36,6 +36,9 @@ http {
   # certbot's nginx plugin duplicates top-of-site-file http directives when
   # rewriting the site config and nginx then fails with "directive is duplicate".
   server_names_hash_bucket_size 64;
+  # Redirect web apps map whole request paths; the default of 64 bytes is
+  # too small for a path longer than ~50 characters (nginx refuses to start).
+  map_hash_bucket_size          128;
   server_tokens                 off;
 
   client_header_timeout         10m;

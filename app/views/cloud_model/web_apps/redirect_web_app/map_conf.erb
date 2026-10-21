@@ -1,0 +1,21 @@
+# Written by CloudModel for the redirect "<%= model.name %>" (http context:
+# nginx maps cannot live inside a server block). The location block in
+# server.d uses <%= model.map_variable %> as the redirect's path.
+<%- source = '$uri' -%>
+<%- if model.normalize_html? -%>
+<%- source = model.normalized_variable -%>
+
+# /dir/index.html -> /dir/ and /page.html -> /page/
+map $uri <%= model.normalized_variable %> {
+    default $uri;
+    ~^(?<<%= model.capture_prefix %>_dir>.*/)index\.html$ $<%= model.capture_prefix %>_dir;
+    ~^(?<<%= model.capture_prefix %>_page>.*)\.html$ $<%= model.capture_prefix %>_page/;
+}
+<%- end -%>
+
+map <%= source %> <%= model.map_variable %> {
+    default <%= source %>;
+<%- model.path_mapping.each do |from, to| -%>
+    <%= from %> <%= to %>;
+<%- end -%>
+}
