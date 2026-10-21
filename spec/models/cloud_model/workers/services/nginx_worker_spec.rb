@@ -19,6 +19,25 @@ describe CloudModel::Workers::Services::NginxWorker do
     allow(subject).to receive(:comment_sub_step)
   end
 
+  describe 'restart_rake_daemons' do
+    it 'restarts the daemon-mode rake services after a rollout and leaves timer tasks alone' do
+      daemon = CloudModel::Services::Rake.new(name: 'Index Worker', rake_task: 'coreon:index_sync', rake_mode: 'restart')
+      timer = CloudModel::Services::Rake.new(name: 'Cleanup', rake_task: 'maintenance:cleanup', rake_mode: 'timer')
+      allow(guest).to receive(:services).and_return [model, daemon, timer]
+      expect(guest).to receive(:exec).with('/bin/systemctl restart rake-coreon:index_sync.service').and_return [true, '']
+      expect(guest).not_to receive(:exec).with(/maintenance:cleanup/)
+
+      subject.restart_rake_daemons
+    end
+
+    it 'reports a failed restart and goes on' do
+      daemon = CloudModel::Services::Rake.new(name: 'Index Worker', rake_task: 'coreon:index_sync', rake_mode: 'restart')
+      allow(guest).to receive(:services).and_return [daemon]
+      allow(guest).to receive(:exec).and_return [false, 'Unit not found']
+      expect { subject.restart_rake_daemons }.to output(/Error restarting rake daemon coreon:index_sync: Unit not found/).to_stdout
+    end
+  end
+
   describe '.unroll_web_image (layers instance config onto the cloned artifact)' do
     let(:web_image) {double 'WebImage', name: 'test-image', id: 'wimg1', has_mongodb?: false, has_redis?: false, master_key: nil}
 

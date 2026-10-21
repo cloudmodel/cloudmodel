@@ -136,6 +136,18 @@ module CloudModel
           deploy_id
         end
 
+        # Rake daemons of the guest run the app's code from `current` too, but
+        # resolve it once at start: after a rollout they keep running the old
+        # release (still mounted as the rollback) until restarted. Timer-mode
+        # tasks are left alone — their next run starts from the new current.
+        def restart_rake_daemons
+          @guest.services.select { |s| s.is_a?(CloudModel::Services::Rake) && s.rake_mode != 'timer' }.each do |rake|
+            comment_sub_step "Restarting rake daemon #{rake.rake_task}"
+            success, data = @model.guest.exec "/bin/systemctl restart #{"rake-#{rake.rake_task}.service".shellescape}"
+            puts "Error restarting rake daemon #{rake.rake_task}: #{data}" unless success
+          end
+        end
+
         # Paths (relative to the release root) that {#unroll_web_image} writes
         # into; a host app that writes elsewhere in its override adds them here.
         def web_release_config_paths
@@ -301,6 +313,7 @@ module CloudModel
                 end
               end
             end
+            restart_rake_daemons
           rescue Exception => e
             CloudModel.log_exception e
             web_image.try :append_to_build_log, "FAILED: #{@guest.name}: #{e}\n"
