@@ -32,7 +32,7 @@ branches on `Rails.env`.
 | `build_host_name` | *(none)* | String **or** per-arch Hash | The host(s) templates and web images are built on. A String (`'core06'`) builds everything there; a Hash (`{ 'arm64' => 'host23', 'amd64' => 'host24' }`) picks a build host per architecture. An arch without an entry builds on the deploy target host itself. |
 | `bundle_command` | `/usr/local/rvm/bin/rvm default do bundle` | shell command | How bundler is invoked on the admin machine (git checkout only). Dev typically sets `'bundle'`. |
 | `ruby_version` | `3.4` | version string | Ruby version used by build components. |
-| `php_version` | `8.2` | version string | PHP version used by PHP components. |
+| `php_version` | `8.4` | version string | PHP major installed by the PHP components (from the ondrej/php PPA on Ubuntu, packages.sury.org on Debian). |
 
 ### `zfs_compression`
 

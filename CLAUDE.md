@@ -161,7 +161,7 @@ end
 CloudModel.configure do |config|
   config.admin_email      = 'admin@example.com'
   config.ubuntu_version   = '22.04.4'
-  config.php_version      = '8.1'
+  config.php_version      = '8.4'
   config.ruby_version     = '3.1'
   config.dns_servers      = %w[1.1.1.1 8.8.8.8]
   config.data_directory   = "#{Rails.root}/data"

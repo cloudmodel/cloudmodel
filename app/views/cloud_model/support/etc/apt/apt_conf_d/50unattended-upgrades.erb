@@ -11,6 +11,12 @@ Unattended-Upgrade::Origins-Pattern {
         "origin=Ubuntu,archive=${distro_codename}-security";
         "origin=UbuntuESMApps,archive=${distro_codename}-apps-security";
         "origin=UbuntuESM,archive=${distro_codename}-infra-security";
+        // PHP comes from the PHP maintainers' repositories (php component),
+        // not from the distribution: sury.org on Debian, the ondrej/php PPA
+        // on Ubuntu. Their releases are the security releases, so they are
+        // allowed as a whole; a system without the repository matches nothing.
+        "origin=deb.sury.org,suite=${distro_codename}";
+        "origin=LP-PPA-ondrej-php,suite=${distro_codename}";
 };
 <%- if role.to_s == 'host' -%>
 

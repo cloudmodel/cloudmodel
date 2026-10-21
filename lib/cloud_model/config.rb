@@ -171,7 +171,7 @@ module CloudModel
     end
 
     def php_version
-      @php_version || "8.2"
+      @php_version || "8.4"
     end
 
     def ruby_version

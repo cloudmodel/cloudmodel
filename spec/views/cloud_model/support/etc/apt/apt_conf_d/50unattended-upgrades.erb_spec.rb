@@ -20,6 +20,12 @@ RSpec.describe 'cloud_model/support/etc/apt/apt_conf_d/50unattended-upgrades', t
     expect(out).not_to include 'Remove-Unused-Dependencies'
   end
 
+  it 'lets the php maintainer repositories through, which carry the php security releases' do
+    out = rendered_for(:guest)
+    expect(out).to include '"origin=deb.sury.org,suite=${distro_codename}";'
+    expect(out).to include '"origin=LP-PPA-ondrej-php,suite=${distro_codename}";'
+  end
+
   it 'uses key=value origin patterns only, for both roles' do
     # a bare "Ubuntu:jammy-security" aborts unattended-upgrade's parser
     %i(host guest).each do |role|

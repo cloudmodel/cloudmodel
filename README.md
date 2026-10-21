@@ -78,7 +78,7 @@ CloudModel.configure do |config|
   # Default OS / software versions used when building templates
   config.ubuntu_version = '22.04.4'   # default: '22.04.4'
   config.debian_version = '12'        # default: '12'
-  config.php_version    = '8.2'       # default: '8.2'
+  config.php_version    = '8.4'       # default: '8.4'
   config.ruby_version   = '3.4'       # default: '3.4'
 
   # Ubuntu apt mirror
