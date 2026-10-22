@@ -28,6 +28,23 @@ module CloudModel
         # apt-daily job instead of failing after apt's default two minutes.
         INSTALL = "apt-get update -q || echo 'apt-get update failed, installing from the existing package lists'; " \
                   "DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=600 #{PACKAGE}".freeze
+        # Only the security suite is applied — useless where it is missing
+        # from the sources. Systems built from templates that predate
+        # TemplateWorker adding -security/-updates have just the base suite,
+        # so add whichever is missing (Debian bullseye and later; older
+        # releases named the suite differently, Ubuntu ships both already).
+        # Matches one-line and deb822 sources alike.
+        SECURITY_SOURCES = <<~SH.squish.freeze
+          . /etc/os-release;
+          if [ "$ID" = debian ] && [ -n "$VERSION_CODENAME" ]; then
+            case "$VERSION_CODENAME" in jessie|stretch|buster) ;; *)
+              grep -rqs -- "$VERSION_CODENAME-security" /etc/apt/sources.list /etc/apt/sources.list.d ||
+                echo "deb http://security.debian.org/debian-security $VERSION_CODENAME-security main contrib" >> /etc/apt/sources.list;
+              grep -rqs -- "$VERSION_CODENAME-updates" /etc/apt/sources.list /etc/apt/sources.list.d ||
+                echo "deb http://ftp.de.debian.org/debian $VERSION_CODENAME-updates main contrib" >> /etc/apt/sources.list;;
+            esac;
+          fi
+        SH
         # A parse error in apt.conf.d breaks every apt call on the system,
         # deploys included — so what was written is verified before the step
         # reports success.
@@ -68,6 +85,7 @@ module CloudModel
           return skip_unattended_upgrades unless CloudModel.config.unattended_upgrades
 
           write_unattended_upgrades_config root, role: role
+          chroot! root, SECURITY_SOURCES, 'Failed to add the security sources'
           chroot! root, "test -x #{BINARY} || { #{INSTALL}; }", "Failed to install #{PACKAGE}"
           chroot! root, CHECK, "#{PACKAGE} rejected the configuration in #{root}"
           apply_security_updates root
@@ -78,6 +96,7 @@ module CloudModel
           return skip_unattended_upgrades unless CloudModel.config.unattended_upgrades
 
           write_unattended_upgrades_config '', role: :host
+          @host.exec! "sh -c #{SECURITY_SOURCES.shellescape}", "Failed to add the security sources on #{@host.name}"
           @host.exec! INSTALL, "Failed to install #{PACKAGE} on #{@host.name}"
           @host.exec! CHECK, "#{PACKAGE} rejected the configuration on #{@host.name}"
           @host.exec! TIMERS, 'Failed to enable the apt timers'
@@ -104,6 +123,7 @@ module CloudModel
               host.exec "rm -f #{tmp.shellescape}"
             end
           end
+          guest.exec! "sh -c #{SECURITY_SOURCES.shellescape}", "Failed to add the security sources in #{cname}"
           guest.exec! "sh -c #{INSTALL.shellescape}", "Failed to install #{PACKAGE} in #{cname}"
           guest.exec! "sh -c #{CHECK.shellescape}", "#{PACKAGE} rejected the configuration in #{cname}"
           guest.exec! TIMERS, "Failed to enable the apt timers in #{cname}"

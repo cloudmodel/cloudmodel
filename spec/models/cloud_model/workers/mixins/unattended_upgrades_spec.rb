@@ -8,6 +8,7 @@ describe CloudModel::Workers::Mixins::UnattendedUpgrades do
   let(:install) { described_class::INSTALL }
   let(:check) { described_class::CHECK }
   let(:timers) { described_class::TIMERS }
+  let(:sources) { described_class::SECURITY_SOURCES }
   let(:tmpl) { described_class::TEMPLATE_DIR }
 
   describe 'the rendered templates' do
@@ -76,6 +77,7 @@ describe CloudModel::Workers::Mixins::UnattendedUpgrades do
     it 'rewrites the configuration, installs the package only where it is missing, then applies the pending updates' do
       expect(worker).to receive(:render_to_remote).with("#{tmpl}/20auto-upgrades", "#{root}/etc/apt/apt.conf.d/20auto-upgrades", 0644, role: :guest).ordered
       expect(worker).to receive(:render_to_remote).with("#{tmpl}/50unattended-upgrades", "#{root}/etc/apt/apt.conf.d/50unattended-upgrades", 0644, role: :guest).ordered
+      expect(worker).to receive(:chroot!).with(root, sources, 'Failed to add the security sources').ordered
       expect(worker).to receive(:chroot!).with(root, "test -x /usr/bin/unattended-upgrade || { #{install}; }", 'Failed to install unattended-upgrades').ordered
       expect(worker).to receive(:chroot!).with(root, check, /rejected the configuration/).ordered
       expect(worker).to receive(:chroot).with(root, upgrade).ordered.and_return([true, ''])
@@ -132,6 +134,7 @@ describe CloudModel::Workers::Mixins::UnattendedUpgrades do
     it 'writes both files in place, installs over ssh, verifies and enables the timers' do
       expect(worker).to receive(:render_to_remote).with("#{tmpl}/20auto-upgrades", '/etc/apt/apt.conf.d/20auto-upgrades', 0644, role: :host).ordered
       expect(worker).to receive(:render_to_remote).with("#{tmpl}/50unattended-upgrades", '/etc/apt/apt.conf.d/50unattended-upgrades', 0644, role: :host).ordered
+      expect(host).to receive(:exec!).with("sh -c #{sources.shellescape}", 'Failed to add the security sources on host01').ordered
       expect(host).to receive(:exec!).with(install, 'Failed to install unattended-upgrades on host01').ordered
       expect(host).to receive(:exec!).with(check, /rejected the configuration on host01/).ordered
       expect(host).to receive(:exec!).with(timers, 'Failed to enable the apt timers').ordered
@@ -160,6 +163,7 @@ describe CloudModel::Workers::Mixins::UnattendedUpgrades do
         expect(host).to receive(:exec!).with("lxc file push /tmp/cloud_model_apt_guest01-20260101000000_#{file}_abcd guest01-20260101000000/etc/apt/apt.conf.d/#{file} --uid 0 --gid 0 --mode 0644", "Failed to push #{file} to guest01-20260101000000")
         expect(host).to receive(:exec).with("rm -f /tmp/cloud_model_apt_guest01-20260101000000_#{file}_abcd")
       end
+      expect(guest).to receive(:exec!).with("sh -c #{sources.shellescape}", 'Failed to add the security sources in guest01-20260101000000').ordered
       expect(guest).to receive(:exec!).with("sh -c #{install.shellescape}", 'Failed to install unattended-upgrades in guest01-20260101000000').ordered
       expect(guest).to receive(:exec!).with("sh -c #{check.shellescape}", /rejected the configuration in guest01-20260101000000/).ordered
       expect(guest).to receive(:exec!).with(timers, 'Failed to enable the apt timers in guest01-20260101000000').ordered
@@ -170,6 +174,41 @@ describe CloudModel::Workers::Mixins::UnattendedUpgrades do
     it 'refuses without a running container' do
       allow(guest).to receive(:current_lxd_container).and_return(nil)
       expect { worker.deploy_unattended_upgrades_to_guest }.to raise_error(/no running LXD container/)
+    end
+  end
+
+  describe 'SECURITY_SOURCES' do
+    # Runs the snippet for real against a scratch /etc.
+    def run_sources os_release, sources_list, extra = {}
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p "#{dir}/etc/apt/sources.list.d"
+        File.write "#{dir}/etc/os-release", os_release
+        File.write "#{dir}/etc/apt/sources.list", sources_list
+        extra.each { |name, content| File.write "#{dir}/etc/apt/sources.list.d/#{name}", content }
+        script = described_class::SECURITY_SOURCES.gsub('/etc/', "#{dir}/etc/")
+        2.times { expect(system('sh', '-c', script)).to eq true }
+        File.read "#{dir}/etc/apt/sources.list"
+      end
+    end
+
+    let(:bookworm) { "ID=debian\nVERSION_CODENAME=bookworm\n" }
+    let(:base) { "deb http://ftp.de.debian.org/debian bookworm contrib main\n" }
+
+    it 'adds the missing -security and -updates suites on Debian, once' do
+      expect(run_sources(bookworm, base)).to eq base +
+        "deb http://security.debian.org/debian-security bookworm-security main contrib\n" \
+        "deb http://ftp.de.debian.org/debian bookworm-updates main contrib\n"
+    end
+
+    it 'leaves suites alone that are there already, also in deb822 sources' do
+      deb822 = "Types: deb\nURIs: http://deb.debian.org/debian\nSuites: bookworm bookworm-updates\n"
+      expect(run_sources(bookworm, base, 'debian.sources' => deb822)).to eq base +
+        "deb http://security.debian.org/debian-security bookworm-security main contrib\n"
+    end
+
+    it 'does not touch Ubuntu or Debian releases with the old security suite name' do
+      expect(run_sources("ID=ubuntu\nVERSION_CODENAME=jammy\n", "deb http://archive.ubuntu.com/ubuntu jammy main\n")).to eq "deb http://archive.ubuntu.com/ubuntu jammy main\n"
+      expect(run_sources("ID=debian\nVERSION_CODENAME=buster\n", "deb http://deb.debian.org/debian buster main\n")).to eq "deb http://deb.debian.org/debian buster main\n"
     end
   end
 
