@@ -32,6 +32,16 @@ module CloudModel
         # deploys included — so what was written is verified before the step
         # reports success.
         CHECK = "apt-config dump >/dev/null && #{BINARY} --dry-run >/dev/null".freeze
+        # One real run on a freshly cloned root. A template is reused until it
+        # is rebuilt, so everything published after its build would otherwise
+        # stay in until the first nightly run. unattended-upgrade does not
+        # refresh the package lists itself (apt.systemd.daily does), hence the
+        # update in front of it; a broken third-party list must not stop the
+        # distribution's own updates.
+        UPGRADE = "apt-get update -q || echo 'apt-get update failed, upgrading from the existing package lists'; " \
+                  "#{BINARY} -v".freeze
+        # Keeps maintainer scripts from starting services inside the chroot.
+        POLICY_RC_D = '/usr/sbin/policy-rc.d'.freeze
 
         # Template build: write the configuration and install the package into
         # the rootfs under construction. (Configuration first: apt ignores
@@ -49,7 +59,9 @@ module CloudModel
 
         # (Re)deploy: the new root was cloned from a template that may predate
         # the feature, or carry an older configuration. Always rewrite the
-        # configuration, install the package only where it is missing.
+        # configuration, install the package only where it is missing, then
+        # apply the security updates published since the template was built,
+        # so the system starts patched instead of waiting for the night.
         # @param root [String] the system root being deployed
         # @param role [Symbol] :host or :guest
         def refresh_unattended_upgrades root, role:
@@ -58,6 +70,7 @@ module CloudModel
           write_unattended_upgrades_config root, role: role
           chroot! root, "test -x #{BINARY} || { #{INSTALL}; }", "Failed to install #{PACKAGE}"
           chroot! root, CHECK, "#{PACKAGE} rejected the configuration in #{root}"
+          apply_security_updates root
         end
 
         # Running host: write the configuration in place and install over SSH.
@@ -97,6 +110,28 @@ module CloudModel
         end
 
         private
+
+        # Runs unattended-upgrade once in the cloned root. Not fatal: a mirror
+        # outage or a package that refuses must not block a deploy, the
+        # nightly run retries. Services stay down while it runs (the deploy
+        # starts them later), so a policy-rc.d is put in place unless the root
+        # already has one, and removed again afterwards.
+        # @param root [String] the system root being deployed
+        # @return [Boolean] whether the run succeeded
+        def apply_security_updates root
+          policy = "#{root}#{POLICY_RC_D}"
+          own_policy = !@host.exec("test -e #{policy.shellescape}").first
+          render_to_remote '/cloud_model/support/usr/sbin/policy-rc.d', policy, 0755 if own_policy
+
+          success, out = chroot root, UPGRADE
+          unless success
+            Rails.logger.warn "unattended-upgrade in #{root} failed: #{out}"
+            comment_sub_step 'Security updates not applied, the nightly run retries (see log)'
+          end
+          success
+        ensure
+          @host.exec "rm -f #{policy.shellescape}" if own_policy
+        end
 
         # @param root [String] system root ('' for the host itself)
         def write_unattended_upgrades_config root, role:

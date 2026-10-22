@@ -562,6 +562,8 @@ describe CloudModel::Workers::HostWorker do
       allow(subject).to receive(:config_firewall)
       allow(subject).to receive(:config_fstab)
       allow(subject).to receive(:local_exec)
+      # the upgrade run itself is covered in the unattended upgrades mixin spec
+      expect(subject).to receive(:apply_security_updates).with(@root)
       allow(File).to receive(:exist?).and_return(true)
       sftp = double 'sftp'
       allow(host).to receive(:sftp).and_return(sftp)

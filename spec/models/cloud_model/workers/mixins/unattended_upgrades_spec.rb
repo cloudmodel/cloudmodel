@@ -58,20 +58,58 @@ describe CloudModel::Workers::Mixins::UnattendedUpgrades do
   describe '(re)deploy from a template (refresh_unattended_upgrades)' do
     subject(:worker) { CloudModel::Workers::GuestWorker.new guest }
 
+    let(:root) { '/var/lib/lxd/containers/guest01-x/rootfs' }
+    let(:upgrade) { described_class::UPGRADE }
+    let(:policy) { "#{root}/usr/sbin/policy-rc.d" }
+
     before do
       allow(worker).to receive(:comment_sub_step)
       allow(worker).to receive(:chroot!)
+      allow(worker).to receive(:chroot).and_return([true, ''])
       allow(worker).to receive(:mkdir_p)
       allow(worker).to receive(:render_to_remote)
+      allow(host).to receive(:exec).and_return([true, ''])
+      # no policy-rc.d in the root: config_services removed it
+      allow(host).to receive(:exec).with("test -e #{policy}").and_return([false, ''])
     end
 
-    it 'rewrites the configuration and installs the package only where it is missing' do
-      expect(worker).to receive(:render_to_remote).with("#{tmpl}/20auto-upgrades", '/var/lib/lxd/containers/guest01-x/rootfs/etc/apt/apt.conf.d/20auto-upgrades', 0644, role: :guest).ordered
-      expect(worker).to receive(:render_to_remote).with("#{tmpl}/50unattended-upgrades", '/var/lib/lxd/containers/guest01-x/rootfs/etc/apt/apt.conf.d/50unattended-upgrades', 0644, role: :guest).ordered
-      expect(worker).to receive(:chroot!).with('/var/lib/lxd/containers/guest01-x/rootfs', "test -x /usr/bin/unattended-upgrade || { #{install}; }", 'Failed to install unattended-upgrades').ordered
-      expect(worker).to receive(:chroot!).with('/var/lib/lxd/containers/guest01-x/rootfs', check, /rejected the configuration/).ordered
+    it 'rewrites the configuration, installs the package only where it is missing, then applies the pending updates' do
+      expect(worker).to receive(:render_to_remote).with("#{tmpl}/20auto-upgrades", "#{root}/etc/apt/apt.conf.d/20auto-upgrades", 0644, role: :guest).ordered
+      expect(worker).to receive(:render_to_remote).with("#{tmpl}/50unattended-upgrades", "#{root}/etc/apt/apt.conf.d/50unattended-upgrades", 0644, role: :guest).ordered
+      expect(worker).to receive(:chroot!).with(root, "test -x /usr/bin/unattended-upgrade || { #{install}; }", 'Failed to install unattended-upgrades').ordered
+      expect(worker).to receive(:chroot!).with(root, check, /rejected the configuration/).ordered
+      expect(worker).to receive(:chroot).with(root, upgrade).ordered.and_return([true, ''])
 
-      worker.refresh_unattended_upgrades '/var/lib/lxd/containers/guest01-x/rootfs', role: :guest
+      expect(worker.refresh_unattended_upgrades(root, role: :guest)).to eq true
+    end
+
+    it 'keeps services from starting in the chroot during the run and removes its policy-rc.d afterwards' do
+      expect(worker).to receive(:render_to_remote).with('/cloud_model/support/usr/sbin/policy-rc.d', policy, 0755).ordered
+      expect(worker).to receive(:chroot).with(root, upgrade).ordered.and_return([true, ''])
+      expect(host).to receive(:exec).with("rm -f #{policy}").ordered
+
+      worker.refresh_unattended_upgrades root, role: :guest
+    end
+
+    it 'leaves a policy-rc.d that was already there alone' do
+      allow(host).to receive(:exec).with("test -e #{policy}").and_return([true, ''])
+      expect(worker).not_to receive(:render_to_remote).with('/cloud_model/support/usr/sbin/policy-rc.d', any_args)
+      expect(host).not_to receive(:exec).with("rm -f #{policy}")
+
+      worker.refresh_unattended_upgrades root, role: :guest
+    end
+
+    it 'does not fail the deploy when the run fails, and still removes its policy-rc.d' do
+      allow(worker).to receive(:chroot).with(root, upgrade).and_return([false, 'E: mirror down'])
+      expect(worker).to receive(:comment_sub_step).with(/nightly run retries/)
+      expect(host).to receive(:exec).with("rm -f #{policy}")
+
+      expect(worker.refresh_unattended_upgrades(root, role: :guest)).to eq false
+    end
+
+    it 'refreshes the package lists first, tolerating a broken list, and runs unattended-upgrade for real' do
+      expect(upgrade).to match(/\Aapt-get update -q \|\| echo .*; \/usr\/bin\/unattended-upgrade -v\z/)
+      expect(upgrade).not_to include '--dry-run'
     end
 
     it 'is a deploy step of the guest worker and of the host deploy' do
