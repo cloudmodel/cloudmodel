@@ -13,6 +13,12 @@ ExecStartPre=/bin/chmod 2775 /var/www/rails/current/public
 # (provision_web_volume), and walking the full release tree can blow the start
 # timeout and wedge nginx in a restart loop under Restart=always.
 ExecStartPre=/bin/chown www:www /var/www /var/www/rails /var/www/rails/current /var/www/rails/current/public
+# Everything below /var/www must still belong to www (a root shell, a rake task
+# run as root). Only what is actually wrong gets changed: a chown to the same
+# owner still rewrites every inode's ctime, which on ZFS is a metadata write per
+# file. The walk runs in the background after the start, so even a cold tree of
+# several hundred thousand files never holds nginx up.
+ExecStartPost=-/bin/sh -c '{ find /var/www ! -user www -exec chown -h www {} + ; find /var/www ! -group www -exec chgrp -h www {} + ; } >/dev/null 2>&1 &'
 # Capistrano deploy keys: keep them owned by www so sshd StrictModes accepts
 # them. Non-recursive, failure-tolerant (absent on guests without deploy keys).
 ExecStartPre=-/bin/chown www:www /var/www/.ssh /var/www/.ssh/authorized_keys

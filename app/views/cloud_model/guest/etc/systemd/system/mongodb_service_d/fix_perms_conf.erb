@@ -6,4 +6,10 @@ LimitMEMLOCK=infinity
 LimitNOFILE=65000
 LimitNPROC=65000
 PermissionsStartOnly=true
-ExecStartPre=/bin/chown -R mongodb:mongodb /var/lib/mongodb
+TimeoutStartSec=600
+# The data must belong to mongodb before mongod opens it, so this one stays in
+# front of the start. Only what is actually wrong gets changed: a chown to the
+# same owner still rewrites every inode's ctime, which on ZFS is a metadata
+# write per file — at every start, for every file of the data directory.
+ExecStartPre=/bin/chown mongodb:mongodb /var/lib/mongodb
+ExecStartPre=/bin/sh -c 'find /var/lib/mongodb ! -user mongodb -exec chown -h mongodb {} + ; find /var/lib/mongodb ! -group mongodb -exec chgrp -h mongodb {} +'
