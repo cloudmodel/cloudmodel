@@ -26,6 +26,12 @@ RSpec.describe 'cloud_model/support/etc/apt/apt_conf_d/50unattended-upgrades', t
     expect(out).to include '"origin=LP-PPA-ondrej-php,suite=${distro_codename}";'
   end
 
+  it 'lets the nodesource repository through, which carries the node.js security releases' do
+    # NodeSource's Release file says "Origin: . nodistro" (with the space), so
+    # the pattern matches the site instead
+    expect(rendered_for(:guest)).to include '"site=deb.nodesource.com,archive=nodistro";'
+  end
+
   it 'uses key=value origin patterns only, for both roles' do
     # a bare "Ubuntu:jammy-security" aborts unattended-upgrade's parser
     %i(host guest).each do |role|
