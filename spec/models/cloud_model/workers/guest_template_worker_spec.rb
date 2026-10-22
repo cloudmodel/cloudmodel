@@ -167,6 +167,11 @@ describe CloudModel::Workers::GuestTemplateWorker do
         subject.install_utils
       end
 
+      it 'should install libcap headers' do
+        expect(subject).to receive(:chroot!).with(subject.build_path, "apt-get install libcap-dev -y", "Failed to install libcap headers")
+        subject.install_utils
+      end
+
       it 'should configure autologin' do
         expect(subject).to receive(:mkdir_p).with("#{subject.build_path}/etc/systemd/system/console-getty.service.d")
         expect(subject).to receive(:render_to_remote).with(
@@ -195,7 +200,7 @@ describe CloudModel::Workers::GuestTemplateWorker do
       end
 
       it 'should install netbase and networking packages' do
-        expect(subject).to receive(:chroot!).with(subject.build_path, "apt-get install netbase iproute2 isc-dhcp-client -y", "Failed to install network base")
+        expect(subject).to receive(:chroot!).with(subject.build_path, "apt-get install netbase iproute2 iputils-ping isc-dhcp-client -y", "Failed to install network base")
         subject.install_network
       end
 

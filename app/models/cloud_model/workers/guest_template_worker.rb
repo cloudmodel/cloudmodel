@@ -73,6 +73,11 @@ module CloudModel
         comment_sub_step 'Install msmtp mailer'
         chroot! build_path, "apt-get install sudo msmtp msmtp-mta mailutils -y", "Failed to install msmtp"
 
+        # Headers for native extensions against sys/capability.h (e.g. the
+        # cap2 gem net-ping pulls in on Linux)
+        comment_sub_step 'Install libcap headers'
+        chroot! build_path, "apt-get install libcap-dev -y", "Failed to install libcap headers"
+
         comment_sub_step 'Configure autologin'
         # Autologin
         mkdir_p "#{build_path}/etc/systemd/system/console-getty.service.d"
@@ -85,7 +90,7 @@ module CloudModel
 
       def install_network
         comment_sub_step 'Install netbase'
-        chroot! build_path, "apt-get install netbase iproute2 isc-dhcp-client -y", "Failed to install network base"
+        chroot! build_path, "apt-get install netbase iproute2 iputils-ping isc-dhcp-client -y", "Failed to install network base"
         render_to_remote "/cloud_model/guest/etc/systemd/system/dhclient.service", "#{build_path}/etc/systemd/system/dhclient.service"
         mkdir_p "#{build_path}/etc/systemd/system/multi-user.target.wants"
         #chroot! build_path, "ln -s /etc/systemd/system/dhclient.service /etc/systemd/system/multi-user.target.wants/dhclient.service", "Failed to enable dhclient service"
