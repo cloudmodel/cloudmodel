@@ -42,10 +42,13 @@ module CloudModel
         rates = @options && @options[:container_oom_rates]
         return unless rates and container = @subject.current_lxd_container
 
-        rate = rates[container.name.tr('.', '_')] || 0.0
+        key = container.name.tr('.', '_')
+        rate = rates[key] || 0.0
+        kills = (@options[:container_oom_kills] || {})[key] || 0
         do_check :cgroup_oom, 'In-container OOM kills', {
           warning: rate > 0
-          }, message: 'Processes were OOM-killed at the container memory limit', value: "#{"%0.3f" % rate}/s"
+          }, message: "#{kills} process#{'es' unless kills == 1} OOM-killed at the container memory limit since the last check",
+          value: "#{kills} (#{"%0.4f" % rate}/s)"
       end
 
       def check

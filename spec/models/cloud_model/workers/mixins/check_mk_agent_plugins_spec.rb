@@ -8,8 +8,9 @@ describe CloudModel::Workers::Mixins::CheckMkAgentPlugins do
     klass = Class.new(CloudModel::Workers::BaseWorker) do
       include CloudModel::Workers::Mixins::CheckMkAgentPlugins
     end
-    klass.new(double('host'))
+    klass.new(host)
   end
+  let(:host) { double('host', exec: [true, '']) }
 
   before do
     allow(worker).to receive(:mkdir_p)
@@ -48,6 +49,16 @@ describe CloudModel::Workers::Mixins::CheckMkAgentPlugins do
     it 'includes the versions and packages plugins' do
       expect(described_class::PLUGINS).to include('versions')
       expect(described_class::CACHED_PLUGINS.values.flatten).to include('packages')
+    end
+
+    it 'runs kernel_log on every poll — a 120 s cache is never fresh for an hourly poll on agent 2.x' do
+      expect(described_class::PLUGINS).to include('kernel_log')
+      expect(described_class::CACHED_PLUGINS.values.flatten).not_to include('kernel_log')
+    end
+
+    it 'removes plugin files of earlier manifests so they do not run twice' do
+      worker.deploy_check_mk_plugins
+      expect(host).to have_received(:exec).with('rm -f /usr/lib/check_mk_agent/plugins/120/kernel_log; rmdir /usr/lib/check_mk_agent/plugins/120 2>/dev/null')
     end
 
     it 'prefixes a build chroot path when given one' do

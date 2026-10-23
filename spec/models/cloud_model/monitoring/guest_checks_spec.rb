@@ -45,13 +45,13 @@ describe CloudModel::Monitoring::GuestChecks do
     let(:container) { double CloudModel::LxdContainer, name: 'guest01-20260101000000' }
     before { allow(guest).to receive(:current_lxd_container).and_return container }
 
-    def checks_with rates
-      CloudModel::Monitoring::GuestChecks.new guest, skip_header: true, container_oom_rates: rates
+    def checks_with rates, kills = {}
+      CloudModel::Monitoring::GuestChecks.new guest, skip_header: true, container_oom_rates: rates, container_oom_kills: kills
     end
 
-    it 'raises the OOM kills the host counted for this container on the guest' do
-      checks = checks_with 'guest01-20260101000000' => 0.25
-      expect(checks).to receive(:do_check).with(:cgroup_oom, 'In-container OOM kills', {warning: true}, hash_including(value: '0.250/s'))
+    it 'raises the OOM kills the host counted for this container on the guest, with the count' do
+      checks = checks_with({'guest01-20260101000000' => 0.25}, {'guest01-20260101000000' => 2})
+      expect(checks).to receive(:do_check).with(:cgroup_oom, 'In-container OOM kills', {warning: true}, hash_including(value: '2 (0.2500/s)', message: /2 processes OOM-killed/))
       checks.check_container_oom
     end
 

@@ -27,13 +27,13 @@ describe CloudModel::Monitoring::HostChecks do
       active_host = double CloudModel::Host, name: 'active', deploy_state: :running, guests: [guest]
       allow(CloudModel::Host).to receive(:scoped).and_return [active_host]
 
-      host_checks = double 'HostChecks', check: true, container_oom_rates: {'guest01-20260101000000' => 0.5}
+      host_checks = double 'HostChecks', check: true, container_oom_rates: {'guest01-20260101000000' => 0.5}, container_oom_kills: {'guest01-20260101000000' => 3}
       guest_checks = double 'GuestChecks', check: true
       volume_checks = double 'LxdCustomVolumeChecks', check: true
       service_checks = double 'ServiceChecks', check: true
 
       expect(CloudModel::Monitoring::HostChecks).to receive(:new).with(active_host).and_return host_checks
-      expect(CloudModel::Monitoring::GuestChecks).to receive(:new).with(guest, container_oom_rates: {'guest01-20260101000000' => 0.5}).and_return guest_checks
+      expect(CloudModel::Monitoring::GuestChecks).to receive(:new).with(guest, container_oom_rates: {'guest01-20260101000000' => 0.5}, container_oom_kills: {'guest01-20260101000000' => 3}).and_return guest_checks
       expect(CloudModel::Monitoring::LxdCustomVolumeChecks).to receive(:new).with(volume).and_return volume_checks
       expect(CloudModel::Monitoring::ServiceChecks).to receive(:new).with(service).and_return service_checks
 
@@ -396,6 +396,7 @@ describe CloudModel::Monitoring::HostChecks do
         subject.check_kernel_log
 
         expect(subject.container_oom_rates).to eq 'guest01-20260101000000' => 0.1, 'guest02-20260101000000' => 0.05
+        expect(subject.container_oom_kills).to eq 'guest01-20260101000000' => 10, 'guest02-20260101000000' => 5
       end
 
       it 'stays unknown while the previous cycle came from an agent plugin without them' do
