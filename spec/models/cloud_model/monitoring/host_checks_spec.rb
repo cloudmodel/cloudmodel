@@ -27,13 +27,13 @@ describe CloudModel::Monitoring::HostChecks do
       active_host = double CloudModel::Host, name: 'active', deploy_state: :running, guests: [guest]
       allow(CloudModel::Host).to receive(:scoped).and_return [active_host]
 
-      host_checks = double 'HostChecks', check: true
+      host_checks = double 'HostChecks', check: true, container_oom_rates: {'guest01-20260101000000' => 0.5}
       guest_checks = double 'GuestChecks', check: true
       volume_checks = double 'LxdCustomVolumeChecks', check: true
       service_checks = double 'ServiceChecks', check: true
 
       expect(CloudModel::Monitoring::HostChecks).to receive(:new).with(active_host).and_return host_checks
-      expect(CloudModel::Monitoring::GuestChecks).to receive(:new).with(guest).and_return guest_checks
+      expect(CloudModel::Monitoring::GuestChecks).to receive(:new).with(guest, container_oom_rates: {'guest01-20260101000000' => 0.5}).and_return guest_checks
       expect(CloudModel::Monitoring::LxdCustomVolumeChecks).to receive(:new).with(volume).and_return volume_checks
       expect(CloudModel::Monitoring::ServiceChecks).to receive(:new).with(service).and_return service_checks
 
@@ -376,6 +376,36 @@ describe CloudModel::Monitoring::HostChecks do
       allow(subject).to receive(:do_check).with(:kernel_io_error, anything, {warning: false}, anything)
 
       subject.check_kernel_log
+    end
+
+    context 'OOM kills per container' do
+      let(:now) { Time.now }
+      let(:quiet) { {'oom' => '0', 'mce' => '0', 'io_error' => '0', 'fs_error' => '0'} }
+
+      before do
+        allow(host).to receive(:monitoring_last_check_at).and_return now
+        subject.instance_variable_set :@prev_at, now - 100
+        allow(subject).to receive(:do_check)
+      end
+
+      it 'turns them into rates for the guests, a container without a previous count starting at 0, and keeps them off the host' do
+        subject.instance_variable_set :@prev_system, {'kernel_log' => quiet.merge('oom_by_container' => '1', 'oom@guest01-20260101000000' => '3')}
+        allow(subject).to receive(:data).and_return({system: {'kernel_log' => quiet.merge('oom_by_container' => '1', 'oom@guest01-20260101000000' => '13', 'oom@guest02-20260101000000' => '5')}})
+
+        expect(subject).to receive(:do_check).with(:kernel_oom, anything, {warning: false}, anything)
+        subject.check_kernel_log
+
+        expect(subject.container_oom_rates).to eq 'guest01-20260101000000' => 0.1, 'guest02-20260101000000' => 0.05
+      end
+
+      it 'stays unknown while the previous cycle came from an agent plugin without them' do
+        subject.instance_variable_set :@prev_system, {'kernel_log' => quiet}
+        allow(subject).to receive(:data).and_return({system: {'kernel_log' => quiet.merge('oom_by_container' => '1', 'oom@guest01-20260101000000' => '13')}})
+
+        subject.check_kernel_log
+
+        expect(subject.container_oom_rates).to be_nil
+      end
     end
   end
 

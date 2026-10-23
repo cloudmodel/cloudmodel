@@ -222,7 +222,9 @@ module CloudModel
           # kernel_log check). Warning — matching the host OOM treatment: a
           # process was killed and is worth surfacing, but many workloads
           # tolerate the odd OOM so it should not page.
-          if rate = counter_rate(cg['oom_kills'], prev['oom_kills'])
+          # The host's count (GuestChecks#check_container_oom) wins where
+          # present — both writing the same issue would flap it.
+          if !(@options && @options[:container_oom_rates]) and rate = counter_rate(cg['oom_kills'], prev['oom_kills'])
             do_check :cgroup_oom, 'In-container OOM kills', {
               warning: rate > 0
               }, value: "#{"%0.3f" % rate}/s"

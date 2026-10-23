@@ -41,6 +41,40 @@ describe CloudModel::Monitoring::GuestChecks do
     end
   end
 
+  describe 'check_container_oom' do
+    let(:container) { double CloudModel::LxdContainer, name: 'guest01-20260101000000' }
+    before { allow(guest).to receive(:current_lxd_container).and_return container }
+
+    def checks_with rates
+      CloudModel::Monitoring::GuestChecks.new guest, skip_header: true, container_oom_rates: rates
+    end
+
+    it 'raises the OOM kills the host counted for this container on the guest' do
+      checks = checks_with 'guest01-20260101000000' => 0.25
+      expect(checks).to receive(:do_check).with(:cgroup_oom, 'In-container OOM kills', {warning: true}, hash_including(value: '0.250/s'))
+      checks.check_container_oom
+    end
+
+    it 'resolves it when the host counted none for this container' do
+      checks = checks_with 'other-20260101000000' => 1.0
+      expect(checks).to receive(:do_check).with(:cgroup_oom, anything, {warning: false}, anything)
+      checks.check_container_oom
+    end
+
+    it 'looks the container up with dots as underscores, as the agent plugin writes it' do
+      allow(container).to receive(:name).and_return 'web.example-20260101000000'
+      checks = checks_with 'web_example-20260101000000' => 0.5
+      expect(checks).to receive(:do_check).with(:cgroup_oom, anything, {warning: true}, anything)
+      checks.check_container_oom
+    end
+
+    it 'does nothing while the host could not tell' do
+      checks = checks_with nil
+      expect(checks).not_to receive(:do_check)
+      checks.check_container_oom
+    end
+  end
+
   describe 'check' do
     before do
       allow(guest).to receive(:monitoring_last_check_result).and_return nil
@@ -53,7 +87,8 @@ describe CloudModel::Monitoring::GuestChecks do
       allow(guest).to receive(:item_issues).and_return issues
       allow(issues).to receive(:where).with(key: :sys_boot_failed, resolved_at: nil).and_return []
 
-      expect(subject).to receive(:check_system_info).and_return true
+      expect(subject).to receive(:check_container_oom).ordered
+      expect(subject).to receive(:check_system_info).ordered.and_return true
       expect(subject.check).to eq true
     end
 

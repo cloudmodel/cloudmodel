@@ -317,6 +317,19 @@ describe CloudModel::Monitoring::Mixins::SysinfoChecksMixin do
       subject.check_cgroup_limits
     end
 
+    it 'should leave in-container OOM kills to the host count where it is given' do
+      now = Time.now
+      allow(host).to receive(:monitoring_last_check_at).and_return now
+      subject.instance_variable_set :@prev_at, now - 60
+      subject.instance_variable_set :@options, {container_oom_rates: {}}
+      subject.instance_variable_set :@prev_system, {'cgroup_limits' => {'oom_kills' => '0'}}
+      allow(subject).to receive(:data).and_return({system: {'cgroup_limits' => {'oom_kills' => '2'}}})
+
+      expect(subject).not_to receive(:do_check).with(:cgroup_oom, anything, anything, anything)
+
+      subject.check_cgroup_limits
+    end
+
     it 'should warn on in-container OOM kills but only graph memory/CPU pressure' do
       now = Time.now
       allow(host).to receive(:monitoring_last_check_at).and_return now

@@ -13,7 +13,22 @@ fi
 [ -z "$log" ] && exit 0
 
 echo "<<<kernel_log>>>"
-echo "oom $(printf '%s\n' "$log" | grep -icE 'out of memory|oom-kill|killed process')"
+# OOM kills at a container's own memory limit are listed per container
+# (`oom@<container> <count>`, dots in the name as underscores) so GuestChecks
+# can raise them on the guest — on cgroup v1 the guest has no usable counter
+# of its own. `oom` counts the remaining kills: global OOM, host services.
+# Kernels >= 4.19 log `oom-kill:...,oom_memcg=/lxc/<name>,` (`/lxc.payload.`
+# with newer LXD), older ones `... killed as a result of limit of /lxc/<name>`.
+containers=$(printf '%s\n' "$log" | sed -nE \
+  -e 's/.*oom-kill:.*oom_memcg=\/lxc(\.payload)?[./]([^,/]+)[,/].*/\2/p' \
+  -e 's/.*killed as a result of limit of \/lxc(\.payload)?[./]([^/ ]+).*/\2/p' | sort | uniq -c)
+kills=$(printf '%s\n' "$log" | grep -c 'Killed process')
+in_containers=$(printf '%s\n' "$containers" | awk '{s+=$1} END{print s+0}')
+host_kills=$((kills - in_containers))
+[ "$host_kills" -lt 0 ] && host_kills=0
+echo "oom $host_kills"
+echo "oom_by_container 1"
+printf '%s\n' "$containers" | awk 'NF==2{gsub(/\./, "_", $2); print "oom@"$2" "$1}'
 echo "mce $(printf '%s\n' "$log" | grep -icE 'machine check|mce:|hardware error')"
 echo "io_error $(printf '%s\n' "$log" | grep -icE 'i/o error|blk_update_request.*error')"
 echo "fs_error $(printf '%s\n' "$log" | grep -icE 'ext4-fs error|xfs.*(error|corrupt)|btrfs.*(error|corrupt)|remounting filesystem read-only')"

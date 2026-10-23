@@ -13,10 +13,11 @@ module CloudModel
             threads << Thread.new do
               Rails.application.executor.wrap do
                 handle_cloudmodel_monitoring_exception host, host, 2 do
-                  if CloudModel::Monitoring::HostChecks.new(host).check
+                  host_checks = CloudModel::Monitoring::HostChecks.new(host)
+                  if host_checks.check
                     host.guests.each do |guest|
                       handle_cloudmodel_monitoring_exception guest, host, 4 do
-                        if CloudModel::Monitoring::GuestChecks.new(guest).check
+                        if CloudModel::Monitoring::GuestChecks.new(guest, container_oom_rates: host_checks.container_oom_rates).check
                           guest.lxd_custom_volumes.each do |lxd_custom_volume|
                             handle_cloudmodel_monitoring_exception lxd_custom_volume, host, 6 do
                               CloudModel::Monitoring::LxdCustomVolumeChecks.new(lxd_custom_volume).check
@@ -450,13 +451,32 @@ module CloudModel
         end
       end
 
+      # OOM kills per container since the previous cycle, from the kernel log
+      # (`oom@<container>` keys, dots as underscores), handed to GuestChecks so
+      # a kill at a container's memory limit is raised on that guest.
+      # @return [Hash{String=>Float}, nil] rate per container name; nil while
+      #   it cannot be told yet (no previous cycle, older agent plugin)
+      attr_reader :container_oom_rates
+
       # Kernel-log signatures that are otherwise invisible: OOM kills, hardware/
       # machine-check errors, block-I/O errors and filesystem corruption. Alerts
-      # on any increase since the previous cycle (rate > 0).
+      # on any increase since the previous cycle (rate > 0). OOM kills inside a
+      # container's own limit are not counted here but per container, see
+      # #container_oom_rates.
       def check_kernel_log
         cur = data[:system] && data[:system]['kernel_log']
         prev = @prev_system && @prev_system['kernel_log']
         return unless cur and prev
+
+        if cur['oom_by_container'] and prev['oom_by_container']
+          @container_oom_rates = {}
+          cur.each do |key, value|
+            next unless container = key[/\Aoom@(.+)\z/, 1]
+            # A container's first kills come without a previous count.
+            rate = counter_rate(value, prev[key] || '0')
+            @container_oom_rates[container] = rate if rate
+          end
+        end
 
         {
           'mce'      => [:critical, 'Machine-check / hardware errors'],

@@ -34,6 +34,20 @@ module CloudModel
         metrics
       end
 
+      # OOM kills at the container's memory limit, counted in the host's kernel
+      # log (HostChecks#container_oom_rates) — cgroup v1 gives the guest no
+      # usable counter, and the host is the wrong place for the issue: the
+      # host has memory left, the guest's limit is too small.
+      def check_container_oom
+        rates = @options && @options[:container_oom_rates]
+        return unless rates and container = @subject.current_lxd_container
+
+        rate = rates[container.name.tr('.', '_')] || 0.0
+        do_check :cgroup_oom, 'In-container OOM kills', {
+          warning: rate > 0
+          }, message: 'Processes were OOM-killed at the container memory limit', value: "#{"%0.3f" % rate}/s"
+      end
+
       def check
         # Snapshot the previous cycle's parsed system data + timestamp before
         # #check_system_info acquires fresh data and overwrites them; needed to
@@ -50,6 +64,7 @@ module CloudModel
           if issue = @subject.item_issues.where(key: :sys_boot_failed, resolved_at: nil).first
             issue.update_attribute :resolved_at, Time.now
           end
+          check_container_oom
           check_system_info
         when :booting
           if @subject.last_downtime_at and @subject.last_downtime_at < Time.now - 5.minutes
