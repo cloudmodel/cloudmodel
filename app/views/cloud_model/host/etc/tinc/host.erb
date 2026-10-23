@@ -5,4 +5,11 @@ Cipher = blowfish
 Digest = sha1
 IndirectData = yes
 
+# Fixed path MTU instead of discovery: while tinc 1.0 re-measures a path it
+# reports provisional MTUs (down to 68) and TCP connections never recover.
+# PMTU counts the 14 byte ethernet header on top of the interface MTU.
+PMTU = <%= CloudModel.config.tinc_mtu + 14 %>
+PMTUDiscovery = no
+ClampMSS = yes
+
 <%= raw host.tinc_public_key %>

@@ -240,6 +240,17 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'tinc_mtu' do
+    it 'should allow to set the MTU of the tinc interface' do
+      subject.tinc_mtu = 1380
+      expect(subject.tinc_mtu).to eq 1380
+    end
+
+    it 'should default to 1400' do
+      expect(subject.tinc_mtu).to eq 1400
+    end
+  end
+
   describe 'tinc_client_name' do
     it 'should allow to set the name of tinc realm' do
       subject.tinc_client_name = 'my_tinc_vpn'

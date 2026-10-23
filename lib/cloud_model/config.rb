@@ -46,7 +46,7 @@ module CloudModel
     attr_writer :dns_domains
 
     attr_writer :host_mac_address_prefix_init
-    attr_writer :tinc_network, :tinc_client_name
+    attr_writer :tinc_network, :tinc_client_name, :tinc_mtu
 
     attr_writer :backup_hosts, :monitoring_notifiers
     attr_writer :monitoring_sample_retention
@@ -201,6 +201,15 @@ module CloudModel
 
     def tinc_client_name
       @tinc_client_name || 'cloudmodel'
+    end
+
+    # MTU of the tinc interface between hosts, fixed instead of discovered:
+    # while tinc 1.0 re-measures a path it answers with provisional MTUs (down
+    # to 68), and established TCP connections never grow their segments back.
+    # Has to leave room below the uplink MTU for UDP and tinc's own headers
+    # (a 1500 uplink carries about 1445 with blowfish/SHA1).
+    def tinc_mtu
+      @tinc_mtu || 1400
     end
 
     def backup_hosts

@@ -246,6 +246,25 @@ namespace :cloudmodel do
       @host_worker.update_tinc_host_files
     end
 
+    desc "Push the tinc host files and tinc-up to a live host and set the tinc interface MTU in place. HOST_ID=<id> required; DRY_RUN=1 shows the changes; RESTART=1 restarts tincd (traffic between hosts drops for a few seconds) so it takes the fixed PMTU and MSS clamping."
+    task :deploy_tinc_config => [:environment, :load_host] do
+      host = @host_worker.host
+      if ENV['DRY_RUN'] == '1'
+        changes = @host_worker.tinc_config_changes
+        puts "#{host.name}: #{changes.empty? ? 'tinc files up to date' : "#{changes.size} file(s) would change"}"
+        changes.each do |path, (live, rendered)|
+          puts "--- #{path}"
+          (live.lines - rendered.lines).each { |line| puts "  - #{line}" }
+          (rendered.lines - live.lines).each { |line| puts "  + #{line}" }
+        end
+        _, mtu = host.exec "cat /sys/class/net/vpn/mtu"
+        puts "vpn MTU now #{mtu.strip}, would be #{CloudModel.config.tinc_mtu}"
+      else
+        @host_worker.deploy_tinc_config restart: ENV['RESTART'] == '1'
+        puts "#{host.name}: tinc config deployed, vpn MTU #{CloudModel.config.tinc_mtu}#{', tincd restarted' if ENV['RESTART'] == '1'}"
+      end
+    end
+
     desc "Push check_mk agent plugins to live hosts over SSH (no image rebuild/redeploy). Set HOST_ID=<id> to target a single host."
     task :deploy_check_mk_plugins => [:environment] do
       hosts = if ENV['HOST_ID'].present?

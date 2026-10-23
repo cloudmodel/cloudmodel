@@ -1,3 +1,4 @@
 #!/bin/sh
+/bin/ip link set $INTERFACE mtu <%= CloudModel.config.tinc_mtu %>
 /bin/ip link set $INTERFACE up
 /bin/ip addr add <%= host.private_address %>/<%= host.private_network.tinc_subnet %> dev $INTERFACE

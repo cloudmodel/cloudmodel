@@ -174,6 +174,35 @@ module CloudModel
         true
       end
 
+      # tinc files of the running host and what they render to now, for a
+      # dry run (tinc.conf is left out: its ConnectTo list is not part of
+      # #deploy_tinc_config).
+      # @return [Hash{String=>Array(String, String)}] path => [live, rendered]
+      def tinc_config_changes
+        files = { '/etc/tinc/vpn/tinc-up' => render("/cloud_model/host/etc/tinc/tinc-up", host: @host) }
+        CloudModel::Host.each do |host|
+          files["/etc/tinc/vpn/hosts/#{host.name.downcase.gsub('-', '_')}"] = render("/cloud_model/host/etc/tinc/host", host: host)
+        end
+        files.each_with_object({}) do |(path, rendered), changes|
+          _, live = @host.exec "cat #{path.shellescape}"
+          changes[path] = [live.to_s, rendered] unless live.to_s.strip == rendered.to_s.strip
+        end
+      end
+
+      # Pushes the tinc host files and tinc-up to the running host and sets
+      # the interface MTU in place — the kernel then never hands tinc a
+      # packet above it, without dropping a connection. The running tincd
+      # picks up the fixed PMTU and MSS clamping only on a restart, which
+      # interrupts traffic between hosts for a few seconds.
+      # @param restart [Boolean] restart tincd afterwards
+      def deploy_tinc_config restart: false
+        update_tinc_host_files
+        render_to_remote "/cloud_model/host/etc/tinc/tinc-up", "/etc/tinc/vpn/tinc-up", 0755, host: @host
+        @host.exec! "ip link set vpn mtu #{CloudModel.config.tinc_mtu.to_i}", "Failed to set the tinc interface MTU"
+        @host.exec! "systemctl restart tinc@vpn", "Failed to restart tinc" if restart
+        true
+      end
+
       def disk_partition_device device, number
         if not number.is_a? Integer or number < 1
           raise "Partition number must be a positive integer value. First partition is 1."

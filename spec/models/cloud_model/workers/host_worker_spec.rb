@@ -229,6 +229,57 @@ describe CloudModel::Workers::HostWorker do
     end
   end
 
+  describe 'tinc templates' do
+    it 'fixes the path MTU in the host file instead of discovering it' do
+      other = Factory :host, name: 'other', tinc_public_key: 'KEY'
+      allow(other).to receive(:primary_address).and_return CloudModel::Address.from_str('192.0.2.10/24')
+      allow(other).to receive(:private_network).and_return CloudModel::Address.from_str('10.42.1.0/24')
+      rendered = subject.render('/cloud_model/host/etc/tinc/host', host: other)
+      expect(rendered).to include "PMTU = 1414\n", "PMTUDiscovery = no\n", "ClampMSS = yes\n"
+    end
+
+    it 'sets the interface MTU in tinc-up' do
+      allow(host).to receive(:private_address).and_return '10.42.0.1'
+      allow(host).to receive(:private_network).and_return double(tinc_subnet: 16)
+      expect(subject.render('/cloud_model/host/etc/tinc/tinc-up', host: host)).to include '/bin/ip link set $INTERFACE mtu 1400'
+    end
+  end
+
+  describe 'deploy_tinc_config' do
+    before do
+      allow(subject).to receive(:update_tinc_host_files)
+      allow(subject).to receive(:render_to_remote)
+      allow(host).to receive(:exec!)
+    end
+
+    it 'pushes host files and tinc-up and sets the MTU live without restarting tinc' do
+      expect(subject).to receive(:update_tinc_host_files)
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/tinc/tinc-up', '/etc/tinc/vpn/tinc-up', 0755, host: host)
+      expect(host).to receive(:exec!).with('ip link set vpn mtu 1400', anything)
+      expect(host).not_to receive(:exec!).with('systemctl restart tinc@vpn', anything)
+      expect(subject).not_to receive(:render_to_remote).with('/cloud_model/host/etc/tinc/tinc.conf', any_args)
+
+      subject.deploy_tinc_config
+    end
+
+    it 'restarts tinc on request' do
+      expect(host).to receive(:exec!).with('systemctl restart tinc@vpn', 'Failed to restart tinc')
+      subject.deploy_tinc_config restart: true
+    end
+  end
+
+  describe 'tinc_config_changes' do
+    it 'lists the files whose live content differs from the rendered one' do
+      allow(CloudModel::Host).to receive(:each).and_yield(host)
+      allow(subject).to receive(:render).with('/cloud_model/host/etc/tinc/tinc-up', host: host).and_return "up 1400\n"
+      allow(subject).to receive(:render).with('/cloud_model/host/etc/tinc/host', host: host).and_return "same\n"
+      allow(host).to receive(:exec).with('cat /etc/tinc/vpn/tinc-up').and_return [true, "up 1500\n"]
+      allow(host).to receive(:exec).with("cat /etc/tinc/vpn/hosts/#{host.name.downcase.gsub('-', '_')}").and_return [true, "same\n"]
+
+      expect(subject.tinc_config_changes).to eq '/etc/tinc/vpn/tinc-up' => ["up 1500\n", "up 1400\n"]
+    end
+  end
+
   describe 'disk_partition_device' do
     let(:number_exception) { "Partition number must be a positive integer value. First partition is 1." }
 
