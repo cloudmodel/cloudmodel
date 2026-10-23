@@ -86,8 +86,13 @@ module CloudModel
     # Callback: reads `not_before` / `not_after` from the X.509 data and
     # stores them in {#valid_from} and {#valid_thru}.
     def set_valid_dates
-      self.valid_from = x509.not_before
-      self.valid_thru = x509.not_after
+      cert = x509
+      self.valid_from, self.valid_thru = begin
+        [cert.not_before, cert.not_after]
+      rescue OpenSSL::ASN1::ASN1Error
+        # openssl >= 4.0 raises on the empty fallback certificate instead of returning nil
+        [nil, nil]
+      end
     end
 
     # Returns true when the certificate validity window includes the current time.
