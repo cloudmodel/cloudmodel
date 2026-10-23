@@ -30,6 +30,20 @@ module CloudModel
         RETIRED_PLUGINS = %w(120/kernel_log).freeze
 
         TEMPLATE_DIR = '/cloud_model/support/usr/lib/check_mk_agent/plugins'.freeze
+        AGENT_URL = 'https://raw.githubusercontent.com/Checkmk/checkmk/%s/agents/check_mk_agent.linux'.freeze
+
+        # The agent script itself, same source as the image build, so a live
+        # plugin push also brings an old host's agent to the current release
+        # (1.2.8 agents left from earlier templates print stale plugin caches
+        # and lack sections the parser knows from 2.x hosts). Fetched to a
+        # temp file first: a failed download must not leave an empty agent.
+        # @param base_path [String] build chroot, or '' for the live host
+        def deploy_check_mk_agent base_path = ''
+          url = AGENT_URL % CloudModel.config.check_mk_agent_version
+          target = "#{base_path}/usr/bin/check_mk_agent"
+          @host.exec! "curl -sSf -o #{target.shellescape}.new #{url.shellescape} && chmod 755 #{target.shellescape}.new && mv #{target.shellescape}.new #{target.shellescape}",
+            'Failed to install the check_mk agent'
+        end
 
         # Render every plugin template to `<base_path>/usr/lib/check_mk_agent/
         # plugins` with mode 0755. `base_path` is a build chroot when building an
@@ -40,6 +54,7 @@ module CloudModel
         def deploy_check_mk_plugins base_path = ''
           plugins_dir = "#{base_path}/usr/lib/check_mk_agent/plugins"
 
+          deploy_check_mk_agent base_path
           mkdir_p plugins_dir
           PLUGINS.each do |plugin|
             render_to_remote "#{TEMPLATE_DIR}/#{plugin}", "#{plugins_dir}/#{plugin}", 0755

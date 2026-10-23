@@ -251,6 +251,14 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'check_mk_agent_version' do
+    it 'should default to the 2.2.0 branch and allow to set it' do
+      expect(subject.check_mk_agent_version).to eq '2.2.0'
+      subject.check_mk_agent_version = '2.3.0'
+      expect(subject.check_mk_agent_version).to eq '2.3.0'
+    end
+  end
+
   describe 'tinc_udp_buffer' do
     it 'should default to 8 MB and allow to set it' do
       expect(subject.tinc_udp_buffer).to eq 8388608

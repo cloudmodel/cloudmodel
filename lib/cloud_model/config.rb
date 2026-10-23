@@ -47,6 +47,7 @@ module CloudModel
 
     attr_writer :host_mac_address_prefix_init
     attr_writer :tinc_network, :tinc_client_name, :tinc_mtu, :tinc_cipher, :tinc_digest, :tinc_udp_buffer
+    attr_writer :check_mk_agent_version
 
     attr_writer :backup_hosts, :monitoring_notifiers
     attr_writer :monitoring_sample_retention
@@ -232,6 +233,13 @@ module CloudModel
     # path. The host's net.core.rmem_max/wmem_max are raised to twice this.
     def tinc_udp_buffer
       @tinc_udp_buffer || 8 * 1024 * 1024
+    end
+
+    # Checkmk release branch the plain agent script is taken from (the
+    # agent is a single bash script, installed from the project's GitHub
+    # into /usr/bin/check_mk_agent on image build and every plugin push).
+    def check_mk_agent_version
+      @check_mk_agent_version || '2.2.0'
     end
 
     def backup_hosts

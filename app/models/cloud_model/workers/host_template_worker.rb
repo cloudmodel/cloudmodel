@@ -96,8 +96,7 @@ module CloudModel
       def install_check_mk_agent
         chroot! build_path, "apt-get install lm-sensors smartmontools -y", "Failed to install CheckMKAgent dependencies"
 
-        chroot! build_path, "curl -s https://raw.githubusercontent.com/Checkmk/checkmk/2.2.0/agents/check_mk_agent.linux >/usr/bin/check_mk_agent && chmod 755 /usr/bin/check_mk_agent", "Failed to install CheckMKAgent"
-
+        # The agent script comes with the plugin set (deploy_check_mk_agent).
         deploy_check_mk_plugins build_path
 
         render_to_remote "/cloud_model/guest/etc/systemd/system/check_mk@.service", "#{build_path}/etc/systemd/system/check_mk@.service"

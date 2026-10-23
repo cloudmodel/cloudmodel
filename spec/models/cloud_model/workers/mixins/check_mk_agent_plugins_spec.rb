@@ -10,7 +10,7 @@ describe CloudModel::Workers::Mixins::CheckMkAgentPlugins do
     end
     klass.new(host)
   end
-  let(:host) { double('host', exec: [true, '']) }
+  let(:host) { double('host', exec: [true, ''], exec!: '') }
 
   before do
     allow(worker).to receive(:mkdir_p)
@@ -54,6 +54,16 @@ describe CloudModel::Workers::Mixins::CheckMkAgentPlugins do
     it 'runs kernel_log on every poll — a 120 s cache is never fresh for an hourly poll on agent 2.x' do
       expect(described_class::PLUGINS).to include('kernel_log')
       expect(described_class::CACHED_PLUGINS.values.flatten).not_to include('kernel_log')
+    end
+
+    it 'installs the agent script of the configured release before the plugins, atomically' do
+      worker.deploy_check_mk_plugins
+      expect(host).to have_received(:exec!).with("curl -sSf -o /usr/bin/check_mk_agent.new https://raw.githubusercontent.com/Checkmk/checkmk/2.2.0/agents/check_mk_agent.linux && chmod 755 /usr/bin/check_mk_agent.new && mv /usr/bin/check_mk_agent.new /usr/bin/check_mk_agent", 'Failed to install the check_mk agent')
+    end
+
+    it 'installs the agent into a build chroot path when given one' do
+      worker.deploy_check_mk_plugins '/cloud/build/host/1'
+      expect(host).to have_received(:exec!).with(/-o \/cloud\/build\/host\/1\/usr\/bin\/check_mk_agent\.new /, anything)
     end
 
     it 'removes plugin files of earlier manifests so they do not run twice' do
