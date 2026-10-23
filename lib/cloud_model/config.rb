@@ -46,7 +46,7 @@ module CloudModel
     attr_writer :dns_domains
 
     attr_writer :host_mac_address_prefix_init
-    attr_writer :tinc_network, :tinc_client_name, :tinc_mtu
+    attr_writer :tinc_network, :tinc_client_name, :tinc_mtu, :tinc_cipher, :tinc_digest
 
     attr_writer :backup_hosts, :monitoring_notifiers
     attr_writer :monitoring_sample_retention
@@ -210,6 +210,18 @@ module CloudModel
     # (a 1500 uplink carries about 1445 with blowfish/SHA1).
     def tinc_mtu
       @tinc_mtu || 1400
+    end
+
+    # Cipher and digest a tinc node announces for the packets sent to it
+    # (tinc 1.0 reads them from the node's own host file, so nodes can switch
+    # one by one). AES needs no OpenSSL legacy provider, unlike tinc's old
+    # Blowfish default.
+    def tinc_cipher
+      @tinc_cipher || 'aes-256-cbc'
+    end
+
+    def tinc_digest
+      @tinc_digest || 'sha256'
     end
 
     def backup_hosts

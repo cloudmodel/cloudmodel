@@ -174,6 +174,26 @@ module CloudModel
         true
       end
 
+      # Lets tincd use Blowfish where the system runs OpenSSL 3, which keeps
+      # it in the legacy provider: writes /etc/tinc/openssl-legacy.cnf and,
+      # on OpenSSL 3 only (1.1 does not know the providers section), a
+      # tinc@ drop-in pointing OPENSSL_CONF at it.
+      # @param root [String] system root ('' for the running host)
+      # @return [Boolean] whether the drop-in is in place
+      def config_tinc_openssl root = ''
+        render_to_remote "/cloud_model/host/etc/tinc/openssl-legacy.cnf", "#{root}/etc/tinc/openssl-legacy.cnf"
+        _, version = root.empty? ? @host.exec('openssl version') : @host.exec("chroot #{root.shellescape} openssl version")
+        dropin = "#{root}/etc/systemd/system/tinc@.service.d"
+        if version.to_s[/\AOpenSSL (\d+)\./, 1].to_i >= 3
+          mkdir_p dropin
+          render_to_remote "/cloud_model/host/etc/systemd/system/tinc_service_d/openssl_legacy_conf", "#{dropin}/openssl-legacy.conf"
+          true
+        else
+          @host.exec "rm -f #{"#{dropin}/openssl-legacy.conf".shellescape}"
+          false
+        end
+      end
+
       # tinc files of the running host and what they render to now, for a
       # dry run (tinc.conf is left out: its ConnectTo list is not part of
       # #deploy_tinc_config).
@@ -198,6 +218,8 @@ module CloudModel
       def deploy_tinc_config restart: false
         update_tinc_host_files
         render_to_remote "/cloud_model/host/etc/tinc/tinc-up", "/etc/tinc/vpn/tinc-up", 0755, host: @host
+        config_tinc_openssl
+        @host.exec! "systemctl daemon-reload", "Failed to reload systemd"
         @host.exec! "ip link set vpn mtu #{CloudModel.config.tinc_mtu.to_i}", "Failed to set the tinc interface MTU"
         @host.exec! "systemctl restart tinc@vpn", "Failed to restart tinc" if restart
         true
@@ -421,6 +443,7 @@ module CloudModel
 
         render_to_remote "/cloud_model/host/etc/tinc/tinc.conf", "#{root}/etc/tinc/vpn/tinc.conf", host: @host
         render_to_remote "/cloud_model/host/etc/tinc/tinc-up", "#{root}/etc/tinc/vpn/tinc-up", 0755, host: @host
+        config_tinc_openssl root
 
 
         comment_sub_step 'render fstab'

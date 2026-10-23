@@ -251,6 +251,19 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'tinc_cipher and tinc_digest' do
+    it 'should default to AES-256 and SHA-256' do
+      expect(subject.tinc_cipher).to eq 'aes-256-cbc'
+      expect(subject.tinc_digest).to eq 'sha256'
+    end
+
+    it 'should allow to set them' do
+      subject.tinc_cipher = 'blowfish'
+      subject.tinc_digest = 'sha1'
+      expect([subject.tinc_cipher, subject.tinc_digest]).to eq %w(blowfish sha1)
+    end
+  end
+
   describe 'tinc_client_name' do
     it 'should allow to set the name of tinc realm' do
       subject.tinc_client_name = 'my_tinc_vpn'

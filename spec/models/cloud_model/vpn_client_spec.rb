@@ -29,5 +29,13 @@ describe CloudModel::VpnClient do
       result = subject.config_tarball
       expect(result).to be_a StringIO
     end
+
+    it 'should ship the OpenSSL legacy config for tinc on OpenSSL 3' do
+      subject.name = 'test-client'
+      allow(CloudModel::Host).to receive(:each)
+      names = []
+      Gem::Package::TarReader.new(StringIO.new(subject.config_tarball.string)) { |tar| tar.each { |e| names << e.full_name } }
+      expect(names).to include 'openssl-legacy.cnf'
+    end
   end
 end

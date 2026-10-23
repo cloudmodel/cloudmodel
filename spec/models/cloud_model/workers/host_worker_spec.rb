@@ -236,6 +236,8 @@ describe CloudModel::Workers::HostWorker do
       allow(other).to receive(:private_network).and_return CloudModel::Address.from_str('10.42.1.0/24')
       rendered = subject.render('/cloud_model/host/etc/tinc/host', host: other)
       expect(rendered).to include "PMTU = 1414\n", "PMTUDiscovery = no\n", "ClampMSS = yes\n"
+      expect(rendered).to include "Cipher = aes-256-cbc\n", "Digest = sha256\n"
+      expect(rendered).not_to include 'blowfish'
     end
 
     it 'sets the interface MTU in tinc-up' do
@@ -249,6 +251,7 @@ describe CloudModel::Workers::HostWorker do
     before do
       allow(subject).to receive(:update_tinc_host_files)
       allow(subject).to receive(:render_to_remote)
+      allow(subject).to receive(:config_tinc_openssl)
       allow(host).to receive(:exec!)
     end
 
@@ -265,6 +268,32 @@ describe CloudModel::Workers::HostWorker do
     it 'restarts tinc on request' do
       expect(host).to receive(:exec!).with('systemctl restart tinc@vpn', 'Failed to restart tinc')
       subject.deploy_tinc_config restart: true
+    end
+  end
+
+  describe 'config_tinc_openssl' do
+    before do
+      allow(subject).to receive(:render_to_remote)
+      allow(subject).to receive(:mkdir_p)
+    end
+
+    it 'adds the legacy provider drop-in on OpenSSL 3' do
+      allow(host).to receive(:exec).with('openssl version').and_return [true, "OpenSSL 3.0.13 30 Jan 2024\n"]
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/tinc/openssl-legacy.cnf', '/etc/tinc/openssl-legacy.cnf')
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/systemd/system/tinc_service_d/openssl_legacy_conf', '/etc/systemd/system/tinc@.service.d/openssl-legacy.conf')
+      expect(subject.config_tinc_openssl).to eq true
+    end
+
+    it 'leaves OpenSSL 1.1 without the drop-in' do
+      allow(host).to receive(:exec).with('openssl version').and_return [true, "OpenSSL 1.1.1f  31 Mar 2020\n"]
+      expect(subject).not_to receive(:render_to_remote).with('/cloud_model/host/etc/systemd/system/tinc_service_d/openssl_legacy_conf', anything)
+      expect(host).to receive(:exec).with('rm -f /etc/systemd/system/tinc@.service.d/openssl-legacy.conf')
+      expect(subject.config_tinc_openssl).to eq false
+    end
+
+    it 'asks the OpenSSL of a new root through chroot' do
+      expect(host).to receive(:exec).with('chroot /mnt/root openssl version').and_return [true, "OpenSSL 3.0.15\n"]
+      expect(subject.config_tinc_openssl('/mnt/root')).to eq true
     end
   end
 

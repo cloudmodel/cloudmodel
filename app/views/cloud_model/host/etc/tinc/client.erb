@@ -1,3 +1,5 @@
 Subnet = <%= client.address %>/32
+Cipher = <%= CloudModel.config.tinc_cipher %>
+Digest = <%= CloudModel.config.tinc_digest %>
 
 <%= raw client.tinc_public_key %>

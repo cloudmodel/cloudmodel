@@ -1,8 +1,8 @@
 Address = <%= host.primary_address.ip %>
 Subnet = <%= host.private_network %>
 
-Cipher = blowfish
-Digest = sha1
+Cipher = <%= CloudModel.config.tinc_cipher %>
+Digest = <%= CloudModel.config.tinc_digest %>
 IndirectData = yes
 
 # Fixed path MTU instead of discovery: while tinc 1.0 re-measures a path it

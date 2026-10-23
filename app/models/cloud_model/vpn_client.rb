@@ -36,9 +36,13 @@ module CloudModel
 
     # Generates a tar archive containing a complete tinc configuration for this device.
     #
-    # The archive includes `tinc.conf`, `tinc-up`, `tinc-down` scripts, and a
-    # `hosts/` directory with keys for this client and every managed host.
-    # Extract it into `/etc/tinc/<network_name>/` on the client device.
+    # The archive includes `tinc.conf`, `tinc-up`, `tinc-down` scripts, a
+    # `hosts/` directory with keys for this client and every managed host, and
+    # `openssl-legacy.cnf`. Extract it into `/etc/tinc/<network_name>/` on the
+    # client device. Where tinc links OpenSSL 3 (e.g. Homebrew), start tincd
+    # with `OPENSSL_CONF=<that dir>/openssl-legacy.cnf` (launchd:
+    # EnvironmentVariables, systemd: Environment=) — Blowfish lives in the
+    # legacy provider there, and key exchanges fail without it.
     #
     # @return [StringIO] an in-memory tar stream
     def config_tarball
@@ -57,6 +61,10 @@ module CloudModel
 
         tar.add_file "tinc-down", exec_mode do |tf|
           tf.write ActionController::Base.new.render_to_string(template: "/cloud_model/vpn_clients/tinc-down", locals: {vpn_client: self})
+        end
+
+        tar.add_file "openssl-legacy.cnf", data_mode do |tf|
+          tf.write ActionController::Base.new.render_to_string(template: "/cloud_model/host/etc/tinc/openssl-legacy_cnf")
         end
 
         tar.mkdir 'hosts', exec_mode

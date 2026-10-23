@@ -1,4 +1,6 @@
 Subnet = <%= vpn_client.address %>/32
+Cipher = <%= CloudModel.config.tinc_cipher %>
+Digest = <%= CloudModel.config.tinc_digest %>
 Silent = true
 
 <%= raw vpn_client.tinc_public_key %>

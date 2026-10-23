@@ -1,0 +1,18 @@
+# tinc 1.0 encrypts with Blowfish, which OpenSSL 3 only offers in its legacy
+# provider. Start tincd with OPENSSL_CONF pointing here on systems with
+# OpenSSL 3 — without it every key exchange fails ("no cipher set" /
+# "unsupported") and the node loses its direct paths on the next re-key.
+openssl_conf = openssl_init
+
+[openssl_init]
+providers = provider_sect
+
+[provider_sect]
+default = default_sect
+legacy = legacy_sect
+
+[default_sect]
+activate = 1
+
+[legacy_sect]
+activate = 1
