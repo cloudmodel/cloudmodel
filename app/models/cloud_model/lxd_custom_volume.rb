@@ -26,10 +26,14 @@ module CloudModel
     field :writeable, type: Mongoid::Boolean, default: true
     field :has_backups, type: Mongoid::Boolean, default: false
     # ZFS primarycache for the backing dataset: nil = inherit the pool default
-    # (cache data + metadata), 'metadata' = cache only metadata in the ARC.
-    # Set 'metadata' for volumes holding a database with its own cache (e.g.
-    # MongoDB/WiredTiger) so data blocks aren't double-cached in both the ARC
-    # and the DB cache.
+    # ('all': data + metadata in the ARC), 'metadata' = only metadata,
+    # 'none' = nothing. 'metadata' avoids double caching for a database with
+    # its own cache, but at a price: a write smaller than the dataset's
+    # recordsize first reads the whole record, and without data in the ARC
+    # that read goes to disk — on spinning disks a database's small page
+    # writes then cost one random read each. Prefer the pool default there;
+    # the ARC's size is capped anyway, so 'all' costs no extra memory.
+    PRIMARYCACHE_VALUES = %w(all metadata none).freeze
     field :primarycache, type: String
 
     validates :name, presence: true
@@ -40,10 +44,15 @@ module CloudModel
     validates :mount_point, uniqueness: { scope: :guest }
     validates :mount_point, format: {with: /\A[A-Za-z0-9][A-Za-z0-9\-_\/]*\z/}
 
+    validates :primarycache, inclusion: { in: PRIMARYCACHE_VALUES }, allow_blank: true
+
     accept_size_strings_for :disk_space
 
     before_validation :set_volume_name
     after_create :create_volume!, unless: :skip_volume_creation
+    # A changed cache setting reaches the live dataset right away, not only
+    # on the guest's next redeploy.
+    after_update :apply_zfs_properties!, if: -> { saved_change_to_primarycache? and guest&.deploy_state != :not_started }
     before_destroy :before_destroy, unless: :skip_volume_creation
 
     attr_accessor :skip_volume_creation
@@ -77,19 +86,25 @@ module CloudModel
     def create_volume!
       unless guest.deploy_state == :not_started
         lxc! "storage volume create #{pool.shellescape} #{name.shellescape}", "Failed to init LXD volume"
-        apply_zfs_properties!
+        # A fresh dataset inherits already — only an explicit value needs setting.
+        apply_zfs_properties! if primarycache.present?
       end
     end
 
     # Applies ZFS dataset properties (currently primarycache) to the backing
-    # dataset. Idempotent — safe to re-run on an existing volume. No-op when
-    # nothing is set or the dataset can't be resolved yet.
+    # dataset: the set value, or back to the pool's when none is set (so
+    # clearing the field also undoes an earlier local setting). Idempotent —
+    # safe to re-run on an existing volume. No-op while the dataset can't be
+    # resolved yet.
     # @return [Array(Boolean, String), true]
     def apply_zfs_properties!
-      return true if primarycache.to_s.empty?
       dataset = zfs_dataset
       return true unless dataset
-      host.exec "zfs set primarycache=#{primarycache.shellescape} #{dataset.shellescape}"
+      if primarycache.present?
+        host.exec "zfs set primarycache=#{primarycache.shellescape} #{dataset.shellescape}"
+      else
+        host.exec "zfs inherit primarycache #{dataset.shellescape}"
+      end
     end
 
     def destroy_volume

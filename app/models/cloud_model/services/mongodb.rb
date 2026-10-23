@@ -43,8 +43,8 @@ module CloudModel
       # container that runs nothing else it wastes most of the memory. Derived
       # here as three quarters of the guest's memory, but leaving at least
       # 1.5 GB: the rest is connections, mongod's own bookkeeping and the
-      # container's page cache — the only file cache the data gets when the
-      # volume runs with primarycache=metadata. Rounded down to 0.25 GB.
+      # container's page cache (the host's ARC adds to it unless the volume
+      # runs with primarycache=metadata). Rounded down to 0.25 GB.
       # @return [Float] cache size in GB
       def effective_wiredtiger_cache_size_gb
         return wiredtiger_cache_size_gb.to_f if wiredtiger_cache_size_gb.to_f > 0

@@ -413,6 +413,7 @@ de:
         disk_space: Laufwerksgröße
         writeable: Schreibbar?
         has_backups: Backups?
+        primarycache: ZFS-Lesecache (primarycache)
         state: Status
         monitoring_last_check_at: Zuletzt überwacht
       cloud_model/certificate:

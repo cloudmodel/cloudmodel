@@ -386,6 +386,69 @@ describe CloudModel::LxdCustomVolume do
     end
   end
 
+  describe 'primarycache' do
+    it { expect(subject).to have_field(:primarycache).of_type(String) }
+
+    it 'accepts the ZFS values and blank (pool default), nothing else' do
+      subject.guest = guest
+      subject.mount_point = 'var/data'
+      (%w(all metadata none) + [nil, '']).each do |value|
+        subject.primarycache = value
+        subject.valid?
+        expect(subject.errors[:primarycache]).to be_empty
+      end
+      subject.primarycache = 'everything; rm -rf /'
+      subject.valid?
+      expect(subject.errors[:primarycache]).not_to be_empty
+    end
+  end
+
+  describe 'apply_zfs_properties!' do
+    before do
+      subject.guest = guest
+      allow(subject).to receive(:zfs_dataset).and_return 'guests/custom/some_guest-var-data'
+    end
+
+    it 'sets an explicit value on the dataset' do
+      subject.primarycache = 'metadata'
+      expect(host).to receive(:exec).with('zfs set primarycache=metadata guests/custom/some_guest-var-data').and_return [true, '']
+      subject.apply_zfs_properties!
+    end
+
+    it 'goes back to the pool default when none is set' do
+      subject.primarycache = nil
+      expect(host).to receive(:exec).with('zfs inherit primarycache guests/custom/some_guest-var-data').and_return [true, '']
+      subject.apply_zfs_properties!
+    end
+
+    it 'does nothing while the dataset cannot be resolved' do
+      allow(subject).to receive(:zfs_dataset).and_return nil
+      expect(host).not_to receive(:exec)
+      expect(subject.apply_zfs_properties!).to eq true
+    end
+  end
+
+  describe 'applying a changed primarycache' do
+    before do
+      allow(guest).to receive(:deploy_state).and_return :finished
+      subject.guest = guest
+      subject.name = 'some_guest-var-data'
+      subject.mount_point = 'var/data'
+      subject.skip_volume_creation = true
+      subject.save!
+    end
+
+    it 'applies it to the live dataset on save' do
+      expect(subject).to receive(:apply_zfs_properties!)
+      subject.update! primarycache: 'all'
+    end
+
+    it 'leaves the dataset alone when something else changed' do
+      expect(subject).not_to receive(:apply_zfs_properties!)
+      subject.update! disk_space: 20 * 1024**3
+    end
+  end
+
   describe 'zfs_dataset' do
     before do
       subject.guest = guest

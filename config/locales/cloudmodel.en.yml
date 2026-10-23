@@ -411,6 +411,7 @@ en:
         disk_space: Disk Space
         writeable: Writeable?
         has_backups: Backups?
+        primarycache: ZFS read cache (primarycache)
         state: State
         monitoring_last_check_at: Last Monitored
       cloud_model/certificate:
