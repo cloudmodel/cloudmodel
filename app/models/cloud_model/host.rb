@@ -242,6 +242,20 @@ module CloudModel
       "[#{stage}] #{name}"
     end
 
+    # tinc node name: tinc allows only letters, digits and underscores.
+    # @return [String]
+    def tinc_name
+      name.downcase.gsub('-', '_')
+    end
+
+    # Hosts a node should keep a tinc meta connection to: deployed hosts
+    # with a key, except itself (nil = a VPN client, which connects to all).
+    # @param me [CloudModel::Host, nil]
+    # @return [Array<CloudModel::Host>]
+    def self.tinc_peers_of me
+      all.select { |h| h.deploy_state == :finished and h.tinc_public_key.present? and h != me }
+    end
+
     def self.update_tinc_keys
       CloudModel::Host.each do |host|
         begin

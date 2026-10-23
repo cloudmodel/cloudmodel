@@ -7,6 +7,6 @@ Port = 666
 Device = /dev/net/tun
 <%- end -%>
 
-<% CloudModel::Host.where(:tinc_public_key.ne => nil).map{|h| h.name.downcase}.each do |name| -%>
-ConnectTo = <%= name %>
+<% CloudModel::Host.tinc_peers_of(nil).each do |peer| -%>
+ConnectTo = <%= peer.tinc_name %>
 <% end-%>

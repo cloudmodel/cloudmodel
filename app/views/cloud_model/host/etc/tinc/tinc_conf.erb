@@ -1,12 +1,15 @@
 Name = <%=raw host.name.downcase.gsub('-', '_') %>
 AddressFamily = ipv4
 BindToInterface = eth0
-<% (CloudModel::Host.where(:tinc_public_key.ne => nil) - [host]).map{|h| h.name.downcase}.each do |name| -%>
-ConnectTo = <%= name %>
+<% CloudModel::Host.tinc_peers_of(host).each do |peer| -%>
+ConnectTo = <%= peer.tinc_name %>
 <% end-%>
 Device = /dev/net/tun
 Mode = router
-KeyExpire = 3600
+# Short key lifetime: a node that restarts while a lingering edge (e.g. a
+# VPN client's) keeps it "reachable" is not re-keyed by its peers, which
+# then send with a stale key until the next regeneration — this bounds that.
+KeyExpire = 600
 PrivateKeyFile = /etc/tinc/vpn/rsa_key.priv
 
 # Socket buffers for packet bursts from one peer (config.tinc_udp_buffer;

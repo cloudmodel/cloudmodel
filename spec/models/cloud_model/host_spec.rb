@@ -428,6 +428,24 @@ describe CloudModel::Host do
     end
   end
 
+  describe 'tinc_name' do
+    it 'turns the name into a valid tinc node name' do
+      subject.name = 'Core-v6only'
+      expect(subject.tinc_name).to eq 'core_v6only'
+    end
+  end
+
+  describe '.tinc_peers_of' do
+    it 'lists deployed hosts with a key, except the asking host' do
+      me = Factory :host, name: 'me', tinc_public_key: 'K', deploy_state: :finished
+      peer = Factory :host, name: 'peer', tinc_public_key: 'K', deploy_state: :finished
+      Factory :host, name: 'no-key', tinc_public_key: '', deploy_state: :finished
+      Factory :host, name: 'not-deployed', tinc_public_key: 'K', deploy_state: :not_started
+      expect(CloudModel::Host.tinc_peers_of(me).map(&:name)).to eq %w(peer)
+      expect(CloudModel::Host.tinc_peers_of(nil).map(&:name).sort).to eq %w(me peer)
+    end
+  end
+
   describe 'tinc_private_key' do
     it 'should generate new key pair' do
       key = 'PRIVATE_KEY'
