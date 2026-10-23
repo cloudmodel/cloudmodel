@@ -251,6 +251,14 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'tinc_udp_buffer' do
+    it 'should default to 8 MB and allow to set it' do
+      expect(subject.tinc_udp_buffer).to eq 8388608
+      subject.tinc_udp_buffer = 4194304
+      expect(subject.tinc_udp_buffer).to eq 4194304
+    end
+  end
+
   describe 'tinc_cipher and tinc_digest' do
     it 'should default to AES-256 and SHA-256' do
       expect(subject.tinc_cipher).to eq 'aes-256-cbc'

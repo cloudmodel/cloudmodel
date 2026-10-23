@@ -194,12 +194,26 @@ module CloudModel
         end
       end
 
+      # Kernel limits for tinc's UDP socket buffers (sysctl.d), applied in
+      # place on a running host — they must be up before tincd sets its
+      # buffers, so this runs before a tinc restart.
+      # @param root [String] system root ('' for the running host)
+      def config_tinc_sysctl root = ''
+        mkdir_p "#{root}/etc/sysctl.d"
+        render_to_remote "/cloud_model/host/etc/sysctl.d/60-tinc.conf", "#{root}/etc/sysctl.d/60-tinc.conf"
+        @host.exec! "sysctl -q -p /etc/sysctl.d/60-tinc.conf", 'Failed to apply the tinc sysctl settings' if root.empty?
+        true
+      end
+
       # tinc files of the running host and what they render to now, for a
-      # dry run (tinc.conf is left out: its ConnectTo list is not part of
-      # #deploy_tinc_config).
+      # dry run.
       # @return [Hash{String=>Array(String, String)}] path => [live, rendered]
       def tinc_config_changes
-        files = { '/etc/tinc/vpn/tinc-up' => render("/cloud_model/host/etc/tinc/tinc-up", host: @host) }
+        files = {
+          '/etc/tinc/vpn/tinc.conf' => render("/cloud_model/host/etc/tinc/tinc.conf", host: @host),
+          '/etc/tinc/vpn/tinc-up' => render("/cloud_model/host/etc/tinc/tinc-up", host: @host),
+          '/etc/sysctl.d/60-tinc.conf' => render("/cloud_model/host/etc/sysctl.d/60-tinc.conf")
+        }
         CloudModel::Host.each do |host|
           files["/etc/tinc/vpn/hosts/#{host.name.downcase.gsub('-', '_')}"] = render("/cloud_model/host/etc/tinc/host", host: host)
         end
@@ -209,16 +223,19 @@ module CloudModel
         end
       end
 
-      # Pushes the tinc host files and tinc-up to the running host and sets
-      # the interface MTU in place — the kernel then never hands tinc a
+      # Pushes the tinc configuration (host files, tinc.conf, tinc-up), the
+      # OpenSSL legacy drop-in and the sysctl limits to the running host and
+      # sets the interface MTU in place — the kernel then never hands tinc a
       # packet above it, without dropping a connection. The running tincd
-      # picks up the fixed PMTU and MSS clamping only on a restart, which
-      # interrupts traffic between hosts for a few seconds.
+      # picks up the fixed PMTU, MSS clamping and socket buffers only on a
+      # restart, which interrupts traffic between hosts for a few seconds.
       # @param restart [Boolean] restart tincd afterwards
       def deploy_tinc_config restart: false
         update_tinc_host_files
+        render_to_remote "/cloud_model/host/etc/tinc/tinc.conf", "/etc/tinc/vpn/tinc.conf", host: @host
         render_to_remote "/cloud_model/host/etc/tinc/tinc-up", "/etc/tinc/vpn/tinc-up", 0755, host: @host
         config_tinc_openssl
+        config_tinc_sysctl
         @host.exec! "systemctl daemon-reload", "Failed to reload systemd"
         @host.exec! "ip link set vpn mtu #{CloudModel.config.tinc_mtu.to_i}", "Failed to set the tinc interface MTU"
         @host.exec! "systemctl restart tinc@vpn", "Failed to restart tinc" if restart
@@ -444,6 +461,7 @@ module CloudModel
         render_to_remote "/cloud_model/host/etc/tinc/tinc.conf", "#{root}/etc/tinc/vpn/tinc.conf", host: @host
         render_to_remote "/cloud_model/host/etc/tinc/tinc-up", "#{root}/etc/tinc/vpn/tinc-up", 0755, host: @host
         config_tinc_openssl root
+        config_tinc_sysctl root
 
 
         comment_sub_step 'render fstab'

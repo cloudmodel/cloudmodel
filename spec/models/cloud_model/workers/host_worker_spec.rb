@@ -245,6 +245,11 @@ describe CloudModel::Workers::HostWorker do
       allow(host).to receive(:private_network).and_return double(tinc_subnet: 16)
       expect(subject.render('/cloud_model/host/etc/tinc/tinc-up', host: host)).to include '/bin/ip link set $INTERFACE mtu 1400'
     end
+
+    it 'sizes the UDP socket buffers in tinc.conf and the kernel limits to match' do
+      expect(subject.render('/cloud_model/host/etc/tinc/tinc.conf', host: host)).to include "UDPRcvBuf = 8388608\n", "UDPSndBuf = 8388608\n"
+      expect(subject.render('/cloud_model/host/etc/sysctl.d/60-tinc.conf')).to include "net.core.rmem_max = 16777216\n", "net.core.wmem_max = 16777216\n"
+    end
   end
 
   describe 'deploy_tinc_config' do
@@ -252,6 +257,7 @@ describe CloudModel::Workers::HostWorker do
       allow(subject).to receive(:update_tinc_host_files)
       allow(subject).to receive(:render_to_remote)
       allow(subject).to receive(:config_tinc_openssl)
+      allow(subject).to receive(:config_tinc_sysctl)
       allow(host).to receive(:exec!)
     end
 
@@ -260,7 +266,8 @@ describe CloudModel::Workers::HostWorker do
       expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/tinc/tinc-up', '/etc/tinc/vpn/tinc-up', 0755, host: host)
       expect(host).to receive(:exec!).with('ip link set vpn mtu 1400', anything)
       expect(host).not_to receive(:exec!).with('systemctl restart tinc@vpn', anything)
-      expect(subject).not_to receive(:render_to_remote).with('/cloud_model/host/etc/tinc/tinc.conf', any_args)
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/tinc/tinc.conf', '/etc/tinc/vpn/tinc.conf', host: host)
+      expect(subject).to receive(:config_tinc_sysctl)
 
       subject.deploy_tinc_config
     end
@@ -297,10 +304,30 @@ describe CloudModel::Workers::HostWorker do
     end
   end
 
+  describe 'config_tinc_sysctl' do
+    before { allow(subject).to receive(:mkdir_p); allow(subject).to receive(:render_to_remote) }
+
+    it 'renders the sysctl.d file and applies it on a running host' do
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/sysctl.d/60-tinc.conf', '/etc/sysctl.d/60-tinc.conf')
+      expect(host).to receive(:exec!).with('sysctl -q -p /etc/sysctl.d/60-tinc.conf', anything)
+      subject.config_tinc_sysctl
+    end
+
+    it 'only renders into a root under construction' do
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/sysctl.d/60-tinc.conf', '/mnt/root/etc/sysctl.d/60-tinc.conf')
+      expect(host).not_to receive(:exec!)
+      subject.config_tinc_sysctl '/mnt/root'
+    end
+  end
+
   describe 'tinc_config_changes' do
     it 'lists the files whose live content differs from the rendered one' do
       allow(CloudModel::Host).to receive(:each).and_yield(host)
       allow(subject).to receive(:render).with('/cloud_model/host/etc/tinc/tinc-up', host: host).and_return "up 1400\n"
+      allow(subject).to receive(:render).with('/cloud_model/host/etc/tinc/tinc.conf', host: host).and_return "conf\n"
+      allow(subject).to receive(:render).with('/cloud_model/host/etc/sysctl.d/60-tinc.conf').and_return "sys\n"
+      allow(host).to receive(:exec).with('cat /etc/tinc/vpn/tinc.conf').and_return [true, "conf\n"]
+      allow(host).to receive(:exec).with('cat /etc/sysctl.d/60-tinc.conf').and_return [true, "sys\n"]
       allow(subject).to receive(:render).with('/cloud_model/host/etc/tinc/host', host: host).and_return "same\n"
       allow(host).to receive(:exec).with('cat /etc/tinc/vpn/tinc-up').and_return [true, "up 1500\n"]
       allow(host).to receive(:exec).with("cat /etc/tinc/vpn/hosts/#{host.name.downcase.gsub('-', '_')}").and_return [true, "same\n"]

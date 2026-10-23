@@ -46,7 +46,7 @@ module CloudModel
     attr_writer :dns_domains
 
     attr_writer :host_mac_address_prefix_init
-    attr_writer :tinc_network, :tinc_client_name, :tinc_mtu, :tinc_cipher, :tinc_digest
+    attr_writer :tinc_network, :tinc_client_name, :tinc_mtu, :tinc_cipher, :tinc_digest, :tinc_udp_buffer
 
     attr_writer :backup_hosts, :monitoring_notifiers
     attr_writer :monitoring_sample_retention
@@ -222,6 +222,16 @@ module CloudModel
 
     def tinc_digest
       @tinc_digest || 'sha256'
+    end
+
+    # Send and receive buffer of tinc's UDP socket, in bytes. A TCP burst
+    # from one peer (a database result batch is ~1 MB in ~850 packets)
+    # lands on this socket faster than tincd drains it; with the kernel
+    # default of ~200 KB much of such a burst is dropped and the sender's
+    # TCP window collapses — measured 2× slower cursor walks over a 25 ms
+    # path. The host's net.core.rmem_max/wmem_max are raised to twice this.
+    def tinc_udp_buffer
+      @tinc_udp_buffer || 8 * 1024 * 1024
     end
 
     def backup_hosts

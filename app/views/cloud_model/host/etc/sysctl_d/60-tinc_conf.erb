@@ -1,0 +1,6 @@
+# Managed by cloudmodel. Socket buffer limits for tinc's UDP socket
+# (tinc.conf UDPRcvBuf/UDPSndBuf are capped by these) and a deeper backlog
+# for packet bursts that arrive faster than they are drained.
+net.core.rmem_max = <%= CloudModel.config.tinc_udp_buffer * 2 %>
+net.core.wmem_max = <%= CloudModel.config.tinc_udp_buffer * 2 %>
+net.core.netdev_max_backlog = 5000
