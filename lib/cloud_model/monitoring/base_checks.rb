@@ -169,10 +169,14 @@ module CloudModel
         puts "#{line_prefix}  * Check #{name}... "
 
         if severity = checks.select{|k,v| v}.keys.first
-          issue.severity = severity # unless issue.persisted? - check if severity raised?
+          existed = issue.persisted?
+          issue.severity = severity
           issue.message = options[:message]
           issue.value = options[:value]
           issue.save
+          # A warning seen open in an earlier cycle is confirmed now; a
+          # severity that rose above the reported one is told right away.
+          issue.notify_if_due confirmed: existed if existed
           severity_colors = {
             info: 94,
             task: 34,

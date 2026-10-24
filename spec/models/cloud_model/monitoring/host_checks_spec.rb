@@ -24,7 +24,7 @@ describe CloudModel::Monitoring::HostChecks do
       volume = double CloudModel::LxdCustomVolume
       service = double CloudModel::Services::Base
       guest = double CloudModel::Guest, lxd_custom_volumes: [volume], services: [service]
-      active_host = double CloudModel::Host, name: 'active', deploy_state: :running, guests: [guest]
+      active_host = double CloudModel::Host, name: 'active', deploy_state: :running, guests: [guest], drop_ssh_connection!: nil
       allow(CloudModel::Host).to receive(:scoped).and_return [active_host]
 
       host_checks = double 'HostChecks', check: true, container_oom_rates: {'guest01-20260101000000' => 0.5}, container_oom_kills: {'guest01-20260101000000' => 3}
@@ -56,7 +56,7 @@ describe CloudModel::Monitoring::HostChecks do
 
     it 'should skip guest sub-checks when the host check fails' do
       guest = double CloudModel::Guest
-      active_host = double CloudModel::Host, name: 'active', deploy_state: :running, guests: [guest]
+      active_host = double CloudModel::Host, name: 'active', deploy_state: :running, guests: [guest], drop_ssh_connection!: nil
       allow(CloudModel::Host).to receive(:scoped).and_return [active_host]
 
       host_checks = double 'HostChecks', check: false

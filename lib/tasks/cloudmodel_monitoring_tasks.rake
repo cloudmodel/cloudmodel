@@ -2,8 +2,15 @@
 
 namespace :cloudmodel do
   namespace :monitoring do
-    desc "Check monitoring"
+    desc "Check monitoring (STAGGER=0 skips the wait that interleaves cycles with other monitoring hosts)"
     task :check => [:environment] do
+      # With another admin host running the monitoring, start half a period
+      # after it did, so the fleet is checked twice per period.
+      if ENV['STAGGER'] != '0' and (delay = CloudModel::MonitoringHeartbeat.stagger_delay) > 0
+        puts "[_Monitoring_] Waiting #{delay.round} s to interleave with the other monitoring host(s)"
+        sleep delay
+      end
+
       begin
         CloudModel::Monitoring.check
       ensure

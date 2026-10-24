@@ -48,6 +48,8 @@ module CloudModel
     attr_writer :host_mac_address_prefix_init
     attr_writer :tinc_network, :tinc_client_name, :tinc_mtu, :tinc_cipher, :tinc_digest, :tinc_udp_buffer
     attr_writer :check_mk_agent_version
+    attr_writer :monitoring_guest_concurrency
+    attr_writer :monitoring_restart_pause
 
     attr_writer :backup_hosts, :monitoring_notifiers
     attr_writer :monitoring_sample_retention
@@ -240,6 +242,20 @@ module CloudModel
     # into /usr/bin/check_mk_agent on image build and every plugin push).
     def check_mk_agent_version
       @check_mk_agent_version || '2.2.0'
+    end
+
+    # Guests checked at the same time per host during a monitoring cycle
+    # (hosts already run in parallel). Each worker opens its own SSH session
+    # to the host, on top of the host check's one — keep the sum below any
+    # rate limit the hosts put on new SSH connections.
+    def monitoring_guest_concurrency
+      @monitoring_guest_concurrency || 3
+    end
+
+    # Seconds the monitoring service unit pauses between two cycles
+    # (RestartSec). The cycle stagger between admin hosts counts with it.
+    def monitoring_restart_pause
+      @monitoring_restart_pause || 180
     end
 
     def backup_hosts

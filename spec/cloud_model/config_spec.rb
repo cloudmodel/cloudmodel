@@ -259,6 +259,22 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'monitoring_guest_concurrency' do
+    it 'should default to 3 guests at a time per host and allow to set it' do
+      expect(subject.monitoring_guest_concurrency).to eq 3
+      subject.monitoring_guest_concurrency = 2
+      expect(subject.monitoring_guest_concurrency).to eq 2
+    end
+  end
+
+  describe 'monitoring_restart_pause' do
+    it 'should default to 180 s and allow to set it' do
+      expect(subject.monitoring_restart_pause).to eq 180
+      subject.monitoring_restart_pause = 60
+      expect(subject.monitoring_restart_pause).to eq 60
+    end
+  end
+
   describe 'tinc_udp_buffer' do
     it 'should default to 8 MB and allow to set it' do
       expect(subject.tinc_udp_buffer).to eq 8388608

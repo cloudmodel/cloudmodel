@@ -15,22 +15,23 @@ module CloudModel
                 handle_cloudmodel_monitoring_exception host, host, 2 do
                   host_checks = CloudModel::Monitoring::HostChecks.new(host)
                   if host_checks.check
-                    host.guests.each do |guest|
-                      handle_cloudmodel_monitoring_exception guest, host, 4 do
-                        if CloudModel::Monitoring::GuestChecks.new(guest, container_oom_rates: host_checks.container_oom_rates, container_oom_kills: host_checks.container_oom_kills).check
-                          guest.lxd_custom_volumes.each do |lxd_custom_volume|
-                            handle_cloudmodel_monitoring_exception lxd_custom_volume, host, 6 do
-                              CloudModel::Monitoring::LxdCustomVolumeChecks.new(lxd_custom_volume).check
-                            end
+                    # A few guests at a time. The guests share this host
+                    # document, and the host keeps one SSH session per thread
+                    # (Host#ssh_connection), so each worker talks to the host
+                    # over its own session and closes it when it is done.
+                    queue = Queue.new
+                    host.guests.each { |guest| queue << guest }
+                    Array.new([[CloudModel.config.monitoring_guest_concurrency, queue.size].min, 1].max) do
+                      Thread.new do
+                        Rails.application.executor.wrap do
+                          while (guest = (queue.pop(true) rescue nil))
+                            check_guest guest, host, host_checks
                           end
-                          guest.services.each do |service|
-                            handle_cloudmodel_monitoring_exception service, host, 6 do
-                              CloudModel::Monitoring::ServiceChecks.new(service).check
-                            end
-                          end
+                        ensure
+                          host.drop_ssh_connection!
                         end
                       end
-                    end
+                    end.each(&:join)
                   end
                   puts "[#{host.name}] Done."
                 end
@@ -39,6 +40,24 @@ module CloudModel
           end
         end
         threads.each(&:join)
+      end
+
+      # The checks of one guest and everything inside it.
+      def self.check_guest guest, host, host_checks
+        handle_cloudmodel_monitoring_exception guest, host, 4 do
+          if CloudModel::Monitoring::GuestChecks.new(guest, container_oom_rates: host_checks.container_oom_rates, container_oom_kills: host_checks.container_oom_kills).check
+            guest.lxd_custom_volumes.each do |lxd_custom_volume|
+              handle_cloudmodel_monitoring_exception lxd_custom_volume, host, 6 do
+                CloudModel::Monitoring::LxdCustomVolumeChecks.new(lxd_custom_volume).check
+              end
+            end
+            guest.services.each do |service|
+              handle_cloudmodel_monitoring_exception service, host, 6 do
+                CloudModel::Monitoring::ServiceChecks.new(service).check
+              end
+            end
+          end
+        end
       end
 
       def line_prefix

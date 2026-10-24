@@ -9,6 +9,8 @@ describe CloudModel::ItemIssue do
   it { expect(subject).to have_field(:message).of_type String }
   it { expect(subject).to have_field(:key).of_type String }
   it { expect(subject).to have_field(:value) }
+  it { expect(subject).to have_field(:notified_at).of_type Time }
+  it { expect(subject).to have_field(:notified_severity).of_type String }
   it { expect(subject).to have_enum(:severity).with_values(
     0x00 => :info,
     0x01 => :task,
@@ -199,10 +201,89 @@ describe CloudModel::ItemIssue do
       subject.notify
     end
 
-    it 'should be triggered after create' do
-      expect(subject).to receive(:notify)
+    it 'should be considered after create' do
+      expect(subject).to receive(:notify_if_due)
 
       subject.run_callbacks :create
+    end
+  end
+
+  describe 'notify_if_due' do
+    let(:notifier) { double }
+
+    before do
+      allow(CloudModel.config).to receive(:monitoring_notifiers).and_return [{severity: [:info, :task, :warning, :critical, :fatal], notifier: notifier}]
+      subject.title = 'Issue Test'
+      subject.save!
+    end
+
+    it 'should report a critical issue at once' do
+      subject.severity = :critical
+      expect(notifier).to receive(:send_message).with('[CRITICAL] Issue Test', '')
+
+      expect(subject.notify_if_due).to eq true
+      expect(subject.reload.notified_severity).to eq 'critical'
+      expect(subject.notified_at).not_to be_nil
+    end
+
+    it 'should hold a warning back until it is confirmed' do
+      subject.severity = :warning
+      expect(notifier).not_to receive(:send_message)
+
+      expect(subject.notify_if_due).to eq false
+      expect(subject.reload.notified_at).to be_nil
+    end
+
+    it 'should report a confirmed warning' do
+      subject.severity = :warning
+      expect(notifier).to receive(:send_message).with('[WARNING] Issue Test', '')
+
+      expect(subject.notify_if_due(confirmed: true)).to eq true
+    end
+
+    it 'should not report the same severity twice' do
+      subject.severity = :warning
+      subject.set notified_at: 1.hour.ago, notified_severity: 'warning'
+      expect(notifier).not_to receive(:send_message)
+
+      expect(subject.notify_if_due(confirmed: true)).to eq false
+    end
+
+    it 'should report again when the severity rose' do
+      subject.severity = :critical
+      subject.set notified_at: 1.hour.ago, notified_severity: 'warning'
+      expect(notifier).to receive(:send_message).with('[CRITICAL] Issue Test', '')
+
+      expect(subject.notify_if_due).to eq true
+      expect(subject.reload.notified_severity).to eq 'critical'
+    end
+
+    it 'should not report again when the severity fell' do
+      subject.severity = :warning
+      subject.set notified_at: 1.hour.ago, notified_severity: 'critical'
+      expect(notifier).not_to receive(:send_message)
+
+      expect(subject.notify_if_due(confirmed: true)).to eq false
+    end
+  end
+
+  describe 'notify_due!' do
+    it 'should report open, unreported issues older than the threshold and count them' do
+      due = CloudModel::ItemIssue.create! title: 'Due', severity: :warning
+      due.set created_at: 20.minutes.ago
+      fresh = CloudModel::ItemIssue.create! title: 'Fresh', severity: :warning
+      reported = CloudModel::ItemIssue.create! title: 'Reported', severity: :warning
+      reported.set created_at: 20.minutes.ago, notified_at: 15.minutes.ago, notified_severity: 'warning'
+      resolved = CloudModel::ItemIssue.create! title: 'Resolved', severity: :warning
+      resolved.set created_at: 20.minutes.ago, resolved_at: 5.minutes.ago
+
+      expect_any_instance_of(CloudModel::ItemIssue).to receive(:notify) do |issue|
+        expect(issue.title).to eq 'Due'
+      end
+
+      expect(CloudModel::ItemIssue.notify_due!).to eq 1
+      expect(due.reload.notified_severity).to eq 'warning'
+      expect(fresh.reload.notified_at).to be_nil
     end
   end
 

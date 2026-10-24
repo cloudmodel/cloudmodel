@@ -95,7 +95,7 @@ describe CloudModel::Monitoring::MongodbReplicationSetChecks do
         {'stateStr' => 'SECONDARY', 'optimeDate' => t - 5},
         {'stateStr' => 'SECONDARY', 'optimeDate' => t - 30}
       ])
-      expect(subject).to receive(:do_check_value).with(:replication_lag, 30.0, {critical: 60, warning: 10}, hash_including(unit: 's'))
+      expect(subject).to receive(:do_check_value).with(:replication_lag, 30.0, {critical: 120, warning: 30}, hash_including(unit: 's'))
 
       subject.check_replication_lag
     end

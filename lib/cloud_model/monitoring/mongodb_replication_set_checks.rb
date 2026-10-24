@@ -58,9 +58,12 @@ module CloudModel
         max_lag = secondaries.map { |m| (primary['optimeDate'] - m['optimeDate']).to_f }.max
         max_lag = 0.0 if max_lag < 0 # clock skew between members
 
+        # A secondary on a busy host trails a write burst by some seconds and
+        # catches up within a minute; that is noise. Lag that stays or grows
+        # is the signal, and the confirmation step reports it a cycle later.
         do_check_value :replication_lag, max_lag, {
-          critical: 60,
-          warning: 10
+          critical: 120,
+          warning: 30
           }, unit: 's', name: 'Replication lag'
       end
     end

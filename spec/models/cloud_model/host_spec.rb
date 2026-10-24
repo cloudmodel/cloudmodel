@@ -485,6 +485,29 @@ describe CloudModel::Host do
       expect(subject.ssh_connection).to eq "SSH CONNECTION"
     end
 
+    it "should keep one connection per thread" do
+      allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
+      allow(Net::SSH).to receive(:start).and_return "SSH CONNECTION 1", "SSH CONNECTION 2"
+      expect(subject.ssh_connection).to eq "SSH CONNECTION 1"
+      expect(Thread.new { subject.ssh_connection }.value).to eq "SSH CONNECTION 2"
+      expect(subject.ssh_connection).to eq "SSH CONNECTION 1"
+    end
+
+    it "should drop only the current thread's connection" do
+      allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
+      connection = double 'ssh', shutdown!: nil
+      allow(Net::SSH).to receive(:start).and_return connection, "SSH CONNECTION 2", "SSH CONNECTION 3"
+      subject.ssh_connection
+      other = Thread.new { subject.ssh_connection; Thread.stop; subject.ssh_connection }
+      sleep 0.01 until other.status == 'sleep'
+
+      expect(connection).to receive(:shutdown!)
+      subject.drop_ssh_connection!
+      expect(subject.ssh_connection).to eq "SSH CONNECTION 3"
+      other.wakeup
+      expect(other.value).to eq "SSH CONNECTION 2"
+    end
+
     it "should try to access host via external address if internal failed" do
       allow(CloudModel.config).to receive(:data_directory).and_return '/var/cloudmodel'
       allow(Net::SSH).to receive(:start).with(subject.private_address, "root", {keys: ["/var/cloudmodel/keys/id_rsa"], keys_only: true, password: '', **CloudModel::Host::SSH_OPTIONS}).and_raise Errno::ENETUNREACH
@@ -626,21 +649,21 @@ describe CloudModel::Host do
       ssh_session = double 'Net::SSH::Session', open_channel: true
       allow(ssh_session).to receive(:instance_variable_set)
       allow(ssh_session).to receive(:loop).and_raise(Encoding::UndefinedConversionError, 'boom')
-      subject.instance_variable_set '@ssh_connection', ssh_session
+      subject.ssh_connections[subject.id] = ssh_session
 
       expect(ssh_session).to receive(:shutdown!)
       expect { subject.exec 'command' }.to raise_error(Encoding::UndefinedConversionError, 'boom')
-      expect(subject.instance_variable_get '@ssh_connection').to be_nil
+      expect(subject.ssh_connections[subject.id]).to be_nil
     end
   end
 
   describe 'drop_ssh_connection!' do
     it 'forgets the connection and shuts its socket' do
       ssh_session = double 'Net::SSH::Session'
-      subject.instance_variable_set '@ssh_connection', ssh_session
+      subject.ssh_connections[subject.id] = ssh_session
       expect(ssh_session).to receive(:shutdown!)
       subject.drop_ssh_connection!
-      expect(subject.instance_variable_get '@ssh_connection').to be_nil
+      expect(subject.ssh_connections[subject.id]).to be_nil
     end
 
     it 'does nothing without a connection' do
@@ -650,9 +673,9 @@ describe CloudModel::Host do
     it 'swallows a failing shutdown — the point is to forget the connection' do
       ssh_session = double 'Net::SSH::Session'
       allow(ssh_session).to receive(:shutdown!).and_raise(IOError, 'closed stream')
-      subject.instance_variable_set '@ssh_connection', ssh_session
+      subject.ssh_connections[subject.id] = ssh_session
       expect { subject.drop_ssh_connection! }.not_to raise_error
-      expect(subject.instance_variable_get '@ssh_connection').to be_nil
+      expect(subject.ssh_connections[subject.id]).to be_nil
     end
   end
 

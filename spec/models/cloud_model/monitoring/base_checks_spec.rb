@@ -256,6 +256,28 @@ describe CloudModel::Monitoring::BaseChecks do
       end.to output(/CRITICAL/).to_stdout
     end
 
+    it 'should let a persisted issue consider a confirmed or escalated notification' do
+      persisted_issue = double 'ItemIssue', persisted?: true
+      allow(issues).to receive(:find_or_initialize_by).and_return persisted_issue
+      allow(persisted_issue).to receive(:severity=)
+      allow(persisted_issue).to receive(:message=)
+      allow(persisted_issue).to receive(:value=)
+      allow(persisted_issue).to receive(:save)
+      expect(persisted_issue).to receive(:notify_if_due).with(confirmed: true)
+
+      expect { subject.do_check :test_key, 'Test Check', {warning: true} }.to output(/WARNING/).to_stdout
+    end
+
+    it 'should not ask a new issue to notify again (the create callback does)' do
+      allow(issue).to receive(:severity=)
+      allow(issue).to receive(:message=)
+      allow(issue).to receive(:value=)
+      allow(issue).to receive(:save)
+      expect(issue).not_to receive(:notify_if_due)
+
+      expect { subject.do_check :test_key, 'Test Check', {warning: true} }.to output(/WARNING/).to_stdout
+    end
+
     it 'should use the first truthy severity' do
       expect(issue).to receive(:severity=).with(:warning)
       allow(issue).to receive(:message=)

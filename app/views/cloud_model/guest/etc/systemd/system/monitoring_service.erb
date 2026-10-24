@@ -13,9 +13,11 @@ User=www
 Group=www
 UMask=0002
 
-# Restart after 1 minute delay
+# Run cycle after cycle, with a pause in between (see
+# CloudModel.config.monitoring_restart_pause; the cycle stagger between
+# admin hosts counts with it).
 Restart=always
-RestartSec=180
+RestartSec=<%= CloudModel.config.monitoring_restart_pause %>
 # A cycle takes well under an hour; one that runs for hours hangs on a dead
 # connection (seen after a VPN restart: 19 h in futex wait on SSH sessions
 # whose peers were gone). Kill it and let Restart start a fresh cycle.

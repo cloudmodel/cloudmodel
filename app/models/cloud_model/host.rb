@@ -341,8 +341,13 @@ module CloudModel
       keepalive_maxcount: 3
     }.freeze
 
+    # The SSH session to the host, one per host and thread: a Net::SSH
+    # session is a single event loop that two threads cannot drive at once,
+    # and one host document is shared by several threads when a monitoring
+    # cycle checks a host's guests a few at a time. A thread that is done
+    # with the host calls {#drop_ssh_connection!}.
     def ssh_connection
-      @ssh_connection ||= if initial_root_pw
+      ssh_connections[id] ||= if initial_root_pw
         Net::SSH.start(primary_address.ip, "root",
           password: initial_root_pw,
           verify_host_key: :never,
@@ -378,6 +383,11 @@ module CloudModel
 
     def sftp
       ssh_connection.sftp
+    end
+
+    # The current thread's SSH sessions by host id.
+    def ssh_connections
+      Thread.current[:cloud_model_ssh_connections] ||= {}
     end
 
     # Host can take part in direct host-to-host build volume syncs (as source
@@ -504,12 +514,12 @@ module CloudModel
       bytes.to_s.dup.force_encoding(Encoding::UTF_8).scrub('?')
     end
 
-    # Forgets the cached SSH connection and closes its socket, so the next
-    # {#ssh_connection} opens a fresh one. For connections whose event loop
-    # was aborted (see {#exec}) — Net::SSH offers no way to resync them.
+    # Forgets the current thread's SSH connection to this host and closes its
+    # socket, so the next {#ssh_connection} opens a fresh one. For connections
+    # whose event loop was aborted (see {#exec}) — Net::SSH offers no way to
+    # resync them — and for threads that are done with the host.
     def drop_ssh_connection!
-      connection = @ssh_connection
-      @ssh_connection = nil
+      connection = ssh_connections.delete id
       connection&.shutdown!
     rescue => e
       Rails.logger.warn "Host#drop_ssh_connection!: #{e.class}: #{e.message}"
