@@ -570,6 +570,7 @@ describe CloudModel::Workers::Services::NginxWorker do
 
     it 'should render cloudmodel.conf' do
       expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/nginx/sites-available/cloudmodel.conf', '/etc/nginx/sites-available/cloudmodel.conf', 0600, guest: guest, model: model)
+      expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/logrotate.d/nginx', '/etc/logrotate.d/nginx', 0644, guest: guest, model: model)
       subject.write_config
     end
 
@@ -634,4 +635,28 @@ describe CloudModel::Workers::Services::NginxWorker do
       subject.auto_start
     end
   end
+  describe '#deploy_logrotate_config' do
+    let(:lr_guest) { double 'guest', host: double('host'), name: 'web01' }
+    let(:lr_lxc) { double 'lxc', guest: lr_guest, name: 'web01-c1' }
+    let(:lr_worker) { described_class.new lr_lxc, CloudModel::Services::Nginx.new }
+
+    before do
+      allow(lr_worker).to receive(:render).with('/cloud_model/guest/etc/logrotate.d/nginx', guest: lr_guest, model: anything).and_return "rules\n"
+      allow(lr_worker).to receive(:upload_to_guest)
+    end
+
+    it 'uploads the rules, verifies them with a dry run and clears a failed logrotate unit' do
+      expect(lr_worker).to receive(:upload_to_guest).with("rules\n", '/etc/logrotate.d/nginx', '0644')
+      expect(lr_guest).to receive(:exec).with('logrotate -d /etc/logrotate.d/nginx').and_return [true, "reading config file /etc/logrotate.d/nginx\nrotating pattern: /var/log/nginx/*.log\n"]
+      expect(lr_guest).to receive(:exec).with('systemctl reset-failed logrotate.service')
+      expect(lr_worker.deploy_logrotate_config).to eq true
+    end
+
+    it 'reports rules logrotate rejects and leaves the failed unit alone' do
+      expect(lr_guest).to receive(:exec).with('logrotate -d /etc/logrotate.d/nginx').and_return [true, "error: skipping \"/var/log/nginx/access.log\" because parent directory has insecure permissions\n"]
+      expect(lr_guest).not_to receive(:exec).with('systemctl reset-failed logrotate.service')
+      expect(lr_worker.deploy_logrotate_config).to eq false
+    end
+  end
+
 end

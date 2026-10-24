@@ -1,0 +1,19 @@
+# Managed by cloudmodel. The log directory belongs to the nginx user and is
+# group writable (see the nginx.service drop-in); logrotate refuses such a
+# directory unless told which user to rotate as, and the distribution's file
+# (create … www-data adm, invoke-rc.d rotate) never matched this setup — the
+# logs simply grew. Rotation reopens the logs through nginx itself (USR1).
+/var/log/nginx/*.log {
+	su www www
+	daily
+	missingok
+	rotate 14
+	compress
+	delaycompress
+	notifempty
+	create 0640 www www
+	sharedscripts
+	postrotate
+		[ -s /run/nginx.pid ] && kill -USR1 "$(cat /run/nginx.pid)" >/dev/null 2>&1 || true
+	endscript
+}

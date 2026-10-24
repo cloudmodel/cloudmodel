@@ -485,6 +485,33 @@ namespace :cloudmodel do
       abort "#{failures} guest(s) failed" if failures > 0
     end
 
+    desc "Put cloudmodel's logrotate rules for nginx into running guests with an nginx service (the distribution's file never rotated the logs). Set GUEST_ID=<id> to target a single guest."
+    task :deploy_nginx_logrotate => [:environment] do
+      guests = ENV['GUEST_ID'].present? ? [CloudModel::Guest.find(ENV['GUEST_ID'])] : CloudModel::Guest.all.select { |g| g.up_state == :started }
+      guests = guests.select { |g| g.services.any? { |s| s.is_a?(CloudModel::Services::Nginx) } }
+      abort "No running guests with nginx found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
+
+      failures = 0
+      guests.each do |guest|
+        print "#{guest.name} @ #{guest.host.name}: "
+        begin
+          service = guest.services.detect { |s| s.is_a?(CloudModel::Services::Nginx) }
+          worker = CloudModel::Workers::Services::NginxWorker.new guest.current_lxd_container, service
+          if worker.deploy_logrotate_config
+            puts "\e[32mOK\e[39m"
+          else
+            failures += 1
+            puts "\e[31mlogrotate rejects the configuration\e[39m"
+          end
+        rescue => e
+          failures += 1
+          puts "\e[31mFAILED\e[39m (#{e.class}: #{e.message[0, 120]})"
+        end
+      end
+      puts "\nnginx logrotate rules in #{guests.size - failures}/#{guests.size} guest(s)."
+      abort "#{failures} guest(s) failed" if failures > 0
+    end
+
     desc "Push check_mk agent plugins into live guest containers via lxc file push (no image rebuild/redeploy). Set GUEST_ID=<id> to target a single guest."
     task :deploy_check_mk_plugins => [:environment] do
       guests = if ENV['GUEST_ID'].present?

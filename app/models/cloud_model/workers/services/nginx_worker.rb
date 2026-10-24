@@ -373,12 +373,28 @@ module CloudModel
           end
         end
 
+        LOGROTATE_TEMPLATE = '/cloud_model/guest/etc/logrotate.d/nginx'.freeze
+        LOGROTATE_FILE = '/etc/logrotate.d/nginx'.freeze
+
+        # Puts the logrotate rules for nginx into the running guest (the
+        # distribution's file skipped the logs, see the template), verifies
+        # them with a logrotate dry run and clears a failed logrotate unit.
+        # @return [Boolean] whether logrotate accepts the configuration
+        def deploy_logrotate_config
+          upload_to_guest render(LOGROTATE_TEMPLATE, guest: @guest, model: @model), LOGROTATE_FILE, '0644'
+          ok, out = @guest.exec "logrotate -d #{LOGROTATE_FILE}"
+          clean = ok && out.to_s !~ /error:/i
+          @guest.exec "systemctl reset-failed logrotate.service" if clean
+          clean
+        end
+
         def write_config
           comment_sub_step "Config nginx"
 
           render_to_guest "/cloud_model/guest/etc/nginx/nginx.conf", "/etc/nginx/nginx.conf", 0600, guest: @guest, model: @model
           render_to_guest "/cloud_model/guest/etc/nginx/sites-available/cloudmodel.conf", "/etc/nginx/sites-available/cloudmodel.conf", 0600, guest: @guest, model: @model
           #render_to_guest "/cloud_model/guest/etc/nginx/conf.d/gzip.conf", "/etc/nginx/conf.d/gzip.conf", 0600, guest: @guest, model: @model
+          render_to_guest LOGROTATE_TEMPLATE, LOGROTATE_FILE, 0644, guest: @guest, model: @model
 
           chroot @guest.deploy_path, "ln -s /etc/nginx/sites-available/cloudmodel.conf etc/nginx/sites-enabled/cloudmodel.conf"
 
