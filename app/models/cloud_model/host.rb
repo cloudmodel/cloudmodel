@@ -599,10 +599,6 @@ module CloudModel
 
     def cpu_name
       if super.blank?
-        unless Net::Ping::External.new.ping(private_network.list_ips.first)
-          return 'No network connect to host private address'
-        end
-
         success, result = exec('cat /proc/cpuinfo')
         # ARM kernels (e.g. aarch64 VMs) have no "model name" in cpuinfo —
         # fall back to lscpu's "Model name" there.
@@ -627,11 +623,10 @@ module CloudModel
       end
     end
 
+    # No reachability probe first: an ICMP ping needs privileges the app
+    # user may not have, and the SSH connect timeout answers the question
+    # anyway.
     def system_info
-      unless Net::Ping::External.new.ping(private_network.list_ips.first)
-        return {'error' => 'No network connect to host private address'}
-      end
-
       success, result = exec('check_mk_agent')
       if success
         success, df_result = exec('df -k -T')

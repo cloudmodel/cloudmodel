@@ -808,7 +808,6 @@ describe CloudModel::Host do
 
   describe 'system_info' do
     it 'should parse check_mk_agent output on success' do
-      allow(Net::Ping::External).to receive_message_chain(:new, :ping).and_return(true)
       allow(subject).to receive(:private_network).and_return(double(list_ips: ['10.42.0.1']))
       allow(subject).to receive(:exec).with('check_mk_agent').and_return([true, "<<<mem>>>\nMemTotal: 1024\n"])
       allow(subject).to receive(:exec).with('df -k -T').and_return([false, ''])
@@ -818,7 +817,6 @@ describe CloudModel::Host do
     end
 
     it 'should return error hash on failure' do
-      allow(Net::Ping::External).to receive_message_chain(:new, :ping).and_return(true)
       allow(subject).to receive(:private_network).and_return(double(list_ips: ['10.42.0.1']))
       allow(subject).to receive(:exec).with('check_mk_agent').and_return([false, 'Connection refused'])
 
