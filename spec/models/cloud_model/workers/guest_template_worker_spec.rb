@@ -172,6 +172,11 @@ describe CloudModel::Workers::GuestTemplateWorker do
         subject.install_utils
       end
 
+      it 'should install logrotate (Ubuntu images come without it)' do
+        expect(subject).to receive(:chroot!).with(subject.build_path, "apt-get install logrotate -y", "Failed to install logrotate")
+        subject.install_utils
+      end
+
       it 'should configure autologin' do
         expect(subject).to receive(:mkdir_p).with("#{subject.build_path}/etc/systemd/system/console-getty.service.d")
         expect(subject).to receive(:render_to_remote).with(

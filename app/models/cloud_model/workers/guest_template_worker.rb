@@ -78,6 +78,11 @@ module CloudModel
         comment_sub_step 'Install libcap headers'
         chroot! build_path, "apt-get install libcap-dev -y", "Failed to install libcap headers"
 
+        # Debian pulls it in with nginx, Ubuntu does not — without it no log
+        # on the guest ever rotates.
+        comment_sub_step 'Install logrotate'
+        chroot! build_path, "apt-get install logrotate -y", "Failed to install logrotate"
+
         comment_sub_step 'Configure autologin'
         # Autologin
         mkdir_p "#{build_path}/etc/systemd/system/console-getty.service.d"
