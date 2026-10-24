@@ -571,6 +571,7 @@ describe CloudModel::Workers::Services::NginxWorker do
     it 'should render cloudmodel.conf' do
       expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/nginx/sites-available/cloudmodel.conf', '/etc/nginx/sites-available/cloudmodel.conf', 0600, guest: guest, model: model)
       expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/logrotate.d/nginx', '/etc/logrotate.d/nginx', 0644, guest: guest, model: model)
+      expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/logrotate.d/rails', '/etc/logrotate.d/rails', 0644, guest: guest, model: model) if model.passenger_supported or model.capistrano_supported
       subject.write_config
     end
 
@@ -642,7 +643,14 @@ describe CloudModel::Workers::Services::NginxWorker do
 
     before do
       allow(lr_worker).to receive(:render).with('/cloud_model/guest/etc/logrotate.d/nginx', guest: lr_guest, model: anything).and_return "rules\n"
+      allow(lr_worker).to receive(:render).with('/cloud_model/guest/etc/logrotate.d/rails', guest: lr_guest, model: anything).and_return "rails rules\n"
       allow(lr_worker).to receive(:upload_to_guest)
+    end
+
+    it 'adds the Rails rules only where an app is deployed' do
+      expect(lr_worker.logrotate_files.keys).to eq ['/etc/logrotate.d/nginx']
+      app_worker = described_class.new lr_lxc, CloudModel::Services::Nginx.new(passenger_supported: true)
+      expect(app_worker.logrotate_files.keys).to eq ['/etc/logrotate.d/nginx', '/etc/logrotate.d/rails']
     end
 
     it 'uploads the rules, verifies them with a dry run and clears a failed logrotate unit' do

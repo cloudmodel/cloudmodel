@@ -1,0 +1,15 @@
+# Managed by cloudmodel. Rails and its daemons log to files under the
+# current release's log/ (file logger, no reopen signal), so the files are
+# copied and truncated in place; the writers hold their descriptors in
+# append mode and continue in the truncated file. A release rollout starts
+# a fresh log/ anyway — this bounds the months in between.
+/var/www/rails/current/log/*.log /var/www/rails/shared/log/*.log {
+	su www www
+	daily
+	missingok
+	rotate 7
+	compress
+	delaycompress
+	notifempty
+	copytruncate
+}
