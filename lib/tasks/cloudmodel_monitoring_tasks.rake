@@ -16,6 +16,11 @@ namespace :cloudmodel do
       puts "[_Monitoring_] Done."
     end
 
+    desc "Rewrite stored MongoDB service samples to the current gauge set (one-off after the sampler stopped flattening all of serverStatus). Dry run unless CONFIRM=1."
+    task :rewrite_mongodb_samples => [:environment] do
+      puts CloudModel::MonitoringSample.rewrite_mongodb_samples!(confirm: ENV['CONFIRM'] == '1')
+    end
+
     desc "Consolidate monitoring samples into coarser resolutions"
     task :rollup => [:environment] do
       CloudModel::MonitoringSample.rollup!

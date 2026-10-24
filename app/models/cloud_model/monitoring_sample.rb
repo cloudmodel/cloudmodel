@@ -76,6 +76,37 @@ module CloudModel
     # Consolidate finer resolutions into coarser ones. Idempotent: only the
     # most recent buckets are recomputed so late-arriving raw data is folded in
     # without rewriting the whole history.
+    # One-off after MongodbChecks#sample_metrics changed from "all of
+    # serverStatus" to a few gauges: rebuilds the metrics of every stored
+    # MongoDB service sample from the old flattened keys, server side (the
+    # old documents are ~120 KB each, there are hundreds of thousands).
+    # @return [String] what was (or would be) done
+    def self.rewrite_mongodb_samples! confirm: false
+      count = collection.count_documents(mongodb_rewrite_selector)
+      return "#{count} MongoDB samples still carry the flattened serverStatus — set CONFIRM=1 to rewrite them" unless confirm
+
+      result = collection.update_many(mongodb_rewrite_selector, mongodb_rewrite_pipeline)
+      "rewrote #{result.modified_count} of #{count} MongoDB samples"
+    end
+
+    # The old keys are literal dotted field names, so match them by value.
+    def self.mongodb_rewrite_selector
+      { subject_type: 'CloudModel::Services::Mongodb', '$expr' => { '$ne' => [mongodb_old_field(%w(connections current)), nil] } }
+    end
+
+    def self.mongodb_rewrite_pipeline
+      checks = CloudModel::Monitoring::Services::MongodbChecks
+      pairs = checks::SAMPLE_PATHS.map { |key, path| { k: key, v: { '$toDouble' => mongodb_old_field(path) } } }
+      used, max, dirty = mongodb_old_field(checks::CACHE_USED), mongodb_old_field(checks::CACHE_MAX), mongodb_old_field(checks::CACHE_DIRTY)
+      pairs << { k: 'db.cache_usage', v: { '$cond' => [{ '$gt' => [max, 0] }, { '$round' => [{ '$multiply' => [100, { '$divide' => [used, max] }] }, 2] }, nil] } }
+      pairs << { k: 'db.cache_dirty_mb', v: { '$round' => [{ '$divide' => [dirty, 1024.0**2] }, 1] } }
+      [{ '$set' => { metrics: { '$arrayToObject' => { '$filter' => { input: pairs, cond: { '$ne' => ['$$this.v', nil] } } } } } }]
+    end
+
+    def self.mongodb_old_field path
+      { '$getField' => { field: path.join('.'), input: '$metrics' } }
+    end
+
     def self.rollup!
       rollup_resolution! 'raw', 'hour', recompute: 2.hours
       rollup_resolution! 'hour', 'day', recompute: 2.days
