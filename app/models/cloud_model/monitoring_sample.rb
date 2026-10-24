@@ -134,18 +134,17 @@ module CloudModel
         groups[[sample.subject_type, sample.subject_id, bucket]] << sample.metrics
       end
 
-      groups.each do |(subject_type, subject_id, bucket), metrics_list|
-        averaged = average_metrics metrics_list
-
-        where(
-          subject_type: subject_type,
-          subject_id: subject_id,
-          resolution: to,
-          ref_at: bucket
-        ).find_one_and_update(
-          { '$set' => { metrics: averaged, expires_at: bucket + retention } },
-          upsert: true
-        )
+      # One bulk upsert per 1000 buckets instead of a round trip per bucket:
+      # the day rollup alone touches ~50k buckets per cycle, which from an
+      # admin in another site (25 ms per round trip) took half an hour.
+      groups.each_slice(1000) do |slice|
+        ops = slice.map do |(subject_type, subject_id, bucket), metrics_list|
+          { update_one: {
+              filter: { subject_type: subject_type, subject_id: subject_id, resolution: to, ref_at: bucket },
+              update: { '$set' => { metrics: average_metrics(metrics_list), expires_at: bucket + retention } },
+              upsert: true } }
+        end
+        collection.bulk_write ops, ordered: false
       end
     end
 

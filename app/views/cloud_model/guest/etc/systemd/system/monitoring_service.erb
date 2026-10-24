@@ -16,6 +16,11 @@ UMask=0002
 # Restart after 1 minute delay
 Restart=always
 RestartSec=180
+# A cycle takes well under an hour; one that runs for hours hangs on a dead
+# connection (seen after a VPN restart: 19 h in futex wait on SSH sessions
+# whose peers were gone). Kill it and let Restart start a fresh cycle.
+RuntimeMaxSec=14400
+TimeoutStopSec=60
 
 StandardOutput=syslog
 StandardError=syslog
