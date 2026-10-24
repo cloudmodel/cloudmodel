@@ -600,7 +600,7 @@ module CloudModel
     def cpu_name
       if super.blank?
         unless Net::Ping::External.new.ping(private_network.list_ips.first)
-          'No network connect to host private address'
+          return 'No network connect to host private address'
         end
 
         success, result = exec('cat /proc/cpuinfo')
@@ -629,7 +629,7 @@ module CloudModel
 
     def system_info
       unless Net::Ping::External.new.ping(private_network.list_ips.first)
-        {'error' => 'No network connect to host private address'}
+        return {'error' => 'No network connect to host private address'}
       end
 
       success, result = exec('check_mk_agent')

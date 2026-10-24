@@ -583,23 +583,27 @@ module CloudModel
       result
     end
 
+    # Seconds to wait for the guest's agent socket before falling back to
+    # the host; a reachable guest answers within milliseconds.
+    CHECK_MK_CONNECT_TIMEOUT = 5
+
+    # Reads the monitoring agent's output over its socket on the guest's
+    # private address. One connection only: the socket is activated per
+    # connection, so a separate reachability probe would run the whole agent
+    # a second time just to be hung up on.
+    # @return [Array(Boolean, String)] success and the agent output or error
     def check_mk_agent
-      if Net::Ping::TCP.new(private_address, 6556).ping
-        begin
-          s = TCPSocket.new private_address, 6556
-          result = ''
-          while line = s.gets
-            result << line
-          end
-        rescue Errno::ECONNREFUSED
-          return check_mk_agent_via_host
-        ensure
-          s&.close
+      result = +''
+      Socket.tcp(private_address, 6556, connect_timeout: CHECK_MK_CONNECT_TIMEOUT) do |s|
+        while line = s.gets
+          result << line
         end
-        [true, result]
-      else
-        check_mk_agent_via_host
       end
+      [true, result]
+    rescue Errno::ECONNREFUSED
+      check_mk_agent_via_host
+    rescue Errno::ETIMEDOUT, Errno::EHOSTUNREACH, Errno::ENETUNREACH, IO::TimeoutError
+      check_mk_agent_via_host
     end
 
     # Fallback when the guest's private address is not routable from the admin
@@ -618,10 +622,7 @@ module CloudModel
 
     def system_info
       if current_lxd_container.blank?
-        {'error' => 'No current lxd container for guest'}
-      end
-      unless Net::Ping::External.new.ping(private_address)
-        {'error' => 'No network connect to guest private address'}
+        return {'error' => 'No current lxd container for guest'}
       end
 
       success, result = check_mk_agent

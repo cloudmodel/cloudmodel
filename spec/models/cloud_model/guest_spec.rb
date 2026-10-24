@@ -1065,33 +1065,22 @@ describe CloudModel::Guest do
   end
 
   describe 'check_mk_agent' do
-    it 'should return result from TCP connection on success' do
-      tcp = double 'tcp'
-      allow(Net::Ping::TCP).to receive(:new).with(subject.private_address, 6556).and_return(tcp)
-      allow(tcp).to receive(:ping).and_return(true)
-      socket = double 'socket'
-      allow(TCPSocket).to receive(:new).and_return(socket)
-      allow(socket).to receive(:gets).and_return("<<<check_mk>>>\n", nil)
-      allow(socket).to receive(:close)
+    let(:socket) { double 'socket' }
+
+    before do
+      allow(Socket).to receive(:tcp).with(subject.private_address, 6556, connect_timeout: 5).and_yield(socket)
+    end
+
+    it 'should return the agent output read over a single connection' do
+      allow(socket).to receive(:gets).and_return("<<<check_mk>>>\n", "Version: 2.2.0\n", nil)
 
       success, result = subject.check_mk_agent
       expect(success).to eq true
-      expect(result).to include '<<<check_mk>>>'
+      expect(result).to eq "<<<check_mk>>>\nVersion: 2.2.0\n"
     end
 
-    it 'should return false on connection refused' do
-      tcp = double 'tcp'
-      allow(Net::Ping::TCP).to receive(:new).and_return(tcp)
-      allow(tcp).to receive(:ping).and_return(false)
-
-      success, result = subject.check_mk_agent
-      expect(success).to eq false
-    end
-
-    it 'should fall back to running the agent via the host when not routable' do
-      tcp = double 'tcp'
-      allow(Net::Ping::TCP).to receive(:new).and_return(tcp)
-      allow(tcp).to receive(:ping).and_return(false)
+    it 'should fall back to running the agent via the host when the connection is refused' do
+      allow(Socket).to receive(:tcp).and_raise(Errno::ECONNREFUSED)
       container = double 'container', name: 'test-1', blank?: false
       allow(subject).to receive(:current_lxd_container).and_return(container)
       host = double 'host'
@@ -1103,10 +1092,23 @@ describe CloudModel::Guest do
       expect(result).to include '<<<check_mk>>>'
     end
 
+    it 'should fall back via the host when the address is not routable' do
+      allow(Socket).to receive(:tcp).and_raise(Errno::EHOSTUNREACH)
+      expect(subject).to receive(:check_mk_agent_via_host).and_return([true, "<<<check_mk>>>\n"])
+
+      expect(subject.check_mk_agent).to eq [true, "<<<check_mk>>>\n"]
+    end
+
+    it 'should fall back via the host when the connection times out' do
+      allow(Socket).to receive(:tcp).and_raise(IO::TimeoutError)
+      expect(subject).to receive(:check_mk_agent_via_host).and_return([false, 'Connection refused (direct and via host)'])
+
+      success, result = subject.check_mk_agent
+      expect(success).to eq false
+    end
+
     it 'should report failure when the host fallback fails too' do
-      tcp = double 'tcp'
-      allow(Net::Ping::TCP).to receive(:new).and_return(tcp)
-      allow(tcp).to receive(:ping).and_return(false)
+      allow(Socket).to receive(:tcp).and_raise(Errno::ECONNREFUSED)
       container = double 'container', name: 'test-1', blank?: false
       allow(subject).to receive(:current_lxd_container).and_return(container)
       host = double 'host'
@@ -1117,25 +1119,38 @@ describe CloudModel::Guest do
       expect(success).to eq false
       expect(result).to include 'Connection refused'
     end
+
+    it 'should report failure without a container to fall back to' do
+      allow(Socket).to receive(:tcp).and_raise(Errno::ECONNREFUSED)
+      allow(subject).to receive(:current_lxd_container).and_return(nil)
+
+      expect(subject.check_mk_agent).to eq [false, 'Connection refused']
+    end
   end
 
   describe 'system_info' do
     it 'should parse check_mk_agent output on success' do
       allow(subject).to receive(:current_lxd_container).and_return(double('container'))
-      allow(Net::Ping::External).to receive_message_chain(:new, :ping).and_return(true)
       allow(subject).to receive(:check_mk_agent).and_return([true, "<<<mem>>>\nMemTotal: 1024\n"])
 
       result = subject.system_info
       expect(result).to be_a Hash
+      expect(result['mem']).to be_present
     end
 
     it 'should return error hash on failure' do
       allow(subject).to receive(:current_lxd_container).and_return(double('container'))
-      allow(Net::Ping::External).to receive_message_chain(:new, :ping).and_return(true)
       allow(subject).to receive(:check_mk_agent).and_return([false, 'Connection refused'])
 
       result = subject.system_info
       expect(result['error']).to eq 'Connection refused'
+    end
+
+    it 'should not ask the agent without a current container' do
+      allow(subject).to receive(:current_lxd_container).and_return(nil)
+      expect(subject).not_to receive(:check_mk_agent)
+
+      expect(subject.system_info).to eq({'error' => 'No current lxd container for guest'})
     end
   end
 
