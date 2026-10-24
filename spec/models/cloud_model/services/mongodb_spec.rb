@@ -87,12 +87,38 @@ describe CloudModel::Services::Mongodb do
       expect(result['featureCompatibilityVersion']).to eq '5.0'
     end
 
-    it 'should return critical error on NoServerAvailable' do
+    it 'should return critical error on NoServerAvailable, after a second attempt' do
       selector = double('selector', name: 'test', server_selection_timeout: 1, local_threshold: 0.015)
       allow(Mongo::Client).to receive(:new).and_raise(Mongo::Error::NoServerAvailable.new(selector))
       result = subject.service_status
       expect(result[:key]).to eq :not_reachable
       expect(result[:severity]).to eq :critical
+      expect(Mongo::Client).to have_received(:new).twice
+    end
+
+    it 'gives the server a 5 s budget and retries once when the driver loses the connection' do
+      mongo_client = double 'mongo_client', close: nil
+      database = double 'database'
+      allow(Mongo::Client).to receive(:new).with(anything, hash_including(connect_timeout: 5, server_selection_timeout: 5, socket_timeout: 10)).and_return(mongo_client)
+      allow(mongo_client).to receive(:database).and_return(database)
+      allow(database).to receive(:command).with('serverStatus' => true).and_invoke(
+        ->(*) { raise Mongo::Error::ConnectionPerished, 'Connection 1:1 is closed' },
+        ->(*) { [{'connections' => {'current' => 5}}] })
+      allow(database).to receive(:command).with(getParameter: 1, featureCompatibilityVersion: 1).and_return([{'featureCompatibilityVersion' => {'version' => '7.0'}}])
+
+      result = subject.service_status
+      expect(result['connections']).to eq({'current' => 5})
+      expect(mongo_client).to have_received(:close).twice
+    end
+
+    it 'reports a warning when the connection is lost twice' do
+      mongo_client = double 'mongo_client', close: nil
+      database = double 'database'
+      allow(Mongo::Client).to receive(:new).and_return(mongo_client)
+      allow(mongo_client).to receive(:database).and_return(database)
+      allow(database).to receive(:command).and_raise(Mongo::Error::ConnectionPerished, 'closed')
+      result = subject.service_status
+      expect(result).to include(key: :not_reachable, severity: :warning)
     end
   end
 

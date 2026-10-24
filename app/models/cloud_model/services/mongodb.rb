@@ -147,13 +147,29 @@ module CloudModel
         60
       end
 
+      # Driver errors a second attempt usually cures: a handshake that
+      # overran the budget (a cross-site path while backups load both ends),
+      # or the socket the driver then finds closed. With a one second budget
+      # these raised false "not reachable" issues at night.
+      TRANSIENT_STATUS_ERRORS = [
+        Mongo::Error::NoServerAvailable, Mongo::Error::SocketError,
+        Mongo::Error::SocketTimeoutError, Mongo::Error::ConnectionPerished
+      ].freeze
+
       def service_status
+        attempts = 0
         begin
-          mongo_client = Mongo::Client.new(["#{server_uri}"], connect_timeout: 1, server_selection_timeout: 1, connect: :direct)
+          attempts += 1
+          mongo_client = Mongo::Client.new(["#{server_uri}"], connect_timeout: 5, server_selection_timeout: 5, socket_timeout: 10, connect: :direct)
           data = mongo_client.database.command('serverStatus' => true).first
           data['featureCompatibilityVersion'] = mongo_client.database.command(getParameter: 1, featureCompatibilityVersion: 1).first['featureCompatibilityVersion']['version']
-        rescue Mongo::Error::NoServerAvailable => e
-          return {key: :not_reachable, error: "#{e.class}\n\n#{e.to_s}", severity: :critical}
+        rescue *TRANSIENT_STATUS_ERRORS => e
+          # ensure does not run on retry — release the failed client here.
+          mongo_client&.close
+          mongo_client = nil
+          retry if attempts < 2
+          severity = e.is_a?(Mongo::Error::NoServerAvailable) ? :critical : :warning
+          return {key: :not_reachable, error: "#{e.class}\n\n#{e.to_s}", severity: severity}
         rescue Exception => e
           return {key: :not_reachable, error: "#{e.class}\n\n#{e.to_s}", severity: :warning}
         ensure
