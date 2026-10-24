@@ -90,8 +90,11 @@ module CloudModel
     end
 
     # The old keys are literal dotted field names, so match them by value.
+    # $isNumber, not a null comparison: in $expr a missing field is not equal
+    # to null, so `$ne … nil` would match rewritten documents as well and a
+    # second pass would empty them.
     def self.mongodb_rewrite_selector
-      { subject_type: 'CloudModel::Services::Mongodb', '$expr' => { '$ne' => [mongodb_old_field(%w(connections current)), nil] } }
+      { subject_type: 'CloudModel::Services::Mongodb', '$expr' => { '$isNumber' => mongodb_old_field(%w(connections current)) } }
     end
 
     def self.mongodb_rewrite_pipeline
