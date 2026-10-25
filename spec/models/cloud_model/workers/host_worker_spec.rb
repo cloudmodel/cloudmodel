@@ -240,10 +240,12 @@ describe CloudModel::Workers::HostWorker do
       expect(rendered).not_to include 'blowfish'
     end
 
-    it 'sets the interface MTU in tinc-up' do
+    it 'sets the interface MTU and queue length in tinc-up' do
       allow(host).to receive(:private_address).and_return '10.42.0.1'
       allow(host).to receive(:private_network).and_return double(tinc_subnet: 16)
-      expect(subject.render('/cloud_model/host/etc/tinc/tinc-up', host: host)).to include '/bin/ip link set $INTERFACE mtu 1400'
+      rendered = subject.render('/cloud_model/host/etc/tinc/tinc-up', host: host)
+      expect(rendered).to include '/bin/ip link set $INTERFACE mtu 1400'
+      expect(rendered).to include '/bin/ip link set $INTERFACE txqueuelen 2000'
     end
 
     it 'sizes the UDP socket buffers in tinc.conf and the kernel limits to match' do
@@ -261,10 +263,11 @@ describe CloudModel::Workers::HostWorker do
       allow(host).to receive(:exec!)
     end
 
-    it 'pushes host files and tinc-up and sets the MTU live without restarting tinc' do
+    it 'pushes host files and tinc-up and sets MTU and queue length live without restarting tinc' do
       expect(subject).to receive(:update_tinc_host_files)
       expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/tinc/tinc-up', '/etc/tinc/vpn/tinc-up', 0755, host: host)
       expect(host).to receive(:exec!).with('ip link set vpn mtu 1400', anything)
+      expect(host).to receive(:exec!).with('ip link set vpn txqueuelen 2000', anything)
       expect(host).not_to receive(:exec!).with('systemctl restart tinc@vpn', anything)
       expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/tinc/tinc.conf', '/etc/tinc/vpn/tinc.conf', host: host)
       expect(subject).to receive(:config_tinc_sysctl)

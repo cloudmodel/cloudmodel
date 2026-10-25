@@ -251,6 +251,14 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'tinc_txqueuelen' do
+    it 'should default to 2000 packets and allow to set it' do
+      expect(subject.tinc_txqueuelen).to eq 2000
+      subject.tinc_txqueuelen = 1000
+      expect(subject.tinc_txqueuelen).to eq 1000
+    end
+  end
+
   describe 'check_mk_agent_version' do
     it 'should default to the 2.2.0 branch and allow to set it' do
       expect(subject.check_mk_agent_version).to eq '2.2.0'

@@ -46,7 +46,7 @@ module CloudModel
     attr_writer :dns_domains
 
     attr_writer :host_mac_address_prefix_init
-    attr_writer :tinc_network, :tinc_client_name, :tinc_mtu, :tinc_cipher, :tinc_digest, :tinc_udp_buffer
+    attr_writer :tinc_network, :tinc_client_name, :tinc_mtu, :tinc_cipher, :tinc_digest, :tinc_udp_buffer, :tinc_txqueuelen
     attr_writer :check_mk_agent_version
     attr_writer :monitoring_guest_concurrency
     attr_writer :monitoring_restart_pause
@@ -213,6 +213,13 @@ module CloudModel
     # (a 1500 uplink carries about 1445 with blowfish/SHA1).
     def tinc_mtu
       @tinc_mtu || 1400
+    end
+
+    # Transmit queue length of the VPN interface. The kernel default of 500
+    # packets drops the tail of a burst (a dump streaming to another host)
+    # while the daemon is still encrypting the head.
+    def tinc_txqueuelen
+      @tinc_txqueuelen || 2000
     end
 
     # Cipher and digest a tinc node announces for the packets sent to it

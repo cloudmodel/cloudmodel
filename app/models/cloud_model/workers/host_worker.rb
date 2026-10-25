@@ -225,8 +225,9 @@ module CloudModel
 
       # Pushes the tinc configuration (host files, tinc.conf, tinc-up), the
       # OpenSSL legacy drop-in and the sysctl limits to the running host and
-      # sets the interface MTU in place — the kernel then never hands tinc a
-      # packet above it, without dropping a connection. The running tincd
+      # sets the interface MTU and queue length in place — the kernel then
+      # never hands tinc a packet above the MTU and queues bursts instead of
+      # dropping them, without dropping a connection. The running tincd
       # picks up the fixed PMTU, MSS clamping and socket buffers only on a
       # restart, which interrupts traffic between hosts for a few seconds.
       # @param restart [Boolean] restart tincd afterwards
@@ -238,6 +239,7 @@ module CloudModel
         config_tinc_sysctl
         @host.exec! "systemctl daemon-reload", "Failed to reload systemd"
         @host.exec! "ip link set vpn mtu #{CloudModel.config.tinc_mtu.to_i}", "Failed to set the tinc interface MTU"
+        @host.exec! "ip link set vpn txqueuelen #{CloudModel.config.tinc_txqueuelen.to_i}", "Failed to set the tinc interface queue length"
         @host.exec! "systemctl restart tinc@vpn", "Failed to restart tinc" if restart
         true
       end
