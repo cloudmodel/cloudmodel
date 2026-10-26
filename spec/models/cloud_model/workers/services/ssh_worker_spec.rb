@@ -58,6 +58,14 @@ describe CloudModel::Workers::Services::SshWorker do
       subject.write_config
     end
 
+    it 'should create the www user before owning the client keys, whatever the service order' do
+      # The template has no www user; Nginx adds it, but a guest may list its
+      # SSH service first (auth guests do), so the chown must not depend on it.
+      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', CloudModel::Workers::Services::BaseWorker::WWW_USER_COMMAND, 'Failed to add www user').ordered
+      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', 'chown -R www:www /var/www/.ssh', 'Failed to change owner of www client keys to user www').ordered
+      subject.write_config
+    end
+
     it 'should set owner of www client keys by name inside the container, not by a host uid' do
       # A raw host-side chown assumed the tarball-era uid shift; a chroot chown
       # by name is right for both layouts (sshd StrictModes needs the owner).

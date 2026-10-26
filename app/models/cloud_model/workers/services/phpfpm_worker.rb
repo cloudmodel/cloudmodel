@@ -22,7 +22,7 @@ module CloudModel
           patch_php_ini :upload_max_filesize, "#{@model.php_upload_max_filesize}M"
           patch_php_ini :post_max_size, "#{@model.php_upload_max_filesize+6}M"
 
-          chroot! @guest.deploy_path, "groupadd -f -r -g 1001 www && id -u www || useradd -c 'added by cloud_model for nginx' -d /var/www -s /bin/bash -r -g 1001 -u 1001 www", "Failed to add www user"
+          ensure_www_user!
         end
 
         def service_name

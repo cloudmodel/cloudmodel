@@ -55,6 +55,9 @@ module CloudModel
           # ZFS-volume deploy does not shift the same way, and the raw chown
           # then lands as literal 101001 inside, so sshd StrictModes rejects the
           # keys (not owned by their user). Chowning by name is correct either way.
+          # The template has no www user; the Nginx worker normally adds it, but
+          # the SSH service may be configured first, so make sure it exists here.
+          ensure_www_user!
           chroot! @guest.deploy_path, "chown -R www:www /var/www/.ssh", "Failed to change owner of www client keys to user www"
           chroot! @guest.deploy_path, "chmod 700 /var/www/.ssh", "Failed to set mode on www .ssh dir"
         end

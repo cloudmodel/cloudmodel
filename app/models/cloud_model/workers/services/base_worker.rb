@@ -81,6 +81,20 @@ module CloudModel
         def write_config
         end
 
+        # Shell one-liner that creates the `www` user and group (uid/gid 1001)
+        # inside the guest if they are missing, and is a no-op otherwise.
+        WWW_USER_COMMAND = "groupadd -f -r -g 1001 www && id -u www || useradd -c 'added by cloud_model for nginx' -d /var/www -s /bin/bash -r -g 1001 -u 1001 www".freeze
+
+        # Ensures the `www` user (uid 1001) exists in the guest rootfs.
+        #
+        # Idempotent, so every worker that writes files owned by `www` can
+        # call it, regardless of the order in which the guest's services are
+        # configured: a guest with its SSH service listed before Nginx would
+        # otherwise `chown www:www` into a rootfs that has no such user yet.
+        def ensure_www_user!
+          chroot! @guest.deploy_path, WWW_USER_COMMAND, "Failed to add www user"
+        end
+
         # @return [String] systemd service unit name (defaults to the model class element name)
         def service_name
           @model.class.model_name.element.shellescape

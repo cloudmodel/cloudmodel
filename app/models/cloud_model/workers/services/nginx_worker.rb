@@ -412,7 +412,7 @@ module CloudModel
 
           chroot @guest.deploy_path, "ln -s /etc/nginx/sites-available/cloudmodel.conf etc/nginx/sites-enabled/cloudmodel.conf"
 
-          chroot! @guest.deploy_path, "groupadd -f -r -g 1001 www && id -u www || useradd -c 'added by cloud_model for nginx' -d /var/www -s /bin/bash -r -g 1001 -u 1001 www", "Failed to add www user"
+          ensure_www_user!
 
           comment_sub_step "Make nginx root"
           mkdir_p "#{@guest.deploy_path}#{@model.www_root}"
