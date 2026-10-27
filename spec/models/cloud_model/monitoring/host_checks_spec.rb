@@ -115,6 +115,59 @@ describe CloudModel::Monitoring::HostChecks do
 
       subject.check_md
     end
+
+    def md_devs overrides = {}
+      devs = %w(md0 md1 md2 md3 md4).map { |d| [d, {'status' => 'active', 'raid_level' => 'raid1', 'disks_status' => '[UU]'}] }.to_h
+      devs.merge(overrides)
+    end
+
+    it 'should pass healthy mirrors' do
+      allow(subject).to receive(:data).and_return({system: {'md' => {'devs' => md_devs}}})
+      expect(subject).to receive(:do_check).with(:mdtools, 'RAID', {critical: false}, message: '')
+
+      subject.check_md
+    end
+
+    it 'should report a degraded mirror that is still active' do
+      allow(subject).to receive(:data).and_return({system: {'md' => {'devs' => md_devs('md2' => {'status' => 'active', 'raid_level' => 'raid1', 'disks_status' => '[U_]'})}}})
+      expect(subject).to receive(:do_check).with(:mdtools, 'RAID', {critical: true}, message: 'md2 degraded [U_]')
+
+      subject.check_md
+    end
+
+    it 'should report a degraded mirror during recovery with its progress' do
+      allow(subject).to receive(:data).and_return({system: {'md' => {'devs' => md_devs('md1' => {'status' => 'active', 'raid_level' => 'raid1', 'disks_status' => '[_U]', 'recovery' => {'percentage' => '51.3'}})}}})
+      expect(subject).to receive(:do_check).with(:mdtools, 'RAID', {critical: true}, message: 'md1 degraded [_U], recovery 51.3%')
+
+      subject.check_md
+    end
+
+    it 'should not treat arrays without a member map as degraded' do
+      allow(subject).to receive(:data).and_return({system: {'md' => {'devs' => md_devs('md3' => {'status' => 'active', 'raid_level' => 'raid0', 'disks_status' => 'chunks'})}}})
+      expect(subject).to receive(:do_check).with(:mdtools, 'RAID', {critical: false}, message: '')
+
+      subject.check_md
+    end
+
+    it 'should evaluate degraded mirrors from parsed mdstat output' do
+      input = "<<<md>>>\n" \
+              "Personalities : [raid1]\n" \
+              "md0 : active raid1 sdb1[1](F) sda1[0]\n" \
+              "      523264 blocks super 1.2 [2/1] [U_]\n" \
+              "md1 : active raid1 sdb2[1] sda2[0]\n" \
+              "      100596736 blocks super 1.2 [2/2] [UU]\n" \
+              "md2 : active raid1 sdb3[1] sda3[0]\n" \
+              "      33520640 blocks super 1.2 [2/2] [UU]\n" \
+              "md3 : active raid1 sdb4[1] sda4[0]\n" \
+              "      33520640 blocks super 1.2 [2/2] [UU]\n" \
+              "md4 : active raid1 sdb6[1] sda6[0]\n" \
+              "      25148416 blocks super 1.2 [2/2] [UU]\n" \
+              "unused devices: <none>\n"
+      allow(subject).to receive(:data).and_return({system: CloudModel::CheckMkParser.parse(input)})
+      expect(subject).to receive(:do_check).with(:mdtools, 'RAID', {critical: true}, message: 'md0 degraded [U_]')
+
+      subject.check_md
+    end
   end
 
   describe 'check_sensors' do

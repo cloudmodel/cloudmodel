@@ -186,6 +186,15 @@ module CloudModel
             if v['status'] != 'active'
               failures << "#{k} not active"
             end
+
+            # A mirror that lost a member stays 'active' in /proc/mdstat; only
+            # the member map shows it ([U_] instead of [UU]). Arrays without a
+            # member map (raid0 ends the line with its chunk size) are skipped.
+            disks_status = v['disks_status'].to_s
+            if disks_status =~ /\A\[[U_]+\]\z/ and disks_status.include?('_')
+              recovery = v['recovery'].is_a?(Hash) && v['recovery']['percentage']
+              failures << "#{k} degraded #{disks_status}#{", recovery #{recovery}%" if recovery}"
+            end
           end
 
           do_check :mdtools, 'RAID', {critical: not(failures.blank?)}, message: failures * "\n"
