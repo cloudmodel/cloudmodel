@@ -33,6 +33,22 @@ module CloudModel
     validates :tinc_public_key, presence: true
     validates :address, presence: true, format: /\A((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.)){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\z/
 
+    # The hosts only know a client through its host file. Without these, a
+    # new client could not connect until the next host deploy, and a deleted
+    # one could keep connecting as long as its file stayed on the hosts.
+    after_save :sync_tinc_host_files, if: -> { (previous_changes.keys & %w(name tinc_public_key address)).any? }
+    after_destroy :sync_tinc_host_files
+
+    # Enqueues the update of the tinc host files on all deployed hosts.
+    # @return [Boolean] whether the job could be enqueued
+    def sync_tinc_host_files
+      CloudModel::HostJobs::UpdateTincHostFilesJob.perform_later
+      true
+    rescue => e
+      CloudModel.log_exception e
+      false
+    end
+
 
     # Generates a tar archive containing a complete tinc configuration for this device.
     #

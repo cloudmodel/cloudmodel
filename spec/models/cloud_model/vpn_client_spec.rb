@@ -18,6 +18,42 @@ describe CloudModel::VpnClient do
   it { expect(subject).to validate_format_of(:address).to_allow("127.0.0.1") }
   it { expect(subject).to validate_format_of(:address).not_to_allow("256.2.1.2") }
 
+  describe 'tinc host file sync' do
+    let(:client) { CloudModel::VpnClient.new name: "dev-#{SecureRandom.hex(3)}", tinc_public_key: 'KEY', address: '10.42.253.4' }
+
+    it 'enqueues the host file update when a client is created' do
+      expect(CloudModel::HostJobs::UpdateTincHostFilesJob).to receive(:perform_later)
+      client.save!
+    end
+
+    it 'enqueues the host file update when the key changes' do
+      allow(CloudModel::HostJobs::UpdateTincHostFilesJob).to receive(:perform_later)
+      client.save!
+      expect(CloudModel::HostJobs::UpdateTincHostFilesJob).to receive(:perform_later)
+      client.update! tinc_public_key: 'NEW KEY'
+    end
+
+    it 'does not enqueue for changes the hosts do not see' do
+      allow(CloudModel::HostJobs::UpdateTincHostFilesJob).to receive(:perform_later)
+      client.save!
+      expect(CloudModel::HostJobs::UpdateTincHostFilesJob).not_to receive(:perform_later)
+      client.update! os: 'macOS'
+    end
+
+    it 'enqueues the host file update when a client is deleted' do
+      allow(CloudModel::HostJobs::UpdateTincHostFilesJob).to receive(:perform_later)
+      client.save!
+      expect(CloudModel::HostJobs::UpdateTincHostFilesJob).to receive(:perform_later)
+      client.destroy
+    end
+
+    it 'does not fail the save when the job cannot be enqueued' do
+      allow(CloudModel::HostJobs::UpdateTincHostFilesJob).to receive(:perform_later).and_raise 'queue down'
+      allow(CloudModel).to receive(:log_exception)
+      expect(client.save).to eq true
+    end
+  end
+
   describe 'config_tarball' do
     it 'should return a StringIO tar archive' do
       subject.name = 'test-client'

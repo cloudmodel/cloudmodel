@@ -667,4 +667,61 @@ describe CloudModel::Workers::Services::NginxWorker do
     end
   end
 
+  describe '#sync_authorized_keys' do
+    let(:key_a) { 'ssh-ed25519 AAAAkeya alice@laptop' }
+    let(:key_b) { 'ssh-rsa AAAAkeyb bob@desk' }
+    let(:key_old) { 'ssh-rsa AAAAkeyold former@vm' }
+    let(:group) { double CloudModel::SshGroup, pub_keys: [double(key: key_a), double(key: key_b)] }
+
+    before do
+      allow(lxc).to receive(:name).and_return 'g-1'
+      allow(model).to receive(:capistrano_ssh_groups).and_return [group]
+      allow(subject).to receive(:upload_to_guest)
+    end
+
+    def live_keys *keys
+      allow(guest).to receive(:exec).with("sh -c #{'cat /var/www/.ssh/authorized_keys 2>/dev/null'.shellescape}").and_return [true, keys.join("\n") + "\n"]
+    end
+
+    it 'skips services without SSH groups' do
+      allow(model).to receive(:capistrano_ssh_groups).and_return []
+      expect(guest).not_to receive(:exec)
+      expect(subject.sync_authorized_keys).to eq state: :skipped, added: [], removed: []
+    end
+
+    it 'leaves a file alone that already matches the groups' do
+      live_keys key_b, key_a
+      expect(subject).not_to receive(:upload_to_guest)
+      expect(subject.sync_authorized_keys).to eq state: :unchanged, added: [], removed: []
+    end
+
+    it 'only reports the difference on a dry run' do
+      live_keys key_a, key_old
+      expect(subject).not_to receive(:upload_to_guest)
+      expect(subject.sync_authorized_keys(dry_run: true)).to eq state: :pending, added: ['bob@desk'], removed: ['former@vm']
+    end
+
+    it 'writes the keys of the groups next to the old file and moves them into place' do
+      live_keys key_a, key_old
+      allow(guest).to receive(:exec).with(/\Ash -c .*mkdir/).and_return [true, '']
+      expect(subject).to receive(:upload_to_guest).with("#{key_a}\n#{key_b}", '/var/www/.ssh/authorized_keys.cloudmodel-new', '0600')
+      install = 'chown -R www:www /var/www/.ssh && chmod 700 /var/www/.ssh && chmod 600 /var/www/.ssh/authorized_keys.cloudmodel-new && mv /var/www/.ssh/authorized_keys.cloudmodel-new /var/www/.ssh/authorized_keys'
+      expect(guest).to receive(:exec).with("sh -c #{install.shellescape}").and_return [true, '']
+
+      expect(subject.sync_authorized_keys).to eq state: :applied, added: ['bob@desk'], removed: ['former@vm']
+    end
+
+    it 'raises when the new file cannot be installed' do
+      live_keys key_old
+      allow(guest).to receive(:exec).with(/\Ash -c .*mkdir/).and_return [true, '']
+      allow(guest).to receive(:exec).with(/chown/).and_return [false, 'Permission denied']
+      expect { subject.sync_authorized_keys }.to raise_error(/Failed to install authorized_keys.*Permission denied/)
+    end
+
+    it 'ignores comments and blank lines in the live file' do
+      live_keys '# managed by cloudmodel', '', key_a, key_b
+      expect(subject.sync_authorized_keys[:state]).to eq :unchanged
+    end
+  end
+
 end

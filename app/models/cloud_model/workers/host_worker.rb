@@ -157,21 +157,63 @@ module CloudModel
         end
       end
 
-      def update_tinc_host_files root = ''
-        #
-        # Update tinc host files
-        #
+      # tinc stores one file per node under hosts/, named after the node
+      # with hyphens replaced (tinc node names allow no hyphen).
+      # @return [String]
+      def self.tinc_node_name name
+        name.to_s.downcase.gsub('-', '_')
+      end
 
+      # Node names that must have a host file: every VPN client and every host.
+      # @return [Array<String>]
+      def tinc_expected_nodes
+        (CloudModel::VpnClient.all.map { |c| self.class.tinc_node_name c.name } +
+          CloudModel::Host.all.map { |h| self.class.tinc_node_name h.name }).uniq
+      end
+
+      # Host files on the running host that belong to no VPN client and no
+      # host any more (a deleted client or host). tincd keeps accepting such
+      # a node as long as its file exists.
+      # @return [Array<String>] node names
+      def stale_tinc_host_files
+        expected = tinc_expected_nodes
+        return [] if expected.empty? # never treat an empty database as "remove everything"
+        _, out = @host.exec "ls -1 /etc/tinc/vpn/hosts/"
+        out.to_s.split("\n").map(&:strip).reject(&:blank?) - expected
+      end
+
+      # Writes a host file for every VPN client and host. On the running host
+      # (root ''), files of nodes that no longer exist are moved aside to
+      # /etc/tinc/vpn/hosts.removed/ and tincd re-reads its configuration
+      # (SIGHUP), which also closes connections of nodes whose file is gone.
+      # @param root [String] system root ('' for the running host)
+      # @param prune [Boolean] move stale host files aside (running host only)
+      # @return [Array<String>] node names whose files were moved aside
+      def update_tinc_host_files root = '', prune: true
         mkdir_p "#{root}/etc/tinc/vpn/hosts/"
         CloudModel::VpnClient.each do |client|
-          render_to_remote "/cloud_model/host/etc/tinc/client", "#{root}/etc/tinc/vpn/hosts/#{client.name.downcase.gsub('-', '_').shellescape}", client: client
+          render_to_remote "/cloud_model/host/etc/tinc/client", "#{root}/etc/tinc/vpn/hosts/#{self.class.tinc_node_name(client.name).shellescape}", client: client
         end
 
         CloudModel::Host.each do |host|
-          render_to_remote "/cloud_model/host/etc/tinc/host", "#{root}/etc/tinc/vpn/hosts/#{host.name.downcase.gsub('-', '_').shellescape}", host: host
+          render_to_remote "/cloud_model/host/etc/tinc/host", "#{root}/etc/tinc/vpn/hosts/#{self.class.tinc_node_name(host.name).shellescape}", host: host
         end
 
-        true
+        removed = []
+        if prune and root.empty?
+          removed = stale_tinc_host_files
+          unless removed.empty?
+            stamp = Time.now.utc.strftime('%Y%m%d%H%M%S')
+            @host.exec! "mkdir -p /etc/tinc/vpn/hosts.removed", 'Failed to create the folder for removed tinc host files'
+            removed.each do |node|
+              @host.exec! "mv /etc/tinc/vpn/hosts/#{node.shellescape} /etc/tinc/vpn/hosts.removed/#{node.shellescape}.#{stamp}", "Failed to remove the tinc host file of #{node}"
+            end
+          end
+          # Reload in any case: new or changed client files take effect too.
+          @host.exec "systemctl reload tinc@vpn 2>/dev/null || pkill -HUP -x tincd"
+        end
+
+        removed
       end
 
       # Lets tincd use Blowfish where the system runs OpenSSL 3, which keeps

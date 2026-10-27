@@ -672,6 +672,47 @@ module CloudModel
           "/var/lib/cloud_model/nginx_bak#{path}"
         end
 
+        AUTHORIZED_KEYS_PATH = '/var/www/.ssh/authorized_keys'.freeze
+
+        # Public keys the service's capistrano SSH groups grant, in group
+        # order, without duplicates.
+        # @return [Array<String>]
+        def expected_authorized_keys
+          @model.capistrano_ssh_groups.flat_map { |group| group.pub_keys.map { |key| key.key.to_s.strip } }.reject(&:blank?).uniq
+        end
+
+        # Brings the deploy keys (www's authorized_keys) of the RUNNING
+        # container in line with the service's SSH groups, without a
+        # redeploy. A redeploy writes the same file; between redeploys a key
+        # removed from a group would otherwise keep its access. The file is
+        # written next to the old one and moved into place, so sshd never
+        # reads a half-written file.
+        #
+        # @param dry_run [Boolean] only compare, change nothing
+        # @return [Hash] {state: :applied|:pending|:unchanged|:skipped,
+        #   added: [labels], removed: [labels]} — labels are the key comments
+        def sync_authorized_keys dry_run: false
+          if @model.capistrano_ssh_groups.blank?
+            return {state: :skipped, added: [], removed: []}
+          end
+
+          expected = expected_authorized_keys
+          _, live = guest_sh "cat #{AUTHORIZED_KEYS_PATH} 2>/dev/null"
+          live_keys = live.to_s.split("\n").map(&:strip).reject { |line| line.blank? or line.start_with?('#') }
+
+          result = {added: (expected - live_keys).map { |k| key_label k }, removed: (live_keys - expected).map { |k| key_label k }}
+          return result.merge(state: :unchanged) if result[:added].empty? and result[:removed].empty?
+          return result.merge(state: :pending) if dry_run
+
+          new_path = "#{AUTHORIZED_KEYS_PATH}.cloudmodel-new"
+          guest_sh "mkdir -p #{File.dirname(AUTHORIZED_KEYS_PATH).shellescape}"
+          upload_to_guest expected * "\n", new_path, "0600"
+          success, output = guest_sh "chown -R www:www /var/www/.ssh && chmod 700 /var/www/.ssh && chmod 600 #{new_path.shellescape} && mv #{new_path.shellescape} #{AUTHORIZED_KEYS_PATH.shellescape}"
+          raise "Failed to install authorized_keys on #{@guest.name}: #{output}" unless success
+
+          result.merge(state: :applied)
+        end
+
         def auto_restart
           true
         end
@@ -686,6 +727,13 @@ module CloudModel
         end
 
         private
+
+        # The comment of a public key line (usually user@machine), else a
+        # shortened key so the line stays recognisable in a report.
+        def key_label key
+          parts = key.to_s.split(' ')
+          parts.size > 2 ? parts[2..] * ' ' : "#{parts[0]} …#{parts[1].to_s[-12..]}"
+        end
 
         # Run a shell line inside the container — plain @guest.exec would let
         # the HOST shell interpret operators like `&&` after `lxc exec` ends.

@@ -227,6 +227,85 @@ describe CloudModel::Workers::HostWorker do
 
       subject.update_tinc_host_files(@root)
     end
+
+    context 'on the running host' do
+      let(:client) { CloudModel::VpnClient.new name: 'dev-laptop', tinc_public_key: 'KEY', address: '10.42.253.4' }
+
+      before do
+        allow(CloudModel::VpnClient).to receive(:each).and_yield(client)
+        allow(CloudModel::VpnClient).to receive(:all).and_return [client]
+        allow(CloudModel::Host).to receive(:each).and_yield(host)
+        allow(CloudModel::Host).to receive(:all).and_return [host]
+        allow(subject).to receive(:mkdir_p)
+        allow(subject).to receive(:render_to_remote)
+      end
+
+      def live_files *names
+        allow(host).to receive(:exec).with('ls -1 /etc/tinc/vpn/hosts/').and_return [true, names.map { |n| "#{n}\n" }.join]
+      end
+
+      it 'writes the files of clients and hosts under their tinc node names' do
+        live_files 'dev_laptop', host.name.gsub('-', '_')
+        expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/tinc/client', '/etc/tinc/vpn/hosts/dev_laptop', client: client)
+        expect(subject).to receive(:render_to_remote).with('/cloud_model/host/etc/tinc/host', "/etc/tinc/vpn/hosts/#{host.name.gsub('-', '_')}", host: host)
+
+        expect(subject.update_tinc_host_files).to eq []
+      end
+
+      it 'moves files of deleted nodes aside and reloads tincd' do
+        live_files 'dev_laptop', host.name.gsub('-', '_'), 'old_vm'
+        expect(host).to receive(:exec!).with('mkdir -p /etc/tinc/vpn/hosts.removed', anything)
+        expect(host).to receive(:exec!).with(%r{\Amv /etc/tinc/vpn/hosts/old_vm /etc/tinc/vpn/hosts.removed/old_vm\.\d{14}\z}, anything)
+        expect(host).to receive(:exec).with('systemctl reload tinc@vpn 2>/dev/null || pkill -HUP -x tincd')
+
+        expect(subject.update_tinc_host_files).to eq ['old_vm']
+      end
+
+      it 'reloads tincd even when nothing was removed, so new client files take effect' do
+        live_files 'dev_laptop', host.name.gsub('-', '_')
+        expect(host).not_to receive(:exec!).with(/\Amv /, anything)
+        expect(host).to receive(:exec).with('systemctl reload tinc@vpn 2>/dev/null || pkill -HUP -x tincd')
+
+        subject.update_tinc_host_files
+      end
+
+      it 'never removes anything when the database has no nodes' do
+        allow(CloudModel::VpnClient).to receive(:all).and_return []
+        allow(CloudModel::Host).to receive(:all).and_return []
+        live_files 'dev_laptop', 'old_vm'
+        expect(host).not_to receive(:exec!).with(/\Amv /, anything)
+
+        expect(subject.update_tinc_host_files).to eq []
+      end
+
+      it 'leaves stale files alone with prune: false' do
+        live_files 'old_vm'
+        expect(host).not_to receive(:exec).with('ls -1 /etc/tinc/vpn/hosts/')
+        expect(host).not_to receive(:exec!).with(/\Amv /, anything)
+
+        expect(subject.update_tinc_host_files(prune: false)).to eq []
+      end
+    end
+
+    it 'does not prune or reload inside a chroot (host deploy)' do
+      allow(CloudModel::VpnClient).to receive(:each)
+      allow(CloudModel::Host).to receive(:each)
+      allow(subject).to receive(:mkdir_p)
+      expect(host).not_to receive(:exec).with('ls -1 /etc/tinc/vpn/hosts/')
+      expect(host).not_to receive(:exec).with('systemctl reload tinc@vpn 2>/dev/null || pkill -HUP -x tincd')
+
+      expect(subject.update_tinc_host_files(@root)).to eq []
+    end
+  end
+
+  describe 'stale_tinc_host_files' do
+    it 'lists files of nodes that are neither a VPN client nor a host' do
+      allow(CloudModel::VpnClient).to receive(:all).and_return [CloudModel::VpnClient.new(name: 'a-b')]
+      allow(CloudModel::Host).to receive(:all).and_return [host]
+      allow(host).to receive(:exec).with('ls -1 /etc/tinc/vpn/hosts/').and_return [true, "a_b\n#{host.name.gsub('-', '_')}\ngone\n\n"]
+
+      expect(subject.stale_tinc_host_files).to eq ['gone']
+    end
   end
 
   describe 'tinc templates' do

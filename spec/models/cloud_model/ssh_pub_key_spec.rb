@@ -38,4 +38,32 @@ describe CloudModel::SshPubKey do
       expect(subject.name).to eq 'user@host.domain'
     end
   end
+
+  describe 'authorized_keys sync' do
+    let(:group) { CloudModel::SshGroup.create! name: "g-#{SecureRandom.hex(3)}" }
+
+    before { allow(CloudModel::GuestJobs::SyncAuthorizedKeysJob).to receive(:perform_later) }
+
+    it 'enqueues the sync for its groups when the key is created in a group' do
+      expect(CloudModel::GuestJobs::SyncAuthorizedKeysJob).to receive(:perform_later).with([group.id.to_s])
+      CloudModel::SshPubKey.create! key: "ssh-ed25519 AAAA#{SecureRandom.hex(4)} a@b", groups: [group]
+    end
+
+    it 'enqueues the sync for its former groups when the key is deleted' do
+      key = CloudModel::SshPubKey.create! key: "ssh-ed25519 AAAA#{SecureRandom.hex(4)} a@b", groups: [group]
+      expect(CloudModel::GuestJobs::SyncAuthorizedKeysJob).to receive(:perform_later).with([group.id.to_s])
+      key.destroy
+    end
+
+    it 'does not enqueue for a key outside any group' do
+      expect(CloudModel::GuestJobs::SyncAuthorizedKeysJob).not_to receive(:perform_later)
+      CloudModel::SshPubKey.create! key: "ssh-ed25519 AAAA#{SecureRandom.hex(4)} a@b"
+    end
+
+    it 'does not fail the save when the job cannot be enqueued' do
+      allow(CloudModel::GuestJobs::SyncAuthorizedKeysJob).to receive(:perform_later).and_raise 'queue down'
+      allow(CloudModel).to receive(:log_exception)
+      expect(CloudModel::SshPubKey.new(key: "ssh-ed25519 AAAA#{SecureRandom.hex(4)} a@b", groups: [group]).save).to eq true
+    end
+  end
 end

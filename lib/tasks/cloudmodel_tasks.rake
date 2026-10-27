@@ -241,9 +241,28 @@ namespace :cloudmodel do
     #   @host_worker.redeploy
     # end
 
-    desc "Update tinc host files"
+    desc "Update tinc host files on one host (HOST_ID=<id>): write a file per VPN client and host, move files of deleted nodes aside, reload tincd"
     task :update_tinc_host_files => [:environment, :load_host] do
-      @host_worker.update_tinc_host_files
+      removed = @host_worker.update_tinc_host_files
+      puts "#{@host_worker.host.name}: tinc host files updated#{"; moved aside: #{removed * ', '}" unless removed.empty?}"
+    end
+
+    desc "Sync tinc host files on all deployed hosts. DRY_RUN=1 only lists files of nodes that no longer exist (deleted VPN clients or hosts)."
+    task :sync_tinc_host_files => [:environment] do
+      CloudModel::Host.tinc_peers_of(nil).each do |host|
+        worker = CloudModel::Workers::HostWorker.new(host)
+        begin
+          if ENV['DRY_RUN'] == '1'
+            stale = worker.stale_tinc_host_files
+            puts "#{host.name}: #{stale.empty? ? 'no stale host files' : "would move aside #{stale * ', '}"}"
+          else
+            removed = worker.update_tinc_host_files
+            puts "#{host.name}: updated#{"; moved aside #{removed * ', '}" unless removed.empty?}"
+          end
+        rescue => e
+          puts "#{host.name}: FAILED (#{e.class}: #{e.message})"
+        end
+      end
     end
 
     desc "Push the tinc host files and tinc-up to a live host and set the tinc interface MTU in place. HOST_ID=<id> required; DRY_RUN=1 shows the changes; RESTART=1 restarts tincd (traffic between hosts drops for a few seconds) so it takes the fixed PMTU and MSS clamping."
@@ -482,6 +501,30 @@ namespace :cloudmodel do
         end
       end
       puts "\nUnattended security upgrades in #{guests.size - failures}/#{guests.size} guest(s)."
+      abort "#{failures} guest(s) failed" if failures > 0
+    end
+
+    desc "Push the deploy keys (www authorized_keys) of the capistrano SSH groups to running guests without a redeploy. DRY_RUN=1 only lists added/removed keys; GUEST_ID=<id> or GROUP_ID=<id> to narrow."
+    task :sync_authorized_keys => [:environment] do
+      group_ids = ENV['GROUP_ID'].present? ? [ENV['GROUP_ID']] : nil
+      pairs = CloudModel::GuestJobs::SyncAuthorizedKeysJob.services_for(group_ids)
+      pairs = pairs.select { |guest, _| guest.id.to_s == ENV['GUEST_ID'] } if ENV['GUEST_ID'].present?
+      abort "No running guests with capistrano SSH groups found in #{Rails.env} database — forgot RAILS_ENV=production?" if pairs.empty?
+
+      dry_run = ENV['DRY_RUN'] == '1'
+      failures = 0
+      pairs.each do |guest, service|
+        print "#{guest.name} @ #{guest.host.name}: "
+        begin
+          result = service.worker.sync_authorized_keys dry_run: dry_run
+          diff = [("+ #{result[:added] * ', '}" if result[:added].any?), ("- #{result[:removed] * ', '}" if result[:removed].any?)].compact * '  '
+          puts "#{result[:state]}#{"  #{diff}" unless diff.empty?}"
+        rescue => e
+          failures += 1
+          puts "\e[31mFAILED\e[39m (#{e.class}: #{e.message[0, 120]})"
+        end
+      end
+      puts "\n#{pairs.size - failures}/#{pairs.size} guest(s)#{' (dry run, nothing changed)' if dry_run}."
       abort "#{failures} guest(s) failed" if failures > 0
     end
 
