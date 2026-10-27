@@ -49,4 +49,5 @@ require_relative "monitoring/heartbeat_checks"
 CloudModel::Monitoring.register_check CloudModel::Monitoring::HostChecks
 CloudModel::Monitoring.register_check CloudModel::Monitoring::MongodbReplicationSetChecks
 CloudModel::Monitoring.register_check CloudModel::Monitoring::RedisSentinelSetChecks
+CloudModel::Monitoring.register_check CloudModel::Monitoring::CertificateChecks
 CloudModel::Monitoring.register_check CloudModel::Monitoring::HeartbeatChecks
