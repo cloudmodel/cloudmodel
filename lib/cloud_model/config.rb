@@ -13,6 +13,9 @@ module CloudModel
     # overlap their wait. Default 4. Note: each concurrent backup uses a Mongoid
     # connection, so keep this <= the Mongoid pool size.
     attr_writer :backup_concurrency
+    # Backup retention (dumps and ZFS volume snapshots), see
+    # Mixins::BackupTools.disposable_timestamps.
+    attr_writer :backup_retention
     attr_writer :skip_sync_images
     # ZFS dataset guest template builds are created under (on the build host)
     attr_writer :build_dataset
@@ -85,6 +88,13 @@ module CloudModel
 
     def backup_concurrency
       @backup_concurrency || 4
+    end
+
+    # @return [Hash] {recent:, days:, weeks:, months:} — the newest `recent`
+    #   backups plus the newest backup of each of the last `days` calendar
+    #   days, `weeks` calendar weeks and `months` calendar months
+    def backup_retention
+      {recent: 3, days: 6, weeks: 6, months: 6}.merge(@backup_retention || {})
     end
 
     # Prefix for ZFS backup snapshots (see the writer above). Generic default;

@@ -11,12 +11,10 @@ module CloudModel
     # (`YYYYMMDDHHmmSS`). A `latest` symlink is maintained pointing to the most
     # recent snapshot.
     #
-    # The retention policy keeps:
-    # - The 3 most recent snapshots unconditionally
-    # - All snapshots from the last 3 days
-    # - One snapshot per day for days 3–6
-    # - One snapshot per week for weeks 1–6
-    # - One snapshot per month for months 1–6
+    # The retention policy (see {.disposable_timestamps}) keeps the newest
+    # snapshots, the newest per calendar day, week and month for a configured
+    # number of each ({CloudModel::Config#backup_retention}, default: 3 newest,
+    # 6 days, 6 weeks, 6 months).
     module BackupTools
       # Returns all existing backup timestamps, newest first.
       # @return [Array<String>] e.g. `["20240315120000", "20240314120000"]`
@@ -171,53 +169,54 @@ module CloudModel
 
       # The retention policy itself, applicable to any list of 14-digit backup
       # timestamps (dump directories, ZFS snapshot names, …): returns the
-      # timestamps that fall outside the policy documented above.
+      # timestamps that fall outside it.
+      #
+      # Grandfather-father-son over calendar buckets, configured by
+      # {CloudModel::Config#backup_retention}: the newest backup of each of
+      # the last `days` calendar days, of each of the last `weeks` calendar
+      # weeks and of each of the last `months` calendar months is kept, plus
+      # the `recent` newest backups regardless of age. Each tier picks among
+      # the backups that are still there, so a daily backup that ages out of
+      # the daily tier is the one the weekly tier keeps — the selection is
+      # stable from one run to the next. (The earlier "newest backup older
+      # than n days" slots dropped every backup on its fourth day, before any
+      # slot could claim it, and kept only three versions in practice.)
+      #
       # @param backups [Array<String>] 14-digit timestamps, any order
+      # @param retention [Hash] {recent:, days:, weeks:, months:}
+      # @param now [Time]
       # @return [Array<String>] timestamps eligible for deletion
-      def self.disposable_timestamps backups
-        backups = backups.sort{|a,b| b<=>a}
+      def self.disposable_timestamps backups, retention: CloudModel.config.backup_retention, now: Time.now
+        backups = backups.uniq.sort.reverse
+        times = backups.each_with_object({}) do |stamp, h|
+          h[stamp] = Time.strptime(stamp, '%Y%m%d%H%M%S') rescue nil
+        end
+        dated = backups.select { |b| times[b] }
 
-        #puts "\n ALL #{backups * ', '}"
+        keep = backups.first(retention[:recent].to_i)
 
-        now = Time.now
-      
-        keep_backups = backups[0..2] # always keep last 3 updates
-      
-        # keep all backups in the last 3 days
-        keep_backups += backups.select{|x| x >= (now - 3.days).strftime("%Y%m%d%H%M%S")}
-      
-        # limit backups to the last 6 month (exept less than 3)
-        last_backups = backups.select{|x| x >= (now - 6.month).strftime("%Y%m%d%H%M%S")}
-      
-        # keep one backup each for the last 6 days
-        (3..6).each do |n|
-          keep = last_backups.select{|x| x <= (now - (n+1).days).strftime("%Y%m%d%H%M%S")}.first
-          #puts "Keep for Day    #{n} (#{(now - (n+1).days).strftime("%Y%m%d%H%M%S")}): #{keep}"
-          keep_backups << keep
+        today = now.to_date
+        day_buckets = (0...retention[:days].to_i).map { |n| today - n }
+        week_buckets = (0...retention[:weeks].to_i).map { |n| (today - 7 * n).beginning_of_week }
+        month_buckets = (0...retention[:months].to_i).map { |n| (today << n).beginning_of_month }
+
+        {
+          day_buckets => ->(t) { t.to_date },
+          week_buckets => ->(t) { t.to_date.beginning_of_week },
+          month_buckets => ->(t) { t.to_date.beginning_of_month }
+        }.each do |buckets, bucket_of|
+          buckets.each do |bucket|
+            newest = dated.detect { |b| bucket_of.(times[b]) == bucket }
+            keep << newest if newest
+          end
         end
-      
-        # keep one backup each for the last 6 weeks
-        (1..6).each do |n|
-          keep = last_backups.select{|x| x <= (now - (n+1).weeks).strftime("%Y%m%d%H%M%S")}.first
-          #puts "Keep for Week   #{n} (#{(now - (n+1).weeks).strftime("%Y%m%d%H%M%S")}): #{keep}"
-          keep_backups << keep
-        end
-        # keep one backup each for the last 6 month
-        (1..6).each do |n|
-          keep = last_backups.select{|x| x <= (now - (n+1).month).strftime("%Y%m%d%H%M%S")}.first
-          #puts "Keep for Month #{"%2d" % n} (#{(now - (n+1).month).strftime("%Y%m%d%H%M%S")}): #{keep}"
-          keep_backups << keep
-        end
-        disposible_backups = backups - keep_backups
-      
-        Rails.logger.debug "Keep backups: #{keep_backups.uniq * ', '}"
-        Rails.logger.debug "Dispose backups: #{disposible_backups * ', '}"
-        #puts "KEEP #{keep_backups.uniq * ', '}"
-        #puts "DISP #{disposible_backups * ', '}"
-      
-        disposible_backups
+
+        disposable = backups - keep
+        Rails.logger.debug "Keep backups: #{keep.uniq * ', '}"
+        Rails.logger.debug "Dispose backups: #{disposable * ', '}"
+        disposable
       end
-    
+
       # Deletes all disposable backup directories as determined by {#list_disposable_backups}.
       # @return [true]
       def cleanup_backups
