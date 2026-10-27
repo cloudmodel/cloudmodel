@@ -10,6 +10,7 @@ module CloudModel
     class GuestWorker < BaseWorker
       include CloudModel::Workers::Mixins::UnattendedUpgrades
       include CloudModel::Workers::Mixins::CheckMkAgentGuestPlugins
+      include CloudModel::Workers::Mixins::ChangeRecording
 
       def initialize(guest)
         @guest = guest
@@ -251,6 +252,7 @@ module CloudModel
           ['Config network', :config_network],
           ['Config firewall', :config_firewall],
           ['Activate Address Resolution', :activate_address_resolution],
+          ['Record package list', :record_new_container],
         ]
         if options[:launch] == false
           steps << ['Leave container prepared (switch-over deferred)', :leave_prepared]
@@ -258,15 +260,18 @@ module CloudModel
           steps << ['Launch LXD container', :start_lxd_container]
         end
 
+        begin_change_record 'deploy'
         begin
           run_steps :deploy, steps, options
         rescue Exception => e
+          fail_change_record e
           cleanup_chroot_quietly guest.deploy_path
           @lxc.unmount unless @lxc.blank?
           raise e
         end
 
         if options[:launch] == false
+          prepare_change_record
           guest.collection.update_one({_id: guest.id}, '$set' => { 'deploy_state_id': 0xe1, 'deploy_prepared_at': Time.now, 'deploy_prepared_fingerprints': guest.reload.deploy_config_fingerprints })
           puts "Prepared container #{@lxc.name} in #{distance_of_time_in_words_to_now build_start_at}; the guest keeps running on #{guest.current_lxd_container.try(:name) || 'its current container'} until the switch-over"
           Rails.logger.debug "GUEST_WORKER: Prepared guest #{guest.name} container #{@lxc.name} in #{Time.now - build_start_at}"
@@ -274,6 +279,7 @@ module CloudModel
         end
 
         mark_deployed
+        finish_change_record
         puts "Finished deploy host in #{distance_of_time_in_words_to_now build_start_at}"
         Rails.logger.debug "GUEST_WORKER: Deploy guest #{guest.name} on container #{@lxc.name} done in #{Time.now - build_start_at}"
       end
@@ -297,14 +303,17 @@ module CloudModel
 
         start_at = Time.now
         guest.update_attributes deploy_state: :running, deploy_last_issue: nil
+        resume_change_record
         begin
           run_steps :launch, [['Launch LXD container', :start_lxd_container]], options
         rescue Exception => e
+          fail_change_record e
           guest.update_attributes deploy_state: :failed, deploy_last_issue: "#{e}"
           raise e
         end
 
         mark_deployed
+        finish_change_record
         puts "Switched #{guest.name} to #{@lxc.name} in #{distance_of_time_in_words_to_now start_at}"
       end
 
