@@ -6,7 +6,7 @@ Open-source Rails engine gem (MIT license) providing ActiveModel representations
 
 ## Architecture Decision Records
 
-cloudmodel keeps no ADR directory of its own. Architecture decisions about the engine are recorded in the **core-admin** repository (`../core-admin/docs/adr/`, identifiers `ADR-ADMIN-NNNN`), because cloudmodel development is steered from there: workers over SSH and provider gems (ADR-ADMIN-0002), release directories with the `current` symlink and the `tmp/restart.txt` marker (0003), LXD containers on a ZFS pool (0004), Content-Security-Policy set by nginx (0005), backups as incremental ZFS snapshots plus one mongodump per replica set (0006), guest templates and web images as ZFS volumes (0007), the Forgejo move (0008, proposed) and the two-phase rollout (0013). A change to one of these decisions gets a new ADR there in the same PR.
+cloudmodel keeps no ADR directory of its own. Architecture decisions about the engine are recorded in the **core-admin** repository (`../core-admin/docs/adr/`, identifiers `ADR-ADMIN-NNNN`), because cloudmodel development is steered from there: web images as GridFS tarballs (ADR-ADMIN-0006, superseded), workers over SSH and provider gems (0007), release directories with the `current` symlink and the `tmp/restart.txt` marker (0008), LXD containers on a ZFS pool (0009), monitoring as Ruby check classes with ItemIssues (0010), Content-Security-Policy set by nginx (0012), backups as incremental ZFS snapshots plus one mongodump per replica set (0014), guest templates and web images as ZFS volumes (0016), the Forgejo move (0017, proposed) and the two-phase rollout (0022). A change to one of these decisions gets a new ADR there in the same PR.
 
 ## Tech Stack
 
