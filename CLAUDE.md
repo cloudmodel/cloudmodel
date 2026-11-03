@@ -4,6 +4,10 @@ Open-source Rails engine gem (MIT license) providing ActiveModel representations
 
 **This is an open-source project. Do not add `Co-Authored-By` lines to commits.**
 
+## Architecture Decision Records
+
+cloudmodel keeps no ADR directory of its own. Architecture decisions about the engine are recorded in the **core-admin** repository (`../core-admin/docs/adr/`, identifiers `ADR-ADMIN-NNNN`), because cloudmodel development is steered from there: web images as GridFS tarballs (ADR-ADMIN-0007, superseded), workers over SSH and provider gems (0008), release directories with the `current` symlink and the `tmp/restart.txt` marker (0012), LXD containers on a ZFS pool (0014), monitoring as Ruby check classes with ItemIssues (0016), Content-Security-Policy set by nginx (0020), Active Job on Delayed Job with the Mongoid backend (0023), backups as incremental ZFS snapshots plus one mongodump per replica set (0024), guest templates and web images as ZFS volumes (0027), the Forgejo move (0029, proposed), the two-phase rollout (0036), the tinc mesh VPN with host firewalls and port-NAT (0009), the layered guest images — core template, template type, build-only vs runtime components (0013), the guest as aggregate root with clusters as top-level documents (0010), certbot in the nginx guest and uploaded certificates placed by path (0015), the rolling `live_log` pushed by Action Cable from a change stream (0026), non-Rails web apps and collaboration services as services and web apps (0019), rake tasks and daemons as `Services::Rake` systemd units (0021), unattended security upgrades without reboot, kernel or ZFS (0034), hosts built on Debian 12 with debootstrap (0022), the WiredTiger cache at 75 % of a MongoDB guest's RAM (0038), metadata-only `primarycache` on MongoDB volumes (0040, rejected), files in deployed containers owned by container ids (0030) and PHP from the sury.org / ondrej repositories on both distributions (0039). A change to one of these decisions gets a new ADR there in the same PR.
+
 ## Tech Stack
 
 - **Ruby 3.4.8** / **Rails ~> 8.0** (engine, not a standalone app)
