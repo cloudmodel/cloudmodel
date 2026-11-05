@@ -5,12 +5,6 @@ RUN_MODE = prod
 
 [database]
 DB_TYPE = sqlite3
-HOST = 127.0.0.1:3306
-NAME = forgejo
-USER = forgejo
-PASSWD =
-SCHEMA =
-SSL_MODE = disable
 PATH = /var/lib/forgejo/data/forgejo.db
 LOG_SQL = false
 
@@ -33,27 +27,54 @@ OFFLINE_MODE = false
 [lfs]
 PATH = /var/lib/forgejo/data/lfs
 
+[packages]
+ENABLED = <%= model.packages_enabled ? 'true' : 'false' %>
+
 [mailer]
-ENABLED = false
+ENABLED = <%= model.mailer_enabled ? 'true' : 'false' %>
+<% if model.mailer_enabled %>
+; Through the guest's sendmail (msmtp relays via the host).
+PROTOCOL = sendmail
+SENDMAIL_PATH = /usr/sbin/sendmail
+FROM = <%= model.effective_mail_from %>
+<% end %>
 
 [ui]
-DEFAULT_THEME: <%= model.default_theme %>
+DEFAULT_THEME = <%= model.default_theme %>
 
 [service]
 REGISTER_EMAIL_CONFIRM = false
-ENABLE_NOTIFY_MAIL = false
+ENABLE_NOTIFY_MAIL = <%= model.mailer_enabled ? 'true' : 'false' %>
 DISABLE_REGISTRATION = true
-ALLOW_ONLY_EXTERNAL_REGISTRATION = false
+ALLOW_ONLY_EXTERNAL_REGISTRATION = <%= model.oidc? && model.oidc_auto_registration ? 'true' : 'false' %>
+<% if model.external_login_only? %>
+; The external login source is the only way in.
+ENABLE_INTERNAL_SIGNIN = false
+ENABLE_BASIC_AUTHENTICATION = false
+<% else %>
+ENABLE_INTERNAL_SIGNIN = true
+ENABLE_BASIC_AUTHENTICATION = true
+<% end %>
 ENABLE_CAPTCHA = false
 REQUIRE_SIGNIN_VIEW = false
 DEFAULT_KEEP_EMAIL_PRIVATE = false
 DEFAULT_ALLOW_CREATE_ORGANIZATION = true
 DEFAULT_ENABLE_TIMETRACKING = true
-NO_REPLY_ADDRESS = noreply.localhost
+NO_REPLY_ADDRESS = noreply.<%= guest.external_hostname %>
+
+[oauth2_client]
+ENABLE_AUTO_REGISTRATION = <%= model.oidc_auto_registration ? 'true' : 'false' %>
+ACCOUNT_LINKING = <%= model.oidc_account_linking %>
+USERNAME = nickname
+UPDATE_AVATAR = false
 
 [openid]
 ENABLE_OPENID_SIGNIN = <%= model.enable_openid_signin ? 'true' : 'false' %>
 ENABLE_OPENID_SIGNUP = <%= model.enable_openid_signup ? 'true' : 'false' %>
+
+[actions]
+ENABLED = <%= model.actions_enabled ? 'true' : 'false' %>
+DEFAULT_ACTIONS_URL = <%= model.actions_default_url %>
 
 [cron.update_checker]
 ENABLED = false
@@ -62,6 +83,7 @@ ENABLED = false
 PROVIDER = file
 
 [log]
+; Console under systemd = journald (Forgejo switches to journald flags itself).
 MODE = console
 LEVEL = info
 ROOT_PATH = /var/lib/forgejo/log
@@ -81,4 +103,4 @@ PASSWORD_HASH_ALGO = pbkdf2_hi
 JWT_SECRET = <%= model.oauth_jwt_secret %>
 
 [metrics]
-ENABLED=true
+ENABLED = true

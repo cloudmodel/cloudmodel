@@ -87,6 +87,7 @@ module CloudModel
           collabora: CloudModel::Services::Collabora,
           jitsi: CloudModel::Services::Jitsi,
           forgejo: CloudModel::Services::Forgejo,
+          forgejo_runner: CloudModel::Services::ForgejoRunner,
           rake: CloudModel::Services::Rake,
           backup: CloudModel::Services::Backup,
           monitoring: CloudModel::Services::Monitoring,

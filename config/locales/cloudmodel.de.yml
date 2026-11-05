@@ -267,6 +267,9 @@ de:
       cloud_model/services/forgejo:
         one: Forgejo-Dienst
         other: Forgejo-Dienste
+      cloud_model/services/forgejo_runner:
+        one: Forgejo-Actions-Runner
+        other: Forgejo-Actions-Runner
       cloud_model/services/collabora:
         one: Collabora Office-Dienst
         other: Collabore Office-Dienste

@@ -20,9 +20,8 @@ describe CloudModel::Monitoring::Services::ForgejoChecks do
 
       expect(subject).to have_received(:do_check_for_errors_on).with(test_data, {
         not_reachable: 'service reachable',
-        no_fuseki_status: 'status available',
-        fuseki_status_forbidden: 'status forbidden',
-        parse_result: 'parse status'
+        not_found: 'metrics available',
+        not_parsable: 'parse metrics'
       })
     end
   end

@@ -23,6 +23,7 @@ describe CloudModel::Services::Base do
         mariadb: CloudModel::Services::Mariadb,
         neo4j: CloudModel::Services::Neo4j,
         forgejo: CloudModel::Services::Forgejo,
+        forgejo_runner: CloudModel::Services::ForgejoRunner,
         fuseki: CloudModel::Services::Fuseki,
         jitsi: CloudModel::Services::Jitsi,
         solr: CloudModel::Services::Solr,

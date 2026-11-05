@@ -1,0 +1,21 @@
+[Unit]
+Description=Forgejo Actions runner
+Documentation=https://forgejo.org/docs/latest/admin/actions/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=forgejo-runner
+Group=forgejo-runner
+WorkingDirectory=/var/lib/forgejo-runner
+Environment=HOME=/var/lib/forgejo-runner
+ExecStart=/usr/local/bin/forgejo-runner daemon -c /etc/forgejo-runner/config.yml
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=10
+# Let the configured shutdown_timeout finish running jobs.
+TimeoutStopSec=infinity
+
+[Install]
+WantedBy=multi-user.target

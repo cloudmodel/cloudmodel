@@ -16,9 +16,9 @@ describe CloudModel::Components::ForgejoComponent do
       expect(subject.name).to eq :forgejo
     end
 
-    it 'should still return :forgejo even if version is set' do
+    it 'should carry the version (one template per Forgejo release)' do
       subject.version = "42.23"
-      expect(subject.name).to eq :forgejo
+      expect(subject.name).to eq :"forgejo@42.23"
     end
   end
 
