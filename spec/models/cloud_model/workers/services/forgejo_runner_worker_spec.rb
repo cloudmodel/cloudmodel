@@ -56,6 +56,20 @@ describe CloudModel::Workers::Services::ForgejoRunnerWorker do
     end
   end
 
+  describe 'rendered config' do
+    it 'should be valid YAML with the connection, labels and job environment (no HTML escaping)' do
+      model.registration_secret = '7c31591e8b67225a116d4a4519ea8e507e08f71f'
+      model.additional_components = ['ruby@3.4', 'rust']
+      yaml = subject.send(:render, '/cloud_model/guest/etc/forgejo_runner/config.yml', guest: guest, model: model)
+      config = YAML.safe_load(yaml)
+      expect(config['server']['connections']['forgejo']).to eq('url' => 'https://git.example.com/', 'uuid' => '37633331-3539-3165-3862-363732323561', 'token' => '7c31591e8b67225a116d4a4519ea8e507e08f71f')
+      expect(config['runner']['labels']).to eq ['ubuntu-latest:host', 'self-hosted:host']
+      expect(config['runner']['envs']['PATH']).to start_with '/usr/local/rvm/wrappers/default:'
+      expect(config['runner']['envs']['BUNDLE_PATH']).to eq '/var/lib/forgejo-runner/gems'
+      expect(yaml).not_to include '&quot;'
+    end
+  end
+
   describe 'auto_restart' do
     it { expect(subject.auto_restart).to eq true }
   end

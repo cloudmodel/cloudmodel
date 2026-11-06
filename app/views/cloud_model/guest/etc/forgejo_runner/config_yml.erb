@@ -1,11 +1,11 @@
 # Rendered by cloudmodel, do not edit on the guest.
 log:
-  level: <%= model.log_level %>
-  job_level: <%= model.log_level %>
+  level: <%== model.log_level %>
+  job_level: <%== model.log_level %>
 
 runner:
   file: /var/lib/forgejo-runner/.runner
-  capacity: <%= model.capacity %>
+  capacity: <%== model.capacity %>
   timeout: 3h
   shutdown_timeout: 3h
   insecure: false
@@ -15,11 +15,11 @@ runner:
   # Tool chains from the guest template, reachable without a login shell.
   envs:
 <% model.job_environment.each do |key, value| -%>
-    <%= key %>: <%= value.to_json %>
+    <%== key %>: <%== value.to_json %>
 <% end -%>
   labels:
 <% model.effective_labels.each do |label| -%>
-    - <%= label.to_json %>
+    - <%== label.to_json %>
 <% end -%>
 
 cache:
@@ -36,6 +36,6 @@ host:
 server:
   connections:
     forgejo:
-      url: <%= model.effective_instance_url.to_json %>
-      uuid: <%= model.runner_uuid %>
-      token: <%= model.registration_secret %>
+      url: <%== model.effective_instance_url.to_json %>
+      uuid: <%== model.runner_uuid %>
+      token: <%== model.registration_secret %>
