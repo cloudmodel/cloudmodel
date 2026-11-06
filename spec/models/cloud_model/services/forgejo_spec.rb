@@ -136,7 +136,6 @@ describe CloudModel::Services::Forgejo do
       expect(Shellwords.join(flags)).to include("--secret se\\ cret")
     end
   end
-  end
 
   describe 'used_ports' do
     it 'should return the configured tcp port' do
