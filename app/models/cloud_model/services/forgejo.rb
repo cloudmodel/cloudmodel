@@ -225,18 +225,62 @@ module CloudModel
         end
       end
 
-      # Forgejo CLI call (run as the `forgejo` user) that registers or updates
-      # a runner with its shared secret; idempotent on the Forgejo side.
+      # Forgejo CLI as argv, run with the deployed config and work dir.
+      # @return [Array<String>]
+      def self.cli_argv
+        %w[env GITEA_WORK_DIR=/var/lib/forgejo forgejo --config /etc/forgejo/app.ini]
+      end
+
+      # Runs a CLI argv as the forgejo user without an inner shell (one level
+      # of quoting, whatever the values contain).
+      # @param argv [Array<String>]
+      # @return [String] shell command line
+      def self.as_forgejo(argv)
+        Shellwords.join(%w[runuser -u forgejo --] + argv)
+      end
+
+      # Flags of the OIDC login source (without the add/update verb). Every
+      # mapping flag is present, empty when unset, so a cleared field clears
+      # the source on the next provisioning run.
+      # @return [Array<String>]
+      def oidc_login_source_flags
+        flags = [
+          '--name', oidc_name.to_s,
+          '--provider', 'openidConnect',
+          '--key', oidc_client_id.to_s,
+          '--secret', oidc_client_secret.to_s,
+          '--auto-discover-url', oidc_auto_discovery_url.to_s,
+          "--skip-local-2fa=#{oidc_skip_local_2fa ? 'true' : 'false'}",
+          '--group-claim-name', oidc_group_claim.to_s,
+          '--admin-group', oidc_admin_group.to_s,
+          '--restricted-group', oidc_restricted_group.to_s,
+          '--required-claim-name', oidc_required_claim_name.to_s,
+          '--required-claim-value', oidc_required_claim_value.to_s,
+          '--group-team-map', oidc_group_team_map.to_s,
+          "--group-team-map-removal=#{oidc_group_team_map_removal ? 'true' : 'false'}"
+        ]
+        oidc_scope_list.each { |scope| flags += ['--scopes', scope] }
+        flags
+      end
+
+      # CLI argv that registers or updates a runner with its shared secret;
+      # idempotent on the Forgejo side.
       #
       # @param runner [CloudModel::Services::ForgejoRunner]
-      # @return [String] shell command
+      # @return [Array<String>]
+      def runner_registration_argv(runner)
+        argv = self.class.cli_argv + ['forgejo-cli', 'actions', 'register',
+          '--name', runner.effective_runner_name,
+          '--labels', runner.label_names.join(','),
+          '--secret', runner.registration_secret.to_s]
+        argv += ['--scope', runner.scope] if runner.scope.present?
+        argv
+      end
+
+      # @param runner [CloudModel::Services::ForgejoRunner]
+      # @return [String] shell command (as the forgejo user)
       def runner_registration_command(runner)
-        cmd = "#{self.class.cli} forgejo-cli actions register" \
-          " --name #{runner.effective_runner_name.shellescape}" \
-          " --labels #{runner.label_names.join(',').shellescape}" \
-          " --secret #{runner.registration_secret.to_s.shellescape}"
-        cmd += " --scope #{runner.scope.shellescape}" if runner.scope.present?
-        cmd
+        self.class.as_forgejo runner_registration_argv(runner)
       end
 
       # Registers a runner on the running instance (via `lxc exec`), so a newly
@@ -246,17 +290,7 @@ module CloudModel
       # @return [String] command output
       # @raise [RuntimeError] when the registration fails
       def register_actions_runner!(runner)
-        guest.exec! "#{self.class.as_forgejo} #{runner_registration_command(runner).shellescape}", "Failed to register runner #{runner.effective_runner_name}"
-      end
-
-      # @return [String] Forgejo CLI with the deployed config and work dir
-      def self.cli
-        "GITEA_WORK_DIR=/var/lib/forgejo forgejo --config /etc/forgejo/app.ini"
-      end
-
-      # @return [String] prefix that runs a command as the forgejo user
-      def self.as_forgejo
-        "su -s /bin/bash forgejo -c"
+        guest.exec! runner_registration_command(runner), "Failed to register runner #{runner.effective_runner_name}"
       end
 
       def backupable?
@@ -282,8 +316,7 @@ module CloudModel
 
         FileUtils.mkdir_p target
 
-        dump = "#{self.class.cli} dump --type zip --file #{guest_file.shellescape}"
-        success, output = guest.exec "#{self.class.as_forgejo} #{dump.shellescape}"
+        success, output = guest.exec self.class.as_forgejo(self.class.cli_argv + ['dump', '--type', 'zip', '--file', guest_file])
         unless success
           CloudModel.backup_log "forgejo dump failed: #{output.to_s.strip.lines.last.to_s.strip}"
           FileUtils.rm_rf target

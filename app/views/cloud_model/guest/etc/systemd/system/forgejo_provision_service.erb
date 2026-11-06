@@ -1,0 +1,13 @@
+[Unit]
+Description=Forgejo provisioning (login source, Actions runners)
+After=forgejo.service network-online.target
+Requires=forgejo.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=15min
+ExecStart=/etc/forgejo/provision.sh
+
+[Install]
+WantedBy=multi-user.target

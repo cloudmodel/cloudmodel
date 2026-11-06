@@ -95,56 +95,7 @@ describe CloudModel::Workers::Services::ForgejoWorker do
     end
   end
 
-  describe 'write_config with an OIDC login source' do
-    let(:cli) { 'GITEA_WORK_DIR=/var/lib/forgejo forgejo --config /etc/forgejo/app.ini' }
-
-    before do
-      allow(guest).to receive(:deploy_path).and_return('/var/lib/lxc/test/rootfs')
-      allow(subject).to receive(:comment_sub_step)
-      allow(subject).to receive(:chroot!).and_return('x')
-      allow(subject).to receive(:chroot).and_return([true, ''])
-      allow(subject).to receive(:render_to_guest)
-      allow(model).to receive(:save)
-      allow(model).to receive(:actions_runners).and_return([])
-      model.oidc_name = 'sso'
-      model.oidc_auto_discovery_url = 'https://auth.example.com/.well-known/openid-configuration'
-      model.oidc_client_id = 'client'
-      model.oidc_client_secret = 'secret'
-      model.oidc_admin_group = 'admins'
-      model.oidc_restricted_group = 'external'
-      model.oidc_group_team_map = '{"staff": {"org": ["staff"]}}'
-      model.oidc_skip_local_2fa = true
-    end
-
-    it 'should migrate the database first' do
-      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', "su -s /bin/bash forgejo -c #{"#{cli} migrate".shellescape}", 'Failed to migrate forgejo db').ordered
-      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', /admin\\ auth\\ add-oauth/, 'Failed to configure OIDC login source').ordered
-      subject.write_config
-    end
-
-    it 'should add the source with the group mapping and scopes' do
-      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', /admin\\ auth\\ add-oauth/, 'Failed to configure OIDC login source') do |_, command, _|
-        inner = Shellwords.split(command).last
-        expect(inner).to include '--provider openidConnect'
-        expect(inner).to include '--skip-local-2fa=true'
-        expect(inner).to include '--group-claim-name groups'
-        expect(inner).to include '--admin-group admins'
-        expect(inner).to include '--restricted-group external'
-        expect(Shellwords.split(inner)).to include('--group-team-map', '{"staff": {"org": ["staff"]}}')
-        expect(inner).to include '--group-team-map-removal=false'
-        expect(inner).to include '--scopes openid --scopes profile --scopes email --scopes groups'
-      end
-      subject.write_config
-    end
-
-    it 'should update an existing source of the same name instead of adding a duplicate' do
-      allow(subject).to receive(:chroot).and_return([true, "1\tsso\tOAuth2\ttrue\n"])
-      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', /admin\\ auth\\ update-oauth\\ --id\\ 1\\ --name\\ sso/, 'Failed to configure OIDC login source')
-      subject.write_config
-    end
-  end
-
-  describe 'write_config with Actions runners' do
+  describe 'provisioning script (login source and runners live on the data volume, applied after start)' do
     let(:runner) { CloudModel::Services::ForgejoRunner.new runner_name: 'ci', registration_secret: 'b' * 40 }
 
     before do
@@ -154,24 +105,50 @@ describe CloudModel::Workers::Services::ForgejoWorker do
       allow(subject).to receive(:render_to_guest)
       allow(model).to receive(:save)
       allow(model).to receive(:actions_runners).and_return([runner])
+      model.oidc_name = 'sso'
+      model.oidc_auto_discovery_url = 'https://auth.example.com/.well-known/openid-configuration'
+      model.oidc_client_id = 'client'
+      model.oidc_client_secret = 'secret'
     end
 
-    it 'should register each runner offline with its shared secret' do
-      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', /migrate/, 'Failed to migrate forgejo db').ordered
-      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', /forgejo-cli\\ actions\\ register\\ --name\\ ci\\ --labels\\ ubuntu-latest,self-hosted\\ --secret\\ b{40}/, 'Failed to register runner ci').ordered
+    it 'should never touch the database in the deploy chroot' do
+      expect(subject).not_to receive(:chroot!).with(anything, /migrate|auth add-oauth|actions register/, anything)
       subject.write_config
     end
 
-    it 'should skip a runner that has no secret yet' do
+    it 'should render the root-only provisioning script with the registered runners' do
+      expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/forgejo/provision.sh', '/etc/forgejo/provision.sh', 0700, guest: guest, model: model, runners: [runner])
+      expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', 'chown root:root /etc/forgejo/provision.sh && chmod 700 /etc/forgejo/provision.sh', 'Failed to set provision script ownership')
+      subject.write_config
+    end
+
+    it 'should leave out runners without a secret and all runners when Actions are disabled' do
       runner.registration_secret = nil
-      expect(subject).not_to receive(:chroot!).with(anything, /actions\\ register/, anything)
+      expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/forgejo/provision.sh', anything, anything, hash_including(runners: []))
+      subject.write_config
+
+      runner.registration_secret = 'b' * 40
+      model.actions_enabled = false
+      expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/forgejo/provision.sh', anything, anything, hash_including(runners: []))
       subject.write_config
     end
 
-    it 'should not register runners when Actions are disabled' do
-      model.actions_enabled = false
-      expect(subject).not_to receive(:chroot!).with(anything, /actions\\ register/, anything)
-      subject.write_config
+    it 'should render a script that waits for healthz, updates an existing source by name or adds it, and registers the runners' do
+      script = subject.send(:render, '/cloud_model/guest/etc/forgejo/provision.sh', guest: guest, model: model, runners: [runner])
+      expect(script).to start_with "#!/bin/bash\n"
+      expect(script).to include 'http://127.0.0.1:3000/api/healthz'
+      expect(script).to include "runuser -u forgejo -- env GITEA_WORK_DIR\\=/var/lib/forgejo forgejo --config /etc/forgejo/app.ini admin auth list | awk -F'\\t' -v n=sso"
+      expect(script).to include 'admin auth update-oauth --id "$id" --name sso --provider openidConnect --key client --secret secret'
+      expect(script).to include 'admin auth add-oauth --name sso --provider openidConnect'
+      expect(script).to include '--scopes openid --scopes profile --scopes email --scopes groups'
+      expect(script).to include "forgejo-cli actions register --name ci --labels ubuntu-latest,self-hosted --secret #{'b' * 40}"
+    end
+
+    it 'should render a script without a login source when none is configured' do
+      model.oidc_name = nil
+      script = subject.send(:render, '/cloud_model/guest/etc/forgejo/provision.sh', guest: guest, model: model, runners: [])
+      expect(script).to include '# No external login source configured.'
+      expect(script).not_to include 'add-oauth'
     end
   end
 
@@ -208,6 +185,12 @@ describe CloudModel::Workers::Services::ForgejoWorker do
 
     it 'should call super to add service to runlevel default' do
       expect(host).to receive(:exec).with('ln -sf /lib/systemd/system/forgejo.service /var/lib/lxc/test/rootfs/etc/systemd/system/multi-user.target.wants/')
+      subject.auto_start
+    end
+
+    it 'should install and enable the provisioning oneshot unit' do
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/guest/etc/systemd/system/forgejo_provision.service', '/var/lib/lxc/test/rootfs/etc/systemd/system/forgejo_provision.service', 0644)
+      expect(host).to receive(:exec).with('ln -sf /etc/systemd/system/forgejo_provision.service /var/lib/lxc/test/rootfs/etc/systemd/system/multi-user.target.wants/')
       subject.auto_start
     end
   end

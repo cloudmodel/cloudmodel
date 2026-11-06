@@ -1,0 +1,29 @@
+#!/bin/bash
+# Rendered by cloudmodel, do not edit on the guest. Run by
+# forgejo_provision.service after Forgejo is up: converges the external login
+# source and the Actions runner registrations (idempotent, every boot).
+set -euo pipefail
+
+for i in $(seq 1 120); do
+  if curl -fsS -o /dev/null http://127.0.0.1:<%== model.port %>/api/healthz; then break; fi
+  if [ "$i" = 120 ]; then echo "forgejo did not become healthy, giving up" >&2; exit 1; fi
+  sleep 5
+done
+
+<% if model.oidc? -%>
+# Login source '<%== model.oidc_name %>': update when present, add otherwise.
+id=$(<%== CloudModel::Services::Forgejo.as_forgejo(CloudModel::Services::Forgejo.cli_argv + %w[admin auth list]) %> | awk -F'\t' -v n=<%== model.oidc_name.shellescape %> '$2 == n { print $1; exit }')
+if [ -n "$id" ]; then
+  <%== CloudModel::Services::Forgejo.as_forgejo(CloudModel::Services::Forgejo.cli_argv + %w[admin auth update-oauth --id]) %> "$id" <%== Shellwords.join(model.oidc_login_source_flags) %>
+else
+  <%== CloudModel::Services::Forgejo.as_forgejo(CloudModel::Services::Forgejo.cli_argv + %w[admin auth add-oauth] + model.oidc_login_source_flags) %>
+fi
+<% else -%>
+# No external login source configured.
+<% end -%>
+
+<% runners.each do |runner| -%>
+# Actions runner '<%== runner.effective_runner_name %>'
+<%== model.runner_registration_command(runner) %>
+<% end -%>
+echo "forgejo provisioning done"

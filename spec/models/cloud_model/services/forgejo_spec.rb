@@ -108,14 +108,34 @@ describe CloudModel::Services::Forgejo do
   describe 'runner_registration_command' do
     let(:runner) { CloudModel::Services::ForgejoRunner.new runner_name: 'ci', registration_secret: 'a' * 40, labels: ['ubuntu-latest:host', 'self-hosted:host'] }
 
-    it 'should register the runner with its secret and label names' do
-      expect(subject.runner_registration_command(runner)).to eq "GITEA_WORK_DIR=/var/lib/forgejo forgejo --config /etc/forgejo/app.ini forgejo-cli actions register --name ci --labels ubuntu-latest,self-hosted --secret #{'a' * 40}"
+    it 'should register the runner as the forgejo user with its secret and label names, without an inner shell' do
+      expect(subject.runner_registration_command(runner)).to eq "runuser -u forgejo -- env GITEA_WORK_DIR\\=/var/lib/forgejo forgejo --config /etc/forgejo/app.ini forgejo-cli actions register --name ci --labels ubuntu-latest,self-hosted --secret #{'a' * 40}"
     end
 
     it 'should scope the runner when a scope is set' do
       runner.scope = 'myorg'
       expect(subject.runner_registration_command(runner)).to end_with ' --scope myorg'
     end
+  end
+
+  describe 'oidc_login_source_flags' do
+    before do
+      subject.oidc_name = 'sso'
+      subject.oidc_auto_discovery_url = 'https://auth.example.com/.well-known/openid-configuration'
+      subject.oidc_client_id = 'client'
+      subject.oidc_client_secret = 'se cret'
+      subject.oidc_admin_group = 'admins'
+      subject.oidc_group_team_map = '{"staff": {"org": ["staff"]}}'
+      subject.oidc_skip_local_2fa = true
+    end
+
+    it 'should carry every mapping flag (empty when unset) and one --scopes per scope' do
+      flags = subject.oidc_login_source_flags
+      expect(flags).to include('--provider', 'openidConnect', '--key', 'client', '--secret', 'se cret', '--skip-local-2fa=true', '--group-claim-name', 'groups', '--admin-group', 'admins', '--restricted-group', '', '--group-team-map', '{"staff": {"org": ["staff"]}}', '--group-team-map-removal=false')
+      expect(flags.each_cons(2).count { |k, v| k == '--scopes' }).to eq 4
+      expect(Shellwords.join(flags)).to include("--secret se\\ cret")
+    end
+  end
   end
 
   describe 'used_ports' do
