@@ -241,9 +241,14 @@ module CloudModel
       end
     end
 
+    # Whether the container's rootfs dataset is mounted at its mountpoint in
+    # the host's mount namespace — the one the deploy writes through. The ZFS
+    # `mounted` property is no proof: snap LXD mounts and unmounts the dataset
+    # in its own namespace (for `lxc file push`, device changes, …) and leaves
+    # the property saying "yes" while the host path is empty.
     def mounted?
-      success, state = host.exec "zfs get -H -o value mounted #{root_dataset}"
-      success and state.to_s.strip == 'yes'
+      success, _ = host.exec "mountpoint -q #{mountpoint.shellescape}"
+      success
     end
 
     def mount
@@ -251,16 +256,20 @@ module CloudModel
       return [true, mountpoint] if mounted?
 
       success, out = host.exec "zfs mount #{root_dataset}"
-      unless success
-        # LXD switches its datasets to mountpoint=legacy whenever it mounts
-        # them itself (e.g. to rewrite backup.yaml after a device was added),
-        # and zfs then refuses to mount them ("use mount(8)"). Mount it the
-        # legacy way at the path LXD uses, so the offline deploy steps keep
-        # writing into the volume.
-        raise "Failed to mount containers fs:\n\n#{out}" unless out =~ /legacy mountpoint/
-        host.exec! "mkdir -p #{mountpoint.shellescape} && mount -t zfs #{root_dataset.shellescape} #{mountpoint.shellescape}",
-          "Failed to mount containers fs (legacy mountpoint)"
+      return [true, mountpoint] if success && mounted?
+
+      # LXD switches its datasets to mountpoint=legacy whenever it mounts
+      # them itself (e.g. to rewrite backup.yaml after a device was added),
+      # and zfs then refuses to mount them ("use mount(8)"); with snap LXD
+      # zfs may also consider the dataset mounted (in LXD's namespace) and
+      # refuse ("already mounted"), or succeed without the host path becoming
+      # a mountpoint. Mount it the legacy way at the path LXD uses, so the
+      # offline deploy steps keep writing into the volume.
+      unless success || out =~ /legacy mountpoint|already mounted/
+        raise "Failed to mount containers fs:\n\n#{out}"
       end
+      host.exec! "mkdir -p #{mountpoint.shellescape} && mount -t zfs #{root_dataset.shellescape} #{mountpoint.shellescape}",
+        "Failed to mount containers fs (legacy mountpoint)"
 
       [true, mountpoint]
     end

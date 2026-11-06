@@ -441,9 +441,25 @@ describe CloudModel::LxdContainer do
     end
 
     it 'should mount zfs container´s fs' do
-      allow(subject).to receive(:mounted?).and_return false
+      allow(subject).to receive(:mounted?).and_return false, true
       expect(host).to receive(:exec).with("zfs mount #{dataset}").and_return [true, '']
       expect(host).not_to receive(:exec!)
+
+      expect(subject.mount).to eq [true, path]
+    end
+
+    it 'should fall back to mount(8) when zfs mount succeeds but the host path is still no mountpoint (snap LXD namespace)' do
+      allow(subject).to receive(:mounted?).and_return false, false
+      expect(host).to receive(:exec).with("zfs mount #{dataset}").and_return [true, '']
+      expect(host).to receive(:exec!).with("mkdir -p #{path} && mount -t zfs #{dataset} #{path}", /legacy mountpoint/)
+
+      expect(subject.mount).to eq [true, path]
+    end
+
+    it 'should fall back to mount(8) when zfs considers the dataset already mounted' do
+      allow(subject).to receive(:mounted?).and_return false
+      expect(host).to receive(:exec).with("zfs mount #{dataset}").and_return [false, "cannot mount '#{dataset}': filesystem already mounted"]
+      expect(host).to receive(:exec!).with("mkdir -p #{path} && mount -t zfs #{dataset} #{path}", /legacy mountpoint/)
 
       expect(subject.mount).to eq [true, path]
     end
@@ -470,6 +486,14 @@ describe CloudModel::LxdContainer do
       expect(host).not_to receive(:exec!)
 
       expect { subject.mount }.to raise_error(RuntimeError, /Failed to mount containers fs.*dataset does not exist/m)
+    end
+  end
+
+  describe 'mounted?' do
+    it 'should ask the host whether the path is a mountpoint, not the zfs property' do
+      allow(subject).to receive(:mountpoint).and_return '/var/lib/lxd/storage-pools/default/containers/x'
+      expect(host).to receive(:exec).with('mountpoint -q /var/lib/lxd/storage-pools/default/containers/x').and_return [false, '']
+      expect(subject.mounted?).to eq false
     end
   end
 
