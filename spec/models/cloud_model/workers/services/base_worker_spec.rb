@@ -55,19 +55,23 @@ describe CloudModel::Workers::Services::BaseWorker do
       allow(BSON::ObjectId).to receive(:new).and_return 'tmpid'
     end
 
-    it 'should push the content via lxc file push and remove the temp file' do
-      expect(host).to receive(:exec!).with("lxc file push /tmp/cloudmodel_tmpid test-20200331133742//etc/motd -p --mode 0644", 'Failed to upload /etc/motd')
-      expect(host).to receive(:exec).with('rm /tmp/cloudmodel_tmpid')
-      allow(lxc).to receive(:mount)
+    it 'should write straight into the deploy mount while the container is being deployed' do
+      allow(lxc).to receive(:mounted?).and_return true
+      allow(lxc).to receive(:mountpoint).and_return '/var/lib/cloudmodel/deploy/test-20200331133742'
+      expect(host).to receive(:exec!).with('mkdir -p /var/lib/cloudmodel/deploy/test-20200331133742/rootfs/etc', 'Failed to create directory for /etc/motd').ordered
+      expect(sftp_file).to receive(:open).with('/var/lib/cloudmodel/deploy/test-20200331133742/rootfs/etc/motd', 'w', 0644).and_yield(double('f', puts: nil)).ordered
+      expect(host).to receive(:exec!).with('chmod 0644 /var/lib/cloudmodel/deploy/test-20200331133742/rootfs/etc/motd', 'Failed to set mode of /etc/motd').ordered
+      expect(host).not_to receive(:exec!).with(/lxc file push/, anything)
 
       expect(subject.upload_to_guest 'hello', '/etc/motd', '0644').to eq true
     end
 
-    it 'should remount the container afterwards — LXD unmounts a stopped container after the push' do
-      expect(host).to receive(:exec!).ordered
-      expect(lxc).to receive(:mount).ordered
+    it 'should push the content via lxc file push into a running container and remove the temp file' do
+      allow(lxc).to receive(:mounted?).and_return false
+      expect(host).to receive(:exec!).with("lxc file push /tmp/cloudmodel_tmpid test-20200331133742//etc/motd -p --mode 0644", 'Failed to upload /etc/motd')
+      expect(host).to receive(:exec).with('rm /tmp/cloudmodel_tmpid')
 
-      subject.upload_to_guest 'hello', '/etc/motd'
+      expect(subject.upload_to_guest 'hello', '/etc/motd', '0644').to eq true
     end
   end
 end

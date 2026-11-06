@@ -40,6 +40,20 @@ module CloudModel
         # @param perm [String] octal permission string (default: `"0600"`)
         # @return [true]
         def upload_to_guest content, remote_file, perm = "0600"
+          if @lxc.mounted?
+            # Deploy of a stopped container: write straight into the rootfs
+            # through the deploy mount. `lxc file push` would make LXD mount
+            # the dataset itself and fail on our mount ("dataset is busy").
+            target = "#{@lxc.mountpoint}/rootfs#{remote_file}"
+            host.exec! "mkdir -p #{File.dirname(target).shellescape}", "Failed to create directory for #{remote_file}"
+            @host.sftp.file.open(target, 'w', perm.to_i(8)) do |f|
+              f.puts content
+            end
+            host.exec! "chmod #{perm.to_s.shellescape} #{target.shellescape}", "Failed to set mode of #{remote_file}"
+            return true
+          end
+
+          # Running container: through LXD.
           tmp_file = "/tmp/cloudmodel_#{BSON::ObjectId.new}"
 
           @host.sftp.file.open(tmp_file, 'w', 0600) do |f|
@@ -48,14 +62,6 @@ module CloudModel
 
           host.exec!("lxc file push #{tmp_file.shellescape} #{@lxc.name}/#{remote_file.shellescape} -p --mode #{perm}", "Failed to upload #{remote_file}")
           host.exec("rm #{tmp_file.shellescape}")
-
-          # For a stopped container LXD mounts the volume for the push and
-          # unmounts it afterwards (unless chroot submounts of an earlier step
-          # happen to keep it busy), switching it to mountpoint=legacy on the
-          # way. Everything this worker then writes straight into the rootfs
-          # (render_to_remote, chroot) must land in the volume, not on the
-          # bare mountpoint directory — so remount. A no-op while it runs.
-          @lxc.mount
           true
         end
 

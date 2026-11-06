@@ -51,14 +51,14 @@ module CloudModel
         @lxc = guest.lxd_containers.new guest_template: @template, created_at: Time.now, updated_at: Time.now
         @lxc.save!
         @lxc.mount
-        host.exec!("echo #{"Deployed at #{Time.now} with CloudModel".shellescape} | lxc file push - #{@lxc.name}/etc/deployed", "Failed to render deploy stemp")
+        host.sftp.file.open("#{@lxc.mountpoint}/rootfs/etc/deployed", 'w', 0644) { |f| f.puts "Deployed at #{Time.now} with CloudModel" }
       end
 
       def mount_lxd_container
         @lxc = guest.lxd_containers.desc(:created_at).first
         comment_sub_step "Mounting guests/containers/#{@lxc.name} to #{@lxc.mountpoint}"
         @lxc.mount
-        host.exec!("echo #{"Resumed deployment at #{Time.now} with CloudModel".shellescape} | lxc file push - #{@lxc.name}/etc/deployed.resume", "Failed to render deploy stemp")
+        host.sftp.file.open("#{@lxc.mountpoint}/rootfs/etc/deployed.resume", 'w', 0644) { |f| f.puts "Resumed deployment at #{Time.now} with CloudModel" }
       end
 
       def ensure_lxd_custom_volumes

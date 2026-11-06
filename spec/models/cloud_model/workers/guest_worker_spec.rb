@@ -304,13 +304,15 @@ describe CloudModel::Workers::GuestWorker do
     it 'should create a container for the guest template, mount it and write the deploy stamp' do
       template = double 'template'
       subject.instance_variable_set(:@template, template)
-      lxc = double 'lxc', name: 'test-lxc'
+      lxc = double 'lxc', name: 'test-lxc', mountpoint: '/var/lib/cloudmodel/deploy/test-lxc'
       lxd_containers = double 'lxd_containers'
       allow(guest).to receive(:lxd_containers).and_return(lxd_containers)
       expect(lxd_containers).to receive(:new).with(hash_including(guest_template: template)).and_return(lxc)
       expect(lxc).to receive(:save!)
       expect(lxc).to receive(:mount)
-      expect(host).to receive(:exec!).with(/lxc file push - test-lxc\/etc\/deployed/, 'Failed to render deploy stemp')
+      sftp_file = double 'sftp file'
+      allow(host).to receive(:sftp).and_return double('sftp', file: sftp_file)
+      expect(sftp_file).to receive(:open).with('/var/lib/cloudmodel/deploy/test-lxc/rootfs/etc/deployed', 'w', 0644).and_yield(double('f', puts: nil))
 
       subject.create_lxd_container
       expect(subject.instance_variable_get(:@lxc)).to eq lxc
@@ -319,13 +321,15 @@ describe CloudModel::Workers::GuestWorker do
 
   describe 'mount_lxd_container' do
     it 'should look up the latest container and mount it' do
-      lxc = double 'lxc', name: 'test-lxc', mountpoint: '/var/lib/lxd/storage-pools/default/containers/test-lxc'
+      lxc = double 'lxc', name: 'test-lxc', mountpoint: '/var/lib/cloudmodel/deploy/test-lxc'
       desc = double 'desc'
       allow(guest).to receive(:lxd_containers).and_return(double('containers', desc: desc))
       allow(desc).to receive(:first).and_return(lxc)
-      expect(subject).to receive(:comment_sub_step).with('Mounting guests/containers/test-lxc to /var/lib/lxd/storage-pools/default/containers/test-lxc')
+      expect(subject).to receive(:comment_sub_step).with('Mounting guests/containers/test-lxc to /var/lib/cloudmodel/deploy/test-lxc')
       expect(lxc).to receive(:mount)
-      expect(host).to receive(:exec!).with(/lxc file push - test-lxc\/etc\/deployed.resume/, 'Failed to render deploy stemp')
+      sftp_file = double 'sftp file'
+      allow(host).to receive(:sftp).and_return double('sftp', file: sftp_file)
+      expect(sftp_file).to receive(:open).with('/var/lib/cloudmodel/deploy/test-lxc/rootfs/etc/deployed.resume', 'w', 0644).and_yield(double('f', puts: nil))
 
       subject.mount_lxd_container
     end

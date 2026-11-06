@@ -533,6 +533,7 @@ describe CloudModel::Workers::Services::NginxWorker do
     before do
       allow(guest).to receive(:deploy_path).and_return "/var/www/rails/#{Time.now.to_i}"
       allow(subject).to receive(:render_to_guest)
+      allow(lxc).to receive(:mounted?).and_return false
     end
 
     it "should not link delayed jobs service by default" do
