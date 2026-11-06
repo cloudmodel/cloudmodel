@@ -21,10 +21,10 @@ describe CloudModel::Workers::Services::ForgejoRunnerWorker do
       allow(model).to receive(:ensure_ssh_key!) { model.ssh_private_key = 'PRIVATE'; model.ssh_public_key = 'ssh-ed25519 AAAA ci (forgejo-runner)'; true }
     end
 
-    it 'should install the runner user´s ssh identity with the instance host pre-accepted' do
+    it 'should install the runner user´s ssh identity for every git host, keys accepted on first contact' do
       expect(subject).to receive(:upload_to_guest).with('PRIVATE', '/var/lib/forgejo-runner/.ssh/id_ed25519', '0600')
       expect(subject).to receive(:upload_to_guest).with("ssh-ed25519 AAAA ci (forgejo-runner)\n", '/var/lib/forgejo-runner/.ssh/id_ed25519.pub', '0644')
-      expect(subject).to receive(:upload_to_guest).with("Host git.example.com\n  IdentitiesOnly yes\n  IdentityFile ~/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n", '/var/lib/forgejo-runner/.ssh/config', '0600')
+      expect(subject).to receive(:upload_to_guest).with("Host *\n  IdentitiesOnly yes\n  IdentityFile ~/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n", '/var/lib/forgejo-runner/.ssh/config', '0600')
       expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', 'chown -R forgejo-runner:forgejo-runner /var/lib/forgejo-runner/.ssh && chmod 700 /var/lib/forgejo-runner/.ssh', 'Failed to set runner .ssh ownership')
       subject.write_config
     end

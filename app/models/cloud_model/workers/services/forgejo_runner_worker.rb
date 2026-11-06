@@ -43,7 +43,10 @@ module CloudModel
           mkdir_p "#{@guest.deploy_path}#{ssh_dir}"
           upload_to_guest @model.ssh_private_key, "#{ssh_dir}/id_ed25519", "0600"
           upload_to_guest "#{@model.ssh_public_key}\n", "#{ssh_dir}/id_ed25519.pub", "0644"
-          config = "Host #{@model.instance_host}\n  IdentitiesOnly yes\n  IdentityFile ~/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n"
+          # The runner's one identity for every git host a job may reach
+          # (the instance, and the hosts of git-source gems and cargo
+          # dependencies); host keys are accepted on first contact.
+          config = "Host *\n  IdentitiesOnly yes\n  IdentityFile ~/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n"
           upload_to_guest config, "#{ssh_dir}/config", "0600"
           chroot! @guest.deploy_path, "chown -R forgejo-runner:forgejo-runner #{ssh_dir} && chmod 700 #{ssh_dir}", "Failed to set runner .ssh ownership"
         end
