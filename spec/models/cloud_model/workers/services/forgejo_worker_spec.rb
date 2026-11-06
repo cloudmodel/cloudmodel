@@ -68,8 +68,8 @@ describe CloudModel::Workers::Services::ForgejoWorker do
     end
 
     context 'without a custom logo' do
-      it 'should not create the assets directory or upload a logo' do
-        expect(subject).not_to receive(:mkdir_p)
+      it 'should create the custom path on the root image but upload no logo' do
+        expect(subject).to receive(:mkdir_p).with('/var/lib/lxc/test/rootfs/etc/forgejo/custom')
         expect(subject).not_to receive(:upload_to_guest)
         subject.write_config
       end
@@ -78,18 +78,23 @@ describe CloudModel::Workers::Services::ForgejoWorker do
     context 'with a custom logo' do
       before { model.logo_svg = '<svg></svg>' }
 
-      it 'should create the assets directory' do
-        expect(subject).to receive(:mkdir_p).with('/var/lib/lxc/test/rootfs/var/lib/forgejo/custom/public/assets/img/')
+      it 'should create the assets directory in the custom path (root image, not the data volume)' do
+        expect(subject).to receive(:mkdir_p).with('/var/lib/lxc/test/rootfs/etc/forgejo/custom/public/assets/img/')
         subject.write_config
       end
 
       it 'should upload the logo svg' do
-        expect(subject).to receive(:upload_to_guest).with('<svg></svg>', '/var/lib/forgejo/custom/public/assets/img/logo.svg')
+        expect(subject).to receive(:upload_to_guest).with('<svg></svg>', '/etc/forgejo/custom/public/assets/img/logo.svg')
         subject.write_config
       end
 
       it 'should upload the favicon svg' do
-        expect(subject).to receive(:upload_to_guest).with('<svg></svg>', '/var/lib/forgejo/custom/public/assets/img/favicon.svg')
+        expect(subject).to receive(:upload_to_guest).with('<svg></svg>', '/etc/forgejo/custom/public/assets/img/favicon.svg')
+        subject.write_config
+      end
+
+      it 'should hand the custom path to the forgejo user' do
+        expect(subject).to receive(:chroot!).with('/var/lib/lxc/test/rootfs', 'chown -R forgejo:forgejo /etc/forgejo/custom && find /etc/forgejo/custom -type f -exec chmod 644 {} +', 'Failed to set custom path ownership')
         subject.write_config
       end
     end
@@ -103,6 +108,7 @@ describe CloudModel::Workers::Services::ForgejoWorker do
       allow(subject).to receive(:comment_sub_step)
       allow(subject).to receive(:chroot!).and_return('x')
       allow(subject).to receive(:render_to_guest)
+      allow(subject).to receive(:mkdir_p)
       allow(model).to receive(:save)
       allow(model).to receive(:actions_runners).and_return([runner])
       model.oidc_name = 'sso'
@@ -137,7 +143,7 @@ describe CloudModel::Workers::Services::ForgejoWorker do
       script = subject.send(:render, '/cloud_model/guest/etc/forgejo/provision.sh', guest: guest, model: model, runners: [runner])
       expect(script).to start_with "#!/bin/bash\n"
       expect(script).to include 'http://127.0.0.1:3000/api/healthz'
-      expect(script).to include "runuser -u forgejo -- env GITEA_WORK_DIR\\=/var/lib/forgejo forgejo --config /etc/forgejo/app.ini admin auth list | awk -F'\\t' -v n=sso"
+      expect(script).to include "runuser -u forgejo -- env GITEA_WORK_DIR\\=/var/lib/forgejo GITEA_CUSTOM\\=/etc/forgejo/custom forgejo --config /etc/forgejo/app.ini admin auth list | awk -F'\\t' -v n=sso"
       expect(script).to include 'admin auth update-oauth --id "$id" --name sso --provider openidConnect --key client --secret secret'
       expect(script).to include 'admin auth add-oauth --name sso --provider openidConnect'
       expect(script).to include '--scopes openid --scopes profile --scopes email --scopes groups'

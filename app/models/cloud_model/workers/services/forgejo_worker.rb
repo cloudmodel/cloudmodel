@@ -32,16 +32,20 @@ module CloudModel
           # service and every `forgejo` CLI call run as that user).
           chroot! @guest.deploy_path, "chown forgejo:forgejo /etc/forgejo/app.ini && chmod 640 /etc/forgejo/app.ini", "Failed to set app.ini ownership"
 
+          # Branding lives in the custom path on the root image (see
+          # Services::Forgejo::CUSTOM_PATH): the data volume is not mounted
+          # during the deploy and would shadow anything placed under the work dir.
+          custom = CloudModel::Services::Forgejo::CUSTOM_PATH
+          mkdir_p "#{@guest.deploy_path}#{custom}"
           if @model.logo_svg
-            dir_name = "/var/lib/forgejo/custom/public/assets/img/"
+            dir_name = "#{custom}/public/assets/img/"
             mkdir_p "#{@guest.deploy_path}#{dir_name}"
 
             upload_to_guest @model.logo_svg, "#{dir_name}logo.svg"
             upload_to_guest @model.logo_svg, "#{dir_name}favicon.svg"
-
-            # forgejo serves these assets as its own user.
-            chroot! @guest.deploy_path, "chown -R forgejo:forgejo /var/lib/forgejo/custom && chmod 644 #{dir_name}logo.svg #{dir_name}favicon.svg", "Failed to set logo ownership"
           end
+          # forgejo serves these assets as its own user.
+          chroot! @guest.deploy_path, "chown -R forgejo:forgejo #{custom} && find #{custom} -type f -exec chmod 644 {} +", "Failed to set custom path ownership"
 
           write_provision_script
         end

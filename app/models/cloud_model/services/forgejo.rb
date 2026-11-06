@@ -225,10 +225,14 @@ module CloudModel
         end
       end
 
-      # Forgejo CLI as argv, run with the deployed config and work dir.
+      # Custom path (branding, templates) on the root image: everything under
+      # the work dir lives on the data volume, which the deploy cannot write.
+      CUSTOM_PATH = "/etc/forgejo/custom".freeze
+
+      # Forgejo CLI as argv, run with the deployed config, work dir and custom path.
       # @return [Array<String>]
       def self.cli_argv
-        %w[env GITEA_WORK_DIR=/var/lib/forgejo forgejo --config /etc/forgejo/app.ini]
+        %W[env GITEA_WORK_DIR=/var/lib/forgejo GITEA_CUSTOM=#{CUSTOM_PATH} forgejo --config /etc/forgejo/app.ini]
       end
 
       # Runs a CLI argv as the forgejo user without an inner shell (one level

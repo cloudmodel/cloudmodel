@@ -1,3 +1,5 @@
 [Service]
 PermissionsStartOnly=true
 ExecStartPre=/bin/chown -R forgejo:forgejo /var/lib/forgejo
+# Branding and templates on the root image, not on the data volume.
+Environment=GITEA_CUSTOM=/etc/forgejo/custom

@@ -109,7 +109,7 @@ describe CloudModel::Services::Forgejo do
     let(:runner) { CloudModel::Services::ForgejoRunner.new runner_name: 'ci', registration_secret: 'a' * 40, labels: ['ubuntu-latest:host', 'self-hosted:host'] }
 
     it 'should register the runner as the forgejo user with its secret and label names, without an inner shell' do
-      expect(subject.runner_registration_command(runner)).to eq "runuser -u forgejo -- env GITEA_WORK_DIR\\=/var/lib/forgejo forgejo --config /etc/forgejo/app.ini forgejo-cli actions register --name ci --labels ubuntu-latest,self-hosted --secret #{'a' * 40}"
+      expect(subject.runner_registration_command(runner)).to eq "runuser -u forgejo -- env GITEA_WORK_DIR\\=/var/lib/forgejo GITEA_CUSTOM\\=/etc/forgejo/custom forgejo --config /etc/forgejo/app.ini forgejo-cli actions register --name ci --labels ubuntu-latest,self-hosted --secret #{'a' * 40}"
     end
 
     it 'should scope the runner when a scope is set' do
