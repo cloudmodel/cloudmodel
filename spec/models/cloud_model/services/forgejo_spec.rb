@@ -36,6 +36,8 @@ describe CloudModel::Services::Forgejo do
   it { expect(subject).to have_field(:oidc_skip_local_2fa).of_type(Mongoid::Boolean).with_default_value_of false }
   it { expect(subject).to have_field(:oidc_auto_registration).of_type(Mongoid::Boolean).with_default_value_of true }
   it { expect(subject).to have_field(:oidc_account_linking).of_type(String).with_default_value_of 'login' }
+  it { expect(subject).to have_field(:oidc_username_source).of_type(String).with_default_value_of 'nickname' }
+  it { expect(subject).to validate_inclusion_of(:oidc_username_source).to_allow('nickname', 'email', 'userid') }
   it { expect(subject).to have_field(:mailer_enabled).of_type(Mongoid::Boolean).with_default_value_of true }
   it { expect(subject).to have_field(:packages_enabled).of_type(Mongoid::Boolean).with_default_value_of true }
   it { expect(subject).to have_field(:actions_enabled).of_type(Mongoid::Boolean).with_default_value_of true }

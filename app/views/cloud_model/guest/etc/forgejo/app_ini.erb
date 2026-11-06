@@ -65,7 +65,7 @@ NO_REPLY_ADDRESS = noreply.<%= guest.external_hostname %>
 [oauth2_client]
 ENABLE_AUTO_REGISTRATION = <%= model.oidc_auto_registration ? 'true' : 'false' %>
 ACCOUNT_LINKING = <%= model.oidc_account_linking %>
-USERNAME = nickname
+USERNAME = <%= model.oidc_username_source %>
 UPDATE_AVATAR = false
 
 [openid]

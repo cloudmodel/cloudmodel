@@ -109,6 +109,12 @@ module CloudModel
       #     `disabled`, `login` (link after a local login) or `auto` (by email)
       field :oidc_account_linking, type: String, default: "login"
 
+      # @!attribute [rw] oidc_username_source
+      #   @return [String] where the Forgejo user name of an auto-registered
+      #     account comes from: `nickname` (preferred_username claim), `email`
+      #     (local part) or `userid` (subject)
+      field :oidc_username_source, type: String, default: "nickname"
+
       # @!attribute [rw] oidc_group_claim
       #   @return [String, nil] claim carrying the user's groups (e.g. `"groups"`)
       field :oidc_group_claim, type: String, default: "groups"
@@ -161,8 +167,10 @@ module CloudModel
       field :actions_default_url, type: String, default: "https://data.forgejo.org"
 
       ACCOUNT_LINKING_MODES = %w[disabled login auto].freeze
+      USERNAME_SOURCES = %w[nickname email userid].freeze
 
       validates :oidc_account_linking, inclusion: { in: ACCOUNT_LINKING_MODES }
+      validates :oidc_username_source, inclusion: { in: USERNAME_SOURCES }
       validate :oidc_group_team_map_must_be_json
 
       # @return [Boolean] whether an external OIDC login source should be configured
