@@ -26,4 +26,8 @@ fi
 # Actions runner '<%== runner.effective_runner_name %>'
 <%== model.runner_registration_command(runner) %>
 <% end -%>
+<% if model.secret_scanning -%>
+# Secret scanning hook into every repository (new ones get it from forgejo_hooks.timer).
+/etc/forgejo/link-hooks.sh
+<% end -%>
 echo "forgejo provisioning done"

@@ -45,14 +45,32 @@ describe CloudModel::Services::Forgejo do
 
   it { expect(subject).to validate_inclusion_of(:oidc_account_linking).to_allow('disabled', 'login', 'auto') }
 
+  it { expect(subject).to have_field(:secret_scanning).of_type(Mongoid::Boolean).with_default_value_of true }
+  it { expect(subject).to have_field(:secret_scanning_allowlist_paths).of_type(Array).with_default_value_of [] }
+  it { expect(subject).to have_field(:gitleaks_version).of_type(String) }
+
   describe 'components_needed' do
-    it 'should require the forgejo component of the default (LTS) release' do
-      expect(subject.components_needed).to eq [:"forgejo@15.0.11"]
+    it 'should require the forgejo component of the default (LTS) release and gitleaks for the secret scanning' do
+      expect(subject.components_needed).to eq [:"forgejo@15.0.11", :"gitleaks@8.30.1"]
     end
 
-    it 'should pin the release set on the service' do
+    it 'should pin the releases set on the service' do
       subject.forgejo_version = '15.0.12'
-      expect(subject.components_needed).to eq [:"forgejo@15.0.12"]
+      subject.gitleaks_version = '8.31.0'
+      expect(subject.components_needed).to eq [:"forgejo@15.0.12", :"gitleaks@8.31.0"]
+    end
+
+    it 'should leave gitleaks out when secret scanning is off' do
+      subject.secret_scanning = false
+      expect(subject.components_needed).to eq [:"forgejo@15.0.11"]
+    end
+  end
+
+  describe 'secret_scanning_allowlist_paths_list' do
+    it 'should split on commas and newlines' do
+      subject.secret_scanning_allowlist_paths_list = "dummy_idp/.*\nspec/fixtures/.*, docs/"
+      expect(subject.secret_scanning_allowlist_paths).to eq ['dummy_idp/.*', 'spec/fixtures/.*', 'docs/']
+      expect(subject.secret_scanning_allowlist_paths_list).to eq 'dummy_idp/.*, spec/fixtures/.*, docs/'
     end
   end
 

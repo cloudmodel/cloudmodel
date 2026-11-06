@@ -1,0 +1,17 @@
+# Rendered by cloudmodel, do not edit on the guest. gitleaks configuration of
+# the pre-receive secret scanning: the default rule set plus the allowlist
+# configured on the Forgejo service.
+title = "pre-receive secret scanning"
+
+[extend]
+useDefault = true
+<% if model.secret_scanning_allowlist_paths.any? -%>
+
+[[allowlists]]
+description = "paths excluded on the Forgejo service (test fixtures and the like)"
+paths = [
+<% model.secret_scanning_allowlist_paths.each do |path| -%>
+  '''<%== path.gsub("'''", "") %>''',
+<% end -%>
+]
+<% end -%>

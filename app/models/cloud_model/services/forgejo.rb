@@ -158,6 +158,20 @@ module CloudModel
       #   @return [Boolean] enable the package registry (container images, gems, npm, …)
       field :packages_enabled, type: Mongoid::Boolean, default: true
 
+      # @!attribute [rw] secret_scanning
+      #   @return [Boolean] reject pushes that add secrets: a pre-receive hook
+      #     runs gitleaks over the pushed commits in every repository
+      field :secret_scanning, type: Mongoid::Boolean, default: true
+
+      # @!attribute [rw] secret_scanning_allowlist_paths
+      #   @return [Array<String>] path regexes (Go syntax) gitleaks ignores,
+      #     e.g. test fixtures with throwaway keys
+      field :secret_scanning_allowlist_paths, type: Array, default: []
+
+      # @!attribute [rw] gitleaks_version
+      #   @return [String, nil] gitleaks release; blank uses the component worker default
+      field :gitleaks_version, type: String, default: nil
+
       # @!attribute [rw] actions_enabled
       #   @return [Boolean] enable Forgejo Actions (workflows run on registered {ForgejoRunner}s)
       field :actions_enabled, type: Mongoid::Boolean, default: true
@@ -209,7 +223,25 @@ module CloudModel
       end
 
       def components_needed
-        ([:"forgejo@#{effective_forgejo_version}"] + super).uniq
+        components = [:"forgejo@#{effective_forgejo_version}"]
+        components << :"gitleaks@#{effective_gitleaks_version}" if secret_scanning
+        (components + super).uniq
+      end
+
+      # @return [String] the gitleaks release used for secret scanning
+      def effective_gitleaks_version
+        gitleaks_version.presence || CloudModel::Workers::Components::GitleaksComponentWorker::GITLEAKS_VERSION
+      end
+
+      # Allowlist paths as one editable line.
+      # @return [String]
+      def secret_scanning_allowlist_paths_list
+        secret_scanning_allowlist_paths.join(', ')
+      end
+
+      # @param value [String] comma or newline separated path regexes
+      def secret_scanning_allowlist_paths_list=(value)
+        self.secret_scanning_allowlist_paths = value.to_s.split(/[\n,]+/).map(&:strip).reject(&:blank?)
       end
 
       def used_ports

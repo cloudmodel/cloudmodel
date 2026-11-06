@@ -47,7 +47,22 @@ module CloudModel
           # forgejo serves these assets as its own user.
           chroot! @guest.deploy_path, "chown -R forgejo:forgejo #{custom} && find #{custom} -type f -exec chmod 644 {} +", "Failed to set custom path ownership"
 
+          write_secret_scanning
           write_provision_script
+        end
+
+        # gitleaks pre-receive hook, its configuration and the script that
+        # links the hook into every repository (Forgejo knows no global hooks).
+        # All root-owned but readable by the forgejo user, who runs the hooks.
+        def write_secret_scanning
+          return unless @model.secret_scanning
+
+          comment_sub_step "Render secret scanning hook (gitleaks #{@model.effective_gitleaks_version}, #{@model.secret_scanning_allowlist_paths.size} allowlisted paths)"
+          mkdir_p "#{@guest.deploy_path}/etc/forgejo/hooks/pre-receive.d"
+          render_to_guest "/cloud_model/guest/etc/forgejo/hooks/pre-receive.d/secrets", "/etc/forgejo/hooks/pre-receive.d/secrets", 0755, guest: @guest, model: @model
+          render_to_guest "/cloud_model/guest/etc/forgejo/gitleaks.toml", "/etc/forgejo/gitleaks.toml", 0644, guest: @guest, model: @model
+          render_to_guest "/cloud_model/guest/etc/forgejo/link-hooks.sh", "/etc/forgejo/link-hooks.sh", 0755, guest: @guest, model: @model
+          chroot! @guest.deploy_path, "chown -R root:forgejo /etc/forgejo/hooks /etc/forgejo/gitleaks.toml /etc/forgejo/link-hooks.sh && chmod 755 /etc/forgejo/hooks /etc/forgejo/hooks/pre-receive.d /etc/forgejo/hooks/pre-receive.d/secrets /etc/forgejo/link-hooks.sh && chmod 644 /etc/forgejo/gitleaks.toml", "Failed to set secret scanning file permissions"
         end
 
         # Script run by forgejo_provision.service after Forgejo is up: login
@@ -64,6 +79,13 @@ module CloudModel
         def auto_start
           mkdir_p overlay_path
           render_to_remote "/cloud_model/guest/etc/systemd/system/forgejo.service.d/fix_perms.conf", "#{overlay_path}/fix_perms.conf"
+
+          if @model.secret_scanning
+            comment_sub_step "Add secret scanning hook timer to runlevel default"
+            render_to_remote "/cloud_model/guest/etc/systemd/system/forgejo_hooks.service", "#{@guest.deploy_path.shellescape}/etc/systemd/system/forgejo_hooks.service", 0644
+            render_to_remote "/cloud_model/guest/etc/systemd/system/forgejo_hooks.timer", "#{@guest.deploy_path.shellescape}/etc/systemd/system/forgejo_hooks.timer", 0644
+            @host.exec "mkdir -p #{@guest.deploy_path.shellescape}/etc/systemd/system/timers.target.wants && ln -sf /etc/systemd/system/forgejo_hooks.timer #{@guest.deploy_path.shellescape}/etc/systemd/system/timers.target.wants/"
+          end
 
           comment_sub_step "Add forgejo provisioning to runlevel default"
           render_to_remote "/cloud_model/guest/etc/systemd/system/forgejo_provision.service", "#{@guest.deploy_path.shellescape}/etc/systemd/system/forgejo_provision.service", 0644

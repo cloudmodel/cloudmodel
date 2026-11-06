@@ -1,0 +1,17 @@
+#!/bin/bash
+# Rendered by cloudmodel, do not edit on the guest. Forgejo has no global git
+# hooks: it generates hooks/pre-receive.d/gitea per repository. This links the
+# secret scanning hook next to it in every repository; run at boot, after
+# provisioning and by forgejo_hooks.timer for repositories created since.
+set -u
+root=/var/lib/forgejo/data/forgejo-repositories
+hook=/etc/forgejo/hooks/pre-receive.d/secrets
+linked=0
+for repo in "$root"/*/*.git; do
+  dir="$repo/hooks/pre-receive.d"
+  [ -d "$dir" ] || continue
+  [ -L "$dir/00-secrets" ] && [ "$(readlink "$dir/00-secrets")" = "$hook" ] && continue
+  ln -sfn "$hook" "$dir/00-secrets" && linked=$((linked + 1))
+done
+[ "$linked" -gt 0 ] && echo "secret scanning hook linked into $linked repositories"
+exit 0

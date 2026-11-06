@@ -164,6 +164,43 @@ describe CloudModel::Workers::Services::ForgejoWorker do
     end
   end
 
+  describe 'secret scanning' do
+    before do
+      allow(guest).to receive(:deploy_path).and_return('/var/lib/lxc/test/rootfs')
+      allow(subject).to receive(:comment_sub_step)
+      allow(subject).to receive(:chroot!).and_return('x')
+      allow(subject).to receive(:render_to_guest)
+      allow(subject).to receive(:mkdir_p)
+      allow(model).to receive(:save)
+      allow(model).to receive(:actions_runners).and_return([])
+    end
+
+    it 'should render the hook, the gitleaks config and the link script' do
+      expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/forgejo/hooks/pre-receive.d/secrets', '/etc/forgejo/hooks/pre-receive.d/secrets', 0755, guest: guest, model: model)
+      expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/forgejo/gitleaks.toml', '/etc/forgejo/gitleaks.toml', 0644, guest: guest, model: model)
+      expect(subject).to receive(:render_to_guest).with('/cloud_model/guest/etc/forgejo/link-hooks.sh', '/etc/forgejo/link-hooks.sh', 0755, guest: guest, model: model)
+      subject.write_config
+    end
+
+    it 'should render nothing of it when secret scanning is off' do
+      model.secret_scanning = false
+      expect(subject).not_to receive(:render_to_guest).with(/gitleaks|secrets|link-hooks/, anything, anything, anything)
+      subject.write_config
+    end
+
+    it 'should produce a hook that scans each pushed range and a link script over every repository' do
+      hook = subject.send(:render, '/cloud_model/guest/etc/forgejo/hooks/pre-receive.d/secrets', guest: guest, model: model)
+      expect(hook).to include 'gitleaks git . --config "$CONFIG" --log-opts="$range" --redact --no-banner --exit-code 1'
+      expect(hook).to include 'secrets-skip='
+      link = subject.send(:render, '/cloud_model/guest/etc/forgejo/link-hooks.sh', guest: guest, model: model)
+      expect(link).to include 'ln -sfn "$hook" "$dir/00-secrets"'
+      model.secret_scanning_allowlist_paths = ['spec/fixtures/.*']
+      toml = subject.send(:render, '/cloud_model/guest/etc/forgejo/gitleaks.toml', guest: guest, model: model)
+      expect(toml).to include "[[allowlists]]"
+      expect(toml).to include "'''spec/fixtures/.*'''"
+    end
+  end
+
   describe 'auto_restart' do
     it 'should return false' do
       expect(subject.auto_restart).to eq false
@@ -191,6 +228,12 @@ describe CloudModel::Workers::Services::ForgejoWorker do
 
     it 'should call super to add service to runlevel default' do
       expect(host).to receive(:exec).with('ln -sf /lib/systemd/system/forgejo.service /var/lib/lxc/test/rootfs/etc/systemd/system/multi-user.target.wants/')
+      subject.auto_start
+    end
+
+    it 'should install and enable the secret scanning hook timer' do
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/guest/etc/systemd/system/forgejo_hooks.timer', '/var/lib/lxc/test/rootfs/etc/systemd/system/forgejo_hooks.timer', 0644)
+      expect(host).to receive(:exec).with(/ln -sf \/etc\/systemd\/system\/forgejo_hooks.timer .*timers.target.wants/)
       subject.auto_start
     end
 
