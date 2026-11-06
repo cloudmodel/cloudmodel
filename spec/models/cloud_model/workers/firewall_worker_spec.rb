@@ -112,6 +112,23 @@ describe CloudModel::Workers::FirewallWorker do
     end
   end
 
+  describe '#masq_private' do
+    before do
+      allow(host).to receive(:guests).and_return(double('guests', where: []))
+      allow(host).to receive(:private_network).and_return(private_network)
+    end
+
+    it 'should masquerade bridge-internal DNATed flows so a guest can reach a public address of its own host (hairpin)' do
+      commands = subject.masq_private({})
+      expect(commands).to include "/sbin/iptables -t nat -A POSTROUTING -s 10.42.0.0/16 -d 10.42.0.0/16 -m conntrack --ctstate DNAT -j MASQUERADE"
+    end
+
+    it 'should still masquerade everything leaving the private network' do
+      commands = subject.masq_private({})
+      expect(commands).to include "/sbin/iptables -t nat -A POSTROUTING -s 10.42.0.0/16 ! -d 10.42.0.0/16 -j MASQUERADE"
+    end
+  end
+
   describe '#stop_script' do
     it 'should flush iptables rules for both ip versions' do
       script = subject.stop_script

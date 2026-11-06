@@ -160,6 +160,15 @@ module CloudModel
           end
         end
 
+        # Hairpin: a guest calling a public address of this host (another
+        # guest's DNATed service, e.g. the Git service from the CI guest) has
+        # its request translated by the PREROUTING DNAT above, but the serving
+        # guest would answer straight across the bridge, untranslated — the
+        # caller never sees a reply from the address it called and the
+        # connection times out. Source-NAT such bridge-internal DNATed flows
+        # to the host, so the answer travels back through conntrack.
+        commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} -d #{@host.private_network} -m conntrack --ctstate DNAT -j MASQUERADE"
+
         # Handle multicast
         commands << "#{ip4tables_bin} -t nat -A POSTROUTING -s #{@host.private_network} -d 224.0.0.0/24 -j RETURN"
         # Handle broadcast
