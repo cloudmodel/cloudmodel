@@ -26,7 +26,26 @@ module CloudModel
           # The config carries the registration token; the daemon runs as forgejo-runner.
           chroot! @guest.deploy_path, "chown root:forgejo-runner /etc/forgejo-runner/config.yml && chmod 640 /etc/forgejo-runner/config.yml", "Failed to set runner config ownership"
 
+          write_ssh_identity
+
           register_with_instance
+        end
+
+        # SSH identity of the runner user: jobs clone git-source gems (and
+        # anything else over SSH) with the runner's own key, which the admin
+        # registers on a read-only account of the instance. The instance's
+        # host key is accepted on first contact, no interactive prompt in jobs.
+        def write_ssh_identity
+          @model.ensure_ssh_key!
+          comment_sub_step "Install runner SSH identity (#{@model.ssh_public_key.to_s.split(' ').first(2).join(' ')[0, 40]}…)"
+
+          ssh_dir = "/var/lib/forgejo-runner/.ssh"
+          mkdir_p "#{@guest.deploy_path}#{ssh_dir}"
+          upload_to_guest @model.ssh_private_key, "#{ssh_dir}/id_ed25519", "0600"
+          upload_to_guest "#{@model.ssh_public_key}\n", "#{ssh_dir}/id_ed25519.pub", "0644"
+          config = "Host #{@model.instance_host}\n  IdentitiesOnly yes\n  IdentityFile ~/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n"
+          upload_to_guest config, "#{ssh_dir}/config", "0600"
+          chroot! @guest.deploy_path, "chown -R forgejo-runner:forgejo-runner #{ssh_dir} && chmod 700 #{ssh_dir}", "Failed to set runner .ssh ownership"
         end
 
         # Live registration on the linked instance (no-op without one).

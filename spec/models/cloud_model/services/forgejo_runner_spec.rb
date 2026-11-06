@@ -14,6 +14,28 @@ describe CloudModel::Services::ForgejoRunner do
   it { expect(subject).to have_field(:scope).of_type(String) }
   it { expect(subject).to have_field(:log_level).of_type(String).with_default_value_of 'info' }
   it { expect(subject).to have_field(:runner_version).of_type(String) }
+  it { expect(subject).to have_field(:ssh_private_key).of_type(String) }
+  it { expect(subject).to have_field(:ssh_public_key).of_type(String) }
+
+  describe 'ssh identity' do
+    it 'should generate an ed25519 key pair once and keep it' do
+      subject.instance_url = 'https://git.example.com/'
+      subject.runner_name = 'ci'
+      allow(subject).to receive(:save).and_return true
+      expect(subject.ensure_ssh_key!).to eq true
+      expect(subject.ssh_private_key).to include 'BEGIN OPENSSH PRIVATE KEY'
+      expect(subject.ssh_public_key).to start_with 'ssh-ed25519 '
+      expect(subject.ssh_public_key).to end_with 'ci (forgejo-runner)'
+      key = subject.ssh_public_key
+      expect(subject.ensure_ssh_key!).to eq false
+      expect(subject.ssh_public_key).to eq key
+    end
+
+    it 'should know the instance host for the ssh config' do
+      subject.instance_url = 'https://git.example.com/'
+      expect(subject.instance_host).to eq 'git.example.com'
+    end
+  end
 
   it { expect(subject).to validate_inclusion_of(:log_level).to_allow('info', 'debug') }
 

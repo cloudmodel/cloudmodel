@@ -1,3 +1,4 @@
+require "tmpdir"
 module CloudModel
   module Services
     # Forgejo Actions runner embedded in a {Guest}.
@@ -40,6 +41,16 @@ module CloudModel
       # @!attribute [rw] registration_secret
       #   @return [String, nil] 40 hex chars shared with Forgejo; generated at first deploy
       field :registration_secret, type: String, default: nil
+
+      # @!attribute [rw] ssh_private_key
+      #   @return [String, nil] ed25519 private key of the runner user, generated
+      #     at the first deploy; jobs clone git-source gems over SSH with it
+      field :ssh_private_key, type: String, default: nil
+
+      # @!attribute [rw] ssh_public_key
+      #   @return [String, nil] public part, to be registered on a read-only
+      #     account of the instance (shown in the admin UI)
+      field :ssh_public_key, type: String, default: nil
 
       # @!attribute [rw] labels
       #   @return [Array<String>] runner labels (`<name>:host`); jobs pick the
@@ -103,6 +114,27 @@ module CloudModel
         return instance_url if instance_url.present?
 
         forgejo_service&.root_url
+      end
+
+      # Host name of the instance, for the runner user's SSH config.
+      # @return [String, nil]
+      def instance_host
+        URI.parse(effective_instance_url.to_s).host rescue nil
+      end
+
+      # Generates the runner user's ed25519 key pair (once).
+      # @return [Boolean] whether a key was generated
+      def ensure_ssh_key!
+        return false if ssh_private_key.present?
+
+        Dir.mktmpdir do |dir|
+          file = File.join(dir, 'id_ed25519')
+          system('ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-C', "#{effective_runner_name} (forgejo-runner)", '-f', file) or raise "ssh-keygen failed"
+          self.ssh_private_key = File.read(file)
+          self.ssh_public_key = File.read("#{file}.pub").strip
+        end
+        save
+        true
       end
 
       # @return [String] name registered with Forgejo
