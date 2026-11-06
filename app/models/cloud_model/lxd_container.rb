@@ -118,7 +118,9 @@ module CloudModel
       backup_yaml_present, backup_yaml = host.exec "cat #{mountpoint}/backup.yaml"
       unmount
       host.exec! "zfs destroy -r #{root_dataset}", "Failed to remove empty container dataset"
-      host.exec! "zfs clone -o mountpoint=#{mountpoint.shellescape} -o canmount=noauto #{guest_template.build_snapshot.shellescape} #{root_dataset}", "Failed to clone template volume"
+      # mountpoint=legacy: what LXD keeps its datasets as, and what lets the
+      # deploy mount the dataset at its own path with mount(8) (see #mount).
+      host.exec! "zfs clone -o mountpoint=legacy -o canmount=noauto #{guest_template.build_snapshot.shellescape} #{root_dataset}", "Failed to clone template volume"
       mount
       if backup_yaml_present
         host.sftp.file.open("#{mountpoint}/backup.yaml", 'w') { |f| f.write backup_yaml }
@@ -241,83 +243,50 @@ module CloudModel
       end
     end
 
-    # Whether the container's rootfs dataset is mounted at its mountpoint in
-    # the host's mount namespace — the one the deploy writes through. The ZFS
-    # `mounted` property is no proof: snap LXD mounts and unmounts the dataset
-    # in its own namespace (for `lxc file push`, device changes, …) and leaves
-    # the property saying "yes" while the host path is empty.
+    # Where the deploy mounts the container's dataset: a path of its own under
+    # /var/lib/cloudmodel, not LXD's mountpoint. LXD mounts and unmounts the
+    # dataset at its path in its own mount namespace whenever it touches a
+    # stopped container (config set, device add, file push) and that comes
+    # and goes on the host unpredictably — deploys used to write into the
+    # empty mountpoint directory. A legacy ZFS dataset can be mounted at
+    # several paths, so this private mount coexists with LXD's.
+    DEPLOY_MOUNT_ROOT = "/var/lib/cloudmodel/deploy".freeze
+
+    # @return [String] the deploy's private mountpoint of the container dataset
+    def mountpoint
+      "#{DEPLOY_MOUNT_ROOT}/#{name}"
+    end
+
+    # @return [Boolean] whether the dataset is mounted at the deploy mountpoint
     def mounted?
       success, _ = host.exec "mountpoint -q #{mountpoint.shellescape}"
       success
     end
 
+    # Mounts the container dataset at the deploy mountpoint (idempotent).
+    # @return [Array(true, String)] success and the mountpoint
     def mount
-      mountpoint # to init mountpoint
       return [true, mountpoint] if mounted?
 
-      success, out = host.exec "zfs mount #{root_dataset}"
-      return [true, mountpoint] if success && mounted?
-
-      # LXD switches its datasets to mountpoint=legacy whenever it mounts
-      # them itself (e.g. to rewrite backup.yaml after a device was added),
-      # and zfs then refuses to mount them ("use mount(8)"); with snap LXD
-      # zfs may also consider the dataset mounted (in LXD's namespace) and
-      # refuse ("already mounted"), or succeed without the host path becoming
-      # a mountpoint. Mount it the legacy way at the path LXD uses, so the
-      # offline deploy steps keep writing into the volume.
-      unless success || out =~ /legacy mountpoint|already mounted/
-        raise "Failed to mount containers fs:\n\n#{out}"
-      end
-      host.exec! "mkdir -p #{mountpoint.shellescape} && mount -t zfs #{root_dataset.shellescape} #{mountpoint.shellescape}",
-        "Failed to mount containers fs (legacy mountpoint)"
+      # mount(8) only takes legacy datasets; LXD sets legacy itself on
+      # first use, a fresh clone may still carry a path.
+      host.exec! "zfs set mountpoint=legacy canmount=noauto #{root_dataset.shellescape}", "Failed to set legacy mountpoint on #{root_dataset}"
+      host.exec! "mkdir -p #{mountpoint.shellescape} && mount -t zfs #{root_dataset.shellescape} #{mountpoint.shellescape}", "Failed to mount containers fs"
 
       [true, mountpoint]
     end
 
+    # Unmounts the deploy mountpoint (no-op when not mounted); the failure
+    # path of a deploy must not leave the half-built container's rootfs
+    # mounted. Chroot submounts (proc, sys, dev) are cleaned by the worker.
+    # @return [Array(Boolean, String)]
     def unmount
-      success, out = host.exec "zfs unmount #{root_dataset}"
-      return [success, out] if success
+      return [true, ''] unless mounted?
 
-      # LXD creates its datasets with mountpoint=legacy, and zfs refuses to
-      # unmount those ("use umount(8)"). Find where it is mounted and umount
-      # it there — the failure path of a deploy must not leave the half-built
-      # container's rootfs mounted.
-      target = host.exec("findmnt -n -o TARGET -S #{root_dataset.shellescape}")[1].to_s.strip
-      return [success, out] if target.empty?
-
-      host.exec "umount #{target.shellescape}"
+      success, out = host.exec "umount #{mountpoint.shellescape}"
+      host.exec "rmdir #{mountpoint.shellescape}" if success
+      [success, out]
     end
-
-    def mountpoint
-      return @mountpoint if @mountpoint
-
-      res, out = host.exec("zfs list | grep #{root_dataset}")
-      if res
-        @mountpoint = out.split(' ').last
-
-        if %w(none legacy).include? @mountpoint
-          #@mountpoint = "/var/snap/lxd/common/lxd/storage-pools/default/containers/#{name}"
-          host.exec("mkdir -p /var/lib/lxd/storage-pools/default/containers")
-          @mountpoint = "/var/lib/lxd/storage-pools/default/containers/#{name}"
-          host.exec "zfs set mountpoint=#{@mountpoint} canmount=noauto #{root_dataset}"
-        end
-
-        #puts @mountpoint
-
-        @mountpoint
-      else
-        "/tmp/#{name}"
-      end
-      # if false
-      #   # apt-get version of lxd
-      #   "/var/lib/lxd/storage-pools/default/containers/#{name}"
-      # else
-      #   # snap version of lxd
-      #   "/var/snap/lxd/common/lxd/storage-pools/default/containers/#{name}"
-      # end
-    end
-
-    # Get generic infos about the LXD
     def lxd_info
       success, result = lxc "info"
       YAML.load(result, permitted_classes: [Symbol, Time]).deep_transform_keys { |key| key.to_s.underscore }

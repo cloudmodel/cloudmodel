@@ -150,7 +150,7 @@ describe CloudModel::LxdContainer do
   end
 
   describe 'attach_template_volume' do
-    let(:mountpoint) { '/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742' }
+    let(:mountpoint) { '/var/lib/cloudmodel/deploy/some_guest-20200331133742' }
     let(:sftp_file) { double 'sftp_file' }
     let(:file_handle) { double 'file_handle' }
 
@@ -171,7 +171,7 @@ describe CloudModel::LxdContainer do
       allow(host).to receive(:exec).with("cat #{mountpoint}/backup.yaml").and_return([true, 'BACKUP'])
 
       expect(host).to receive(:exec!).with("zfs destroy -r guests/containers/some_guest-20200331133742", 'Failed to remove empty container dataset').ordered
-      expect(host).to receive(:exec!).with("zfs clone -o mountpoint=#{mountpoint} -o canmount=noauto #{template.build_snapshot} guests/containers/some_guest-20200331133742", 'Failed to clone template volume').ordered
+      expect(host).to receive(:exec!).with("zfs clone -o mountpoint=legacy -o canmount=noauto #{template.build_snapshot} guests/containers/some_guest-20200331133742", 'Failed to clone template volume').ordered
 
       subject.attach_template_volume
     end
@@ -431,72 +431,6 @@ describe CloudModel::LxdContainer do
     end
   end
 
-  describe 'mount' do
-    let(:dataset) { 'guests/containers/some_guest-20200331133742' }
-    let(:path) { '/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742' }
-
-    before do
-      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
-      allow(subject).to receive(:mountpoint).and_return path
-    end
-
-    it 'should mount zfs container´s fs' do
-      allow(subject).to receive(:mounted?).and_return false, true
-      expect(host).to receive(:exec).with("zfs mount #{dataset}").and_return [true, '']
-      expect(host).not_to receive(:exec!)
-
-      expect(subject.mount).to eq [true, path]
-    end
-
-    it 'should fall back to mount(8) when zfs mount succeeds but the host path is still no mountpoint (snap LXD namespace)' do
-      allow(subject).to receive(:mounted?).and_return false, false
-      expect(host).to receive(:exec).with("zfs mount #{dataset}").and_return [true, '']
-      expect(host).to receive(:exec!).with("mkdir -p #{path} && mount -t zfs #{dataset} #{path}", /legacy mountpoint/)
-
-      expect(subject.mount).to eq [true, path]
-    end
-
-    it 'should fall back to mount(8) when zfs considers the dataset already mounted' do
-      allow(subject).to receive(:mounted?).and_return false
-      expect(host).to receive(:exec).with("zfs mount #{dataset}").and_return [false, "cannot mount '#{dataset}': filesystem already mounted"]
-      expect(host).to receive(:exec!).with("mkdir -p #{path} && mount -t zfs #{dataset} #{path}", /legacy mountpoint/)
-
-      expect(subject.mount).to eq [true, path]
-    end
-
-    it 'should not mount twice' do
-      allow(subject).to receive(:mounted?).and_return true
-      expect(host).not_to receive(:exec).with(/zfs mount/)
-
-      expect(subject.mount).to eq [true, path]
-    end
-
-    it 'should fall back to mount(8) when LXD turned the dataset into a legacy mountpoint' do
-      allow(subject).to receive(:mounted?).and_return false
-      expect(host).to receive(:exec).with("zfs mount #{dataset}")
-        .and_return [false, "cannot mount '#{dataset}': legacy mountpoint\nuse mount(8) to mount this filesystem"]
-      expect(host).to receive(:exec!).with("mkdir -p #{path} && mount -t zfs #{dataset} #{path}", /legacy mountpoint/)
-
-      expect(subject.mount).to eq [true, path]
-    end
-
-    it 'should raise on any other zfs mount failure' do
-      allow(subject).to receive(:mounted?).and_return false
-      expect(host).to receive(:exec).with("zfs mount #{dataset}").and_return [false, 'dataset does not exist']
-      expect(host).not_to receive(:exec!)
-
-      expect { subject.mount }.to raise_error(RuntimeError, /Failed to mount containers fs.*dataset does not exist/m)
-    end
-  end
-
-  describe 'mounted?' do
-    it 'should ask the host whether the path is a mountpoint, not the zfs property' do
-      allow(subject).to receive(:mountpoint).and_return '/var/lib/lxd/storage-pools/default/containers/x'
-      expect(host).to receive(:exec).with('mountpoint -q /var/lib/lxd/storage-pools/default/containers/x').and_return [false, '']
-      expect(subject.mounted?).to eq false
-    end
-  end
-
   describe 'warm_up!' do
     before do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
@@ -526,70 +460,56 @@ describe CloudModel::LxdContainer do
     end
   end
 
-  describe 'unmount' do
-    before { subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time }
-
-    it 'should unmount zfs container´s fs' do
-      expect(host).to receive(:exec).with('zfs unmount guests/containers/some_guest-20200331133742').and_return [true, '']
-      expect(host).not_to receive(:exec).with(/umount/)
-
-      expect(subject.unmount).to eq [true, '']
-    end
-
-    it 'should umount a legacy-mountpoint dataset where it is mounted' do
-      expect(host).to receive(:exec).with('zfs unmount guests/containers/some_guest-20200331133742')
-        .and_return [false, "cannot unmount 'guests/containers/some_guest-20200331133742': legacy mountpoint\nuse umount(8) to unmount this filesystem"]
-      expect(host).to receive(:exec).with('findmnt -n -o TARGET -S guests/containers/some_guest-20200331133742')
-        .and_return [true, "/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742\n"]
-      expect(host).to receive(:exec).with('umount /var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742').and_return [true, '']
-
-      expect(subject.unmount).to eq [true, '']
-    end
-
-    it 'should report the zfs failure when the dataset is not mounted at all' do
-      expect(host).to receive(:exec).with('zfs unmount guests/containers/some_guest-20200331133742').and_return [false, 'not currently mounted']
-      expect(host).to receive(:exec).with(/findmnt/).and_return [false, '']
-      expect(host).not_to receive(:exec).with(/^umount/)
-
-      expect(subject.unmount).to eq [false, 'not currently mounted']
+  describe 'mountpoint' do
+    it 'should be the deploy´s private path, not LXD´s' do
+      subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(host).not_to receive(:exec)
+      expect(subject.mountpoint).to eq '/var/lib/cloudmodel/deploy/some_guest-20200331133742'
     end
   end
 
-  describe 'mountpoint' do
-    it 'should return the container´s mountpoint in host' do
+  describe 'mounted?' do
+    it 'should ask the host whether the deploy path is a mountpoint' do
       subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time
+      expect(host).to receive(:exec).with('mountpoint -q /var/lib/cloudmodel/deploy/some_guest-20200331133742').and_return [false, '']
+      expect(subject.mounted?).to eq false
+    end
+  end
 
-      expect(host).to receive(:exec).with("zfs list | grep guests/containers/some_guest-20200331133742").and_return [
-        true,
-        "guests/containers/some_guest-2020033113374    530M   725G   530M  /var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742\n"
-      ]
+  describe 'mount' do
+    let(:dataset) { 'guests/containers/some_guest-20200331133742' }
+    let(:path) { '/var/lib/cloudmodel/deploy/some_guest-20200331133742' }
+    before { subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time }
 
-      subject.mountpoint
-      expect(subject.mountpoint).to eq '/var/lib/lxd/storage-pools/default/containers/some_guest-20200331133742'
+    it 'should mount the legacy dataset at the deploy path with mount(8)' do
+      allow(subject).to receive(:mounted?).and_return false
+      expect(host).to receive(:exec!).with("zfs set mountpoint=legacy canmount=noauto #{dataset}", /legacy mountpoint/).ordered
+      expect(host).to receive(:exec!).with("mkdir -p #{path} && mount -t zfs #{dataset} #{path}", 'Failed to mount containers fs').ordered
+      expect(subject.mount).to eq [true, path]
     end
 
-    it 'should return the container´s mountpoint in host for older snap lxd' do
-      subject.created_at = '2021-04-15 13:37:23.42 UTC'.to_time
+    it 'should not mount twice' do
+      allow(subject).to receive(:mounted?).and_return true
+      expect(host).not_to receive(:exec!)
+      expect(subject.mount).to eq [true, path]
+    end
+  end
 
-      expect(host).to receive(:exec).with("zfs list | grep guests/containers/some_guest-20210415133723").and_return [
-        true,
-        "guests/containers/some_guest-20210415133723    530M   725G   530M  none\n"
-      ]
+  describe 'unmount' do
+    let(:path) { '/var/lib/cloudmodel/deploy/some_guest-20200331133742' }
+    before { subject.created_at = '2020-03-31 13:37:42.23 UTC'.to_time }
 
-      subject.mountpoint
-      expect(subject.mountpoint).to eq '/var/lib/lxd/storage-pools/default/containers/some_guest-20210415133723'
+    it 'should umount the deploy path and remove the directory' do
+      allow(subject).to receive(:mounted?).and_return true
+      expect(host).to receive(:exec).with("umount #{path}").and_return [true, '']
+      expect(host).to receive(:exec).with("rmdir #{path}")
+      expect(subject.unmount).to eq [true, '']
     end
 
-    it 'should return the container´s mountpoint in host for snap lxd' do
-      subject.created_at = '2022-03-30 09:42:42.23 UTC'.to_time
-
-      expect(host).to receive(:exec).with("zfs list | grep guests/containers/some_guest-20220330094242").and_return [
-        true,
-        "guests/containers/some_guest-20220330094242    530M   725G   530M  legacy\n"
-      ]
-
-      subject.mountpoint
-      expect(subject.mountpoint).to eq '/var/lib/lxd/storage-pools/default/containers/some_guest-20220330094242'
+    it 'should be a no-op when not mounted' do
+      allow(subject).to receive(:mounted?).and_return false
+      expect(host).not_to receive(:exec)
+      expect(subject.unmount).to eq [true, '']
     end
   end
 
