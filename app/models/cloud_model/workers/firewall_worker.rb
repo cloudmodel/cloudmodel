@@ -204,6 +204,10 @@ module CloudModel
       def build_commands(host, port, protocol, options)
         if options[:service] == :ssh
           commands = handle_ssh(host, port, {interface: options[:interface]})
+          # A guest's public SSH (Git over SSH on a Forgejo guest, say) is
+          # forwarded like any other public service; without the DNAT the
+          # host's own sshd answers on the guest's address.
+          commands += nat(host, options[:interface] || 'eth0', port, protocol, options[:nat]) if options[:nat]
         else
           iptables = iptables_bin(host)
           interface = options[:interface] || 'eth0'

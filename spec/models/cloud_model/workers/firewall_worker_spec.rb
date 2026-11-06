@@ -112,6 +112,18 @@ describe CloudModel::Workers::FirewallWorker do
     end
   end
 
+  describe '#build_commands for a guest´s public ssh' do
+    it 'should forward the port to the guest like any other public service' do
+      commands = subject.build_commands('192.168.1.1', 22, :tcp, {service: :ssh, interface: 'eth0', nat: '10.42.0.2'})
+      expect(commands).to include "/sbin/iptables -t nat -A PREROUTING -p tcp -d 192.168.1.1 --dport 22 -j DNAT --to-destination 10.42.0.2:22"
+    end
+
+    it 'should not forward the host´s own ssh' do
+      commands = subject.build_commands('192.168.1.1', 22, :tcp, {service: :ssh, interface: 'eth0'})
+      expect(commands.join("\n")).not_to include 'DNAT'
+    end
+  end
+
   describe '#masq_private' do
     before do
       allow(host).to receive(:guests).and_return(double('guests', where: []))
