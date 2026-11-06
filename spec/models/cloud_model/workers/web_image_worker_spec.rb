@@ -294,4 +294,18 @@ describe CloudModel::Workers::WebImageWorker do
       }.to raise_error(CloudModel::ExecutionException)
     end
   end
+
+  describe '#git_ssh_target' do
+    it 'should take user and host from the image´s git server' do
+      allow(web_image).to receive(:git_server).and_return 'forgejo@git.example.com'
+      expect(subject.git_ssh_target).to eq 'forgejo@git.example.com'
+    end
+
+    it 'should default to the git user for a bare host and strip a repository path' do
+      allow(web_image).to receive(:git_server).and_return 'github.com'
+      expect(subject.git_ssh_target).to eq 'git@github.com'
+      allow(web_image).to receive(:git_server).and_return 'ssh://forgejo@git.example.com:22/org'
+      expect(subject.git_ssh_target).to eq 'forgejo@git.example.com'
+    end
+  end
 end

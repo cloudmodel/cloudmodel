@@ -237,6 +237,15 @@ module CloudModel
           "Failed to mark the app root as a safe git directory"
       end
 
+      # `user@host` of the image's git server (`git_server` holds it as used
+      # in the clone URL, e.g. `git@github.com`), the target of the deploy key
+      # check. A bare host name gets the conventional `git` user.
+      # @return [String]
+      def git_ssh_target
+        server = @web_image.git_server.to_s.sub(%r{\Assh://}, '').sub(%r{[/:].*\z}, '')
+        server.include?('@') ? server : "git@#{server}"
+      end
+
       def transfer_ssh
         "ssh -i #{CloudModel.config.ssh_key_file.shellescape} -o StrictHostKeyChecking=no"
       end
@@ -253,14 +262,16 @@ module CloudModel
         ssh_dir = "#{buildsys_volume.rootfs_path}/root/.ssh"
         @host.exec! "mkdir -p #{ssh_dir.shellescape} && chmod 700 #{ssh_dir.shellescape}", "Failed to create .ssh in build system"
         @host.sftp.file.open("#{ssh_dir}/id_git", 'w', 0600) { |f| f.write File.read(key) }
+        # One identity for every git host the Gemfile may reference (the
+        # application's own server and any other git-source gem host).
         @host.sftp.file.open("#{ssh_dir}/config", 'w', 0600) do |f|
-          f.write "Host github.com\n  User git\n  IdentityFile /root/.ssh/id_git\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n"
+          f.write "Host *\n  IdentityFile /root/.ssh/id_git\n  IdentitiesOnly yes\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n"
         end
 
         # Say which identity the build system will clone with — `bundle install`
         # only reports "Permission denied (publickey)" after four retries, and
-        # the build system is gone by then. github answers `ssh -T` with the
-        # account name and exit status 1, so this is informational only. The
+        # the build system is gone by then. Git servers answer `ssh -T` with
+        # the account name and exit status 1, so this is informational only. The
         # verbose lines name the key file ssh loaded, whether it offered it
         # and whether the server took it — enough to tell a key github does
         # not know from one ssh refused to use.
@@ -268,7 +279,7 @@ module CloudModel
         _ok, out = chroot buildsys_volume.rootfs_path, [
           "ssh -V 2>&1",
           "ssh-keygen -lf /root/.ssh/id_git 2>&1",
-          "ssh -v -i /root/.ssh/id_git -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -T git@github.com 2>&1" \
+          "ssh -v -i /root/.ssh/id_git -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -T #{git_ssh_target.shellescape} 2>&1" \
             " | grep -E '^Hi |identity file|Offering public key|Server accepts key|no mutual signature|Permissions [0-7]+ for|Load key|denied'"
         ] * '; '
         puts out.to_s.strip.gsub(/^/, '        ')
