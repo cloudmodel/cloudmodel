@@ -190,7 +190,8 @@ describe CloudModel::Workers::Services::ForgejoWorker do
 
     it 'should produce a hook that scans each pushed range and a link script over every repository' do
       hook = subject.send(:render, '/cloud_model/guest/etc/forgejo/hooks/pre-receive.d/secrets', guest: guest, model: model)
-      expect(hook).to include 'gitleaks git . --config "$CONFIG" --log-opts="$range" --redact --no-banner --exit-code 1'
+      expect(hook).to include 'gitleaks git . --config "$CONFIG" --log-opts="$range" --redact --verbose --no-color --no-banner --exit-code 1'
+      expect(hook).to include 'if [ "$rc" -eq 1 ]; then'
       expect(hook).to include 'secrets-skip='
       link = subject.send(:render, '/cloud_model/guest/etc/forgejo/link-hooks.sh', guest: guest, model: model)
       expect(link).to include 'ln -sfn "$hook" "$dir/00-secrets"'
