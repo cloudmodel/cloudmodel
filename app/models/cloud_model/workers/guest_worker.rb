@@ -87,7 +87,11 @@ module CloudModel
       end
 
       def config_services
-        #@lxc.mount
+        # The service workers write straight into the stopped container's
+        # rootfs. LXD unmounts it after operations of its own (adding the
+        # custom volume devices in the steps before), so a write could land
+        # in the empty mountpoint ("no such file"). Mount it again first.
+        @lxc.mount
         guest.deploy_path = "#{@lxc.mountpoint}/rootfs"
 
         guest.services.each do |service|

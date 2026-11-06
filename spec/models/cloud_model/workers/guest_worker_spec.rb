@@ -170,6 +170,7 @@ describe CloudModel::Workers::GuestWorker do
   describe 'config_services' do
     it 'should configure each service' do
       lxc = double 'lxc', mountpoint: '/var/lib/lxd/containers/test'
+      expect(lxc).to receive(:mount)
       subject.instance_variable_set(:@lxc, lxc)
       allow(guest).to receive(:deploy_path=)
       allow(guest).to receive(:deploy_path).and_return("#{lxc.mountpoint}/rootfs")
@@ -374,7 +375,7 @@ describe CloudModel::Workers::GuestWorker do
       service = double 'service'
       allow(service).to receive_message_chain(:class, :model_name, :element).and_return('nginx')
       allow(service).to receive(:name).and_return('web')
-      lxc = double 'lxc', mountpoint: '/mp'
+      lxc = double 'lxc', mountpoint: '/mp', mount: [true, '/mp']
       subject.instance_variable_set(:@lxc, lxc)
       allow(guest).to receive(:deploy_path=)
       allow(guest).to receive(:deploy_path).and_return('/mp/rootfs')
