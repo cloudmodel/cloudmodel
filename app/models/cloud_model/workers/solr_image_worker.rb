@@ -28,7 +28,12 @@ module CloudModel
           end
         end
 
+        # A checkout kept from earlier builds fetches from the remote it was
+        # cloned from; point it at the configured source first, which may have
+        # moved to another git server (or renamed its branch) since.
         git_script = "cd #{@solr_image.build_path.shellescape} && "
+        git_script += "git remote set-url origin #{"#{@solr_image.git_server}:#{@solr_image.git_repo}".shellescape} &&"
+        git_script += "git fetch --prune origin &&"
         git_script += "git checkout #{@solr_image.git_branch.shellescape} &&"
         git_script += "git pull &&"
         git_script += "git submodule init &&"

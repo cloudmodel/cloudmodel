@@ -150,15 +150,22 @@ module CloudModel
         FileUtils.mkdir_p @web_image.build_path
         path = @web_image.build_path.shellescape
 
-        unless File.directory? "#{@web_image.build_path}/.git"
-          run_with_clean_env "Cloning", "git clone #{@web_image.git_server.shellescape}:#{@web_image.git_repo.shellescape} #{path}"
+        url = "#{@web_image.git_server}:#{@web_image.git_repo}"
+        if File.directory? "#{@web_image.build_path}/.git"
+          # A workspace kept from earlier builds fetches from the remote it was
+          # cloned from; point it at the configured source, which may have
+          # moved to another git server since.
+          run_with_clean_env "Set source", "cd #{path} && git remote set-url origin #{url.shellescape}"
+        else
+          run_with_clean_env "Cloning", "git clone #{url.shellescape} #{path}"
         end
 
         # The build dir is a disposable workspace: earlier builds may have
         # rewritten tracked files. Discard local changes and hard-reset to the
-        # remote branch head.
+        # remote branch head. --prune drops branches that the (new) remote no
+        # longer has, so a stale tracking ref can never be built.
         run_with_clean_env "Pulling",
-          "cd #{path} && git fetch && git checkout -f #{@web_image.git_branch.shellescape} && git reset --hard origin/#{@web_image.git_branch.shellescape}"
+          "cd #{path} && git fetch --prune origin && git checkout -f #{@web_image.git_branch.shellescape} && git reset --hard origin/#{@web_image.git_branch.shellescape}"
 
         commit = run_with_clean_env("Get Version", "cd #{path} && git log -1 --format=%H").to_s.strip
         @web_image.update_attribute :git_commit, commit

@@ -29,6 +29,11 @@ describe CloudModel::Workers::SolrImageWorker do
       subject.checkout_git
     end
 
+    it 'points a kept checkout at the configured source and fetches before checking out' do
+      expect(subject).to receive(:run_step).with("Pulling", /git remote set-url origin \S+ &&git fetch --prune origin &&git checkout/)
+      subject.checkout_git
+    end
+
     it 'should update git_commit attribute' do
       expect(solr_image).to receive(:update_attribute).with(:git_commit, 'abc123')
       subject.checkout_git

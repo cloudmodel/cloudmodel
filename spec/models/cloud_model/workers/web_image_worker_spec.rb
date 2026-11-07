@@ -52,6 +52,13 @@ describe CloudModel::Workers::WebImageWorker do
     it 'clones when there is no checkout yet' do
       allow(File).to receive(:directory?).with("#{web_image.build_path}/.git").and_return(false)
       expect(subject).to receive(:run_with_clean_env).with("Cloning", /git clone git@github.com:org\/webapp/)
+      expect(subject).not_to receive(:run_with_clean_env).with("Set source", anything)
+      subject.checkout_git
+    end
+
+    it 'points a kept checkout at the configured source before fetching (the repository may have moved)' do
+      expect(subject).to receive(:run_with_clean_env).with("Set source", /git remote set-url origin git@github.com:org\/webapp\z/).ordered
+      expect(subject).to receive(:run_with_clean_env).with("Pulling", /git fetch --prune origin/).ordered
       subject.checkout_git
     end
   end
