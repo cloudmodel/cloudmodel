@@ -51,17 +51,21 @@ module CloudModel
       field :reverse_proxy_supported, type: Mongoid::Boolean, default: false
       field :reverse_proxy_for, type: String, default: nil
 
-      # Attribute changes fully covered by the rendered nginx config files —
+      # Attribute changes fully covered by the rendered config files —
       # NginxWorker#sync_config can push them to the running guest without a
       # redeploy. Everything else (ports/firewall, SSL certs, systemd units,
       # web image, dependencies, web locations, …) only takes effect on the
       # next deploy. Changes to embedded location_overwrites are live-syncable
       # too; embedded web_locations are not (their app confs render at deploy).
+      # passenger_env and passenger_env_vars also render into /etc/default/rails,
+      # which the sync writes as well; the nginx reload restarts the Passenger
+      # app with the new environment, the job workers read the file on their
+      # next restart (every web image deploy restarts them).
       LIVE_SYNCABLE_ATTRIBUTES = %w(
         ssl_only ssl_enforce ssl_stapling
         unsafe_inline_script_allowed unsafe_eval_script_allowed
         google_analytics_supported hubspot_forms_supported pingdom_supported
-        reverse_proxy_for passenger_env passenger_max_pool_size rails_cable_supported
+        reverse_proxy_for passenger_env passenger_env_vars passenger_max_pool_size rails_cable_supported
       ).freeze
 
       # Passenger support

@@ -560,7 +560,10 @@ module CloudModel
 
         # The files a live config sync manages — the same set write_config
         # renders. Deploy-only artefacts (web app location confs, systemd
-        # units, SSL files, …) are deliberately not part of this.
+        # units, SSL files, …) are deliberately not part of this. The Passenger
+        # app's environment file /etc/default/rails is included: it carries the
+        # same passenger_env and passenger_env_vars as passenger.conf, and the
+        # job workers read it on their next restart.
         # @return [Array<Hash>] {template:, path:, content:, hash:}
         def config_sync_plan certbot_cert_available: nil
           files = [
@@ -572,6 +575,7 @@ module CloudModel
               files << {template: '/cloud_model/guest/etc/nginx/server.d/proxy.conf', path: '/etc/nginx/server.d/proxy.conf'}
             elsif @model.passenger_supported?
               files << {template: '/cloud_model/guest/etc/nginx/server.d/passenger.conf', path: '/etc/nginx/server.d/passenger.conf'}
+              files << {template: '/cloud_model/guest/etc/default/rails', path: '/etc/default/rails'}
             elsif @model.capistrano_supported?
               files << {template: '/cloud_model/guest/etc/nginx/server.d/cap-deployed.conf', path: '/etc/nginx/server.d/cap-deployed.conf'}
             end
