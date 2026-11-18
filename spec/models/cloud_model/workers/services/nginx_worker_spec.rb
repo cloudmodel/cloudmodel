@@ -708,6 +708,18 @@ describe CloudModel::Workers::Services::NginxWorker do
       expect(subject.sync_config(dry_run: true)).to eq state: :unchanged, applied: [], pending: [], blocked: []
     end
 
+    it 'restricts a sync to the given files and keeps the manifest entries of the others' do
+      allow(subject).to receive(:read_config_manifest).and_return(nginx_conf => 'hash-prev', site_conf => 'hash-old')
+      allow(subject).to receive(:remote_file_hash).with(nginx_conf).and_return 'hash-prev'
+      allow(subject).to receive(:remote_file_hash).with(site_conf).and_return 'hash-edited'
+      allow(subject).to receive(:guest_sh).and_return [true, '']
+      allow(subject).to receive(:upload_to_guest)
+      expect(subject).not_to receive(:upload_to_guest).with(anything, site_conf)
+      expect(subject).to receive(:upload_to_guest).with("a\n", nginx_conf)
+      expect(subject).to receive(:write_config_manifest).with [hash_including(path: nginx_conf, hash: 'hash-a'), hash_including(path: site_conf, hash: 'hash-old')]
+      expect(subject.sync_config(only: ['nginx.conf'])).to eq state: :applied, applied: [nginx_conf], blocked: []
+    end
+
     it 'refuses manually edited files unless forced' do
       allow(subject).to receive(:remote_file_hash).with(site_conf).and_return 'hash-edited'
       expect(subject).not_to receive(:upload_to_guest)

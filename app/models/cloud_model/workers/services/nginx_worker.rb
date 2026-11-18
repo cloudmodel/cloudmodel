@@ -614,12 +614,20 @@ module CloudModel
         # @param force [Boolean] overwrite manually edited/unrecorded files
         # @param dry_run [Boolean] only compare: report what a sync would
         #   write (:pending) or refuse (:blocked), change nothing
+        # @param only [Array<String>, nil] restrict the sync to these files
+        #   (paths or basenames, e.g. `%w(cloudmodel.conf)`); the other files
+        #   of the plan are neither compared nor written and keep their
+        #   manifest entry
         # @return [Hash] {state: :applied|:pending|:unchanged|:blocked|:failed,
         #   applied: [paths], pending: [paths], blocked: [{path:, reason:}],
         #   output: String}
-        def sync_config force: false, dry_run: false
+        def sync_config force: false, dry_run: false, only: nil
           manifest = read_config_manifest
-          plan = config_sync_plan.each do |file|
+          full_plan = config_sync_plan
+          skipped = only ? full_plan.reject { |f| only.include?(f[:path]) or only.include?(File.basename f[:path]) } : []
+          # Skipped files stay in the manifest as they were recorded.
+          kept = skipped.select { |f| manifest[f[:path]] }.map { |f| f.merge(hash: manifest[f[:path]]) }
+          plan = (full_plan - skipped).each do |file|
             remote = remote_file_hash file[:path]
             file[:state] = if remote.nil?
               :missing # not on the guest yet -> just write it
@@ -648,7 +656,7 @@ module CloudModel
           end
 
           if to_write.empty?
-            write_config_manifest plan
+            write_config_manifest plan + kept
             return {state: :unchanged, applied: [], blocked: []}
           end
 
@@ -673,7 +681,7 @@ module CloudModel
           end
 
           to_write.each { |file| guest_sh "rm -f #{backup_path(file[:path]).shellescape}" }
-          write_config_manifest plan
+          write_config_manifest plan + kept
           {state: :applied, applied: to_write.map { |f| f[:path] }, blocked: []}
         end
 

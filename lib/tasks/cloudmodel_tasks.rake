@@ -555,15 +555,18 @@ namespace :cloudmodel do
       abort "#{failures} guest(s) failed" if failures > 0
     end
 
-    desc "Push the current nginx configuration (nginx.conf, cloudmodel.conf, root location conf) to the running guests with an nginx service, without a redeploy (NginxWorker#sync_config: nginx -t with rollback, reload only when a file changed — a reload restarts the Passenger application processes). DRY_RUN=1 only reports what would change; FORCE=1 also overwrites manually edited or never recorded files. HOST=<name>|HOST_ID=<id> or GUEST=<name>|GUEST_ID=<id> narrow the set."
+    desc "Push the current nginx configuration (nginx.conf, cloudmodel.conf, root location conf) to the running guests with an nginx service, without a redeploy (NginxWorker#sync_config: nginx -t with rollback, reload only when a file changed — a reload restarts the Passenger application processes). DRY_RUN=1 only reports what would change; FORCE=1 also overwrites manually edited or never recorded files; FILES=nginx.conf,cloudmodel.conf restricts the sync to these files. HOST=<name>|HOST_ID=<id> or GUEST=<name>|GUEST_ID=<id> narrow the set, EXCLUDE=<name>,<name> leaves guests out."
     task :sync_nginx_config => [:environment] do
       dry_run = ENV['DRY_RUN'].to_s == '1'
       force = ENV['FORCE'].to_s == '1'
+      only = ENV['FILES'].to_s.split(',').map(&:strip).reject(&:blank?).presence
+      exclude = ENV['EXCLUDE'].to_s.split(',').map(&:strip)
 
       guests = ENV['GUEST_ID'].present? ? [CloudModel::Guest.find(ENV['GUEST_ID'])] : CloudModel::Guest.all.to_a
       guests = guests.select { |g| g.name == ENV['GUEST'] } if ENV['GUEST'].present?
       guests = guests.select { |g| g.host_id.to_s == ENV['HOST_ID'] } if ENV['HOST_ID'].present?
       guests = guests.select { |g| g.host.name == ENV['HOST'] } if ENV['HOST'].present?
+      guests = guests.reject { |g| exclude.include? g.name }
       guests = guests.select { |g| g.up_state == :started and g.services.any? { |s| s.is_a?(CloudModel::Services::Nginx) } }
       abort "No running guests with nginx found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
 
@@ -574,7 +577,7 @@ namespace :cloudmodel do
         begin
           service = guest.services.detect { |s| s.is_a?(CloudModel::Services::Nginx) }
           worker = CloudModel::Workers::Services::NginxWorker.new guest.current_lxd_container, service
-          result = worker.sync_config force: force, dry_run: dry_run
+          result = worker.sync_config force: force, dry_run: dry_run, only: only
           counts[result[:state]] += 1
           detail = case result[:state]
           when :applied then result[:applied].map { |path| File.basename path } * ', '
