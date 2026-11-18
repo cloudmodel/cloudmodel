@@ -179,6 +179,17 @@ describe CloudModel::Config do
     end
   end
 
+  describe 'nginx_http2' do
+    it 'should set nginx_http2' do
+      subject.nginx_http2 = true
+      expect(subject.nginx_http2).to eq true
+    end
+
+    it 'should default to false (HTTP/1.1 only until the fleet runs an nginx with the HTTP/2 fixes)' do
+      expect(subject.nginx_http2).to eq false
+    end
+  end
+
   describe 'debian_version' do
     it 'should allow to set Debian version' do
       subject.debian_version = '18'

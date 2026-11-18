@@ -612,9 +612,12 @@ module CloudModel
         # restored — and reloads nginx only when files actually changed.
         #
         # @param force [Boolean] overwrite manually edited/unrecorded files
-        # @return [Hash] {state: :applied|:unchanged|:blocked|:failed,
-        #   applied: [paths], blocked: [{path:, reason:}], output: String}
-        def sync_config force: false
+        # @param dry_run [Boolean] only compare: report what a sync would
+        #   write (:pending) or refuse (:blocked), change nothing
+        # @return [Hash] {state: :applied|:pending|:unchanged|:blocked|:failed,
+        #   applied: [paths], pending: [paths], blocked: [{path:, reason:}],
+        #   output: String}
+        def sync_config force: false, dry_run: false
           manifest = read_config_manifest
           plan = config_sync_plan.each do |file|
             remote = remote_file_hash file[:path]
@@ -632,12 +635,18 @@ module CloudModel
           end
 
           blocked = plan.select { |f| [:edited, :unrecorded].include? f[:state] }
-          if blocked.any? && !force
-            return {state: :blocked, applied: [],
-                    blocked: blocked.map { |f| {path: f[:path], reason: f[:state]} }}
+          blocked_report = blocked.map { |f| {path: f[:path], reason: f[:state]} }
+          to_write = plan.reject { |f| f[:state] == :unchanged }
+
+          if dry_run
+            state = if blocked.any? && !force then :blocked elsif to_write.empty? then :unchanged else :pending end
+            return {state: state, applied: [], pending: to_write.map { |f| f[:path] }, blocked: blocked_report}
           end
 
-          to_write = plan.reject { |f| f[:state] == :unchanged }
+          if blocked.any? && !force
+            return {state: :blocked, applied: [], blocked: blocked_report}
+          end
+
           if to_write.empty?
             write_config_manifest plan
             return {state: :unchanged, applied: [], blocked: []}

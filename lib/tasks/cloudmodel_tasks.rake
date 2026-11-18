@@ -555,6 +555,43 @@ namespace :cloudmodel do
       abort "#{failures} guest(s) failed" if failures > 0
     end
 
+    desc "Push the current nginx configuration (nginx.conf, cloudmodel.conf, root location conf) to the running guests with an nginx service, without a redeploy (NginxWorker#sync_config: nginx -t with rollback, reload only when a file changed — a reload restarts the Passenger application processes). DRY_RUN=1 only reports what would change; FORCE=1 also overwrites manually edited or never recorded files. HOST=<name>|HOST_ID=<id> or GUEST=<name>|GUEST_ID=<id> narrow the set."
+    task :sync_nginx_config => [:environment] do
+      dry_run = ENV['DRY_RUN'].to_s == '1'
+      force = ENV['FORCE'].to_s == '1'
+
+      guests = ENV['GUEST_ID'].present? ? [CloudModel::Guest.find(ENV['GUEST_ID'])] : CloudModel::Guest.all.to_a
+      guests = guests.select { |g| g.name == ENV['GUEST'] } if ENV['GUEST'].present?
+      guests = guests.select { |g| g.host_id.to_s == ENV['HOST_ID'] } if ENV['HOST_ID'].present?
+      guests = guests.select { |g| g.host.name == ENV['HOST'] } if ENV['HOST'].present?
+      guests = guests.select { |g| g.up_state == :started and g.services.any? { |s| s.is_a?(CloudModel::Services::Nginx) } }
+      abort "No running guests with nginx found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
+
+      colors = {applied: 32, unchanged: 32, pending: 33, blocked: 33, failed: 31, error: 31}
+      counts = Hash.new(0)
+      guests.sort_by { |g| [g.host.name, g.name] }.each do |guest|
+        print "#{guest.name} @ #{guest.host.name}: "
+        begin
+          service = guest.services.detect { |s| s.is_a?(CloudModel::Services::Nginx) }
+          worker = CloudModel::Workers::Services::NginxWorker.new guest.current_lxd_container, service
+          result = worker.sync_config force: force, dry_run: dry_run
+          counts[result[:state]] += 1
+          detail = case result[:state]
+          when :applied then result[:applied].map { |path| File.basename path } * ', '
+          when :pending then result[:pending].map { |path| File.basename path } * ', '
+          when :blocked then result[:blocked].map { |b| "#{File.basename b[:path]} (#{b[:reason]})" } * ', '
+          when :failed then result[:output].to_s.strip.lines.last.to_s.strip
+          end
+          puts "\e[#{colors[result[:state]]}m#{result[:state]}\e[39m #{detail}".rstrip
+        rescue => e
+          counts[:error] += 1
+          puts "\e[31mERROR\e[39m (#{e.class}: #{e.message[0, 160]})"
+        end
+      end
+      puts "\n#{guests.size} guest(s): #{counts.sort_by { |state, _| state.to_s }.map { |state, n| "#{n} #{state}" } * ', '}#{' (dry run, nothing changed)' if dry_run}"
+      abort "#{counts[:failed] + counts[:error]} guest(s) failed" if counts[:failed] + counts[:error] > 0
+    end
+
     desc "Push check_mk agent plugins into live guest containers via lxc file push (no image rebuild/redeploy). Set GUEST_ID=<id> to target a single guest."
     task :deploy_check_mk_plugins => [:environment] do
       guests = if ENV['GUEST_ID'].present?

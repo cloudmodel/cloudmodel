@@ -668,6 +668,53 @@ describe CloudModel::Workers::Services::NginxWorker do
     end
   end
 
+  describe '#sync_config' do
+    let(:nginx_conf) { '/etc/nginx/nginx.conf' }
+    let(:site_conf) { '/etc/nginx/sites-available/cloudmodel.conf' }
+    let(:plan) do
+      [
+        {template: '/cloud_model/guest/etc/nginx/nginx.conf', path: nginx_conf, content: "a\n", hash: 'hash-a'},
+        {template: '/cloud_model/guest/etc/nginx/sites-available/cloudmodel.conf', path: site_conf, content: "b\n", hash: 'hash-b'}
+      ]
+    end
+
+    before do
+      allow(subject).to receive(:config_sync_plan).and_return plan
+      allow(subject).to receive(:read_config_manifest).and_return(nginx_conf => 'hash-a', site_conf => 'hash-old')
+      allow(subject).to receive(:remote_file_hash).with(nginx_conf).and_return 'hash-a'
+      allow(subject).to receive(:remote_file_hash).with(site_conf).and_return 'hash-old'
+    end
+
+    it 'only reports the files it would write on a dry run' do
+      expect(subject).not_to receive(:upload_to_guest)
+      expect(guest).not_to receive(:exec)
+      expect(subject.sync_config(dry_run: true)).to eq state: :pending, applied: [], pending: [site_conf], blocked: []
+    end
+
+    it 'reports manually edited files as blocked on a dry run' do
+      allow(subject).to receive(:remote_file_hash).with(site_conf).and_return 'hash-edited'
+      expect(subject).not_to receive(:upload_to_guest)
+      expect(subject.sync_config(dry_run: true)).to eq state: :blocked, applied: [], pending: [site_conf], blocked: [{path: site_conf, reason: :edited}]
+    end
+
+    it 'reports pending instead of blocked on a forced dry run' do
+      allow(subject).to receive(:remote_file_hash).with(site_conf).and_return 'hash-edited'
+      expect(subject.sync_config(dry_run: true, force: true)).to eq state: :pending, applied: [], pending: [site_conf], blocked: [{path: site_conf, reason: :edited}]
+    end
+
+    it 'is unchanged on a dry run when the guest already has the rendered files' do
+      allow(subject).to receive(:remote_file_hash).with(site_conf).and_return 'hash-b'
+      expect(subject).not_to receive(:write_config_manifest)
+      expect(subject.sync_config(dry_run: true)).to eq state: :unchanged, applied: [], pending: [], blocked: []
+    end
+
+    it 'refuses manually edited files unless forced' do
+      allow(subject).to receive(:remote_file_hash).with(site_conf).and_return 'hash-edited'
+      expect(subject).not_to receive(:upload_to_guest)
+      expect(subject.sync_config).to eq state: :blocked, applied: [], blocked: [{path: site_conf, reason: :edited}]
+    end
+  end
+
   describe '#sync_authorized_keys' do
     let(:key_a) { 'ssh-ed25519 AAAAkeya alice@laptop' }
     let(:key_b) { 'ssh-rsa AAAAkeyb bob@desk' }
