@@ -4,8 +4,13 @@ module CloudModel
   # and a fleet that cannot be rebuilt the same day.
   #
   # The guests get their Ruby from the template (RubyComponentWorker, RVM
-  # under /usr/local/rvm); Passenger boots the interpreter named in
-  # /etc/nginx/passenger.conf, the job and rake units run `rvm default do`.
+  # under /usr/local/rvm). Passenger's `passenger_free_ruby` takes the first
+  # ruby in the PATH of the app user's login shell, where RVM honours the
+  # application's `.ruby-version` (pinned to the template's Ruby by the web
+  # image build) and falls back to the default alias; the job and rake units
+  # run `rvm default do`. So a patch sets both: the default alias and the
+  # `.ruby-version` of every application, then restarts the Passenger apps
+  # and the units, and checks the interpreters the processes really run.
   # Within one minor line (3.4.x) the ABI is stable, so the applications'
   # bundles (bundle/ruby/3.4.0) keep working on the new interpreter and
   # nothing has to be rebuilt.
@@ -17,10 +22,9 @@ module CloudModel
   # network); every guest then gets it unpacked
   # into /usr/local/rvm, bundler in the versions its applications are locked
   # to, a `bundle check` per application — only when all of them pass does
-  # the default alias switch, passenger.conf gets the new interpreter and
-  # nginx reloads (a Passenger cold start), and the job units restart. The
-  # old Ruby stays: Passenger's own gem (passenger_root, with the compiled
-  # agent) lives in its gem dir, and it is the rollback.
+  # the default alias switch, the `.ruby-version` of each application, a
+  # Passenger app restart (a cold start of the app) and a restart of the job
+  # units. The old Ruby stays: it is the rollback.
   #
   # Driven by `rake cloudmodel:guest:patch_ruby RUBY=<version>` (dry run
   # unless CONFIRM=1).
@@ -60,23 +64,25 @@ module CloudModel
 
     # What the guest runs right now.
     # @return [Hash] default: RUBY_VERSION of `rvm default`, installed: [ruby
-    #   names], passenger_ruby: interpreter path from passenger.conf (nil
-    #   without the file), apps: [{dir:, bundled_with:}], units: [systemd
-    #   units to restart], os:, arch: (as dpkg names them)
+    #   names], apps: [{dir:, bundled_with:, ruby_version:}] (the
+    #   applications under /var/www/<app>/current with the bundler their lock
+    #   names and their `.ruby-version`), running: [versions] (RUBY_VERSION
+    #   of the interpreters the app user's ruby processes execute — Passenger
+    #   apps, job workers, rake services), units: [systemd units to restart],
+    #   os:, arch: (as dpkg names them)
     def inventory guest
       success, data = guest.exec "bash -c #{INVENTORY_SCRIPT.shellescape}"
       raise "inventory failed: #{data.to_s.lines.last}" unless success
-      result = { installed: [], apps: [], units: [] }
+      result = { installed: [], apps: [], running: [], units: [] }
       data.to_s.each_line do |line|
         key, _, value = line.strip.partition('=')
         case key
         when 'default' then result[:default] = value.presence
         when 'installed' then result[:installed] = value.split
-        when 'passenger_ruby' then result[:passenger_ruby] = value.presence
-        when 'passenger_version' then result[:passenger_version] = value.presence
         when 'app'
-          dir, bundled = value.split('|', 2)
-          result[:apps] << { dir: dir, bundled_with: bundled.presence }
+          dir, bundled, pinned = value.split('|', 3)
+          result[:apps] << { dir: dir, bundled_with: bundled.presence, ruby_version: pinned.to_s.sub(/\Aruby-/, '').presence }
+        when 'running' then result[:running] = value.split
         when 'units' then result[:units] = value.split
         when 'os' then result[:os] = value
         when 'arch' then result[:arch] = value
@@ -86,7 +92,16 @@ module CloudModel
     end
 
     def up_to_date? inv
-      inv[:default] == version && (inv[:passenger_ruby].nil? || inv[:passenger_ruby] == ruby_bin)
+      inv[:default] == version &&
+        inv[:apps].all? { |a| a[:ruby_version].nil? || a[:ruby_version] == version } &&
+        inv[:running].all? { |v| v == version }
+    end
+
+    # A patch moves within one minor line (3.4.x → 3.4.13): the bundles are
+    # ABI-compatible there and nowhere else. A guest on another line is not
+    # touched.
+    def same_line? inv
+      inv[:default].to_s.split('.').first(2) == version.split('.').first(2)
     end
 
     # The ruby volume of this release for an os/arch on `host`: the RVM
@@ -99,9 +114,9 @@ module CloudModel
 
     # @param guests [Array<Guest>] running guests with a Ruby (see .guests_with_ruby)
     # @param dry_run [Boolean] inventory and plan only
-    # @return [Hash] `{ patched:, current:, failed: }` counts
+    # @return [Hash] `{ patched:, current:, skipped:, failed: }` counts
     def patch! guests, dry_run: true
-      counts = { patched: 0, current: 0, failed: 0 }
+      counts = { patched: 0, current: 0, skipped: 0, failed: 0 }
       groups = guests.sort_by { |g| [g.host.name, g.name] }.group_by { |g| [g.os_version, g.host.arch] }
 
       groups.each do |(os, arch), group|
@@ -110,14 +125,20 @@ module CloudModel
         group.each do |guest|
           print_prefix guest
           begin
-            inv = inventories[guest] = inventory(guest)
+            inv = inventory(guest)
             state = up_to_date?(inv) ? "\e[32mon #{version}\e[39m" : "#{inv[:default] || '?'} → #{version}"
-            passenger = inv[:passenger_ruby] ? "passenger #{inv[:passenger_ruby].sub("#{RVM_PATH}/rubies/", '')}" : 'no passenger.conf'
-            apps = inv[:apps].map { |a| "#{a[:dir].sub('/var/www/', '')} (bundler #{a[:bundled_with] || '?'})" }
-            output.puts "#{state}; #{passenger}; #{apps.any? ? apps * ', ' : 'no application'}; installed #{inv[:installed] * ' '}"
+            apps = inv[:apps].map { |a| "#{a[:dir].sub('/var/www/', '')} (.ruby-version #{a[:ruby_version] || '-'}, bundler #{a[:bundled_with] || '?'})" }
+            running = inv[:running].any? ? "running #{inv[:running] * ' '}" : 'no ruby process'
+            output.puts "#{state}; #{apps.any? ? apps * ', ' : 'no application'}; #{running}; installed #{inv[:installed] * ' '}"
             if inv[:arch].present? && inv[:arch] != arch
               raise "guest reports arch #{inv[:arch]}, host is #{arch} — leaving it out"
             end
+            unless same_line? inv
+              counts[:skipped] += 1
+              output.puts "    \e[33mskipped\e[39m: #{inv[:default] || 'no default ruby'} is not on the #{version.split('.').first(2) * '.'} line — not a patch, left alone"
+              next
+            end
+            inventories[guest] = inv
           rescue => e
             counts[:failed] += 1
             inventories.delete guest
@@ -164,13 +185,14 @@ module CloudModel
         todo.select { |g| synced.include? g.host }.each do |guest|
           print_prefix guest
           begin
-            patch_guest guest, inventories[guest], os, arch
+            note = patch_guest guest, inventories[guest], os, arch
             counts[:patched] += 1
-            output.puts "\e[32mpatched\e[39m"
+            output.puts "\e[32m#{note}\e[39m"
           rescue => e
             counts[:failed] += 1
             output.puts "\e[31mFAILED\e[39m (#{e.message.lines.last.to_s.strip[0, 200]})"
-            output.puts "    rollback if it switched: #{RVM} alias create default ruby-#{inventories[guest][:default]}; restore passenger_ruby in /etc/nginx/passenger.conf; systemctl reload nginx"
+            inv = inventories[guest]
+            output.puts "    rollback if it switched: #{RVM} alias create default ruby-#{inv[:default]}; #{inv[:apps].map { |a| "echo #{a[:ruby_version] || inv[:default]} > #{a[:dir]}/.ruby-version" } * '; '}; passenger-config restart-app / --ignore-app-not-running; systemctl try-restart #{inv[:units] * ' '}"
           end
         end
       end
@@ -183,11 +205,11 @@ module CloudModel
       RVM=#{RVM}
       echo "default=$($RVM default do ruby -e 'print RUBY_VERSION' 2>/dev/null)"
       echo "installed=$(ls #{RVM_PATH}/rubies 2>/dev/null | grep '^ruby-' | tr '\\n' ' ')"
-      echo "passenger_ruby=$(sed -n 's/^[[:space:]]*passenger_ruby[[:space:]]\\{1,\\}\\([^;]*\\);.*/\\1/p' /etc/nginx/passenger.conf 2>/dev/null | head -1)"
-      echo "passenger_version=$($RVM default do passenger-config --version 2>/dev/null)"
-      for f in $(find /var/www -maxdepth 4 -name Gemfile.lock -not -path '*/releases/*' -not -path '*/shared/*' -not -path '*/bundle/*' 2>/dev/null | sort); do
-        echo "app=$(dirname $f)|$(awk '/^BUNDLED WITH/ { getline; gsub(/ /, ""); print }' $f)"
+      for c in /var/www/*/current; do
+        [ -f "$c/Gemfile.lock" ] || continue
+        echo "app=$c|$(awk '/^BUNDLED WITH/ { getline; gsub(/ /, ""); print }' "$c/Gemfile.lock")|$(cat "$c/.ruby-version" 2>/dev/null | tr -d '[:space:]')"
       done
+      echo "running=$(for p in $(ps -u www -o pid= 2>/dev/null); do readlink /proc/$p/exe 2>/dev/null; done | grep -o 'rubies/ruby-[0-9.]*/' | sed 's#rubies/ruby-##; s#/##' | sort -u | tr '\\n' ' ')"
       echo "units=$(systemctl list-units --plain --no-legend 'delayed_jobs@*.service' 'rake-*.service' monitoring.service 2>/dev/null | awk '{ print $1 }' | tr '\\n' ' ')"
       echo "os=$(. /etc/os-release; echo $ID-$VERSION_ID)"
       echo "arch=$(dpkg --print-architecture)"
@@ -243,28 +265,36 @@ module CloudModel
           "unpacking the ruby into #{guest.name} failed"
       end
       guest.exec! "bash -c #{switch_script(inv).shellescape}", "switching #{guest.name} to #{ruby_name} failed"
-      after = inventory guest
-      raise "guest still runs #{after[:default]} after the switch" unless up_to_date?(after)
+      # Passenger respawns the apps on the next request, the units come back
+      # within seconds — give the processes a moment, then look at what the
+      # app user's processes really execute.
+      after = nil
+      6.times do
+        sleep 5
+        after = inventory guest
+        break if up_to_date?(after)
+      end
+      stale = after[:running].reject { |v| v == version }
+      raise "guest still runs #{stale * ' '} after the switch (default #{after[:default]})" unless up_to_date?(after)
+      after[:running].empty? ? 'patched (no ruby process running yet — checks on the next request)' : 'patched'
     end
 
     # Everything that can fail runs before anything changes: bundler in the
-    # locked versions, `bundle check` per application. Then the default alias,
-    # passenger.conf and the reload, then the job units.
+    # locked versions, `bundle check` per application. Then the default alias
+    # and the applications' `.ruby-version`, a Passenger restart per
+    # application, the job units. The last line reports the interpreters the
+    # app user's processes run afterwards.
     def switch_script inv
       bundlers = inv[:apps].map { |a| a[:bundled_with] }.compact.uniq
-      units = inv[:units]
       <<~SH
         set -e
         test -x #{ruby_bin}
         #{bundlers.map { |b| "#{RVM} #{ruby_name} do gem install bundler -v #{b.shellescape} --no-document >/dev/null" } * "\n"}
         #{inv[:apps].map { |a| "(cd #{a[:dir].shellescape} && #{RVM} #{ruby_name} do bundle check >/dev/null) || { echo \"bundle check failed in #{a[:dir]}\"; exit 3; }" } * "\n"}
         #{RVM} alias create default #{ruby_name}
-        if [ -f /etc/nginx/passenger.conf ]; then
-          sed -i 's#^\\([[:space:]]*passenger_ruby[[:space:]]\\{1,\\}\\)[^;]*;#\\1#{ruby_bin};#' /etc/nginx/passenger.conf
-          nginx -t
-          systemctl reload nginx
-        fi
-        #{units.map { |u| "systemctl try-restart #{u.shellescape}" } * "\n"}
+        #{inv[:apps].map { |a| "echo #{ruby_name} > #{a[:dir].shellescape}/.ruby-version" } * "\n"}
+        #{inv[:apps].map { |a| "passenger-config restart-app #{a[:dir].shellescape} --ignore-app-not-running >/dev/null 2>&1 || true" } * "\n"}
+        #{inv[:units].map { |u| "systemctl try-restart #{u.shellescape}" } * "\n"}
       SH
     end
   end
