@@ -571,7 +571,7 @@ namespace :cloudmodel do
       guests.sort_by { |g| [g.host.name, g.name] }
     end
 
-desc "Bring the RVM Ruby of the running guests onto a new patch release without a redeploy: RUBY=3.4.13. Dry run (inventory and plan) unless CONFIRM=1. Compiles once per os/arch on the build host in a clone of a finished guest template (RVM_UPDATE=1 runs `rvm get master` there first), distributes the archive, switches default alias, passenger.conf (nginx reload = Passenger cold start) and the job units; the old Ruby stays as rollback. HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
+desc "Bring the RVM Ruby of the running guests onto a new patch release without a redeploy: RUBY=3.4.13. Dry run (inventory and plan) unless CONFIRM=1. Compiles once per os/arch on the build host in a clone of a finished guest template (RVM_UPDATE=1 runs `rvm get master` there first), syncs the ruby volume host to host, switches default alias, passenger.conf (nginx reload = Passenger cold start) and the job units; the old Ruby stays as rollback. HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
 task :patch_ruby => [:environment] do
   abort "RUBY=<version> missing (e.g. RUBY=3.4.13)" if ENV["RUBY"].blank?
   guests = CloudModel::RubyPatch.guests_with_ruby nginx_guests_from_env

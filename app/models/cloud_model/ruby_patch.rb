@@ -12,7 +12,9 @@ module CloudModel
   #
   # Per (os, arch) the Ruby is compiled once on the build host, in a clone of
   # a finished guest template of that os/arch ({Workers::RubyBuildWorker}),
-  # and distributed through the controller to the hosts; every guest then gets the archive unpacked
+  # committed as a small ZFS volume and synced host to host the way template
+  # volumes travel ({Mixins::ZfsDatasetSync}, direct over the private
+  # network); every guest then gets it unpacked
   # into /usr/local/rvm, bundler in the versions its applications are locked
   # to, a `bundle check` per application — only when all of them pass does
   # the default alias switch, passenger.conf gets the new interpreter and
@@ -23,6 +25,8 @@ module CloudModel
   # Driven by `rake cloudmodel:guest:patch_ruby RUBY=<version>` (dry run
   # unless CONFIRM=1).
   class RubyPatch
+    include CloudModel::Mixins::ZfsDatasetSync
+
     RVM = '/usr/local/rvm/bin/rvm'
     RVM_PATH = '/usr/local/rvm'
 
@@ -31,12 +35,10 @@ module CloudModel
     # @param version [String] the exact Ruby to install, e.g. "3.4.13"
     # @param rvm_update [Boolean] run `rvm get master` in the build system
     #   first (when RVM refuses the version as unknown)
-    # @param local_dir [String, Pathname] where the controller caches the archives
-    def initialize version:, rvm_update: false, local_dir: Rails.root.join('tmp', 'ruby_patch'), output: $stdout
+    def initialize version:, rvm_update: false, output: $stdout
       raise ArgumentError, "RUBY must be a full version like 3.4.13, got #{version.inspect}" unless version.to_s =~ /\A\d+\.\d+\.\d+\z/
       @version = version.to_s
       @rvm_update = rvm_update
-      @local_dir = local_dir
       @output = output
     end
 
@@ -87,6 +89,14 @@ module CloudModel
       inv[:default] == version && (inv[:passenger_ruby].nil? || inv[:passenger_ruby] == ruby_bin)
     end
 
+    # The ruby volume of this release for an os/arch on `host`: the RVM
+    # directories of the one Ruby (rubies/, gems/, environments/, wrappers/),
+    # committed with a @ready snapshot like a template volume.
+    def volume_on host, os, arch
+      CloudModel::BuildZfsVolume.new host, "#{CloudModel.config.build_dataset}/ruby/#{version}/#{os}-#{arch}",
+        mountpoint: "/cloud/build/ruby/#{version}/#{os}-#{arch}"
+    end
+
     # @param guests [Array<Guest>] running guests with a Ruby (see .guests_with_ruby)
     # @param dry_run [Boolean] inventory and plan only
     # @return [Hash] `{ patched:, current:, failed: }` counts
@@ -119,23 +129,39 @@ module CloudModel
         counts[:current] += inventories.size - todo.size
         next if todo.empty?
 
+        hosts = todo.map(&:host).uniq
         if dry_run
-          host = CloudModel::Host.build_host(arch)
+          build_host = CloudModel::Host.build_host(arch)
           template = build_template os, arch
-          where = host && template ? "on #{host.name} in a clone of template #{template.id} (#{template.template_type&.components&.join(',')})" : "\e[31mno #{host ? 'finished template with a ruby' : 'build host'} for #{os} #{arch}\e[39m"
-          output.puts "  would compile #{ruby_name} #{where}#{' — archive cached, no compile' if File.file?(local_archive(os, arch))}, then patch #{todo.size} guest(s)"
+          if build_host && template
+            ready = volume_on(build_host, os, arch).ready?
+            output.puts "  would #{ready ? "reuse the #{ruby_name} volume on #{build_host.name}" : "compile #{ruby_name} on #{build_host.name} in a clone of template #{template.id} (#{template.template_type&.components&.join(',')})"}, sync it to #{(hosts - [build_host]).map(&:name).join(', ').presence || 'no other host'}, then patch #{todo.size} guest(s)"
+          else
+            output.puts "  \e[31mno #{build_host ? 'finished template with a ruby' : 'build host'} for #{os} #{arch}\e[39m — #{todo.size} guest(s) stay"
+          end
           next
         end
 
         begin
-          ensure_archive os, arch
+          build_host = ensure_volume os, arch
         rescue => e
           counts[:failed] += todo.size
           output.puts "  \e[31mbuild FAILED\e[39m: #{e.message.lines.last.to_s.strip[0, 200]}"
           next
         end
 
-        todo.each do |guest|
+        synced = hosts.select do |host|
+          begin
+            ensure_volume_on host, build_host, os, arch
+            true
+          rescue => e
+            counts[:failed] += todo.count { |g| g.host == host }
+            output.puts "  \e[31msync to #{host.name} FAILED\e[39m: #{e.message.lines.last.to_s.strip[0, 200]}"
+            false
+          end
+        end
+
+        todo.select { |g| synced.include? g.host }.each do |guest|
           print_prefix guest
           begin
             patch_guest guest, inventories[guest], os, arch
@@ -183,44 +209,37 @@ module CloudModel
       end
     end
 
-    def archive_name os, arch
-      "cloudmodel-#{ruby_name}-#{os}-#{arch}.tar.gz"
-    end
-
-    def remote_archive os, arch
-      "/tmp/#{archive_name os, arch}"
-    end
-
-    def local_archive os, arch
-      File.join @local_dir.to_s, archive_name(os, arch)
-    end
-
-    # Compiles the Ruby on the build host when needed and pulls the archive
-    # onto the controller (once per os/arch; a cached archive from an earlier
-    # run is reused and nothing is compiled).
-    def ensure_archive os, arch
-      local = local_archive os, arch
-      if File.file? local
-        output.puts "  archive cached: #{local}"
-        return
-      end
-
+    # Compiles the Ruby on the build host when its volume is not there yet.
+    # @return [CloudModel::Host] the build host
+    def ensure_volume os, arch
       host = CloudModel::Host.build_host(arch) or raise "no build host for arch #{arch} (CloudModel.config.build_host_name)"
-      template = build_template(os, arch) or raise "no finished guest template with a ruby for #{os} #{arch}"
-      output.puts "  compiling #{ruby_name} on #{host.name} in a clone of template #{template.id} (several minutes) …"
-      CloudModel::Workers::RubyBuildWorker.new(host, template: template, version: version, rvm_update: @rvm_update).build! remote_archive(os, arch)
-      FileUtils.mkdir_p @local_dir
-      host.sftp.download! remote_archive(os, arch), local
-      output.puts "  archive: #{local} (#{(File.size(local) / 1024.0**2).round} MB)"
+      volume = volume_on host, os, arch
+      if volume.ready?
+        output.puts "  #{ruby_name} volume ready on #{host.name}"
+      else
+        template = build_template(os, arch) or raise "no finished guest template with a ruby for #{os} #{arch}"
+        output.puts "  compiling #{ruby_name} on #{host.name} in a clone of template #{template.id} (several minutes) …"
+        CloudModel::Workers::RubyBuildWorker.new(host, template: template, version: version, volume: volume, rvm_update: @rvm_update).build!
+      end
+      host
+    end
+
+    # Brings the ruby volume onto `host` (zfs send/receive from the build
+    # host, direct over the private network) and mounts it.
+    def ensure_volume_on host, build_host, os, arch
+      volume = volume_on host, os, arch
+      unless volume.ready?
+        output.puts "  syncing #{ruby_name} volume #{build_host.name} → #{host.name}"
+        sync_zfs_dataset! build_host, host, volume.dataset_name
+      end
+      volume.mount!
     end
 
     def patch_guest guest, inv, os, arch
       host = guest.host
       unless installed? inv
-        remote = remote_archive os, arch
-        success, _ = host.exec "test -f #{remote.shellescape}"
-        host.sftp.upload! local_archive(os, arch), remote unless success
-        host.exec! "/usr/bin/lxc exec #{guest.current_lxd_container.name.shellescape} -- tar -C #{RVM_PATH} -xzf - < #{remote.shellescape}",
+        mountpoint = volume_on(host, os, arch).mountpoint
+        host.exec! "tar -C #{mountpoint.shellescape} -cf - rubies gems environments wrappers | /usr/bin/lxc exec #{guest.current_lxd_container.name.shellescape} -- tar -C #{RVM_PATH} -xf -",
           "unpacking the ruby into #{guest.name} failed"
       end
       guest.exec! "bash -c #{switch_script(inv).shellescape}", "switching #{guest.name} to #{ruby_name} failed"
