@@ -67,14 +67,15 @@ module CloudModel
     # @return [Hash] default: RUBY_VERSION of `rvm default`, installed: [ruby
     #   names], apps: [{dir:, bundled_with:, ruby_version:}] (the
     #   applications under /var/www/<app>/current with the bundler their lock
-    #   names and their `.ruby-version`), running: [versions] (RUBY_VERSION
-    #   of the interpreters the app user's ruby processes execute — Passenger
-    #   apps, job workers, rake services), units: [systemd units to restart],
+    #   names and their `.ruby-version`), passenger_running: / other_running:
+    #   / running: [versions] (RUBY_VERSION of the interpreters the app
+    #   user's ruby processes execute — Passenger apps; job workers and rake
+    #   services; both), units: [systemd units to restart],
     #   os:, arch: (as dpkg names them)
     def inventory guest
       success, data = guest.exec "bash -c #{INVENTORY_SCRIPT.shellescape}"
       raise "inventory failed: #{data.to_s.lines.last}" unless success
-      result = { installed: [], apps: [], running: [], units: [] }
+      result = { installed: [], apps: [], passenger_running: [], other_running: [], units: [] }
       data.to_s.each_line do |line|
         key, _, value = line.strip.partition('=')
         case key
@@ -83,12 +84,14 @@ module CloudModel
         when 'app'
           dir, bundled, pinned = value.split('|', 3)
           result[:apps] << { dir: dir, bundled_with: bundled.presence, ruby_version: pinned.to_s.sub(/\Aruby-/, '').presence }
-        when 'running' then result[:running] = value.split
+        when 'passenger_running' then result[:passenger_running] = value.split
+        when 'other_running' then result[:other_running] = value.split
         when 'units' then result[:units] = value.split
         when 'os' then result[:os] = value
         when 'arch' then result[:arch] = value
         end
       end
+      result[:running] = (result[:passenger_running] + result[:other_running]).uniq.sort
       result
     end
 
@@ -210,7 +213,9 @@ module CloudModel
         [ -f "$c/Gemfile.lock" ] || continue
         echo "app=$c|$(awk '/^BUNDLED WITH/ { getline; gsub(/ /, ""); print }' "$c/Gemfile.lock")|$(cat "$c/.ruby-version" 2>/dev/null | tr -d '[:space:]')"
       done
-      echo "running=$(for p in $(ps -u www -o pid= 2>/dev/null); do readlink /proc/$p/exe 2>/dev/null; done | grep -o 'rubies/ruby-[0-9.]*/' | sed 's#rubies/ruby-##; s#/##' | sort -u | tr '\\n' ' ')"
+      rv() { for p in $(ps -u www -o pid= 2>/dev/null); do if ps -o args= -p $p 2>/dev/null | grep -q "$1"; then readlink /proc/$p/exe 2>/dev/null; fi; done | grep -o 'rubies/ruby-[0-9.]*/' | sed 's#rubies/ruby-##; s#/##' | sort -u | tr '\\n' ' '; }
+      echo "passenger_running=$(rv '^Passenger')"
+      echo "other_running=$(rv -v '^Passenger')"
       echo "units=$(systemctl list-units --plain --no-legend 'delayed_jobs@*.service' 'rake-*.service' monitoring.service 2>/dev/null | awk '{ print $1 }' | tr '\\n' ' ')"
       echo "os=$(. /etc/os-release; echo $ID-$VERSION_ID)"
       echo "arch=$(dpkg --print-architecture)"
@@ -269,8 +274,10 @@ module CloudModel
       # Passenger respawns the apps on the next request, the units come back
       # within seconds — give the processes a moment, then look at what the
       # app user's processes really execute.
+      # On an I/O-bound host a Rails boot takes minutes, so give it up to
+      # three before calling the switch failed.
       after = nil
-      6.times do
+      36.times do
         sleep 5
         after = inventory guest
         break if up_to_date?(after)
@@ -283,20 +290,31 @@ module CloudModel
     # Everything that can fail runs before anything changes: bundler in the
     # locked versions, `bundle check` per application. Then the default alias
     # and the applications' `.ruby-version`, a Passenger restart per
-    # application, the job units. The last line reports the interpreters the
-    # app user's processes run afterwards.
+    # application, the job units (without waiting: a unit whose Rails boot
+    # outlives systemd's start timeout on a slow host must not abort the
+    # switch — the verification afterwards looks at the processes). A guest
+    # that is switched already and only has processes left on the old Ruby
+    # (a unit restart that timed out in an earlier run) gets just the
+    # restarts it needs: the Passenger apps when a Passenger process is
+    # stale, the units when another process is.
     def switch_script inv
+      switched = inv[:default] == version && inv[:apps].all? { |a| a[:ruby_version] == version }
       bundlers = inv[:apps].map { |a| a[:bundled_with] }.compact.uniq
-      <<~SH
-        set -e
-        test -x #{ruby_bin}
-        #{bundlers.map { |b| "#{RVM} #{ruby_name} do gem install bundler -v #{b.shellescape} --no-document >/dev/null" } * "\n"}
-        #{inv[:apps].map { |a| "(cd #{a[:dir].shellescape} && #{RVM} #{ruby_name} do bundle check >/dev/null) || { echo \"bundle check failed in #{a[:dir]}\"; exit 3; }" } * "\n"}
-        #{RVM} alias create default #{ruby_name}
-        #{inv[:apps].map { |a| "echo #{ruby_name} > #{a[:dir].shellescape}/.ruby-version" } * "\n"}
-        #{inv[:apps].map { |a| "passenger-config restart-app #{a[:dir].shellescape} --ignore-app-not-running >/dev/null 2>&1 || true" } * "\n"}
-        #{inv[:units].map { |u| "systemctl try-restart #{u.shellescape}" } * "\n"}
-      SH
+      steps = ["set -e", "test -x #{ruby_bin}"]
+      unless switched
+        steps += bundlers.map { |b| "#{RVM} #{ruby_name} do gem install bundler -v #{b.shellescape} --no-document >/dev/null" }
+        steps += inv[:apps].map { |a| "(cd #{a[:dir].shellescape} && #{RVM} #{ruby_name} do bundle check >/dev/null) || { echo \"bundle check failed in #{a[:dir]}\"; exit 3; }" }
+        steps << "#{RVM} alias create default #{ruby_name}"
+        steps += inv[:apps].map { |a| "echo #{ruby_name} > #{a[:dir].shellescape}/.ruby-version" }
+      end
+      stale = ->(versions) { versions.any? { |v| v != version } }
+      if !switched || stale.(inv[:passenger_running])
+        steps += inv[:apps].map { |a| "passenger-config restart-app #{a[:dir].shellescape} --ignore-app-not-running >/dev/null 2>&1 || true" }
+      end
+      if !switched || stale.(inv[:other_running])
+        steps += inv[:units].map { |u| "systemctl --no-block try-restart #{u.shellescape}" }
+      end
+      steps.join("\n") + "\n"
     end
   end
 end

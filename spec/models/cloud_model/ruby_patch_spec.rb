@@ -22,7 +22,8 @@ describe CloudModel::RubyPatch do
       default=3.4.8
       installed=ruby-3.4.8
       app=/var/www/rails/current|2.5.4|ruby-3.4.8
-      running=3.4.8
+      passenger_running=3.4.8
+      other_running=3.4.8
       units=delayed_jobs@default.service rake-index.service
       os=debian-12
       arch=amd64
@@ -30,7 +31,7 @@ describe CloudModel::RubyPatch do
   end
 
   let(:new_inventory) do
-    old_inventory.sub('default=3.4.8', 'default=3.4.13').sub('|ruby-3.4.8', '|ruby-3.4.13').sub('running=3.4.8', 'running=3.4.13').sub('installed=ruby-3.4.8', 'installed=ruby-3.4.8 ruby-3.4.13')
+    old_inventory.sub('default=3.4.8', 'default=3.4.13').sub('|ruby-3.4.8', '|ruby-3.4.13').gsub('running=3.4.8', 'running=3.4.13').sub('installed=ruby-3.4.8', 'installed=ruby-3.4.8 ruby-3.4.13')
   end
 
   it 'refuses anything but a full version' do
@@ -65,7 +66,7 @@ describe CloudModel::RubyPatch do
     end
 
     it 'is current only when default, every .ruby-version and every running interpreter are the release' do
-      expect(guest).to receive(:exec).and_return [true, new_inventory], [true, new_inventory.sub('|ruby-3.4.13', '|3.4.11')], [true, new_inventory.sub('running=3.4.13', 'running=3.4.11 3.4.13')], [true, new_inventory.sub("running=3.4.13\n", "running=\n")]
+      expect(guest).to receive(:exec).and_return [true, new_inventory], [true, new_inventory.sub('|ruby-3.4.13', '|3.4.11')], [true, new_inventory.sub('other_running=3.4.13', 'other_running=3.4.11 3.4.13')], [true, new_inventory.gsub(/_running=3.4.13\n/, "_running=\n")]
       expect(subject.up_to_date?(subject.inventory(guest))).to be true
       expect(subject.up_to_date?(subject.inventory(guest))).to be false
       expect(subject.up_to_date?(subject.inventory(guest))).to be false
@@ -180,8 +181,8 @@ describe CloudModel::RubyPatch do
             expect(script).to include 'rvm alias create default ruby-3.4.13'
             expect(script).to include 'echo ruby-3.4.13 > /var/www/rails/current/.ruby-version'
             expect(script).to include 'passenger-config restart-app /var/www/rails/current --ignore-app-not-running'
-            expect(script).to include 'systemctl try-restart delayed_jobs@default.service'
-            expect(script).to include 'systemctl try-restart rake-index.service'
+            expect(script).to include 'systemctl --no-block try-restart delayed_jobs@default.service'
+            expect(script).to include 'systemctl --no-block try-restart rake-index.service'
             expect(script).not_to include 'nginx'
             expect(script.index('bundle check')).to be < script.index('alias create default')
             expect(script.index('alias create default')).to be < script.index('.ruby-version')
@@ -214,7 +215,7 @@ describe CloudModel::RubyPatch do
       end
 
       it 'fails a guest whose processes still run the old interpreter after the switch' do
-        expect(guest).to receive(:exec).with(/readlink/).and_return [true, old_inventory], *([[true, new_inventory.sub('running=3.4.13', 'running=3.4.8 3.4.13')]] * 6)
+        expect(guest).to receive(:exec).with(/readlink/).and_return [true, old_inventory], *([[true, new_inventory.sub('passenger_running=3.4.13', 'passenger_running=3.4.8 3.4.13')]] * 36)
         allow(build_volume).to receive(:ready?).and_return true
         allow(host_volume).to receive(:ready?).and_return true
         allow(host_volume).to receive(:mount!)
@@ -225,8 +226,27 @@ describe CloudModel::RubyPatch do
         expect(out.string).to include 'guest still runs 3.4.8 after the switch'
       end
 
+      it 'only restarts the apps and units of a guest that is switched but still has processes on the old ruby' do
+        half = new_inventory.sub('other_running=3.4.13', 'other_running=3.4.11 3.4.13')
+        expect(guest).to receive(:exec).with(/readlink/).and_return [true, half], [true, new_inventory]
+        allow(build_volume).to receive(:ready?).and_return true
+        allow(host_volume).to receive(:ready?).and_return true
+        allow(host_volume).to receive(:mount!)
+        expect(host).not_to receive(:exec!)
+        expect(guest).to receive(:exec!).with(/\Abash -c /, /switching/) do |command, _msg|
+          script = script_of command
+          expect(script).not_to include 'bundle check'
+          expect(script).not_to include 'alias create'
+          expect(script).not_to include '.ruby-version'
+          expect(script).not_to include 'passenger-config restart-app'
+          expect(script).to include 'systemctl --no-block try-restart delayed_jobs@default.service'
+          'ok'
+        end
+        expect(subject.patch!([guest], dry_run: false)[:patched]).to eq 1
+      end
+
       it 'reports a guest without a ruby process yet as patched with a note' do
-        expect(guest).to receive(:exec).with(/readlink/).and_return [true, old_inventory], [true, new_inventory.sub("running=3.4.13\n", "running=\n")]
+        expect(guest).to receive(:exec).with(/readlink/).and_return [true, old_inventory], [true, new_inventory.gsub(/_running=3.4.13\n/, "_running=\n")]
         allow(build_volume).to receive(:ready?).and_return true
         allow(host_volume).to receive(:ready?).and_return true
         allow(host_volume).to receive(:mount!)
