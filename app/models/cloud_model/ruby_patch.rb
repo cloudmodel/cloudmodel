@@ -213,9 +213,14 @@ module CloudModel
         [ -f "$c/Gemfile.lock" ] || continue
         echo "app=$c|$(awk '/^BUNDLED WITH/ { getline; gsub(/ /, ""); print }' "$c/Gemfile.lock")|$(cat "$c/.ruby-version" 2>/dev/null | tr -d '[:space:]')"
       done
-      rv() { for p in $(ps -u www -o pid= 2>/dev/null); do if ps -o args= -p $p 2>/dev/null | grep -q "$1"; then readlink /proc/$p/exe 2>/dev/null; fi; done | grep -o 'rubies/ruby-[0-9.]*/' | sed 's#rubies/ruby-##; s#/##' | sort -u | tr '\\n' ' '; }
-      echo "passenger_running=$(rv '^Passenger')"
-      echo "other_running=$(rv -v '^Passenger')"
+      rubies() { grep -o 'rubies/ruby-[0-9.]*/' | sed 's#rubies/ruby-##; s#/##' | sort -u | tr '\\n' ' '; }
+      pass=""; other=""
+      for p in $(ps -u www -o pid= 2>/dev/null); do
+        e=$(readlink /proc/$p/exe 2>/dev/null) || continue
+        if ps -o args= -p $p 2>/dev/null | grep -q '^Passenger'; then pass="$pass $e"; else other="$other $e"; fi
+      done
+      echo "passenger_running=$(echo "$pass" | tr ' ' '\\n' | rubies)"
+      echo "other_running=$(echo "$other" | tr ' ' '\\n' | rubies)"
       echo "units=$(systemctl list-units --plain --no-legend 'delayed_jobs@*.service' 'rake-*.service' monitoring.service 2>/dev/null | awk '{ print $1 }' | tr '\\n' ' ')"
       echo "os=$(. /etc/os-release; echo $ID-$VERSION_ID)"
       echo "arch=$(dpkg --print-architecture)"
