@@ -10,9 +10,9 @@ module CloudModel
   # bundles (bundle/ruby/3.4.0) keep working on the new interpreter and
   # nothing has to be rebuilt.
   #
-  # Per (os, arch) the Ruby is compiled once, in the first guest of the
-  # group (or `build_guest`), archived on its host and distributed through the
-  # controller to the other hosts; every guest then gets the archive unpacked
+  # Per (os, arch) the Ruby is compiled once on the build host, in a clone of
+  # a finished guest template of that os/arch ({Workers::RubyBuildWorker}),
+  # and distributed through the controller to the hosts; every guest then gets the archive unpacked
   # into /usr/local/rvm, bundler in the versions its applications are locked
   # to, a `bundle check` per application — only when all of them pass does
   # the default alias switch, passenger.conf gets the new interpreter and
@@ -29,15 +29,12 @@ module CloudModel
     attr_reader :version, :output
 
     # @param version [String] the exact Ruby to install, e.g. "3.4.13"
-    # @param build_guest [String, nil] name of the guest to compile in (per
-    #   group default: the first guest, alphabetically by host and name)
-    # @param rvm_update [Boolean] run `rvm get master` in the build guest
+    # @param rvm_update [Boolean] run `rvm get master` in the build system
     #   first (when RVM refuses the version as unknown)
     # @param local_dir [String, Pathname] where the controller caches the archives
-    def initialize version:, build_guest: nil, rvm_update: false, local_dir: Rails.root.join('tmp', 'ruby_patch'), output: $stdout
+    def initialize version:, rvm_update: false, local_dir: Rails.root.join('tmp', 'ruby_patch'), output: $stdout
       raise ArgumentError, "RUBY must be a full version like 3.4.13, got #{version.inspect}" unless version.to_s =~ /\A\d+\.\d+\.\d+\z/
       @version = version.to_s
-      @build_guest = build_guest
       @rvm_update = rvm_update
       @local_dir = local_dir
       @output = output
@@ -122,17 +119,19 @@ module CloudModel
         counts[:current] += inventories.size - todo.size
         next if todo.empty?
 
-        builder = build_guest_for todo, inventories
         if dry_run
-          output.puts "  would compile #{ruby_name} in #{builder.name} @ #{builder.host.name}#{' (already there)' if installed?(inventories[builder])}, then patch #{todo.size} guest(s)"
+          host = CloudModel::Host.build_host(arch)
+          template = build_template os, arch
+          where = host && template ? "on #{host.name} in a clone of template #{template.id} (#{template.template_type&.components&.join(',')})" : "\e[31mno #{host ? 'finished template with a ruby' : 'build host'} for #{os} #{arch}\e[39m"
+          output.puts "  would compile #{ruby_name} #{where}#{' — archive cached, no compile' if File.file?(local_archive(os, arch))}, then patch #{todo.size} guest(s)"
           next
         end
 
         begin
-          ensure_archive builder, inventories[builder], os, arch
+          ensure_archive os, arch
         rescue => e
           counts[:failed] += todo.size
-          output.puts "  \e[31mbuild FAILED\e[39m in #{builder.name}: #{e.message.lines.last.to_s.strip[0, 200]}"
+          output.puts "  \e[31mbuild FAILED\e[39m: #{e.message.lines.last.to_s.strip[0, 200]}"
           next
         end
 
@@ -176,11 +175,12 @@ module CloudModel
       inv[:installed].include? ruby_name
     end
 
-    # The guest to compile in: the named one if it is in the group, else a
-    # guest that already has the Ruby, else the first.
-    def build_guest_for todo, inventories
-      named = todo.detect { |g| g.name == @build_guest } if @build_guest.present?
-      named || todo.detect { |g| installed?(inventories[g]) } || todo.first
+    # The newest finished guest template of the os/arch whose components
+    # include a ruby — RVM and the build dependencies are in it.
+    def build_template os, arch
+      CloudModel::GuestTemplate.where(os_version: os, arch: arch, build_state_id: 0xf0).order(created_at: :desc).to_a.detect do |t|
+        t.template_type&.components.to_a.any? { |c| c.to_s =~ /\Aruby/ }
+      end
     end
 
     def archive_name os, arch
@@ -195,37 +195,23 @@ module CloudModel
       File.join @local_dir.to_s, archive_name(os, arch)
     end
 
-    # Compiles the Ruby in the build guest when needed, packs it on its host
-    # and pulls the archive onto the controller (once per os/arch; a cached
-    # archive from an earlier run is reused and nothing is compiled).
-    def ensure_archive builder, inv, os, arch
+    # Compiles the Ruby on the build host when needed and pulls the archive
+    # onto the controller (once per os/arch; a cached archive from an earlier
+    # run is reused and nothing is compiled).
+    def ensure_archive os, arch
       local = local_archive os, arch
       if File.file? local
         output.puts "  archive cached: #{local}"
         return
       end
 
-      unless installed? inv
-        output.puts "  compiling #{ruby_name} in #{builder.name} @ #{builder.host.name} (several minutes) …"
-        builder.exec! "bash -c #{build_script.shellescape}", "rvm install #{ruby_name} failed"
-      end
-      output.puts "  packing #{ruby_name} from #{builder.name}"
-      pack = "cd #{RVM_PATH} && tar -cf - rubies/#{ruby_name} gems/#{ruby_name}* environments/#{ruby_name}* wrappers/#{ruby_name}*"
-      builder.host.exec! "/usr/bin/lxc exec #{builder.current_lxd_container.name.shellescape} -- bash -c #{pack.shellescape} | gzip -1 > #{remote_archive(os, arch).shellescape}",
-        "packing the ruby on #{builder.host.name} failed"
+      host = CloudModel::Host.build_host(arch) or raise "no build host for arch #{arch} (CloudModel.config.build_host_name)"
+      template = build_template(os, arch) or raise "no finished guest template with a ruby for #{os} #{arch}"
+      output.puts "  compiling #{ruby_name} on #{host.name} in a clone of template #{template.id} (several minutes) …"
+      CloudModel::Workers::RubyBuildWorker.new(host, template: template, version: version, rvm_update: @rvm_update).build! remote_archive(os, arch)
       FileUtils.mkdir_p @local_dir
-      builder.host.sftp.download! remote_archive(os, arch), local
+      host.sftp.download! remote_archive(os, arch), local
       output.puts "  archive: #{local} (#{(File.size(local) / 1024.0**2).round} MB)"
-    end
-
-    def build_script
-      <<~SH
-        set -e
-        test -x #{ruby_bin} && exit 0
-        #{"#{RVM} get master" if @rvm_update}
-        #{RVM} install #{ruby_name} --disable-binary --autolibs=read-fail
-        test -x #{ruby_bin}
-      SH
     end
 
     def patch_guest guest, inv, os, arch

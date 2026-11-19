@@ -571,7 +571,7 @@ namespace :cloudmodel do
       guests.sort_by { |g| [g.host.name, g.name] }
     end
 
-desc "Bring the RVM Ruby of the running guests onto a new patch release without a redeploy: RUBY=3.4.13. Dry run (inventory and plan) unless CONFIRM=1. Compiles once per os/arch in the first guest of the group (BUILD=<name> picks it; RVM_UPDATE=1 runs `rvm get master` there first), distributes the archive, switches default alias, passenger.conf (nginx reload = Passenger cold start) and the job units; the old Ruby stays as rollback. HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
+desc "Bring the RVM Ruby of the running guests onto a new patch release without a redeploy: RUBY=3.4.13. Dry run (inventory and plan) unless CONFIRM=1. Compiles once per os/arch on the build host in a clone of a finished guest template (RVM_UPDATE=1 runs `rvm get master` there first), distributes the archive, switches default alias, passenger.conf (nginx reload = Passenger cold start) and the job units; the old Ruby stays as rollback. HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
 task :patch_ruby => [:environment] do
   abort "RUBY=<version> missing (e.g. RUBY=3.4.13)" if ENV["RUBY"].blank?
   guests = CloudModel::RubyPatch.guests_with_ruby nginx_guests_from_env
@@ -579,7 +579,7 @@ task :patch_ruby => [:environment] do
 
   dry_run = ENV["CONFIRM"] != "1"
   puts "\e[33mDRY RUN — set CONFIRM=1 to patch.\e[39m" if dry_run
-  patch = CloudModel::RubyPatch.new version: ENV["RUBY"], build_guest: ENV["BUILD"], rvm_update: ENV["RVM_UPDATE"] == "1"
+  patch = CloudModel::RubyPatch.new version: ENV["RUBY"], rvm_update: ENV["RVM_UPDATE"] == "1"
   counts = patch.patch! guests, dry_run: dry_run
   puts "\n#{counts[:current]} guest(s) already on #{ENV["RUBY"]}, #{counts[:patched]} patched, #{counts[:failed]} failed#{" (dry run, nothing changed)" if dry_run}."
   abort "#{counts[:failed]} guest(s) failed" if counts[:failed] > 0
