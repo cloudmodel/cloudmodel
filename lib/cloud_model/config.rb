@@ -43,13 +43,6 @@ module CloudModel
     # hosts and guests (templates + live push). true by default.
     attr_writer :unattended_upgrades
     attr_writer :debian_version
-    # HTTP/2 on the nginx TLS listeners of the guests. Off by default since
-    # the nginx2root disclosure (CVE-2026-123007, CVE-2026-123633: remote code
-    # execution through HTTP/2 in every nginx before 1.30.7); distribution
-    # packages carried no fix at that time, so the fleet answers HTTP/1.1
-    # only. Switch it back on once every guest runs a fixed nginx and push it
-    # live with `rake cloudmodel:guest:sync_nginx_config`.
-    attr_writer :nginx_http2
     attr_writer :php_version, :ruby_version
 
     attr_accessor :admin_email, :email_domain
@@ -184,10 +177,6 @@ module CloudModel
 
     def debian_version
       @debian_version || "12"
-    end
-
-    def nginx_http2
-      @nginx_http2.nil? ? false : @nginx_http2
     end
 
     def ubuntu_major_version

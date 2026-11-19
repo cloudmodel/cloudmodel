@@ -609,6 +609,7 @@ en:
         ssl_port: HTTPS Port
         ssl_cert: SSL Certificate
         ssl_certbot: Use Let's Encrypt Certificate?
+        http2: HTTP/2
 
         secure_headers: Secure Headers
         unsafe_inline_script_allowed: Allow unsafe inline scripts?

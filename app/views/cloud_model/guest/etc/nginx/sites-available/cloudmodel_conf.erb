@@ -9,7 +9,7 @@ protocols << :https if model.ssl_supported?
 <%- protocols.each do |protocol| -%>
 
 server {
-  listen                        <%= protocol == :https ? "#{model.ssl_port} ssl#{' http2' if CloudModel.config.nginx_http2} deferred" : model.port %>;
+  listen                        <%= protocol == :https ? "#{model.ssl_port} ssl#{' http2' if model.http2?} deferred" : model.port %>;
 <%- if model.ssl_certbot? -%>
   server_name                   <%= ([model.guest.external_hostname] + model.guest.external_alt_names) * ' ' %>;
 <%- end -%>

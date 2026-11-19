@@ -555,6 +555,75 @@ namespace :cloudmodel do
       abort "#{failures} guest(s) failed" if failures > 0
     end
 
+    desc "Switch HTTP/2 on the TLS listeners of every nginx service: HTTP2=on|off. Dry run unless CONFIRM=1 — then the field is set on the services (and, with SYNC=1, pushed to the running guests through the live sync of cloudmodel.conf; without SYNC the service is marked staged and `sync_nginx_config FILES=cloudmodel.conf` or the next deploy makes it live). HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
+    task :set_nginx_http2 => [:environment] do
+      value = case ENV['HTTP2'].to_s.downcase
+      when 'on', 'true', '1' then true
+      when 'off', 'false', '0' then false
+      else abort "HTTP2=on or HTTP2=off required"
+      end
+      confirm = ENV['CONFIRM'].to_s == '1'
+      sync = ENV['SYNC'].to_s == '1'
+      exclude = ENV['EXCLUDE'].to_s.split(',').map(&:strip)
+
+      guests = ENV['GUEST_ID'].present? ? [CloudModel::Guest.find(ENV['GUEST_ID'])] : CloudModel::Guest.all.to_a
+      guests = guests.select { |g| g.name == ENV['GUEST'] } if ENV['GUEST'].present?
+      guests = guests.select { |g| g.host_id.to_s == ENV['HOST_ID'] } if ENV['HOST_ID'].present?
+      guests = guests.select { |g| g.host.name == ENV['HOST'] } if ENV['HOST'].present?
+      guests = guests.reject { |g| exclude.include? g.name }
+      guests = guests.select { |g| g.services.any? { |s| s.is_a?(CloudModel::Services::Nginx) } }
+      abort "No guests with nginx found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
+
+      counts = Hash.new(0)
+      guests.sort_by { |g| [g.host.name, g.name] }.each do |guest|
+        service = guest.services.detect { |s| s.is_a?(CloudModel::Services::Nginx) }
+        print "#{guest.name} @ #{guest.host.name}: "
+        unless service.ssl_supported?
+          counts[:no_tls] += 1
+          puts "no TLS listener, HTTP/2 not applicable#{' (field set anyway)' if confirm && service.http2 != value}"
+          service.set http2: value if confirm && service.http2 != value
+          next
+        end
+        if service.http2 == value
+          counts[:unchanged] += 1
+          puts "\e[32malready #{value ? 'on' : 'off'}\e[39m"
+          next
+        end
+        unless confirm
+          counts[:pending] += 1
+          puts "\e[33mwould switch HTTP/2 #{value ? 'on' : 'off'}\e[39m"
+          next
+        end
+        service.set http2: value
+        if sync && guest.up_state == :started
+          begin
+            worker = CloudModel::Workers::Services::NginxWorker.new guest.current_lxd_container, service
+            result = worker.sync_config only: ['cloudmodel.conf']
+            if [:applied, :unchanged].include? result[:state]
+              service.set config_staged_at: nil, config_staged_deploy_required: false, config_staged_changes: [] unless service.config_staged_deploy_required?
+              counts[:synced] += 1
+              puts "\e[32mHTTP/2 #{value ? 'on' : 'off'}, #{result[:state]} live\e[39m"
+            else
+              service.set config_staged_at: Time.now
+              counts[:staged] += 1
+              detail = result[:blocked].to_a.map { |b| "#{File.basename b[:path]} (#{b[:reason]})" } * ', '
+              puts "\e[33mHTTP/2 #{value ? 'on' : 'off'} stored, sync #{result[:state]}\e[39m #{detail}#{result[:output].to_s.strip.lines.last.to_s.strip if result[:state] == :failed}".rstrip
+            end
+          rescue => e
+            service.set config_staged_at: Time.now
+            counts[:staged] += 1
+            puts "\e[31mHTTP/2 #{value ? 'on' : 'off'} stored, sync ERROR\e[39m (#{e.class}: #{e.message[0, 160]})"
+          end
+        else
+          service.set config_staged_at: Time.now
+          counts[:staged] += 1
+          puts "\e[33mHTTP/2 #{value ? 'on' : 'off'} stored, not live yet\e[39m"
+        end
+      end
+      puts "\n#{guests.size} guest(s): #{counts.sort_by { |state, _| state.to_s }.map { |state, n| "#{n} #{state}" } * ', '}#{' (dry run, nothing changed — CONFIRM=1 to apply)' unless confirm}"
+      puts "Push the stored value live with: rake cloudmodel:guest:sync_nginx_config FILES=cloudmodel.conf" if confirm && counts[:staged] > 0
+    end
+
     desc "Push the current nginx configuration (nginx.conf, cloudmodel.conf, root location conf) to the running guests with an nginx service, without a redeploy (NginxWorker#sync_config: nginx -t with rollback, reload only when a file changed — a reload restarts the Passenger application processes). DRY_RUN=1 only reports what would change; FORCE=1 also overwrites manually edited or never recorded files; FILES=nginx.conf,cloudmodel.conf restricts the sync to these files. HOST=<name>|HOST_ID=<id> or GUEST=<name>|GUEST_ID=<id> narrow the set, EXCLUDE=<name>,<name> leaves guests out."
     task :sync_nginx_config => [:environment] do
       dry_run = ENV['DRY_RUN'].to_s == '1'

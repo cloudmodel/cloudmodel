@@ -32,6 +32,11 @@ module CloudModel
       # CAs) — the futile fetches during TLS handshakes can drop connections
       # at strict CDNs/clients.
       field :ssl_stapling, type: Mongoid::Boolean, default: true
+      # HTTP/2 on the TLS listener. Per service so a fleet can drop back to
+      # HTTP/1.1 (`rake cloudmodel:guest:set_nginx_http2 HTTP2=off`) while an
+      # nginx HTTP/2 vulnerability has no distribution fix yet, and come back
+      # once it has — both without a redeploy, through the live config sync.
+      field :http2, type: Mongoid::Boolean, default: true
       belongs_to :ssl_cert, class_name: CloudModel::Certificate, inverse_of: :services, optional: true
       # With Let's Encrypt the cert is certbot's business: no preselected
       # certificate — the deploy bootstraps a self-signed one so nginx comes
@@ -62,7 +67,7 @@ module CloudModel
       # app with the new environment, the job workers read the file on their
       # next restart (every web image deploy restarts them).
       LIVE_SYNCABLE_ATTRIBUTES = %w(
-        ssl_only ssl_enforce ssl_stapling
+        ssl_only ssl_enforce ssl_stapling http2
         unsafe_inline_script_allowed unsafe_eval_script_allowed
         google_analytics_supported hubspot_forms_supported pingdom_supported
         reverse_proxy_for passenger_env passenger_env_vars passenger_max_pool_size rails_cable_supported
