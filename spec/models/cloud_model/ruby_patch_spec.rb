@@ -38,14 +38,15 @@ describe CloudModel::RubyPatch do
   end
 
   describe '.guests_with_ruby' do
-    it 'keeps guests whose nginx runs Passenger or Capistrano apps' do
-      passenger = double 'nginx', passenger_supported: true, capistrano_supported: false
-      proxy = double 'nginx', passenger_supported: false, capistrano_supported: false
-      allow(passenger).to receive(:is_a?).with(CloudModel::Services::Nginx).and_return true
-      allow(proxy).to receive(:is_a?).with(CloudModel::Services::Nginx).and_return true
-      with = double 'guest', services: [passenger]
-      without = double 'guest', services: [proxy]
-      expect(described_class.guests_with_ruby([with, without])).to eq [with]
+    it 'keeps guests with a service whose components include a ruby' do
+      passenger = double 'nginx', components_needed: [:"ruby@3.4", :nginx]
+      runner = double 'runner', components_needed: [:"forgejo_runner@13.2.1", :"ruby@3.4.8", :nodejs]
+      proxy = double 'nginx', components_needed: [:nginx]
+      rubyless = double 'mongodb', components_needed: [:"mongodb@8.0"]
+      web = double 'web guest', services: [passenger]
+      ci = double 'ci guest', services: [rubyless, runner]
+      other = double 'other guest', services: [proxy, rubyless]
+      expect(described_class.guests_with_ruby([web, ci, other])).to eq [web, ci]
     end
   end
 

@@ -54,11 +54,12 @@ module CloudModel
       "#{RVM_PATH}/rubies/#{ruby_name}/bin/ruby"
     end
 
-    # Guests that run a Ruby from the template: an nginx service with
-    # Passenger or Capistrano support pulls the ruby component in.
+    # Guests that run a Ruby from the template: any service whose components
+    # include a ruby — an nginx service with Passenger or Capistrano support,
+    # a CI runner with a ruby toolchain, …
     def self.guests_with_ruby guests
       guests.select do |g|
-        g.services.any? { |s| s.is_a?(CloudModel::Services::Nginx) && (s.passenger_supported || s.capistrano_supported) }
+        g.services.any? { |s| s.components_needed.any? { |c| c.to_s =~ /\Aruby(@|\z)/ } }
       end
     end
 
