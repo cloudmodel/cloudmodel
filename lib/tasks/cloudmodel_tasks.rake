@@ -558,7 +558,7 @@ namespace :cloudmodel do
     # Guests with an nginx service, narrowed by HOST=<name>|HOST_ID=<id>,
     # GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name>, sorted by host and
     # name. Aborts when nothing is left (the usual cause: RAILS_ENV missing).
-    def nginx_guests_from_env running_only: true
+    def nginx_guests_from_env running_only: true, with_nginx: true
       exclude = ENV['EXCLUDE'].to_s.split(',').map(&:strip)
       guests = ENV['GUEST_ID'].present? ? [CloudModel::Guest.find(ENV['GUEST_ID'])] : CloudModel::Guest.all.to_a
       guests = guests.select { |g| g.name == ENV['GUEST'] } if ENV['GUEST'].present?
@@ -566,15 +566,15 @@ namespace :cloudmodel do
       guests = guests.select { |g| g.host.name == ENV['HOST'] } if ENV['HOST'].present?
       guests = guests.reject { |g| exclude.include? g.name }
       guests = guests.select { |g| g.up_state == :started } if running_only
-      guests = guests.select { |g| g.services.any? { |s| s.is_a?(CloudModel::Services::Nginx) } }
-      abort "No #{'running ' if running_only}guests with nginx found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
+      guests = guests.select { |g| g.services.any? { |s| s.is_a?(CloudModel::Services::Nginx) } } if with_nginx
+      abort "No #{'running ' if running_only}guests#{' with nginx' if with_nginx} found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
       guests.sort_by { |g| [g.host.name, g.name] }
     end
 
 desc "Bring the RVM Ruby of the running guests onto a new patch release without a redeploy: RUBY=3.4.13. Dry run (inventory and plan) unless CONFIRM=1. Compiles once per os/arch on the build host in a clone of a finished guest template (RVM_UPDATE=1 runs `rvm get master` there first), syncs the ruby volume host to host, switches the RVM default and each application's .ruby-version, restarts the Passenger apps (cold start) and the job units; guests on another minor line are skipped; the old Ruby stays as rollback. HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
 task :patch_ruby => [:environment] do
   abort "RUBY=<version> missing (e.g. RUBY=3.4.13)" if ENV["RUBY"].blank?
-  guests = CloudModel::RubyPatch.guests_with_ruby nginx_guests_from_env
+  guests = CloudModel::RubyPatch.guests_with_ruby nginx_guests_from_env(with_nginx: false)
   abort "No running guests with a Ruby found in #{Rails.env} database" if guests.empty?
 
   dry_run = ENV["CONFIRM"] != "1"
