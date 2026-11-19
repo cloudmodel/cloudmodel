@@ -1315,6 +1315,39 @@ describe CloudModel::Guest do
     end
   end
 
+  describe 'stage_nginx_config_on_cpu_change' do
+    let(:nginx) { CloudModel::Services::Nginx.new name: 'nginx' }
+    let(:ssh) { CloudModel::Services::Ssh.new name: 'ssh' }
+
+    before do
+      subject.services << nginx
+      subject.services << ssh
+      allow(subject).to receive(:persisted?).and_return true
+      subject.move_changes # a new document reports its defaults as changes
+    end
+
+    it 'stages the nginx services of a deployed guest when cpu_count changes' do
+      subject.current_lxd_container_id = BSON::ObjectId.new
+      subject.cpu_count = 4
+      subject.stage_nginx_config_on_cpu_change
+      expect(nginx.config_staged_at).to be_within(2.seconds).of Time.now
+      expect(ssh.config_staged_at).to be_nil
+    end
+
+    it 'leaves the services alone when cpu_count did not change' do
+      subject.current_lxd_container_id = BSON::ObjectId.new
+      subject.name = 'other'
+      subject.stage_nginx_config_on_cpu_change
+      expect(nginx.config_staged_at).to be_nil
+    end
+
+    it 'leaves the services alone on a guest that is not deployed' do
+      subject.cpu_count = 4
+      subject.stage_nginx_config_on_cpu_change
+      expect(nginx.config_staged_at).to be_nil
+    end
+  end
+
   describe 'apply_cpu_count' do
     let(:container) { double CloudModel::LxdContainer }
 

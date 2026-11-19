@@ -627,6 +627,12 @@ module CloudModel
           skipped = only ? full_plan.reject { |f| only.include?(f[:path]) or only.include?(File.basename f[:path]) } : []
           # Skipped files stay in the manifest as they were recorded.
           kept = skipped.select { |f| manifest[f[:path]] }.map { |f| f.merge(hash: manifest[f[:path]]) }
+          # `only` named no file of this service's plan (typo, or a file this
+          # service does not render): nothing was compared, say so instead of
+          # reporting the guest as in sync.
+          if only and skipped.size == full_plan.size
+            return {state: :skipped, applied: [], pending: [], blocked: [], skipped: only}
+          end
           plan = (full_plan - skipped).each do |file|
             remote = remote_file_hash file[:path]
             file[:state] = if remote.nil?

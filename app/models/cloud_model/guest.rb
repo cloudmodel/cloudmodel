@@ -98,6 +98,7 @@ module CloudModel
 
     before_validation :set_dhcp_private_address, :on => :create
     before_validation :set_mac_address, :on => :create
+    before_save :stage_nginx_config_on_cpu_change
     before_destroy    :stop
     after_destroy     :remove_external_address_resolution
 
@@ -677,6 +678,15 @@ module CloudModel
         container.set_config 'limits.memory', memory_size
       else
         nil
+      end
+    end
+
+    # nginx sizes its worker processes by cpu_count; on a deployed guest a
+    # changed count is a config change the nginx service has not applied yet.
+    def stage_nginx_config_on_cpu_change
+      return unless cpu_count_changed? and persisted? and current_lxd_container_id.present?
+      services.each do |service|
+        service.config_staged_at = Time.now if service.is_a?(CloudModel::Services::Nginx)
       end
     end
 

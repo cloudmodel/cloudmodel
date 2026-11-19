@@ -119,6 +119,7 @@ de:
     unknown: Unbekannt
 
   cloud_model/services/nginx:
+    client_max_body_size_unlimited: unbegrenzt
     deploy_mongodb_replication_set_manual: Eigene MongoDB Konfiguration
     deploy_redis_sentinel_set_manual: Eigene Redis Konfiguration
     deploy_mongodb_read_preferences:

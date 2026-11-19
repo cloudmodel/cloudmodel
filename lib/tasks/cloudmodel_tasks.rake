@@ -555,7 +555,23 @@ namespace :cloudmodel do
       abort "#{failures} guest(s) failed" if failures > 0
     end
 
-    desc "Switch HTTP/2 on the TLS listeners of every nginx service: HTTP2=on|off. Dry run unless CONFIRM=1 — then the field is set on the services (and, with SYNC=1, pushed to the running guests through the live sync of cloudmodel.conf; without SYNC the service is marked staged and `sync_nginx_config FILES=cloudmodel.conf` or the next deploy makes it live). HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
+    # Guests with an nginx service, narrowed by HOST=<name>|HOST_ID=<id>,
+    # GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name>, sorted by host and
+    # name. Aborts when nothing is left (the usual cause: RAILS_ENV missing).
+    def nginx_guests_from_env running_only: true
+      exclude = ENV['EXCLUDE'].to_s.split(',').map(&:strip)
+      guests = ENV['GUEST_ID'].present? ? [CloudModel::Guest.find(ENV['GUEST_ID'])] : CloudModel::Guest.all.to_a
+      guests = guests.select { |g| g.name == ENV['GUEST'] } if ENV['GUEST'].present?
+      guests = guests.select { |g| g.host_id.to_s == ENV['HOST_ID'] } if ENV['HOST_ID'].present?
+      guests = guests.select { |g| g.host.name == ENV['HOST'] } if ENV['HOST'].present?
+      guests = guests.reject { |g| exclude.include? g.name }
+      guests = guests.select { |g| g.up_state == :started } if running_only
+      guests = guests.select { |g| g.services.any? { |s| s.is_a?(CloudModel::Services::Nginx) } }
+      abort "No #{'running ' if running_only}guests with nginx found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
+      guests.sort_by { |g| [g.host.name, g.name] }
+    end
+
+    desc "Switch HTTP/2 on the TLS listeners of every nginx service: HTTP2=on|off. Dry run unless CONFIRM=1 — then the field is set on the services (and, with SYNC=1, pushed to the running guests through the live sync of cloudmodel.conf; without SYNC the service is marked staged and `sync_nginx_config FILES=cloudmodel.conf` or the next deploy makes it live). FORCE=1 lets the sync overwrite a manually edited or never recorded cloudmodel.conf. HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
     task :set_nginx_http2 => [:environment] do
       value = case ENV['HTTP2'].to_s.downcase
       when 'on', 'true', '1' then true
@@ -564,18 +580,10 @@ namespace :cloudmodel do
       end
       confirm = ENV['CONFIRM'].to_s == '1'
       sync = ENV['SYNC'].to_s == '1'
-      exclude = ENV['EXCLUDE'].to_s.split(',').map(&:strip)
-
-      guests = ENV['GUEST_ID'].present? ? [CloudModel::Guest.find(ENV['GUEST_ID'])] : CloudModel::Guest.all.to_a
-      guests = guests.select { |g| g.name == ENV['GUEST'] } if ENV['GUEST'].present?
-      guests = guests.select { |g| g.host_id.to_s == ENV['HOST_ID'] } if ENV['HOST_ID'].present?
-      guests = guests.select { |g| g.host.name == ENV['HOST'] } if ENV['HOST'].present?
-      guests = guests.reject { |g| exclude.include? g.name }
-      guests = guests.select { |g| g.services.any? { |s| s.is_a?(CloudModel::Services::Nginx) } }
-      abort "No guests with nginx found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
+      force = ENV['FORCE'].to_s == '1'
 
       counts = Hash.new(0)
-      guests.sort_by { |g| [g.host.name, g.name] }.each do |guest|
+      nginx_guests_from_env(running_only: false).each do |guest|
         service = guest.services.detect { |s| s.is_a?(CloudModel::Services::Nginx) }
         print "#{guest.name} @ #{guest.host.name}: "
         unless service.ssl_supported?
@@ -598,9 +606,10 @@ namespace :cloudmodel do
         if sync && guest.up_state == :started
           begin
             worker = CloudModel::Workers::Services::NginxWorker.new guest.current_lxd_container, service
-            result = worker.sync_config only: ['cloudmodel.conf']
+            result = worker.sync_config only: ['cloudmodel.conf'], force: force
             if [:applied, :unchanged].include? result[:state]
-              service.set config_staged_at: nil, config_staged_deploy_required: false, config_staged_changes: [] unless service.config_staged_deploy_required?
+              # The listener is live; staged markers from other files or
+              # fields are none of this task's business and stay as they are.
               counts[:synced] += 1
               puts "\e[32mHTTP/2 #{value ? 'on' : 'off'}, #{result[:state]} live\e[39m"
             else
@@ -629,19 +638,11 @@ namespace :cloudmodel do
       dry_run = ENV['DRY_RUN'].to_s == '1'
       force = ENV['FORCE'].to_s == '1'
       only = ENV['FILES'].to_s.split(',').map(&:strip).reject(&:blank?).presence
-      exclude = ENV['EXCLUDE'].to_s.split(',').map(&:strip)
+      guests = nginx_guests_from_env
 
-      guests = ENV['GUEST_ID'].present? ? [CloudModel::Guest.find(ENV['GUEST_ID'])] : CloudModel::Guest.all.to_a
-      guests = guests.select { |g| g.name == ENV['GUEST'] } if ENV['GUEST'].present?
-      guests = guests.select { |g| g.host_id.to_s == ENV['HOST_ID'] } if ENV['HOST_ID'].present?
-      guests = guests.select { |g| g.host.name == ENV['HOST'] } if ENV['HOST'].present?
-      guests = guests.reject { |g| exclude.include? g.name }
-      guests = guests.select { |g| g.up_state == :started and g.services.any? { |s| s.is_a?(CloudModel::Services::Nginx) } }
-      abort "No running guests with nginx found in #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
-
-      colors = {applied: 32, unchanged: 32, pending: 33, blocked: 33, failed: 31, error: 31}
+      colors = {applied: 32, unchanged: 32, pending: 33, blocked: 33, skipped: 33, failed: 31, error: 31}
       counts = Hash.new(0)
-      guests.sort_by { |g| [g.host.name, g.name] }.each do |guest|
+      guests.each do |guest|
         print "#{guest.name} @ #{guest.host.name}: "
         begin
           service = guest.services.detect { |s| s.is_a?(CloudModel::Services::Nginx) }
@@ -652,6 +653,7 @@ namespace :cloudmodel do
           when :applied then result[:applied].map { |path| File.basename path } * ', '
           when :pending then result[:pending].map { |path| File.basename path } * ', '
           when :blocked then result[:blocked].map { |b| "#{File.basename b[:path]} (#{b[:reason]})" } * ', '
+          when :skipped then "none of #{result[:skipped] * ', '} is in this service's config"
           when :failed then result[:output].to_s.strip.lines.last.to_s.strip
           end
           puts "\e[#{colors[result[:state]]}m#{result[:state]}\e[39m #{detail}".rstrip

@@ -19,6 +19,23 @@ describe CloudModel::Workers::Services::NginxWorker do
     allow(subject).to receive(:comment_sub_step)
   end
 
+  describe '#sync_config with an only list matching no file' do
+    before do
+      allow(subject).to receive(:config_sync_plan).and_return [
+        {template: '/cloud_model/guest/etc/nginx/nginx.conf', path: '/etc/nginx/nginx.conf', content: "a\n", hash: 'hash-a'}
+      ]
+      allow(subject).to receive(:read_config_manifest).and_return({})
+    end
+
+    it 'reports skipped instead of unchanged and touches nothing' do
+      expect(subject).not_to receive(:remote_file_hash)
+      expect(subject).not_to receive(:write_config_manifest)
+      result = subject.sync_config only: ['passenger.conf']
+      expect(result[:state]).to eq :skipped
+      expect(result[:skipped]).to eq ['passenger.conf']
+    end
+  end
+
   describe 'restart_rake_daemons' do
     it 'restarts the daemon-mode rake services after a rollout and leaves timer tasks alone' do
       daemon = CloudModel::Services::Rake.new(name: 'Index Worker', rake_task: 'coreon:index_sync', rake_mode: 'restart')
