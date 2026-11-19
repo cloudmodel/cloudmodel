@@ -7,7 +7,7 @@ location <%= location %> {
   passenger_app_root                <%= model.www_root %>/current;
   passenger_document_root           <%= model.www_root %>/current/public;
   passenger_enabled                 on;
-  passenger_min_instances           3;
+  passenger_min_instances           <%= model.passenger_min_instances %>;
   passenger_env_var                 HTTP_X_FORWARDED_PROTO $scheme;
   <%- (model.passenger_env_vars || {}).each do |env_key, env_value| -%>
   <%- next unless env_key.to_s =~ /\A[A-Za-z_][A-Za-z0-9_]*\z/ -%>

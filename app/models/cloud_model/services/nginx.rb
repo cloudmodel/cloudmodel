@@ -17,6 +17,10 @@ module CloudModel
       include CloudModel::Mixins::ENumFields
 
       field :port, type: Integer, default: 80
+      # Upper bound of a request body in megabytes (`client_max_body_size` in
+      # the server context, both listeners). 0 switches the check off.
+      field :client_max_body_size, type: Integer, default: 600
+      validates :client_max_body_size, numericality: {only_integer: true, greater_than_or_equal_to: 0}
 
       embeds_many :location_overwrites, class_name: CloudModel::Services::Nginx::LocationOverwrite, inverse_of: :service
       accepts_nested_attributes_for :location_overwrites, allow_destroy: true
@@ -67,10 +71,10 @@ module CloudModel
       # app with the new environment, the job workers read the file on their
       # next restart (every web image deploy restarts them).
       LIVE_SYNCABLE_ATTRIBUTES = %w(
-        ssl_only ssl_enforce ssl_stapling http2
+        ssl_only ssl_enforce ssl_stapling http2 client_max_body_size
         unsafe_inline_script_allowed unsafe_eval_script_allowed
         google_analytics_supported hubspot_forms_supported pingdom_supported
-        reverse_proxy_for passenger_env passenger_env_vars passenger_max_pool_size rails_cable_supported
+        reverse_proxy_for passenger_env passenger_env_vars passenger_max_pool_size passenger_min_instances rails_cable_supported
       ).freeze
 
       # Passenger support
@@ -82,6 +86,12 @@ module CloudModel
       # roughly 400MB per app process.
       field :passenger_max_pool_size, type: Integer, default: 6
       validates :passenger_max_pool_size, numericality: {only_integer: true, greater_than: 0}
+      # App processes Passenger keeps running per location even when idle
+      # (location directive; Passenger's own default is 1): spares the first
+      # visitors the cold start. Never more than the pool holds.
+      field :passenger_min_instances, type: Integer, default: 3
+      validates :passenger_min_instances, numericality: {only_integer: true, greater_than: 0}
+      validate :passenger_min_instances_within_pool
       validate :passenger_env_vars_without_nginx_variables
       # Extra environment variables exposed to the Passenger app, rendered as
       # `passenger_env_var KEY VALUE;`. Keys must look like environment variable
@@ -426,6 +436,13 @@ module CloudModel
 
       # nginx expands `$name` inside double-quoted directive values and offers
       # no escape for a literal dollar, so such values cannot be passed.
+      def passenger_min_instances_within_pool
+        return unless passenger_min_instances.is_a?(Integer) and passenger_max_pool_size.is_a?(Integer)
+        if passenger_min_instances > passenger_max_pool_size
+          errors.add :passenger_min_instances, :less_than_or_equal_to, count: passenger_max_pool_size
+        end
+      end
+
       def passenger_env_vars_without_nginx_variables
         (passenger_env_vars || {}).each do |key, value|
           errors.add :passenger_env_vars, "value of #{key} must not contain '$' (nginx would expand it as a variable)" if value.to_s.include?('$')

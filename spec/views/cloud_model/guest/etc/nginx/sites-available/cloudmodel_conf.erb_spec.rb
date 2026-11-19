@@ -16,6 +16,15 @@ RSpec.describe 'cloud_model/guest/etc/nginx/sites-available/cloudmodel_conf', ty
     expect(rendered).to match(/^\s*listen\s+80;$/)
   end
 
+  it 'renders the request body limit in megabytes, 0 as unlimited' do
+    render_conf
+    expect(rendered).to match(/^\s*client_max_body_size\s+600M;$/)
+
+    model.client_max_body_size = 0
+    render_conf
+    expect(rendered).to match(/^\s*client_max_body_size\s+0;$/)
+  end
+
   it 'renders the TLS listener without HTTP/2 when the option is off' do
     model.http2 = false
     render_conf

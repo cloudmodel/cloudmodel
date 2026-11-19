@@ -40,7 +40,7 @@ server {
   # Remove X-Powered-By, which is an information leak
   fastcgi_hide_header X-Powered-By;
 
-  client_max_body_size          600M;
+  client_max_body_size          <%= model.client_max_body_size.to_i > 0 ? "#{model.client_max_body_size.to_i}M" : 0 %>;
   client_body_buffer_size       128k;
   client_header_timeout         30m;
   client_body_timeout           30m;

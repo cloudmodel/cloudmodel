@@ -8,6 +8,8 @@ describe CloudModel::Services::Nginx do
   it { expect(subject.allow_public_service?).to eq true }
 
   it { expect(subject).to have_field(:port).of_type(Integer).with_default_value_of 80 }
+  it { expect(subject).to have_field(:client_max_body_size).of_type(Integer).with_default_value_of 600 }
+  it { expect(subject).to validate_numericality_of(:client_max_body_size).greater_than_or_equal_to(0) }
   it { expect(subject).to embed_many(:location_overwrites).of_type(CloudModel::Services::Nginx::LocationOverwrite).as_inverse_of(:service) }
 
   it { expect(subject).to have_field(:ssl_supported).of_type Mongoid::Boolean }
@@ -24,6 +26,24 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:passenger_ruby_version).of_type(String).with_default_value_of(CloudModel.config.ruby_version) }
   it { expect(subject).to have_field(:passenger_max_pool_size).of_type(Integer).with_default_value_of(6) }
   it { expect(subject).to validate_numericality_of(:passenger_max_pool_size).greater_than(0) }
+  it { expect(subject).to have_field(:passenger_min_instances).of_type(Integer).with_default_value_of(3) }
+  it { expect(subject).to validate_numericality_of(:passenger_min_instances).greater_than(0) }
+
+  describe 'passenger_min_instances within the pool' do
+    it 'rejects more minimum instances than the pool holds' do
+      subject.passenger_max_pool_size = 4
+      subject.passenger_min_instances = 5
+      subject.valid?
+      expect(subject.errors[:passenger_min_instances]).not_to be_empty
+    end
+
+    it 'accepts a minimum equal to the pool size' do
+      subject.passenger_max_pool_size = 4
+      subject.passenger_min_instances = 4
+      subject.valid?
+      expect(subject.errors[:passenger_min_instances]).to be_empty
+    end
+  end
   it { expect(subject).to have_field(:delayed_jobs_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
   it { expect(subject).to have_field(:delayed_jobs_queues).of_type(Array).with_default_value_of(['default']) }
 

@@ -602,6 +602,8 @@ en:
         redis_sentinel_set_version: Replication Version
       cloud_model/services/nginx:
         port: HTTP Port
+        limits: Limits
+        client_max_body_size: Max. Request Body (MB, 0 = unlimited)
         ssl: HTTPS Support
         ssl_supported: Support HTTPS?
         ssl_only: Use only HTTPS?
@@ -623,6 +625,8 @@ en:
         passenger: Passenger/Rack Server
         passenger_supported: Support Rack Server?
         passenger_env: Rails Environment
+        passenger_max_pool_size: Max. App Processes
+        passenger_min_instances: Min. App Processes
         delayed_jobs_supported: "Support Delayed::Job Service?"
         delayed_jobs_queues: "Delayed::Job Queues"
 

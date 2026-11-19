@@ -31,6 +31,14 @@ RSpec.describe 'cloud_model/guest/etc/nginx/server_d/passenger_conf', type: :vie
     CONF
   end
 
+  it 'renders the configured minimum instances' do
+    model.passenger_min_instances = 1
+
+    render template: 'cloud_model/guest/etc/nginx/server_d/passenger_conf', locals: { model: model }
+
+    expect(rendered).to include 'passenger_min_instances           1;'
+  end
+
   it 'quotes passenger_env_var values so spaces and quotes survive' do
     model.passenger_env_vars = {'APP_TITLE' => 'My "Hub" \\ here', 'bad key' => 'x', 'MULTI' => "a\nb;c"}
 
