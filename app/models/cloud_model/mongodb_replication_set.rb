@@ -150,20 +150,33 @@ module CloudModel
     #   end
     # end
 
-    # Bootstraps the replica set by running `rs.initiate()` on the first guest.
-    # Sets {#initiated} to true on success and triggers a monitoring check.
+    # Bootstraps the replica set by running `rs.initiate()` on a member whose
+    # deploy has finished — a data member before an arbiter — or, when none
+    # has, on the first guest. Sets {#initiated} to true on success and
+    # triggers a monitoring check (whose failure does not undo the success).
     # @return [Array(Boolean, String)] `[success, output]`
     def initiate
-      if guests.blank?
+      members = guests.to_a
+      if members.blank?
         return false, 'No guests found'
       end
-      ret, msg = guests.first.exec "mongosh --quiet --eval #{init_rs_cmd.shellescape}"
+      finished = members.select { |guest| guest.deploy_state == :finished }
+      runner = finished.detect { |guest| not arbiter_guest?(guest) } || finished.first || members.first
+      ret, msg = runner.exec "mongosh --quiet --eval #{init_rs_cmd.shellescape}"
       if ret
         ret = false if msg =~ /"ok"\s\:\s0/
         update_attribute :initiated, true if ret
-        CloudModel::Monitoring::MongodbReplicationSetChecks.new(self).check
+        begin
+          CloudModel::Monitoring::MongodbReplicationSetChecks.new(self).check
+        rescue => e
+          Rails.logger.warn "Replica set #{name}: monitoring check after initiate failed: #{e.class}: #{e.message}"
+        end
       end
       return ret, msg
+    end
+
+    def arbiter_guest? guest
+      guest.services.any? { |service| service.is_a?(CloudModel::Services::Mongodb) and service.mongodb_replication_arbiter_only }
     end
 
     # Returns the live replica set status merged with service metadata.

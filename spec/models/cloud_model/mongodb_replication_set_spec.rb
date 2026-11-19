@@ -198,8 +198,34 @@ describe CloudModel::MongodbReplicationSet do
       expect(success).to eq false
     end
 
+    it 'runs mongosh on a data member that finished its deploy rather than on the first guest' do
+      failed = double 'failed guest', deploy_state: :failed
+      arbiter = double 'arbiter', deploy_state: :finished, services: [CloudModel::Services::Mongodb.new(mongodb_replication_arbiter_only: true)]
+      member = double 'member', deploy_state: :finished, services: [CloudModel::Services::Mongodb.new]
+      allow(subject).to receive(:guests).and_return([failed, arbiter, member])
+      allow(subject).to receive(:init_rs_cmd).and_return('rs.initiate({})')
+      allow(subject).to receive(:update_attribute)
+      allow(CloudModel::Monitoring::MongodbReplicationSetChecks).to receive_message_chain(:new, :check)
+      expect(member).to receive(:exec).and_return([true, '"ok" : 1'])
+
+      success, _msg = subject.initiate
+      expect(success).to eq true
+    end
+
+    it 'keeps the success when the monitoring check after initiate raises' do
+      guest = double 'guest', deploy_state: :finished, services: []
+      allow(subject).to receive(:guests).and_return([guest])
+      allow(subject).to receive(:init_rs_cmd).and_return('rs.initiate({})')
+      allow(guest).to receive(:exec).and_return([true, '"ok" : 1'])
+      expect(subject).to receive(:update_attribute).with(:initiated, true)
+      allow(CloudModel::Monitoring::MongodbReplicationSetChecks).to receive_message_chain(:new, :check).and_raise(Mongo::Error::NoServerAvailable.new(nil, nil, 'down'))
+
+      success, _msg = subject.initiate
+      expect(success).to eq true
+    end
+
     it 'should run mongosh on first guest' do
-      guest = double 'guest'
+      guest = double 'guest', deploy_state: :pending
       allow(subject).to receive(:guests).and_return([guest])
       allow(subject).to receive(:init_rs_cmd).and_return('rs.initiate({})')
       allow(guest).to receive(:exec).and_return([true, '"ok" : 1'])
@@ -211,7 +237,7 @@ describe CloudModel::MongodbReplicationSet do
     end
 
     it 'should set initiated to true and run monitoring check on success' do
-      guest = double 'guest'
+      guest = double 'guest', deploy_state: :pending
       allow(subject).to receive(:guests).and_return([guest])
       allow(subject).to receive(:init_rs_cmd).and_return('rs.initiate({})')
       allow(guest).to receive(:exec).and_return([true, '"ok" : 1'])
@@ -225,7 +251,7 @@ describe CloudModel::MongodbReplicationSet do
     end
 
     it 'should treat "ok : 0" output as failure and not set initiated' do
-      guest = double 'guest'
+      guest = double 'guest', deploy_state: :pending
       allow(subject).to receive(:guests).and_return([guest])
       allow(subject).to receive(:init_rs_cmd).and_return('rs.initiate({})')
       allow(guest).to receive(:exec).and_return([true, '{ "ok" : 0 }'])
@@ -237,7 +263,7 @@ describe CloudModel::MongodbReplicationSet do
     end
 
     it 'should return exec result unchanged when exec fails' do
-      guest = double 'guest'
+      guest = double 'guest', deploy_state: :pending
       allow(subject).to receive(:guests).and_return([guest])
       allow(subject).to receive(:init_rs_cmd).and_return('rs.initiate({})')
       allow(guest).to receive(:exec).and_return([false, 'ssh error'])
