@@ -1,5 +1,8 @@
 user                            www www;
-worker_processes                6;
+<%- # One event-driven worker per CPU the guest may use — `auto` would count
+    # the host's cores, the cgroup limit is invisible to nginx. A changed
+    # cpu_count reaches nginx with the next config sync or deploy. -%>
+worker_processes                <%= [guest.cpu_count.to_i, 1].max %>;
 
 error_log                       /var/log/nginx/error.log warn;
 
