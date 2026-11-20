@@ -571,19 +571,19 @@ namespace :cloudmodel do
       guests.sort_by { |g| [g.host.name, g.name] }
     end
 
-desc "Bring the RVM Ruby of the running guests onto a new patch release without a redeploy: RUBY=3.4.13. Dry run (inventory and plan) unless CONFIRM=1. Compiles once per os/arch on the build host in a clone of a finished guest template (RVM_UPDATE=1 runs `rvm get master` there first), syncs the ruby volume host to host, switches the RVM default and each application's .ruby-version, restarts the Passenger apps (cold start) and the job units; guests on another minor line are skipped; the old Ruby stays as rollback. HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
-task :patch_ruby => [:environment] do
-  abort "RUBY=<version> missing (e.g. RUBY=3.4.13)" if ENV["RUBY"].blank?
-  guests = CloudModel::RubyPatch.guests_with_ruby nginx_guests_from_env(with_nginx: false)
-  abort "No running guests with a Ruby found in #{Rails.env} database" if guests.empty?
+    desc "Bring the RVM Ruby of the running guests onto a new patch release without a redeploy: RUBY=3.4.13. Dry run (inventory and plan) unless CONFIRM=1. Compiles once per os/arch on the build host in a clone of a finished guest template (RVM_UPDATE=1 runs `rvm get master` there first), syncs the ruby volume host to host, switches the RVM default and each application's .ruby-version, restarts the Passenger apps (cold start) and the job units; guests on another minor line are skipped; the old Ruby stays as rollback. HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
+    task :patch_ruby => [:environment] do
+      abort "RUBY=<version> missing (e.g. RUBY=3.4.13)" if ENV["RUBY"].blank?
+      guests = CloudModel::RubyPatch.guests_with_ruby nginx_guests_from_env(with_nginx: false)
+      abort "No running guests with a Ruby found in #{Rails.env} database" if guests.empty?
 
-  dry_run = ENV["CONFIRM"] != "1"
-  puts "\e[33mDRY RUN — set CONFIRM=1 to patch.\e[39m" if dry_run
-  patch = CloudModel::RubyPatch.new version: ENV["RUBY"], rvm_update: ENV["RVM_UPDATE"] == "1"
-  counts = patch.patch! guests, dry_run: dry_run
-  puts "\n#{counts[:current]} guest(s) already on #{ENV["RUBY"]}, #{counts[:patched]} patched, #{counts[:skipped]} skipped (other minor line), #{counts[:failed]} failed#{" (dry run, nothing changed)" if dry_run}."
-  abort "#{counts[:failed]} guest(s) failed" if counts[:failed] > 0
-end
+      dry_run = ENV["CONFIRM"] != "1"
+      puts "\e[33mDRY RUN — set CONFIRM=1 to patch.\e[39m" if dry_run
+      patch = CloudModel::RubyPatch.new version: ENV["RUBY"], rvm_update: ENV["RVM_UPDATE"] == "1"
+      counts = patch.patch! guests, dry_run: dry_run
+      puts "\n#{counts[:current]} guest(s) already on #{ENV["RUBY"]}, #{counts[:patched]} patched, #{counts[:skipped]} skipped (other minor line), #{counts[:failed]} failed#{" (dry run, nothing changed)" if dry_run}."
+      abort "#{counts[:failed]} guest(s) failed" if counts[:failed] > 0
+    end
 
     desc "Switch HTTP/2 on the TLS listeners of every nginx service: HTTP2=on|off. Dry run unless CONFIRM=1 — then the field is set on the services (and, with SYNC=1, pushed to the running guests through the live sync of cloudmodel.conf; without SYNC the service is marked staged and `sync_nginx_config FILES=cloudmodel.conf` or the next deploy makes it live). FORCE=1 lets the sync overwrite a manually edited or never recorded cloudmodel.conf. HOST=<name>|HOST_ID=<id>, GUEST=<name>|GUEST_ID=<id> and EXCLUDE=<name>,<name> narrow the set."
     task :set_nginx_http2 => [:environment] do

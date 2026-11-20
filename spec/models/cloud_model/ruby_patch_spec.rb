@@ -139,6 +139,7 @@ describe CloudModel::RubyPatch do
 
       it 'names the build host, template and sync targets in the dry run, and changes nothing' do
         allow(build_volume).to receive(:ready?).and_return false
+        allow(host_volume).to receive(:ready?).and_return false
         expect(guest).to receive(:exec).once.and_return [true, old_inventory]
         expect(guest).not_to receive(:exec!)
         counts = subject.patch! [guest], dry_run: true
@@ -149,9 +150,28 @@ describe CloudModel::RubyPatch do
 
       it 'says so in the dry run when the volume is already built' do
         allow(build_volume).to receive(:ready?).and_return true
+        allow(host_volume).to receive(:ready?).and_return false
         expect(guest).to receive(:exec).once.and_return [true, old_inventory]
         subject.patch! [guest], dry_run: true
-        expect(out.string).to include 'would reuse the ruby-3.4.13 volume on build-host, sync it to host-a'
+        expect(out.string).to include 'would reuse the ruby-3.4.13 volume on build-host, sync it to host-a, then patch 1 guest(s)'
+      end
+
+      it 'does not plan a sync to a host that has the volume already' do
+        allow(build_volume).to receive(:ready?).and_return true
+        allow(host_volume).to receive(:ready?).and_return true
+        expect(guest).to receive(:exec).once.and_return [true, old_inventory]
+        subject.patch! [guest], dry_run: true
+        expect(out.string).to include 'would reuse the ruby-3.4.13 volume on build-host, reuse the copy already on host-a, then patch 1 guest(s)'
+        expect(out.string).not_to include 'sync it'
+      end
+
+      it 'labels a guest that is switched but still runs the old interpreter with what is left' do
+        allow(build_volume).to receive(:ready?).and_return true
+        allow(host_volume).to receive(:ready?).and_return true
+        expect(guest).to receive(:exec).once.and_return [true, new_inventory.sub('other_running=3.4.13', 'other_running=3.4.8')]
+        subject.patch! [guest], dry_run: true
+        expect(out.string).to include 'switched to 3.4.13, still running 3.4.8'
+        expect(out.string).not_to include '3.4.13 → 3.4.13'
       end
 
       before { allow(subject).to receive(:sleep) }

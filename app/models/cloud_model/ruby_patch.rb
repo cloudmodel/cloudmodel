@@ -130,7 +130,7 @@ module CloudModel
           print_prefix guest
           begin
             inv = inventory(guest)
-            state = up_to_date?(inv) ? "\e[32mon #{version}\e[39m" : "#{inv[:default] || '?'} → #{version}"
+            state = state_label inv
             apps = inv[:apps].map { |a| "#{a[:dir].sub('/var/www/', '')} (.ruby-version #{a[:ruby_version] || '-'}, bundler #{a[:bundled_with] || '?'})" }
             running = inv[:running].any? ? "running #{inv[:running] * ' '}" : 'no ruby process'
             output.puts "#{state}; #{apps.any? ? apps * ', ' : 'no application'}; #{running}; installed #{inv[:installed] * ' '}"
@@ -160,7 +160,11 @@ module CloudModel
           template = build_template os, arch
           if build_host && template
             ready = volume_on(build_host, os, arch).ready?
-            output.puts "  would #{ready ? "reuse the #{ruby_name} volume on #{build_host.name}" : "compile #{ruby_name} on #{build_host.name} in a clone of template #{template.id} (#{template.template_type&.components&.join(',')})"}, sync it to #{(hosts - [build_host]).map(&:name).join(', ').presence || 'no other host'}, then patch #{todo.size} guest(s)"
+            to_sync, synced = (hosts - [build_host]).partition { |h| !volume_on(h, os, arch).ready? }
+            plan = [ready ? "reuse the #{ruby_name} volume on #{build_host.name}" : "compile #{ruby_name} on #{build_host.name} in a clone of template #{template.id} (#{template.template_type&.components&.join(',')})"]
+            plan << "sync it to #{to_sync.map(&:name).join(', ')}" if to_sync.any?
+            plan << "reuse the copy already on #{synced.map(&:name).join(', ')}" if synced.any?
+            output.puts "  would #{plan.join(', ')}, then patch #{todo.size} guest(s)"
           else
             output.puts "  \e[31mno #{build_host ? 'finished template with a ruby' : 'build host'} for #{os} #{arch}\e[39m — #{todo.size} guest(s) stay"
           end
@@ -225,6 +229,19 @@ module CloudModel
       echo "os=$(. /etc/os-release; echo $ID-$VERSION_ID)"
       echo "arch=$(dpkg --print-architecture)"
     SH
+
+    # "on 3.4.13", "3.4.8 → 3.4.13", or — switched already, but a process
+    # still runs the old interpreter (a unit restart that timed out) — what
+    # is left to restart.
+    def state_label inv
+      return "\e[32mon #{version}\e[39m" if up_to_date?(inv)
+      stale = inv[:running].reject { |v| v == version }
+      if inv[:default] == version && inv[:apps].all? { |a| a[:ruby_version].nil? || a[:ruby_version] == version } && stale.any?
+        "\e[33mswitched to #{version}, still running #{stale * ' '}\e[39m"
+      else
+        "#{inv[:default] || '?'} → #{version}"
+      end
+    end
 
     def print_prefix guest
       output.print "  #{guest.name} @ #{guest.host.name}: "
