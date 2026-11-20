@@ -22,3 +22,6 @@ doc/yard/
 
 log/*.log
 spec/dummy/log/*.log
+
+# Git worktrees checked out inside the repository
+.worktrees/
