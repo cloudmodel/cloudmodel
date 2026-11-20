@@ -597,7 +597,8 @@ namespace :cloudmodel do
       force = ENV['FORCE'].to_s == '1'
 
       counts = Hash.new(0)
-      nginx_guests_from_env(running_only: false).each do |guest|
+      guests = nginx_guests_from_env(running_only: false)
+      guests.each do |guest|
         service = guest.services.detect { |s| s.is_a?(CloudModel::Services::Nginx) }
         print "#{guest.name} @ #{guest.host.name}: "
         unless service.ssl_supported?
