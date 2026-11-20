@@ -23,6 +23,12 @@ Unattended-Upgrade::Origins-Pattern {
         // is allowed. Its Release file has "Origin: . nodistro", which no
         // origin= pattern can express, hence the match on the site.
         "site=deb.nodesource.com,archive=nodistro";
+        // Passenger comes from Phusion's repository (nginx services with
+        // Passenger support). One suite per distribution codename, and its
+        // releases are the security releases, so the suite is allowed as a
+        // whole. An upgrade of the nginx module restarts nginx, which cold
+        // starts every Passenger application on the guest.
+        "origin=Phusion-Passenger,codename=${distro_codename}";
 };
 <%- if role.to_s == 'host' -%>
 

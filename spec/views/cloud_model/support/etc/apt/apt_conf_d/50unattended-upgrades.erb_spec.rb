@@ -32,6 +32,11 @@ RSpec.describe 'cloud_model/support/etc/apt/apt_conf_d/50unattended-upgrades', t
     expect(rendered_for(:guest)).to include '"site=deb.nodesource.com,archive=nodistro";'
   end
 
+  it 'lets the Phusion repository through, which carries the Passenger security releases' do
+    # Release: "Origin: Phusion-Passenger", one suite per distribution codename
+    expect(rendered_for(:guest)).to include '"origin=Phusion-Passenger,codename=${distro_codename}";'
+  end
+
   it 'uses key=value origin patterns only, for both roles' do
     # a bare "Ubuntu:jammy-security" aborts unattended-upgrade's parser
     %i(host guest).each do |role|
