@@ -42,6 +42,9 @@ module CloudModel
     # Unattended installation of the distribution's security updates on
     # hosts and guests (templates + live push). true by default.
     attr_writer :unattended_upgrades
+    # Nightly replica-set-aware patching of the MongoDB packages on the
+    # guests (CloudModel::MongodbPatch from the backup_all run). true by default.
+    attr_writer :mongodb_unattended
     attr_writer :debian_version
     attr_writer :php_version, :ruby_version
 
@@ -173,6 +176,10 @@ module CloudModel
 
     def unattended_upgrades
       @unattended_upgrades.nil? ? true : @unattended_upgrades
+    end
+
+    def mongodb_unattended
+      @mongodb_unattended.nil? ? true : @mongodb_unattended
     end
 
     def debian_version

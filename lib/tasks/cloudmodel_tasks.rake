@@ -191,6 +191,32 @@ namespace :cloudmodel do
     end
   end
 
+  namespace :mongodb do
+    desc "Patch the MongoDB packages of the running guests to the newest release of their line, replica-set-aware: arbiters, then secondaries one by one, the primary after a step-down; a set that is not healthy is skipped. SET=<name>, GUEST=<name>, HOST=<name> limit the scope; LAG=<s> (30) and TIMEOUT=<s> (900) the waits. Dry run unless CONFIRM=1."
+    task :patch => [:environment] do
+      confirm = ENV['CONFIRM'] == '1'
+      puts "\e[33mDRY RUN — set CONFIRM=1 to apply.\e[39m" unless confirm
+
+      guests = CloudModel::Guest.all.to_a
+      guests.select! { |g| g.name == ENV['GUEST'] } if ENV['GUEST'].present?
+      guests.select! { |g| g.host.name == ENV['HOST'] } if ENV['HOST'].present?
+      services = CloudModel::MongodbPatch.services_of guests
+      services.select! { |s| s.mongodb_replication_set&.name == ENV['SET'] } if ENV['SET'].present?
+      abort "No MongoDB services found in #{Rails.env} database — forgot RAILS_ENV=production?" if services.empty?
+      # A replica set is patched as a whole: a GUEST= or HOST= selection pulls
+      # in the other members of the sets it touches.
+      whole = services.filter_map(&:mongodb_replication_set).uniq.flat_map { |set| CloudModel::MongodbPatch.services_of set.guests }
+      added = whole.reject { |s| services.any? { |given| given.id == s.id } }
+      puts "Including the other members of the selected replica sets: #{added.map { |s| s.guest.name }.sort.join(', ')}" if added.any?
+      services = (services + added).uniq(&:id)
+
+      patch = CloudModel::MongodbPatch.new lag_limit: ENV.fetch('LAG', 30), member_timeout: ENV.fetch('TIMEOUT', 900)
+      counts = patch.patch! services, dry_run: !confirm
+      puts "\n#{counts[:current]} member(s) current, #{counts[:patched]} patched, #{counts[:skipped]} skipped, #{counts[:failed]} failed#{confirm ? '' : ' (dry run, nothing changed)'}."
+      abort "#{counts[:failed]} member(s) failed" if counts[:failed] > 0
+    end
+  end
+
   namespace :cleanup do
     desc "Remove obsolete template tarballs (admin data dir + all hosts) and stale /cloud/build dirs. Dry run unless CONFIRM=1; keeps the newest KEEP (default 2) finished templates per type/arch plus everything referenced by deployed containers."
     task :templates => [:environment] do
@@ -712,9 +738,14 @@ namespace :cloudmodel do
 
     # Perfect for call by crontab
     # bash -c 'cd /var/www/rails/current && RAILS_ENV=production /usr/local/bin/bundle exec rake cloudmodel:guest:backup_all'
-    desc "Backup all guest"
+    desc "Backup all guest (the nightly maintenance run: patches the MongoDB packages replica-set-aware first when CloudModel.config.mongodb_unattended is on)"
     task :backup_all => [:environment] do
       with_backup_run_lock do
+        if CloudModel.config.mongodb_unattended
+          puts "== MongoDB patch run (#{Time.now.utc.strftime('%F %T')} UTC)"
+          counts = CloudModel::MongodbPatch.nightly!
+          puts "MongoDB: #{counts[:current]} current, #{counts[:patched]} patched, #{counts[:skipped]} skipped, #{counts[:failed]} failed.\n\n" if counts
+        end
         total = CloudModel::Guest.count + CloudModel::MongodbReplicationSet.where(has_backups: true).count
         with_tracked_backup_run total do
           CloudModel::Guest.backup_all
