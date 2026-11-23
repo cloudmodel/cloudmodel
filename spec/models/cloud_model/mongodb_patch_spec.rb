@@ -6,7 +6,8 @@ describe CloudModel::MongodbPatch do
   subject { described_class.new output: out, lag_limit: 30, member_timeout: member_timeout }
 
   let(:host) { double CloudModel::Host, name: 'core-a' }
-  let(:set) { double CloudModel::MongodbReplicationSet, name: 'rs-app', service_uris: ['10.0.0.1:27017', '10.0.0.2:27017', '10.0.0.3:27017'], item_issues: issues }
+  let(:last_backup) { Time.now - 5.hours }
+  let(:set) { double CloudModel::MongodbReplicationSet, name: 'rs-app', service_uris: ['10.0.0.1:27017', '10.0.0.2:27017', '10.0.0.3:27017'], item_issues: issues, has_backups: true, last_successful_backup_at: last_backup }
   before { allow(set).to receive(:services).and_return members }
   let(:issues) { double 'issues', find_or_initialize_by: double('issue', :severity= => nil, :message= => nil, save: true), where: double('scope', update_all: 1) }
 
@@ -95,10 +96,12 @@ describe CloudModel::MongodbPatch do
       allow(subject).to receive(:running_version) { |service| versions.fetch(service.guest.name) }
     end
 
-    it 'refuses a partial set and touches nothing' do
-      members.each { |s| expect(s.guest).not_to receive(:exec) }
+    it 'refuses a partial set and upgrades nothing' do
+      [primary, secondary].each { |s| allow(s.guest).to receive(:exec).and_return [true, inventory_output(installed: '7.0.28', candidate: '7.0.48')] }
+      allow(subject).to receive(:running_version).and_return '7.0.28'
+      members.each { |s| expect(s.guest).not_to receive(:exec!) }
       counts = subject.patch! [primary, secondary], dry_run: false
-      expect(counts).to eq patched: 0, current: 0, skipped: 2, failed: 0
+      expect(counts).to eq patched: 0, current: 0, skipped: 2, failed: 0, deferred: 0
       expect(out.string).to include '1 member(s) of the set are not in this run: mongo-3 (finished)'
     end
 
@@ -106,7 +109,7 @@ describe CloudModel::MongodbPatch do
       stub_inventories 'mongo-1' => '7.0.48', 'mongo-2' => '7.0.48', 'mongo-3' => '7.0.48'
       expect(set).not_to receive(:status)
       counts = subject.patch! members, dry_run: false
-      expect(counts).to eq patched: 0, current: 3, skipped: 0, failed: 0
+      expect(counts).to eq patched: 0, current: 3, skipped: 0, failed: 0, deferred: 0
       expect(out.string).to include 'mongo-1@core-a: on 7.0.48'
     end
 
@@ -115,7 +118,7 @@ describe CloudModel::MongodbPatch do
       allow(set).to receive(:status).and_return status
       members.each { |s| expect(s.guest).not_to receive(:exec!) }
       counts = subject.patch! members, dry_run: true
-      expect(counts).to eq patched: 0, current: 0, skipped: 0, failed: 0
+      expect(counts).to eq patched: 0, current: 0, skipped: 0, failed: 0, deferred: 0
       expect(out.string).to include 'would patch mongo-3@core-a (ARBITER), mongo-2@core-a (SECONDARY), mongo-1@core-a (PRIMARY), one after the other'
     end
 
@@ -141,7 +144,7 @@ describe CloudModel::MongodbPatch do
       [secondary, arbiter].each { |s| allow(s.guest).to receive(:exec).and_return [true, inventory_output(installed: '7.0.28', candidate: '7.0.48')] }
       allow(subject).to receive(:running_version).and_return '7.0.28'
       counts = subject.patch! members, dry_run: false
-      expect(counts).to eq patched: 0, current: 0, skipped: 2, failed: 1
+      expect(counts).to eq patched: 0, current: 0, skipped: 2, failed: 1, deferred: 0
       expect(out.string).to include 'not every member answered'
     end
 
@@ -169,7 +172,7 @@ describe CloudModel::MongodbPatch do
       end
 
       counts = subject.patch! members, dry_run: false
-      expect(counts).to eq patched: 3, current: 0, skipped: 0, failed: 0
+      expect(counts).to eq patched: 3, current: 0, skipped: 0, failed: 0, deferred: 0
       expect(order).to eq %w(mongo-3 mongo-2 mongo-1)
       expect(out.string).to include 'mongo-1@core-a: primary, stepping down'
       expect(out.string.scan(/patched.* to 7\.0\.48/).size).to eq 3
@@ -208,27 +211,27 @@ describe CloudModel::MongodbPatch do
       allow(set).to receive(:status).and_return status
       # with two voting members, taking either down leaves one of two — no majority
       counts = subject.patch! members, dry_run: false
-      expect(counts).to eq patched: 0, current: 1, skipped: 2, failed: 0
+      expect(counts).to eq patched: 0, current: 1, skipped: 2, failed: 0, deferred: 0
       expect(out.string).to include 'no majority'
     end
 
     it 'upgrades a standalone service and waits for the new version' do
       guest = double CloudModel::Guest, name: 'web', host: host, deploy_state: :finished, item_issues: issues
-      service = double CloudModel::Services::Mongodb, id: BSON::ObjectId.new, guest: guest, server_uri: '10.0.0.9:27017', mongodb_replication_set: nil
+      service = double CloudModel::Services::Mongodb, id: BSON::ObjectId.new, guest: guest, server_uri: '10.0.0.9:27017', mongodb_replication_set: nil, has_backups: true, last_successful_backup_at: last_backup
       allow(guest).to receive(:exec).and_return [true, inventory_output(installed: '7.0.28', candidate: '7.0.48')]
       running = '7.0.28'
       allow(subject).to receive(:running_version) { running }
       allow(subject).to receive(:direct_command).with(service, hello: 1).and_return('isWritablePrimary' => true)
       expect(guest).to receive(:exec!).with(/only-upgrade/, anything) { running = '7.0.48'; '' }
       counts = subject.patch! [service], dry_run: false
-      expect(counts).to eq patched: 1, current: 0, skipped: 0, failed: 0
+      expect(counts).to eq patched: 1, current: 0, skipped: 0, failed: 0, deferred: 0
       expect(out.string).to include 'standalone — restarts'
       expect(out.string).to match(/web@core-a: .*patched.* to 7\.0\.48/)
     end
 
     it 'steps a primary down whose set the admin does not know, and waits until it is a member again' do
       guest = double CloudModel::Guest, name: 'admin', host: host, deploy_state: :finished, item_issues: issues
-      service = double CloudModel::Services::Mongodb, id: BSON::ObjectId.new, guest: guest, server_uri: '10.0.0.8:27017', mongodb_replication_set: nil
+      service = double CloudModel::Services::Mongodb, id: BSON::ObjectId.new, guest: guest, server_uri: '10.0.0.8:27017', mongodb_replication_set: nil, has_backups: true, last_successful_backup_at: last_backup
       allow(guest).to receive(:exec).and_return [true, inventory_output(installed: '7.0.28', candidate: '7.0.48')]
       running = '7.0.28'
       primary = true
@@ -237,7 +240,7 @@ describe CloudModel::MongodbPatch do
       expect(subject).to receive(:direct_command).with(service, hash_including(replSetStepDown: 60)) { primary = false; {} }
       expect(guest).to receive(:exec!).with(/only-upgrade/, anything) { running = '7.0.48'; '' }
       counts = subject.patch! [service], dry_run: false
-      expect(counts).to eq patched: 1, current: 0, skipped: 0, failed: 0
+      expect(counts).to eq patched: 1, current: 0, skipped: 0, failed: 0, deferred: 0
       expect(out.string).to include 'member of the unmanaged replica set admin, primary — steps down first'
       expect(out.string).to include 'admin@core-a: primary, stepping down'
     end
@@ -251,6 +254,62 @@ describe CloudModel::MongodbPatch do
     end
   end
 
+  describe 'the backup rule and the deadline' do
+    before { stub_all 'mongo-1' => '7.0.28', 'mongo-2' => '7.0.28', 'mongo-3' => '7.0.28' }
+
+    def stub_all versions
+      members.each do |service|
+        allow(service.guest).to receive(:exec).with(/mongodb-org-server/).and_return [true, inventory_output(installed: versions.fetch(service.guest.name), candidate: '7.0.48')]
+      end
+      allow(subject).to receive(:running_version) { |service| versions.fetch(service.guest.name) }
+      allow(set).to receive(:status).and_return status
+    end
+
+    it 'skips a set without a configured backup and records it on the set' do
+      allow(set).to receive(:has_backups).and_return false
+      expect(issues).to receive(:find_or_initialize_by).with(key: :mongodb_patch_blocked, resolved_at: nil)
+      counts = subject.patch! members, dry_run: false
+      expect(counts[:skipped]).to eq 3
+      expect(out.string).to include 'no backup configured'
+    end
+
+    context 'with a backup older than the limit' do
+      let(:last_backup) { Time.now - 40.hours }
+
+      it 'skips the set' do
+        counts = subject.patch! members, dry_run: false
+        expect(counts[:skipped]).to eq 3
+        expect(out.string).to match(/last successful backup .* is older than 36 h/)
+      end
+    end
+
+    it 'patches without the backup rule when told to' do
+      allow(set).to receive(:has_backups).and_return false
+      patch = described_class.new output: out, member_timeout: 60, require_backup: false
+      allow(patch).to receive(:running_version).and_return '7.0.28'
+      counts = patch.patch! members, dry_run: true
+      expect(counts[:skipped]).to eq 0
+      expect(out.string).to include 'would patch'
+    end
+
+    it 'defers every set after the deadline instead of starting it' do
+      patch = described_class.new output: out, member_timeout: 60, deadline: Time.now - 60
+      allow(patch).to receive(:running_version).and_return '7.0.28'
+      members.each { |s| expect(s.guest).not_to receive(:exec!) }
+      counts = patch.patch! members, dry_run: false
+      expect(counts).to eq patched: 0, current: 0, skipped: 0, failed: 0, deferred: 3
+      expect(out.string).to include 'deferred'
+      expect(out.string).to include 'left for the next night'
+    end
+  end
+
+  describe '.deadline_today' do
+    it 'is the given UTC time on the day of now' do
+      now = Time.utc(2026, 11, 24, 0, 5)
+      expect(described_class.deadline_today('02:00', now)).to eq Time.utc(2026, 11, 24, 2, 0)
+    end
+  end
+
   describe '.nightly!' do
     it 'does nothing when switched off' do
       allow(CloudModel.config).to receive(:mongodb_unattended).and_return false
@@ -259,11 +318,18 @@ describe CloudModel::MongodbPatch do
       expect(out.string).to include 'switched off'
     end
 
+    it 'does nothing outside the window' do
+      allow(CloudModel.config).to receive(:mongodb_unattended).and_return true
+      expect(described_class).not_to receive(:new)
+      expect(described_class.nightly!(output: out, now: Time.utc(2026, 11, 24, 10, 15))).to be_nil
+      expect(out.string).to include 'between 00:00 and 02:00 UTC only'
+    end
+
     it 'never raises' do
       allow(CloudModel.config).to receive(:mongodb_unattended).and_return true
       allow(CloudModel::Guest).to receive(:all).and_raise 'db gone'
       allow(CloudModel).to receive(:log_exception)
-      expect(described_class.nightly!(output: out)).to be_nil
+      expect(described_class.nightly!(output: out, now: Time.utc(2026, 11, 24, 0, 5))).to be_nil
       expect(out.string).to include 'crashed'
     end
   end

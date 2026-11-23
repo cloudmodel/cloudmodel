@@ -25,13 +25,27 @@ module CloudModel
   # * standalone services are upgraded and restarted directly (the only
   #   outage this run causes, seconds long).
   #
+  # Two more rules: a set (or standalone service) is only patched when it
+  # has a backup configured and the last successful one is younger than
+  # `backup_max_age` (36 h) — the previous night's backup is the "backup
+  # before the change" (the patch itself changes no data; patch releases of
+  # a line are binary compatible, and the rollback is a package downgrade
+  # within the line, `apt-get install mongodb-org-server=<old>` plus restart,
+  # not a restore) — and the unattended run starts no new set after
+  # `deadline`, so a long patch night does not push the backups and their
+  # I/O into the day; what is left waits for the next night.
+  #
   # Driven by `rake cloudmodel:mongodb:patch` (dry run unless CONFIRM=1) and,
   # when `CloudModel.config.mongodb_unattended` is on, by the nightly
   # maintenance run (`cloudmodel:guest:backup_all`, before the backups, under
   # the same lock), so a security release reaches the fleet the night after
-  # it is published.
+  # it is published. Before the backups on purpose: at 00:00 UTC nobody
+  # notices the election per set and the write pause of a PSA set while its
+  # secondary restarts (w:majority waits for it, the arbiter does not count),
+  # and the backup that follows reads every set from the freshly patched
+  # member — the best check of the new release there is.
   class MongodbPatch
-    attr_reader :output, :lag_limit, :member_timeout
+    attr_reader :output, :lag_limit, :member_timeout, :deadline, :backup_max_age, :require_backup
 
     # Refreshes the package list of the MongoDB repository alone (the nightly
     # apt-daily run refreshes the rest), then reports what is installed, what
@@ -57,10 +71,17 @@ module CloudModel
     #   before and after each member
     # @param member_timeout [Integer] seconds to wait for a member to come
     #   back on the new release and catch up
-    def initialize output: $stdout, lag_limit: 30, member_timeout: 900
+    # @param deadline [Time, nil] start no further set or service after this
+    # @param backup_max_age [ActiveSupport::Duration] how old the last
+    #   successful backup may be
+    # @param require_backup [Boolean] false skips the backup rule (manual runs)
+    def initialize output: $stdout, lag_limit: 30, member_timeout: 900, deadline: nil, backup_max_age: 36.hours, require_backup: true
       @output = output
       @lag_limit = lag_limit.to_i
       @member_timeout = member_timeout.to_i
+      @deadline = deadline
+      @backup_max_age = backup_max_age
+      @require_backup = require_backup
     end
 
     # The MongoDB services of running guests. A guest whose last redeploy
@@ -76,17 +97,28 @@ module CloudModel
     # Runs the unattended patch of the whole fleet; never raises — the
     # nightly run must go on to the backups whatever happens here.
     # @return [Hash, nil] the counts, nil when switched off or crashed
-    def self.nightly! output: $stdout
+    def self.nightly! output: $stdout, now: Time.now
       unless CloudModel.config.mongodb_unattended
         output.puts 'MongoDB unattended patching is switched off (CloudModel.config.mongodb_unattended).'
         return nil
       end
-      new(output: output).patch! services_of(CloudModel::Guest.all), dry_run: false
+      deadline = deadline_today CloudModel.config.mongodb_unattended_until, now
+      if now > deadline
+        output.puts "MongoDB unattended patching runs between 00:00 and #{CloudModel.config.mongodb_unattended_until} UTC only; it is #{now.utc.strftime('%H:%M')} UTC — nothing is patched in this run."
+        return nil
+      end
+      new(output: output, deadline: deadline).patch! services_of(CloudModel::Guest.all), dry_run: false
     rescue Exception => e
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
       CloudModel.log_exception e
       output.puts "\e[31mMongoDB patch run crashed\e[39m: #{e.class}: #{e.message[0, 200]}"
       nil
+    end
+
+    # "02:00" on the UTC day of `now`.
+    def self.deadline_today hhmm, now = Time.now
+      hour, minute = hhmm.to_s.split(':').map(&:to_i)
+      now.utc.change(hour: hour, min: minute, sec: 0)
     end
 
     # @return [Hash] installed, candidate, packages and the running version
@@ -117,18 +149,21 @@ module CloudModel
     # @param services [Array<CloudModel::Services::Mongodb>]
     # @return [Hash] counts of :patched, :current, :skipped, :failed members
     def patch! services, dry_run: true
-      counts = { patched: 0, current: 0, skipped: 0, failed: 0 }
+      counts = { patched: 0, current: 0, skipped: 0, failed: 0, deferred: 0 }
+      take_inventories services
       sets, standalone = services.partition(&:mongodb_replication_set)
       groups = sets.group_by(&:mongodb_replication_set).sort_by { |set, _| [own_set?(set) ? 1 : 0, set.name.to_s] }
 
       groups.each do |set, members|
         output.puts "\n== replica set #{set.name}: #{members.size} member(s)#{own_set?(set) ? ' (this admin\'s own database, last)' : ''}"
+        next if deferred?(members, counts)
         patch_set set, members, counts, dry_run: dry_run
       end
 
       if standalone.any?
         output.puts "\n== standalone: #{standalone.size} service(s)"
         standalone.sort_by { |s| [own_member?(s) ? 1 : 0, label(s)] }.each do |service|
+          next if deferred?([service], counts)
           patch_standalone service, counts, dry_run: dry_run
         end
       end
@@ -136,6 +171,55 @@ module CloudModel
     end
 
     private
+
+    # The inventories of all services up front, one thread per host (one
+    # SSH connection per host, the hosts in parallel): 141 members one after
+    # the other would take a quarter of an hour every night.
+    def take_inventories services
+      @inventories = {}
+      lock = Mutex.new
+      services.group_by { |s| s.guest.host }.map do |_host, group|
+        Thread.new do
+          group.each do |service|
+            result = begin
+              inventory service
+            rescue => e
+              e
+            end
+            lock.synchronize { @inventories[service.id] = result }
+          end
+        end
+      end.each(&:join)
+    end
+
+    # @return [Hash] the inventory; raises what the inventory raised
+    def inventory_of service
+      result = @inventories&.fetch(service.id) { inventory service }
+      raise result if result.is_a?(Exception)
+      result
+    end
+
+    # Past the deadline nothing new is started; the services are counted as
+    # deferred (no issue — the next night takes them).
+    def deferred? services, counts
+      return false unless deadline && Time.now > deadline
+      counts[:deferred] += services.size
+      output.puts "  \e[33mdeferred\e[39m: past #{deadline.utc.strftime('%H:%M')} UTC, left for the next night"
+      true
+    end
+
+    # Why the backup rule blocks a set or service, or nil. `subject` answers
+    # has_backups and last_successful_backup_at (a replica set or a service).
+    def backup_reason subject
+      return nil unless require_backup
+      return 'no backup configured — not patched without one' unless subject.has_backups
+      last = subject.last_successful_backup_at
+      return 'no successful backup yet' unless last
+      if last < Time.now - backup_max_age
+        return "last successful backup #{last.utc.strftime('%Y-%m-%d %H:%M')} UTC is older than #{(backup_max_age / 3600).to_i} h"
+      end
+      nil
+    end
 
     def label service
       "#{service.guest.name}@#{service.guest.host.name}"
@@ -208,7 +292,7 @@ module CloudModel
       inventories = {}
       members.each do |service|
         begin
-          inventories[service] = inventory service
+          inventories[service] = inventory_of service
         rescue => e
           counts[:failed] += 1
           output.puts "  #{label service}: \e[31mFAILED\e[39m (#{e.message[0, 160]})"
@@ -227,6 +311,13 @@ module CloudModel
         counts[:skipped] += todo.size
         output.puts "  \e[33mskipped\e[39m: not every member answered — a set is only patched when all of it is known"
         open_set_issue set, 'A member did not answer the inventory; the set was not patched.'
+        return
+      end
+
+      if (reason = backup_reason(set))
+        counts[:skipped] += todo.size
+        output.puts "  \e[33mskipped\e[39m: #{reason}"
+        open_set_issue set, "#{reason} — the set was not patched."
         return
       end
 
@@ -275,11 +366,17 @@ module CloudModel
     # so in `hello`. Such a member steps down when it is the primary and has
     # to come back as a member, the rest of the set is not known here.
     def patch_standalone service, counts, dry_run:
-      inv = inventory service
+      inv = inventory_of service
       role = member_role service
       unless behind? inv
         counts[:current] += 1
         output.puts "  #{label service}: on #{inv[:installed]}"
+        return
+      end
+      if (reason = backup_reason(service))
+        counts[:skipped] += 1
+        output.puts "  #{label service}: \e[33mskipped\e[39m: #{reason}"
+        open_guest_issue service.guest, "#{reason} — #{service.guest.name} was not patched."
         return
       end
       note = role[:set] ? " (member of the unmanaged replica set #{role[:set]}, #{role[:primary] ? 'primary — steps down first' : 'secondary'})" : ' (standalone — restarts)'

@@ -192,7 +192,7 @@ namespace :cloudmodel do
   end
 
   namespace :mongodb do
-    desc "Patch the MongoDB packages of the running guests to the newest release of their line, replica-set-aware: arbiters, then secondaries one by one, the primary after a step-down; a set that is not healthy is skipped. SET=<name>, GUEST=<name>, HOST=<name> limit the scope; LAG=<s> (30) and TIMEOUT=<s> (900) the waits. Dry run unless CONFIRM=1."
+    desc "Patch the MongoDB packages of the running guests to the newest release of their line, replica-set-aware: arbiters, then secondaries one by one, the primary after a step-down; a set that is not healthy or without a backup younger than 36 h is skipped. SET=<name>, GUEST=<name>, HOST=<name> limit the scope; LAG=<s> (30) and TIMEOUT=<s> (900) the waits; UNTIL=HH:MM (UTC) starts no further set after that time; NO_BACKUP_CHECK=1 patches without the backup rule. Dry run unless CONFIRM=1."
     task :patch => [:environment] do
       confirm = ENV['CONFIRM'] == '1'
       puts "\e[33mDRY RUN — set CONFIRM=1 to apply.\e[39m" unless confirm
@@ -210,9 +210,10 @@ namespace :cloudmodel do
       puts "Including the other members of the selected replica sets: #{added.map { |s| s.guest.name }.sort.join(', ')}" if added.any?
       services = (services + added).uniq(&:id)
 
-      patch = CloudModel::MongodbPatch.new lag_limit: ENV.fetch('LAG', 30), member_timeout: ENV.fetch('TIMEOUT', 900)
+      deadline = ENV['UNTIL'].present? ? CloudModel::MongodbPatch.deadline_today(ENV['UNTIL']) : nil
+      patch = CloudModel::MongodbPatch.new lag_limit: ENV.fetch('LAG', 30), member_timeout: ENV.fetch('TIMEOUT', 900), deadline: deadline, require_backup: ENV['NO_BACKUP_CHECK'] != '1'
       counts = patch.patch! services, dry_run: !confirm
-      puts "\n#{counts[:current]} member(s) current, #{counts[:patched]} patched, #{counts[:skipped]} skipped, #{counts[:failed]} failed#{confirm ? '' : ' (dry run, nothing changed)'}."
+      puts "\n#{counts[:current]} member(s) current, #{counts[:patched]} patched, #{counts[:skipped]} skipped, #{counts[:deferred]} deferred, #{counts[:failed]} failed#{confirm ? '' : ' (dry run, nothing changed)'}."
       abort "#{counts[:failed]} member(s) failed" if counts[:failed] > 0
     end
   end
@@ -744,7 +745,7 @@ namespace :cloudmodel do
         if CloudModel.config.mongodb_unattended
           puts "== MongoDB patch run (#{Time.now.utc.strftime('%F %T')} UTC)"
           counts = CloudModel::MongodbPatch.nightly!
-          puts "MongoDB: #{counts[:current]} current, #{counts[:patched]} patched, #{counts[:skipped]} skipped, #{counts[:failed]} failed.\n\n" if counts
+          puts "MongoDB: #{counts[:current]} current, #{counts[:patched]} patched, #{counts[:skipped]} skipped, #{counts[:deferred]} deferred to the next night, #{counts[:failed]} failed.\n\n" if counts
         end
         total = CloudModel::Guest.count + CloudModel::MongodbReplicationSet.where(has_backups: true).count
         with_tracked_backup_run total do
