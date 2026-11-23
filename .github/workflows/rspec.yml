@@ -17,6 +17,9 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: .ruby-version
+    - name: Install build dependencies
+      # cap2 (pulled in by net-ping on Linux) compiles against libcap
+      run: sudo apt-get install -y --no-install-recommends libcap-dev
     - name: Install mongo
       run: | 
         docker run -d -p 27017:27017 mongo:latest mongod --setParameter ttlMonitorSleepSecs=2
