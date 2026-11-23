@@ -236,10 +236,13 @@ module CloudModel
           "Failed to link git dir"
         # The workspace is owned by the app user from the previous build's
         # finalize, while the build runs as root; git (2.35.2+) refuses to
-        # read a repository owned by someone else. The build system's root
-        # gitconfig is as throwaway as the build system itself.
-        chroot! buildsys_volume.rootfs_path, "git config --global --add safe.directory #{CHROOT_APP_ROOT}",
-          "Failed to mark the app root as a safe git directory"
+        # read a repository owned by someone else — the app root as well as
+        # bundler's clones of git-sourced gems in the workspace's bundle
+        # cache, whose paths are bundler's. The build system's root
+        # gitconfig is as throwaway as the build system itself, so every
+        # directory is safe in it.
+        chroot! buildsys_volume.rootfs_path, "git config --global --add safe.directory '*'",
+          "Failed to mark the build system's git directories as safe"
       end
 
       # `user@host` of the image's git server (`git_server` holds it as used
