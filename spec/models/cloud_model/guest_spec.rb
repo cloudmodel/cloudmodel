@@ -612,6 +612,14 @@ describe CloudModel::Guest do
       expect(subject.ruby_lines_needed).to eq []
       expect(subject.ruby_default_line).to be_nil
     end
+
+    it 'reads and writes the explicit lines as a comma-separated string' do
+      subject.ruby_lines_string = ' 3.4, 4.0.1 '
+      expect(subject.ruby_lines).to eq %w(3.4 4.0.1)
+      expect(subject.ruby_lines_string).to eq '3.4, 4.0.1'
+      subject.ruby_lines_string = ''
+      expect(subject.ruby_lines).to eq []
+    end
   end
 
   describe 'components_needed' do

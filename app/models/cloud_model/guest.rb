@@ -187,6 +187,15 @@ module CloudModel
       self.external_alt_names = string.split(',').map &:strip
     end
 
+    # The explicit Ruby lines as one comma-separated string, for forms.
+    def ruby_lines_string
+      ruby_lines.to_a * ', '
+    end
+
+    def ruby_lines_string=(string)
+      self.ruby_lines = string.to_s.split(/[\s,]+/).reject(&:blank?)
+    end
+
     def copy_to_host host, options={}
       new_name = options[:name] || name
 
