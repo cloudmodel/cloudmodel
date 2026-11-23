@@ -72,6 +72,10 @@ Notes:
 | `ubuntu_version` | `22.04.4` | Default Ubuntu point release (`ubuntu_major_version` derives `22.04`). |
 | `debian_version` | `12` | Default Debian release. |
 | `unattended_upgrades` | `true` | Install `unattended-upgrades` on hosts and guests, limited to the distribution's security suite, no automatic reboot; hosts additionally never update ZFS or the kernel this way. Installed into templates, re-applied on every host and guest (re)deploy (so templates built before the feature need no rebuild), pushable to running systems with `rake cloudmodel:host:deploy_unattended_upgrades` / `cloudmodel:guest:deploy_unattended_upgrades`. |
+| `mongodb_unattended` | `false` | Nightly replica-set-aware patching of the guests' MongoDB packages (`CloudModel::MongodbPatch` at the start of `backup_all`): arbiters, secondaries one by one, the primary after a step-down; a set without a backup younger than 36 h is skipped. The host application switches it on. |
+| `mongodb_unattended_window` | `["23:00", "02:00"]` | UTC window (may cross midnight) the nightly MongoDB patch run has to start in; no further set is started after its end. |
+| `ruby_unattended` | `false` | Nightly patching of the guests' Rubies to the newest release of their lines (`CloudModel::RubyReleasePatch` after the MongoDB run): builds and syncs what the release index has, points `/usr/local/ruby/current` at it, restarts Passenger apps and job units; pinned guests stay. The host application switches it on. |
+| `ruby_unattended_window` | `mongodb_unattended_window` | UTC window for the nightly Ruby patch run. |
 
 ## Networking & DNS
 
