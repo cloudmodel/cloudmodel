@@ -136,16 +136,22 @@ module CloudModel
           end
         end
 
+        # Units that fail in every unprivileged container (no configfs, no
+        # binfmt_misc to register) and say nothing about the deploy.
+        CONTAINER_FAILING_UNITS = %w(sys-kernel-config.mount systemd-binfmt.service).freeze
+
         # Smoke test right after the start: systemd reaches a running state
-        # (waits up to two minutes) and no unit failed.
+        # (waits up to two minutes) and no unit failed. A system that is only
+        # degraded by {CONTAINER_FAILING_UNITS} counts as running.
         # @return [Array<Hash>] {name:, ok:, detail:}
         def change_smoke_checks
           _, state = guest.exec "sh -c #{'timeout 120 systemctl is-system-running --wait 2>/dev/null || systemctl is-system-running'.shellescape}"
           state = state.to_s.strip.lines.last.to_s.strip
           _, failed = guest.exec "systemctl --failed --no-legend --plain"
           units = failed.to_s.lines.map { |line| line.split.first }.compact.reject { |u| u.start_with?('●') }
+          units -= CONTAINER_FAILING_UNITS
           [
-            {name: 'systemd running', ok: state == 'running', detail: state},
+            {name: 'systemd running', ok: state == 'running' || (state == 'degraded' and units.empty?), detail: state},
             {name: 'no failed units', ok: units.empty?, detail: units * ', '}
           ]
         end

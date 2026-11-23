@@ -60,6 +60,26 @@ describe CloudModel::Workers::Mixins::ChangeRecording do
     expect(events.first[:checks].last).to eq name: 'no failed units', ok: false, detail: 'nginx.service'
   end
 
+  it 'ignores the units that fail in every container' do
+    allow(guest).to receive(:exec).with(/is-system-running/).and_return [false, "degraded\n"]
+    allow(guest).to receive(:exec).with('systemctl --failed --no-legend --plain').and_return [true, "sys-kernel-config.mount loaded failed failed Kernel Configuration File System\nsystemd-binfmt.service loaded failed failed Set Up Additional Binary Formats\n"]
+    subject.begin_change_record
+    subject.finish_change_record
+
+    expect(events.first[:state]).to eq 'succeeded'
+    expect(events.first[:checks]).to eq [{name: 'systemd running', ok: true, detail: 'degraded'}, {name: 'no failed units', ok: true, detail: ''}]
+  end
+
+  it 'still reports other failed units next to the container ones' do
+    allow(guest).to receive(:exec).with(/is-system-running/).and_return [false, "degraded\n"]
+    allow(guest).to receive(:exec).with('systemctl --failed --no-legend --plain').and_return [true, "systemd-binfmt.service loaded failed failed Set Up Additional Binary Formats\nmongod.service loaded failed failed MongoDB\n"]
+    subject.begin_change_record
+    subject.finish_change_record
+
+    expect(events.first[:state]).to eq 'degraded'
+    expect(events.first[:checks].last).to eq name: 'no failed units', ok: false, detail: 'mongod.service'
+  end
+
   it 'publishes a failed deploy with its error' do
     subject.begin_change_record
     subject.fail_change_record RuntimeError.new('lxc launch failed')
