@@ -171,10 +171,13 @@ module CloudModel
           host = @guest.external_hostname
           return if host.blank?
           config = "/etc/jitsi/meet/#{host}-config.js"
-          url = @model.welcome_page_url.gsub("'") { "\\'" }
+          # The URL lands in a single-quoted JS string: backslashes and quotes
+          # escaped for JS, the whole line shell-escaped for the printf.
+          url = @model.welcome_page_url.gsub(/[\\']/) { "\\#{$&}" }
+          line = "config.welcomePage = { customUrl: '#{url}' };"
           chroot! @guest.deploy_path, <<~SH, "Failed to set jitsi welcome page"
-            sed -i "/^config.welcomePage = /d" #{config}
-            echo "config.welcomePage = { customUrl: '#{url}' };" >> #{config}
+            sed -i "/^config.welcomePage = /d" #{config.shellescape}
+            printf '%s\\n' #{line.shellescape} >> #{config.shellescape}
           SH
         end
 
@@ -224,13 +227,15 @@ module CloudModel
         end
 
         # Replace every reference to the placeholder hostname across the prosody,
-        # jitsi (jicofo/jvb/web) and nginx config trees. Dots are escaped so the
-        # distinctive placeholder is matched literally.
+        # jitsi (jicofo/jvb/web) and nginx config trees. The old name is
+        # escaped for sed's regex (`.`, `[`, `]`, `*`, `^`, `$`, `\`, `/`), the
+        # new one for its replacement (`\`, `&`, `/`), so both are literal.
         def rewrite_host_references old, new
-          old_re = old.gsub(".", "\\.")
+          old_re = old.gsub(%r{[.\[\]*^$\\/]}) { "\\#{$&}" }
+          new_re = new.gsub(%r{[\\&/]}) { "\\#{$&}" }
           chroot! @guest.deploy_path,
-            "grep -rlF '#{old}' /etc/prosody /etc/jitsi /etc/nginx 2>/dev/null | " \
-            "xargs -r sed -i 's/#{old_re}/#{new}/g' || true",
+            "grep -rlF #{old.shellescape} /etc/prosody /etc/jitsi /etc/nginx 2>/dev/null | " \
+            "xargs -r sed -i #{"s/#{old_re}/#{new_re}/g".shellescape} || true",
             "Failed to rewrite jitsi hostname references"
         end
 
@@ -266,7 +271,7 @@ module CloudModel
           # Three layers, innermost first: the JS string (escape quotes), the
           # sed replacement (`&`, `|`, `\` are special), and the bash double
           # quotes the s/// program travels through (`\`, `"`, `$`, backtick).
-          js  = value.to_s.gsub(/[\r\n]/, ' ').gsub("'") { "\\'" }
+          js  = value.to_s.gsub(/[\r\n]/, ' ').gsub(/[\\']/) { "\\#{$&}" }
           sed = js.gsub(/[\\&|]/) { "\\#{$&}" }
           esc = sed.gsub(/[\\"$`]/) { "\\#{$&}" }
           chroot! @guest.deploy_path,

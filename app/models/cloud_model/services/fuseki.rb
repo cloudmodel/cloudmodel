@@ -45,7 +45,7 @@ module CloudModel
           res.body.lines.each do |line|
             line.strip!
             unless line.first == '#'
-              key, attrs, value = line.match(/^(.+)\{(.+)\}(.*)$/).captures
+              key, attrs, value = line.match(/\A([^{]+)\{([^}]+)\}(.*)\z/).captures
               value.strip!
               description = false
 

@@ -25,6 +25,13 @@ module CloudModel
 
     #embedded_in :service, class: CloudModel::Services::Nginx
 
+    # The location with slashes as a literal for an nginx `location ~` regex:
+    # every regex metacharacter escaped, the slashes as `\/`.
+    # @return [String] e.g. `"\/next\.cloud\/"`
+    def location_regexp
+      Regexp.escape(location_with_slashes).gsub('/', '\\/')
+    end
+
     # Returns the location string with both a leading and a trailing slash.
     # @return [String] e.g. `"/nextcloud/"`
     def location_with_slashes

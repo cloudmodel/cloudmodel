@@ -71,4 +71,16 @@ describe CloudModel::WebLocation do
       expect(subject.location_with_leading_slash).to eq '/'
     end
   end
+
+  describe '#location_regexp' do
+    it 'escapes the slashed location for an nginx regex location' do
+      subject.location = 'next.cloud'
+      expect(subject.location_regexp).to eq '\\/next\\.cloud\\/'
+    end
+
+    it 'escapes backslashes and other metacharacters' do
+      subject.location = 'a+b\\c'
+      expect(subject.location_regexp).to eq '\\/a\\+b\\\\c\\/'
+    end
+  end
 end

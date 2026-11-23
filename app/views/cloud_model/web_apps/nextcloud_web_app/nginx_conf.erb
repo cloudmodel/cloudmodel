@@ -44,10 +44,10 @@ location ^~ <%= model.location_with_leading_slash %> {
     rewrite ^ <%= model.location_with_slashes %>index.php;
   }
 
-  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>(?:build|tests|config|lib|3rdparty|templates|data)\/ {
+  location ~ ^<%= model.location_regexp %>(?:build|tests|config|lib|3rdparty|templates|data)\/ {
     deny all;
   }
-  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>(?:\.|autotest|occ|issue|indie|db_|console) {
+  location ~ ^<%= model.location_regexp %>(?:\.|autotest|occ|issue|indie|db_|console) {
     deny all;
   }
 
@@ -98,7 +98,7 @@ location ^~ <%= model.location_with_leading_slash %> {
 
   ### Collabora CODE END
 
-  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>(?:index|remote|public|cron|core\/ajax\/update|status|ocs\/v[12]|updater\/.+|ocs-provider\/.+|.+\/richdocumentscode\/proxy)\.php(?:$|\/) {
+  location ~ ^<%= model.location_regexp %>(?:index|remote|public|cron|core\/ajax\/update|status|ocs\/v[12]|updater\/.+|ocs-provider\/.+|.+\/richdocumentscode\/proxy)\.php(?:$|\/) {
     fastcgi_split_path_info ^(.+?\.php)(\/.*|)$;
     set $path_info $fastcgi_path_info;
     try_files $fastcgi_script_name =404;
@@ -115,14 +115,14 @@ location ^~ <%= model.location_with_leading_slash %> {
     fastcgi_request_buffering off;
   }
 
-  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>(?:updater|ocs-provider)(?:$|\/) {
+  location ~ ^<%= model.location_regexp %>(?:updater|ocs-provider)(?:$|\/) {
       try_files $uri/ =404;
       index index.php;
   }
 
   # Adding the cache control header for js, css and map files
   # Make sure it is BELOW the PHP block
-  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>.+[^\/]\.(?:css|js|mjs|woff2?|otf|svg|gif|ico|jpg|png|webp|wasm|tflite|map|ogg|flac)$ {
+  location ~ ^<%= model.location_regexp %>.+[^\/]\.(?:css|js|mjs|woff2?|otf|svg|gif|ico|jpg|png|webp|wasm|tflite|map|ogg|flac)$ {
     types {
       text/javascript js mjs;
       text/css css;
@@ -160,7 +160,7 @@ location ^~ <%= model.location_with_leading_slash %> {
     access_log off;
   }
 
-  location ~ ^<%= model.location_with_slashes.gsub('/', '\/') %>.+[^\/]\.(?:png|html|ttf|ico|jpg|jpeg|bcmap|mp4|webm)$ {
+  location ~ ^<%= model.location_regexp %>.+[^\/]\.(?:png|html|ttf|ico|jpg|jpeg|bcmap|mp4|webm)$ {
     try_files $uri <%= model.location_with_slashes %>index.php$request_uri;
     # Optional: Don't log access to other assets
     access_log off;

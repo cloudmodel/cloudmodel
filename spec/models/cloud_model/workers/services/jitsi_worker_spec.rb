@@ -53,7 +53,8 @@ describe CloudModel::Workers::Services::JitsiWorker do
 
       program = command[/sed -i "(.*)" \/usr\/share\/jitsi-meet\/interface_config.js\z/, 1]
       replacement = bash_dq(program)[%r{\|    PROVIDER_NAME: '(.*)',\|\z}, 1]
-      expect(sed_replacement(replacement)).to eq "Meet & Greet | Co \\ Ltd\\'s $HOME"
+      # a literal backslash is `\\` in the JS string, the quote `\'`
+      expect(sed_replacement(replacement)).to eq "Meet & Greet | Co \\\\ Ltd\\'s $HOME"
     end
 
     it 'keeps a multi-line value on one line' do
