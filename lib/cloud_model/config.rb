@@ -47,6 +47,11 @@ module CloudModel
     # restarts at night without a person — off by default, the host
     # application switches it on knowingly.
     attr_writer :mongodb_unattended, :mongodb_unattended_window
+    # Nightly patching of the guests' Rubies to the newest release of their
+    # lines (CloudModel::RubyReleasePatch from the backup_all run): new
+    # releases are built and synced, current is flipped, Passenger apps and
+    # job units restart — off by default, the host application switches it on.
+    attr_writer :ruby_unattended, :ruby_unattended_window
     attr_writer :debian_version
     attr_writer :php_version, :ruby_version
     # Where the guests' Ruby releases live on every host: one ZFS dataset
@@ -196,6 +201,15 @@ module CloudModel
     # further replica set after its end; the rest waits for the next night.
     def mongodb_unattended_window
       @mongodb_unattended_window || ["23:00", "02:00"]
+    end
+
+    def ruby_unattended
+      @ruby_unattended.nil? ? false : @ruby_unattended
+    end
+
+    # ["HH:MM", "HH:MM"] UTC like mongodb_unattended_window.
+    def ruby_unattended_window
+      @ruby_unattended_window || mongodb_unattended_window
     end
 
     def debian_version

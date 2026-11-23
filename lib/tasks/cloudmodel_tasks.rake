@@ -222,6 +222,29 @@ namespace :cloudmodel do
     end
   end
 
+  namespace :ruby do
+    desc "Patch the Rubies of the running guests on the mounted-release layout to the newest release of their lines: builds and syncs a release the index has and nobody carries, points /usr/local/ruby/current at it and restarts Passenger apps and job units; pinned guests are left alone, RVM-layout guests skipped (patch_ruby). GUEST=<name>, HOST=<name> limit the scope; UNTIL=HH:MM (UTC) starts no further guest after it. Dry run unless CONFIRM=1."
+    task :patch => [:environment] do
+      confirm = ENV['CONFIRM'] == '1'
+      puts "\e[33mDRY RUN — set CONFIRM=1 to apply.\e[39m" unless confirm
+
+      guests = CloudModel::Guest.all.to_a
+      abort "No guests in the #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
+      guests.select! { |g| g.name == ENV['GUEST'] } if ENV['GUEST'].present?
+      guests.select! { |g| g.host.name == ENV['HOST'] } if ENV['HOST'].present?
+      guests = CloudModel::RubyReleasePatch.guests_with_ruby guests
+      if guests.empty?
+        filters = %w(GUEST HOST).select { |k| ENV[k].present? }.map { |k| "#{k}=#{ENV[k]}" }
+        abort filters.any? ? "No running guest with a Ruby matches #{filters * ' '}" : "No running guest with a Ruby in the #{Rails.env} database"
+      end
+
+      deadline = ENV['UNTIL'].present? ? CloudModel::MongodbPatch.next_time(ENV['UNTIL']) : nil
+      counts = CloudModel::RubyReleasePatch.new(deadline: deadline).patch! guests, dry_run: !confirm
+      puts "\n#{counts[:built]} built, #{counts[:synced]} synced, #{counts[:current]} guest(s) current, #{counts[:patched]} patched, #{counts[:skipped]} skipped, #{counts[:deferred]} deferred, #{counts[:failed]} failed#{confirm ? '' : ' (dry run, nothing changed)'}."
+      abort "#{counts[:failed]} failed" if counts[:failed] > 0
+    end
+  end
+
   namespace :cleanup do
     desc "Remove obsolete template tarballs (admin data dir + all hosts) and stale /cloud/build dirs. Dry run unless CONFIRM=1; keeps the newest KEEP (default 2) finished templates per type/arch plus everything referenced by deployed containers."
     task :templates => [:environment] do
@@ -750,6 +773,11 @@ namespace :cloudmodel do
           puts "== MongoDB patch run (#{Time.now.utc.strftime('%F %T')} UTC)"
           counts = CloudModel::MongodbPatch.nightly!
           puts "MongoDB: #{counts[:current]} current, #{counts[:patched]} patched, #{counts[:skipped]} skipped, #{counts[:deferred]} deferred to the next night, #{counts[:failed]} failed.\n\n" if counts
+        end
+        if CloudModel.config.ruby_unattended
+          puts "== Ruby patch run (#{Time.now.utc.strftime('%F %T')} UTC)"
+          counts = CloudModel::RubyReleasePatch.nightly!
+          puts "Ruby: #{counts[:built]} built, #{counts[:synced]} synced, #{counts[:current]} current, #{counts[:patched]} patched, #{counts[:skipped]} skipped, #{counts[:deferred]} deferred to the next night, #{counts[:failed]} failed.\n\n" if counts
         end
         total = CloudModel::Guest.count + CloudModel::MongodbReplicationSet.where(has_backups: true).count
         with_tracked_backup_run total do
