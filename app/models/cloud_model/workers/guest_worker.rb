@@ -82,9 +82,11 @@ module CloudModel
 
       # The guest's Rubies (CloudModel::RubyRelease): every line the guest
       # needs is brought onto the host (synced from the build host, built
-      # there first when nobody has it), the host's per-(os, arch) dataset
-      # is attached read-only at /opt/ruby, and the rootfs gets the shims,
-      # the default symlink and the gem homes (Mixins::RubyLayout). Guests
+      # there first when nobody has it) and the host's per-(os, arch)
+      # dataset is attached read-only at /opt/ruby. This runs before the
+      # service workers: LXD rewrites the container's backup.yaml for a
+      # device add, which needs the dataset unmountable — a chroot with
+      # proc/sys/dev mounted inside the deploy mount makes it busy. Guests
       # without a Ruby are left alone.
       def ensure_ruby
         lines = guest.ruby_lines_needed
@@ -104,9 +106,17 @@ module CloudModel
           host.exec! "lxc config device add #{@lxc.name.shellescape} #{RUBY_DEVICE} disk source=#{mountpoint.shellescape} path=#{CloudModel::Workers::Mixins::RubyLayout::GUEST_MOUNT} readonly=true",
             'Failed to attach the ruby dataset'
         end
+      end
+
+      # The rootfs side, after the service workers (the www group the gem
+      # homes belong to exists then): shims, default symlink, profile.d and
+      # gem homes (Mixins::RubyLayout).
+      def write_ruby_layout_for_guest
+        lines = guest.ruby_lines_needed
+        return comment_sub_step 'No Ruby needed' if lines.empty?
 
         comment_sub_step "Write the Ruby layout (default line #{lines.first}, lines #{lines * ', '})"
-        write_ruby_layout guest.deploy_path, os_version: os, arch: arch, default_line: lines.first, lines: lines
+        write_ruby_layout guest.deploy_path, os_version: guest.os_version, arch: host.arch, default_line: lines.first, lines: lines
       end
 
       # The release a line resolves to: the newest the build host carries,
@@ -292,8 +302,9 @@ module CloudModel
           ['Create LXD container', :create_lxd_container, on_skip: :mount_lxd_container],
           ['Ensure LXD custom volumes', :ensure_lxd_custom_volumes, no_skip: true],
           ['Config LXD container', :config_lxd_container],
-          ['Config guest services', :config_services],
           ['Ensure Ruby', :ensure_ruby],
+          ['Config guest services', :config_services],
+          ['Write Ruby layout', :write_ruby_layout_for_guest],
           ['Update check_mk agent plugins', :update_check_mk_plugins],
           ['Ensure unattended security upgrades', :ensure_unattended_upgrades],
           ['Config guest certificates', :config_guest_certificates],
