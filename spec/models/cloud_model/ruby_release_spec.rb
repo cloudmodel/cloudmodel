@@ -60,6 +60,22 @@ describe CloudModel::RubyRelease do
     end
   end
 
+  describe '#ensure_dataset_on!' do
+    it 'creates the dataset when missing' do
+      allow(host).to receive(:exec).with('zfs list -H -o name guests/ruby/debian-12-amd64').and_return [false, '']
+      expect(host).to receive(:exec!).with('zfs create -p -o mountpoint=/cloud/ruby/debian-12-amd64 guests/ruby/debian-12-amd64', anything)
+      subject.ensure_dataset_on! host
+    end
+
+    it 'mounts an existing unmounted dataset and leaves a mounted one alone' do
+      allow(host).to receive(:exec).with('zfs list -H -o name guests/ruby/debian-12-amd64').and_return [true, '']
+      allow(host).to receive(:exec).with('zfs get -H -o value mounted guests/ruby/debian-12-amd64').and_return [true, "no\n"], [true, "yes\n"]
+      expect(host).to receive(:exec!).with('zfs mount guests/ruby/debian-12-amd64', anything).once
+      subject.ensure_dataset_on! host
+      subject.ensure_dataset_on! host
+    end
+  end
+
   describe '#ensure_on!' do
     before { allow(CloudModel::Host).to receive(:build_host).with('amd64').and_return build_host }
 
@@ -78,12 +94,15 @@ describe CloudModel::RubyRelease do
       expect(worker).to receive(:build!).ordered
       expect(build_host).to receive(:exec!).with('zfs snapshot guests/ruby/debian-12-amd64@ruby-3.4.13', anything).ordered
       expect(subject).to receive(:sync_zfs_dataset!).with(build_host, host, 'guests/ruby/debian-12-amd64', snapshot: 'guests/ruby/debian-12-amd64@ruby-3.4.13').ordered
-      expect(host).to receive(:exec!).with(/zfs mount guests\/ruby\/debian-12-amd64/, anything).ordered
+      allow(host).to receive(:exec).with('zfs list -H -o name guests/ruby/debian-12-amd64').and_return [true, '']
+      allow(host).to receive(:exec).with('zfs get -H -o value mounted guests/ruby/debian-12-amd64').and_return [true, "no\n"]
+      expect(host).to receive(:exec!).with('zfs mount guests/ruby/debian-12-amd64', anything).ordered
       subject.ensure_on! host, output: StringIO.new
     end
 
     it 'only syncs when the build host has the release already' do
       allow(host).to receive(:exec).with(/test -x/).and_return [false, ''], [true, '']
+      allow(host).to receive(:exec).with(/zfs (list|get)/).and_return [true, "yes\n"]
       allow(build_host).to receive(:exec).with(/test -x/).and_return [true, '']
       allow(build_host).to receive(:exec).with(/zfs list -H -t snapshot/).and_return [true, '']
       expect(CloudModel::Workers::RubyBuildWorker).not_to receive(:new)
@@ -94,6 +113,7 @@ describe CloudModel::RubyRelease do
 
     it 'fails loudly when the release is not there after the sync' do
       allow(host).to receive(:exec).with(/test -x/).and_return [false, '']
+      allow(host).to receive(:exec).with(/zfs (list|get)/).and_return [true, "yes\n"]
       allow(build_host).to receive(:exec).and_return [true, '']
       allow(subject).to receive(:sync_zfs_dataset!)
       allow(host).to receive(:exec!)

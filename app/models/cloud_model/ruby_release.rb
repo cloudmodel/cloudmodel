@@ -141,10 +141,17 @@ module CloudModel
       success
     end
 
-    # Creates and mounts the per-(os, arch) dataset on a host when missing.
+    # Creates the per-(os, arch) dataset on a host when missing, and mounts
+    # it when it is not (a dataset received by zfs recv, or unmounted by
+    # hand, is there but empty at its mountpoint).
     def ensure_dataset_on! host
-      return if dataset_on? host
-      host.exec! "zfs create -p -o mountpoint=#{mountpoint.shellescape} #{dataset.shellescape}", "Failed to create the ruby dataset #{dataset} on #{host.name}"
+      if dataset_on? host
+        success, mounted = host.exec "zfs get -H -o value mounted #{dataset.shellescape}"
+        return if success && mounted.to_s.strip == 'yes'
+        host.exec! "zfs mount #{dataset.shellescape}", "Failed to mount the ruby dataset #{dataset} on #{host.name}"
+      else
+        host.exec! "zfs create -p -o mountpoint=#{mountpoint.shellescape} #{dataset.shellescape}", "Failed to create the ruby dataset #{dataset} on #{host.name}"
+      end
     end
 
     # The build host for the arch.
@@ -180,7 +187,7 @@ module CloudModel
       end
       output.puts "  syncing #{name} #{source.name} → #{host.name}"
       sync_zfs_dataset! source, host, dataset, snapshot: snapshot
-      host.exec! "zfs mount #{dataset.shellescape} 2>/dev/null || true", "Failed to mount #{dataset} on #{host.name}"
+      ensure_dataset_on! host
       raise "#{name} is not on #{host.name} after the sync" unless present_on? host
     end
   end
