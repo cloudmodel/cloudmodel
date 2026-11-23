@@ -29,7 +29,7 @@ module CloudModel
     # every regex metacharacter escaped, the slashes as `\/`.
     # @return [String] e.g. `"\/next\.cloud\/"`
     def location_regexp
-      Regexp.escape(location_with_slashes).gsub('/', '\\/')
+      location_with_slashes.gsub(%r{[\\/.*+?|()\[\]{}^$\-]}) { "\\#{$&}" }
     end
 
     # Returns the location string with both a leading and a trailing slash.

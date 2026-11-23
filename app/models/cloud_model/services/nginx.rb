@@ -265,9 +265,9 @@ module CloudModel
           data['active'] = res.body.lines[0].gsub('Active connections: ', '').to_i
           data['accepted'], data['handled'], data['requests'] = res.body.lines[2].strip.split(' ').map(&:to_i)
 
-          res.body.lines[3].gsub(/\s*:\s*/, ':').split(' ').each do |pair|
-            k,v = pair.split ':'
-            data["#{k.downcase}"] = v
+          # "Reading: 0 Writing: 1 Waiting: 0" — tokens in pairs, no regex
+          res.body.lines[3].split.each_slice(2) do |k, v|
+            data[k.chomp(':').downcase] = v
           end
         rescue Exception => e
            return {key: :parse_nginx_result, error: "#{e.class}\n\n#{e.to_s}", severity: :warning}
