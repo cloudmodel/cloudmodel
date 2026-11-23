@@ -43,8 +43,10 @@ module CloudModel
     # hosts and guests (templates + live push). true by default.
     attr_writer :unattended_upgrades
     # Nightly replica-set-aware patching of the MongoDB packages on the
-    # guests (CloudModel::MongodbPatch from the backup_all run). true by default.
-    attr_writer :mongodb_unattended, :mongodb_unattended_until
+    # guests (CloudModel::MongodbPatch from the backup_all run): elections and
+    # restarts at night without a person — off by default, the host
+    # application switches it on knowingly.
+    attr_writer :mongodb_unattended, :mongodb_unattended_window
     attr_writer :debian_version
     attr_writer :php_version, :ruby_version
 
@@ -179,13 +181,14 @@ module CloudModel
     end
 
     def mongodb_unattended
-      @mongodb_unattended.nil? ? true : @mongodb_unattended
+      @mongodb_unattended.nil? ? false : @mongodb_unattended
     end
 
-    # "HH:MM" UTC; the nightly MongoDB patch run (00:00 UTC) starts no
-    # further replica set after this time, the rest waits for the next night.
-    def mongodb_unattended_until
-      @mongodb_unattended_until || "02:00"
+    # ["HH:MM", "HH:MM"] UTC, may cross midnight: the nightly MongoDB patch
+    # run patches only when it starts inside this window and starts no
+    # further replica set after its end; the rest waits for the next night.
+    def mongodb_unattended_window
+      @mongodb_unattended_window || ["23:00", "02:00"]
     end
 
     def debian_version

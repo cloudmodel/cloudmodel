@@ -6,7 +6,7 @@ Open-source Rails engine gem (MIT license) providing ActiveModel representations
 
 ## Tech Stack
 
-- **Ruby 3.4.8** / **Rails ~> 8.0** (engine, not a standalone app)
+- **Ruby 3.4.13** / **Rails ~> 8.0** (engine, not a standalone app)
 - **MongoDB** via Mongoid (>= 7.1.2)
 - **License:** MIT
 - **GitHub:** `cloudmodel/cloudmodel`

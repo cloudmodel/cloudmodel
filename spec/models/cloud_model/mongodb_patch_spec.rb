@@ -92,6 +92,8 @@ describe CloudModel::MongodbPatch do
       members.each do |service|
         installed = versions.fetch(service.guest.name)
         allow(service.guest).to receive(:exec).with(/mongodb-org-server/).and_return [true, inventory_output(installed: installed, candidate: '7.0.48')]
+        # the package check after apt: the candidate, unless a test says otherwise
+        allow(service.guest).to receive(:exec!).with(/dpkg-query/, anything).and_return "7.0.48\n"
       end
       allow(subject).to receive(:running_version) { |service| versions.fetch(service.guest.name) }
     end
@@ -170,6 +172,11 @@ describe CloudModel::MongodbPatch do
         primary_now = false
         {}
       end
+      # the old primary takes the role back by priority as soon as it is back
+      allow(primary.guest).to receive(:exec!).with(/dpkg-query/, anything) do
+        current_status = status(primary_name: '10.0.0.1:27017')
+        "7.0.48\n"
+      end
 
       counts = subject.patch! members, dry_run: false
       expect(counts).to eq patched: 3, current: 0, skipped: 0, failed: 0, deferred: 0
@@ -204,6 +211,25 @@ describe CloudModel::MongodbPatch do
     end
     end
 
+    it 'fails a member whose package apt kept back instead of restarting it' do
+      stub_inventories 'mongo-1' => '7.0.48', 'mongo-2' => '7.0.48', 'mongo-3' => '7.0.28'
+      allow(set).to receive(:status).and_return status
+      allow(arbiter.guest).to receive(:exec!).with(/only-upgrade/, anything).and_return ''
+      allow(arbiter.guest).to receive(:exec!).with(/dpkg-query/, anything).and_return "7.0.28\n"
+      expect(arbiter.guest).not_to receive(:exec!).with('/bin/systemctl restart mongod', anything)
+      counts = subject.patch! members, dry_run: false
+      expect(counts[:failed]).to eq 1
+      expect(out.string).to include 'package not upgraded: mongodb-org-server is 7.0.28, apt offered 7.0.48 (held back?)'
+    end
+
+    it 'resolves the blocked issue of a set that is current again' do
+      stub_inventories 'mongo-1' => '7.0.48', 'mongo-2' => '7.0.48', 'mongo-3' => '7.0.48'
+      scope = double 'scope'
+      expect(issues).to receive(:where).with(key: :mongodb_patch_blocked, resolved_at: nil).and_return scope
+      expect(scope).to receive(:update_all)
+      subject.patch! members, dry_run: false
+    end
+
     it 'refuses to take a member down when the set would lose its majority' do
       stub_inventories 'mongo-1' => '7.0.28', 'mongo-2' => '7.0.28', 'mongo-3' => '7.0.48'
       members.each { |s| expect(s.guest).not_to receive(:exec!) }
@@ -223,6 +249,7 @@ describe CloudModel::MongodbPatch do
       allow(subject).to receive(:running_version) { running }
       allow(subject).to receive(:direct_command).with(service, hello: 1).and_return('isWritablePrimary' => true)
       expect(guest).to receive(:exec!).with(/only-upgrade/, anything) { running = '7.0.48'; '' }
+      allow(guest).to receive(:exec!).with(/dpkg-query/, anything).and_return "7.0.48\n"
       counts = subject.patch! [service], dry_run: false
       expect(counts).to eq patched: 1, current: 0, skipped: 0, failed: 0, deferred: 0
       expect(out.string).to include 'standalone — restarts'
@@ -239,6 +266,7 @@ describe CloudModel::MongodbPatch do
       allow(subject).to receive(:direct_command).with(service, hello: 1) { { 'setName' => 'admin', 'isWritablePrimary' => primary, 'secondary' => !primary } }
       expect(subject).to receive(:direct_command).with(service, hash_including(replSetStepDown: 60)) { primary = false; {} }
       expect(guest).to receive(:exec!).with(/only-upgrade/, anything) { running = '7.0.48'; '' }
+      allow(guest).to receive(:exec!).with(/dpkg-query/, anything).and_return "7.0.48\n"
       counts = subject.patch! [service], dry_run: false
       expect(counts).to eq patched: 1, current: 0, skipped: 0, failed: 0, deferred: 0
       expect(out.string).to include 'member of the unmanaged replica set admin, primary — steps down first'
@@ -303,10 +331,19 @@ describe CloudModel::MongodbPatch do
     end
   end
 
-  describe '.deadline_today' do
-    it 'is the given UTC time on the day of now' do
-      now = Time.utc(2026, 11, 24, 0, 5)
-      expect(described_class.deadline_today('02:00', now)).to eq Time.utc(2026, 11, 24, 2, 0)
+  describe '.next_time' do
+    it 'is the next such UTC time after now' do
+      expect(described_class.next_time('02:00', Time.utc(2026, 11, 24, 0, 5))).to eq Time.utc(2026, 11, 24, 2, 0)
+      expect(described_class.next_time('02:00', Time.utc(2026, 11, 24, 10, 0))).to eq Time.utc(2026, 11, 25, 2, 0)
+    end
+  end
+
+  describe '.deadline_in_window' do
+    it 'is the end of the window a run started in, across midnight, and nil outside it' do
+      expect(described_class.deadline_in_window(Time.utc(2026, 11, 24, 0, 5), '23:00', '02:00')).to eq Time.utc(2026, 11, 24, 2, 0)
+      expect(described_class.deadline_in_window(Time.utc(2026, 11, 23, 23, 30), '23:00', '02:00')).to eq Time.utc(2026, 11, 24, 2, 0)
+      expect(described_class.deadline_in_window(Time.utc(2026, 11, 24, 10, 15), '23:00', '02:00')).to be_nil
+      expect(described_class.deadline_in_window(Time.utc(2026, 11, 24, 1, 0), '00:30', '01:30')).to eq Time.utc(2026, 11, 24, 1, 30)
     end
   end
 
@@ -322,7 +359,7 @@ describe CloudModel::MongodbPatch do
       allow(CloudModel.config).to receive(:mongodb_unattended).and_return true
       expect(described_class).not_to receive(:new)
       expect(described_class.nightly!(output: out, now: Time.utc(2026, 11, 24, 10, 15))).to be_nil
-      expect(out.string).to include 'between 00:00 and 02:00 UTC only'
+      expect(out.string).to include 'starts between 23:00 and 02:00 UTC only'
     end
 
     it 'never raises' do

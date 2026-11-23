@@ -65,7 +65,11 @@ module CloudModel
     UPGRADE = "DEBIAN_FRONTEND=noninteractive apt-get install -y -q --only-upgrade -o DPkg::Lock::Timeout=600 -o Dpkg::Options::=--force-confold".freeze
 
     DATA_STATES = %w(PRIMARY SECONDARY).freeze
-    DONE_STATES = %w(SECONDARY ARBITER).freeze
+    # A member counts as back when it is any of these again — the old
+    # primary may take the primary role back by priority as soon as it has
+    # caught up, the step-down freeze does not survive its restart.
+    MEMBER_STATES = %w(PRIMARY SECONDARY ARBITER).freeze
+    INSTALLED = "dpkg-query -W -f='${Version}' mongodb-org-server".freeze
 
     # @param lag_limit [Integer] seconds of replication lag a set may have
     #   before and after each member
@@ -102,9 +106,10 @@ module CloudModel
         output.puts 'MongoDB unattended patching is switched off (CloudModel.config.mongodb_unattended).'
         return nil
       end
-      deadline = deadline_today CloudModel.config.mongodb_unattended_until, now
-      if now > deadline
-        output.puts "MongoDB unattended patching runs between 00:00 and #{CloudModel.config.mongodb_unattended_until} UTC only; it is #{now.utc.strftime('%H:%M')} UTC — nothing is patched in this run."
+      from, till = CloudModel.config.mongodb_unattended_window
+      deadline = deadline_in_window now, from, till
+      unless deadline
+        output.puts "MongoDB unattended patching starts between #{from} and #{till} UTC only; it is #{now.utc.strftime('%H:%M')} UTC — nothing is patched in this run."
         return nil
       end
       new(output: output, deadline: deadline).patch! services_of(CloudModel::Guest.all), dry_run: false
@@ -115,8 +120,26 @@ module CloudModel
       nil
     end
 
-    # "02:00" on the UTC day of `now`.
-    def self.deadline_today hhmm, now = Time.now
+    # The next "HH:MM" UTC after `now` (today's if still ahead, else tomorrow's).
+    def self.next_time hhmm, now = Time.now
+      t = at_time hhmm, now
+      t < now ? t + 1.day : t
+    end
+
+    # The end of the window `from`–`till` (UTC, may cross midnight) that
+    # `now` falls into, nil when `now` is outside it — a run started outside
+    # the window (the one 15 minutes after a reboot) patches nothing.
+    def self.deadline_in_window now, from, till
+      f = at_time from, now
+      t = at_time till, now
+      t += 1.day if t <= f
+      [[f, t], [f - 1.day, t - 1.day]].each do |a, b|
+        return b if now >= a && now <= b
+      end
+      nil
+    end
+
+    def self.at_time hhmm, now
       hour, minute = hhmm.to_s.split(':').map(&:to_i)
       now.utc.change(hour: hour, min: minute, sec: 0)
     end
@@ -277,7 +300,11 @@ module CloudModel
       rescue Mongo::Error::SocketError, Mongo::Error::ConnectionPerished, Mongo::Error::NoServerAvailable
         # the server closes the connection when it steps down
       end
-      wait_until(90, "#{label service} is still the primary after the step-down") { !member_role(service)[:primary] }
+      # reachable and no longer primary — an unreachable member must not pass
+      wait_until(90, "#{label service} is still the primary (or unreachable) after the step-down") do
+        role = member_role service
+        role[:set] && !role[:primary]
+      end
     end
 
     def patch_set set, members, counts, dry_run:
@@ -305,7 +332,10 @@ module CloudModel
         output.puts "  #{label service}: #{state}"
       end
       counts[:current] += inventories.size - todo.size
-      return if todo.empty?
+      if todo.empty?
+        resolve_set_issue set if inventories.size == members.size
+        return
+      end
 
       unless inventories.size == members.size
         counts[:skipped] += todo.size
@@ -335,6 +365,7 @@ module CloudModel
         return
       end
 
+      failed = false
       order.each do |service|
         status = set_status set
         if (reason = blocked_reason(set, status, leaving: service))
@@ -352,13 +383,14 @@ module CloudModel
           output.puts "  #{label service}: \e[32mpatched\e[39m to #{inventories[service][:candidate]}"
         rescue => e
           counts[:failed] += 1
+          failed = true
           output.puts "  #{label service}: \e[31mFAILED\e[39m (#{e.message.lines.last.to_s.strip[0, 200]})"
           open_guest_issue service.guest, "MongoDB patch to #{inventories[service][:candidate]} failed: #{e.message.lines.last.to_s.strip[0, 300]}"
           output.puts "  \e[33mstopping with this set\e[39m: the remaining members stay as they are until it is healthy again"
           break
         end
       end
-      resolve_set_issue set if counts[:failed].zero?
+      resolve_set_issue set unless failed
     end
 
     # A service without a replica set in the admin's data may still be a
@@ -472,6 +504,12 @@ module CloudModel
       packages = inv[:packages].any? ? inv[:packages] : %w(mongodb-org-server)
       output.puts "  #{label service}: upgrading #{packages.size} package(s) to #{inv[:candidate]} (mongod restarts)"
       service.guest.exec! "sh -c #{"#{UPGRADE} #{packages.map(&:shellescape) * ' '}".shellescape}", 'apt-get install failed'
+      # apt exits 0 when it keeps a package back (a hold, a broken
+      # dependency) — check the package before touching mongod.
+      installed = service.guest.exec!("sh -c #{INSTALLED.shellescape}", 'dpkg-query failed').to_s.strip
+      unless installed == inv[:candidate]
+        raise "package not upgraded: mongodb-org-server is #{installed.presence || 'missing'}, apt offered #{inv[:candidate]} (held back?)"
+      end
       # The postinst restarts mongod; where it did not (a masked unit, a
       # policy-rc.d), restart it here.
       restarted = false
@@ -488,16 +526,17 @@ module CloudModel
       end
     end
 
-    # Waits until the member runs the release, is SECONDARY or ARBITER again
-    # and has caught up with the primary.
+    # Waits until the member runs the release, is a member again (secondary,
+    # arbiter, or primary again by priority) and, as a secondary, has caught
+    # up with the primary.
     def wait_for_member set, service, version
       wait_until(member_timeout, "#{label service} did not come back as a caught-up member on #{version}") do
         running = running_version service
         next false unless running == version
         members = set.status['members']
         member = members.find { |m| m['name'] == service.server_uri }
-        next false unless member && member['health'].to_f == 1.0 && DONE_STATES.include?(member['stateStr'])
-        member['stateStr'] == 'ARBITER' || max_lag(members) <= lag_limit
+        next false unless member && member['health'].to_f == 1.0 && MEMBER_STATES.include?(member['stateStr'])
+        member['stateStr'] != 'SECONDARY' || max_lag(members) <= lag_limit
       end
     end
 

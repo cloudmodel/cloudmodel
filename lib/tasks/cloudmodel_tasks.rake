@@ -192,17 +192,21 @@ namespace :cloudmodel do
   end
 
   namespace :mongodb do
-    desc "Patch the MongoDB packages of the running guests to the newest release of their line, replica-set-aware: arbiters, then secondaries one by one, the primary after a step-down; a set that is not healthy or without a backup younger than 36 h is skipped. SET=<name>, GUEST=<name>, HOST=<name> limit the scope; LAG=<s> (30) and TIMEOUT=<s> (900) the waits; UNTIL=HH:MM (UTC) starts no further set after that time; NO_BACKUP_CHECK=1 patches without the backup rule. Dry run unless CONFIRM=1."
+    desc "Patch the MongoDB packages of the running guests to the newest release of their line, replica-set-aware: arbiters, then secondaries one by one, the primary after a step-down; a set that is not healthy or without a backup younger than 36 h is skipped. SET=<name>, GUEST=<name>, HOST=<name> limit the scope; LAG=<s> (30) and TIMEOUT=<s> (900) the waits; UNTIL=HH:MM (UTC, the next such time) starts no further set after it; NO_BACKUP_CHECK=1 patches without the backup rule. Dry run unless CONFIRM=1."
     task :patch => [:environment] do
       confirm = ENV['CONFIRM'] == '1'
       puts "\e[33mDRY RUN — set CONFIRM=1 to apply.\e[39m" unless confirm
 
       guests = CloudModel::Guest.all.to_a
+      abort "No guests in the #{Rails.env} database — forgot RAILS_ENV=production?" if guests.empty?
       guests.select! { |g| g.name == ENV['GUEST'] } if ENV['GUEST'].present?
       guests.select! { |g| g.host.name == ENV['HOST'] } if ENV['HOST'].present?
       services = CloudModel::MongodbPatch.services_of guests
       services.select! { |s| s.mongodb_replication_set&.name == ENV['SET'] } if ENV['SET'].present?
-      abort "No MongoDB services found in #{Rails.env} database — forgot RAILS_ENV=production?" if services.empty?
+      if services.empty?
+        filters = %w(SET GUEST HOST).select { |k| ENV[k].present? }.map { |k| "#{k}=#{ENV[k]}" }
+        abort filters.any? ? "No running MongoDB service matches #{filters * ' '}" : "No MongoDB services on running guests in the #{Rails.env} database"
+      end
       # A replica set is patched as a whole: a GUEST= or HOST= selection pulls
       # in the other members of the sets it touches.
       whole = services.filter_map(&:mongodb_replication_set).uniq.flat_map { |set| CloudModel::MongodbPatch.services_of set.guests }
@@ -210,7 +214,7 @@ namespace :cloudmodel do
       puts "Including the other members of the selected replica sets: #{added.map { |s| s.guest.name }.sort.join(', ')}" if added.any?
       services = (services + added).uniq(&:id)
 
-      deadline = ENV['UNTIL'].present? ? CloudModel::MongodbPatch.deadline_today(ENV['UNTIL']) : nil
+      deadline = ENV['UNTIL'].present? ? CloudModel::MongodbPatch.next_time(ENV['UNTIL']) : nil
       patch = CloudModel::MongodbPatch.new lag_limit: ENV.fetch('LAG', 30), member_timeout: ENV.fetch('TIMEOUT', 900), deadline: deadline, require_backup: ENV['NO_BACKUP_CHECK'] != '1'
       counts = patch.patch! services, dry_run: !confirm
       puts "\n#{counts[:current]} member(s) current, #{counts[:patched]} patched, #{counts[:skipped]} skipped, #{counts[:deferred]} deferred, #{counts[:failed]} failed#{confirm ? '' : ' (dry run, nothing changed)'}."

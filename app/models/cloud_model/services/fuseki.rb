@@ -45,7 +45,13 @@ module CloudModel
           res.body.lines.each do |line|
             line.strip!
             unless line.first == '#'
-              key, attrs, value = line.match(/\A([^{]+)\{([^}]+)\}(.*)\z/).captures
+              # `name{labels} value [timestamp]` or `name value`; the label
+              # set may hold a quoted `}`, so it runs to the last one. Anything
+              # else is not Prometheus text and ends in the parse warning.
+              matched = line.match(/\A(\S+?)(?:\{(.*)\})?\s+(\S+)(?:\s+-?\d+)?\z/)
+              raise ArgumentError, "not a metric line: #{line[0, 80]}" unless matched
+              key, attrs, value = matched.captures
+              attrs = attrs.to_s
               value.strip!
               description = false
 
