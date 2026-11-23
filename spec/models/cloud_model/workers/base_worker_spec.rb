@@ -85,8 +85,9 @@ describe CloudModel::Workers::BaseWorker do
     end
 
 
-    it 'should unmount all chroot mounts, innermost first' do
+    it 'should unmount all chroot mounts, innermost first (the ruby dataset bind mount of a build among them)' do
       allow(host).to receive(:mounted_at?).and_return(true)
+      expect(host).to receive(:exec).with('umount /mnt/root/opt/ruby').ordered.and_return([true, ''])
       expect(host).to receive(:exec).with('umount /mnt/root/dev/pts').ordered.and_return([true, ''])
       expect(host).to receive(:exec).with('umount /mnt/root/dev').ordered.and_return([true, ''])
       expect(host).to receive(:exec).with('umount /mnt/root/sys').ordered.and_return([true, ''])

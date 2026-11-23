@@ -96,7 +96,9 @@ describe CloudModel::Services::Nginx do
 
     it 'should require nginx and ruby if passenger supported' do
       subject.passenger_supported = true
-      expect(subject.components_needed).to eq [:'ruby@3.4', :nginx]
+      # the component carries no version: the release comes from the host's dataset (ruby_lines)
+      expect(subject.components_needed).to eq [:ruby, :nginx]
+      expect(subject.ruby_lines).to eq ['3.4']
     end
 
     it 'keeps the WebImage runtime additional_components but drops build-only toolchain (rust/clang)' do
@@ -104,7 +106,13 @@ describe CloudModel::Services::Nginx do
       subject.passenger_ruby_version = '2.5'
       subject.passenger_supported = true
       allow(subject).to receive(:deploy_web_image).and_return web_image
-      expect(subject.components_needed).to eq [:'ruby@3.4.10', :nginx, :imagemagick]
+      expect(subject.components_needed).to eq [:ruby, :nginx, :imagemagick]
+      # the deployed web image's ruby wins over the service's own setting
+      expect(subject.ruby_lines).to eq ['3.4.10']
+    end
+
+    it 'names no ruby line without passenger or capistrano' do
+      expect(subject.ruby_lines).to eq []
     end
 
     it 'should require web app components' do

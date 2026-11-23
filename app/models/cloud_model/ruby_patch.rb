@@ -269,7 +269,7 @@ module CloudModel
       else
         template = build_template(os, arch) or raise "no finished guest template with a ruby for #{os} #{arch}"
         output.puts "  compiling #{ruby_name} on #{host.name} in a clone of template #{template.id} (several minutes) …"
-        CloudModel::Workers::RubyBuildWorker.new(host, template: template, version: version, volume: volume, rvm_update: @rvm_update).build!
+        CloudModel::Workers::RvmRubyBuildWorker.new(host, template: template, version: version, volume: volume, rvm_update: @rvm_update).build!
       end
       host
     end

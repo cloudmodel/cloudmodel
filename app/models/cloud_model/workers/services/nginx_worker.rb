@@ -297,7 +297,7 @@ module CloudModel
             @model.update_attribute :redeploy_web_image_step, 'restart'
             comment_sub_step "Restart web application"
             web_image.try :append_to_build_log, "Restarting app on #{@guest.name}…\n"
-            success, _out = @model.guest.exec "/usr/local/rvm/bin/rvm default do passenger-config restart-app #{@model.www_root.shellescape} --ignore-app-not-running"
+            success, _out = @model.guest.exec "/usr/bin/env PATH=/usr/local/ruby/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin passenger-config restart-app #{@model.www_root.shellescape} --ignore-app-not-running"
             unless success
               @model.guest.exec! "/bin/systemctl restart nginx", "Failed to restart nginx"
             end
@@ -426,6 +426,10 @@ module CloudModel
             elsif @model.passenger_supported?
               render_to_remote "/cloud_model/guest/etc/nginx/server.d/passenger.conf", "#{@guest.deploy_path}/etc/nginx/server.d/passenger.conf", guest: @guest, model: @model
               render_to_remote "/cloud_model/guest/etc/default/rails", "#{@guest.deploy_path}/etc/default/rails", guest: @guest, model: @model
+              # the Passenger module's own snippet names /usr/bin/passenger_free_ruby — the first ruby on a
+              # login shell's PATH; ours is the shim, which picks the app's release
+              mkdir_p "#{@guest.deploy_path}/etc/nginx/conf.d"
+              render_to_remote "/cloud_model/guest/etc/nginx/conf.d/mod-http-passenger.conf", "#{@guest.deploy_path}/etc/nginx/conf.d/mod-http-passenger.conf", 0644, guest: @guest, model: @model
             elsif @model.capistrano_supported?
               render_to_remote "/cloud_model/guest/etc/nginx/server.d/cap-deployed.conf", "#{@guest.deploy_path}/etc/nginx/server.d/cap-deployed.conf", guest: @guest, model: @model
             end

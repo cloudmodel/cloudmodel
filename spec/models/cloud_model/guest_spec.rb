@@ -589,6 +589,31 @@ describe CloudModel::Guest do
     end
   end
 
+  describe 'ruby_lines_needed' do
+    it 'takes the lines the services name, deduplicated to minor lines, the first as default' do
+      allow(subject).to receive(:services).and_return [
+        double(ruby_lines: ['3.4.13']),
+        double(ruby_lines: []),
+        double(ruby_lines: ['3.4', '4.0.1']),
+      ]
+      expect(subject.ruby_lines_needed).to eq %w(3.4 4.0)
+      expect(subject.ruby_default_line).to eq '3.4'
+    end
+
+    it 'prefers the explicit list of the guest (CI and build guests)' do
+      subject.ruby_lines = ['4.0', '3.4']
+      allow(subject).to receive(:services).and_return [double(ruby_lines: ['3.3'])]
+      expect(subject.ruby_lines_needed).to eq %w(4.0 3.4)
+      expect(subject.ruby_default_line).to eq '4.0'
+    end
+
+    it 'is empty for a guest without a Ruby' do
+      allow(subject).to receive(:services).and_return [double(ruby_lines: [])]
+      expect(subject.ruby_lines_needed).to eq []
+      expect(subject.ruby_default_line).to be_nil
+    end
+  end
+
   describe 'components_needed' do
     it 'should collect all needed components from services' do
       allow(subject).to receive(:services).and_return [

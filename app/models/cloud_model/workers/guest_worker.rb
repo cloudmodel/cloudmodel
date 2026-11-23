@@ -11,6 +11,7 @@ module CloudModel
       include CloudModel::Workers::Mixins::UnattendedUpgrades
       include CloudModel::Workers::Mixins::CheckMkAgentGuestPlugins
       include CloudModel::Workers::Mixins::ChangeRecording
+      include CloudModel::Workers::Mixins::RubyLayout
 
       def initialize(guest)
         @guest = guest
@@ -75,6 +76,48 @@ module CloudModel
 
       def config_lxd_container
         @lxc.config_from_guest
+      end
+
+      RUBY_DEVICE = 'ruby'.freeze
+
+      # The guest's Rubies (CloudModel::RubyRelease): every line the guest
+      # needs is brought onto the host (synced from the build host, built
+      # there first when nobody has it), the host's per-(os, arch) dataset
+      # is attached read-only at /opt/ruby, and the rootfs gets the shims,
+      # the default symlink and the gem homes (Mixins::RubyLayout). Guests
+      # without a Ruby are left alone.
+      def ensure_ruby
+        lines = guest.ruby_lines_needed
+        return comment_sub_step 'No Ruby needed' if lines.empty?
+
+        os, arch = guest.os_version, host.arch
+        lines.each do |line|
+          version = ruby_version_for line, os, arch
+          comment_sub_step "Ensure Ruby #{version} (line #{line}) on #{host.name}"
+          CloudModel::RubyRelease.new(version: version, os_version: os, arch: arch).ensure_on! host, output: $stdout
+        end
+
+        mountpoint = CloudModel::RubyRelease.mountpoint os, arch
+        comment_sub_step "Attach #{mountpoint} read-only at #{CloudModel::Workers::Mixins::RubyLayout::GUEST_MOUNT}"
+        success, _ = host.exec "lxc config device get #{@lxc.name.shellescape} #{RUBY_DEVICE} source"
+        unless success
+          host.exec! "lxc config device add #{@lxc.name.shellescape} #{RUBY_DEVICE} disk source=#{mountpoint.shellescape} path=#{CloudModel::Workers::Mixins::RubyLayout::GUEST_MOUNT} readonly=true",
+            'Failed to attach the ruby dataset'
+        end
+
+        comment_sub_step "Write the Ruby layout (default line #{lines.first}, lines #{lines * ', '})"
+        write_ruby_layout guest.deploy_path, os_version: os, arch: arch, default_line: lines.first, lines: lines
+      end
+
+      # The release a line resolves to: the newest the build host carries,
+      # else CloudModel.config.ruby_version when it is on that line (built
+      # on demand), else an error naming the line.
+      def ruby_version_for line, os, arch
+        build_host = CloudModel::Host.build_host(arch) or raise "no build host for arch #{arch} (CloudModel.config.build_host_name)"
+        versions = CloudModel::RubyRelease.versions_on build_host, os, arch
+        CloudModel::RubyRelease.newest(line, versions) ||
+          (CloudModel::RubyRelease.line_of(CloudModel.config.ruby_version) == line && CloudModel.config.ruby_version =~ CloudModel::RubyRelease::VERSION ? CloudModel.config.ruby_version : nil) ||
+          raise("no Ruby release of line #{line} for #{os} #{arch}: none built on #{build_host.name} and CloudModel.config.ruby_version (#{CloudModel.config.ruby_version}) is not a release of that line")
       end
 
       def start_lxd_container
@@ -250,6 +293,7 @@ module CloudModel
           ['Ensure LXD custom volumes', :ensure_lxd_custom_volumes, no_skip: true],
           ['Config LXD container', :config_lxd_container],
           ['Config guest services', :config_services],
+          ['Ensure Ruby', :ensure_ruby],
           ['Update check_mk agent plugins', :update_check_mk_plugins],
           ['Ensure unattended security upgrades', :ensure_unattended_upgrades],
           ['Config guest certificates', :config_guest_certificates],

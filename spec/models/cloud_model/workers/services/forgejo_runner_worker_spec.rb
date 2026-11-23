@@ -75,7 +75,7 @@ describe CloudModel::Workers::Services::ForgejoRunnerWorker do
       config = YAML.safe_load(yaml)
       expect(config['server']['connections']['forgejo']).to eq('url' => 'https://git.example.com/', 'uuid' => '37633331-3539-3165-3862-363732323561', 'token' => '7c31591e8b67225a116d4a4519ea8e507e08f71f')
       expect(config['runner']['labels']).to eq ['ubuntu-latest:host', 'self-hosted:host']
-      expect(config['runner']['envs']['PATH']).to start_with '/usr/local/rvm/wrappers/default:'
+      expect(config['runner']['envs']['PATH']).to start_with '/usr/local/ruby/bin:'
       expect(config['runner']['envs']['BUNDLE_PATH']).to eq '/var/lib/forgejo-runner/gems'
       expect(yaml).not_to include '&quot;'
     end

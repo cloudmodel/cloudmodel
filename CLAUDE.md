@@ -146,6 +146,10 @@ class MyServiceWorker < CloudModel::Workers::Services::BaseWorker
 end
 ```
 
+### Ruby on guests
+
+Guests do not carry a Ruby in their template. The releases live in one ZFS dataset per (os, arch) on every host (`CloudModel::RubyRelease`: `guests/ruby/<os>-<arch>` at `/cloud/ruby/<os>-<arch>`, one directory per release, built from the checked tarball on the build host by `Workers::RubyBuildWorker` with `--prefix=/opt/ruby/ruby-<version> --enable-load-relative`, sent host to host as the snapshot `@ruby-<version>`). A guest whose services name a Ruby line (`Guest#ruby_lines_needed`: `Services::Nginx#passenger_ruby_version`, a web image's `ruby_version`, `ruby@<line>` components, or the guest's own `ruby_lines` for CI/build guests) gets the dataset attached read-only at `/opt/ruby` and the layout of `Workers::Mixins::RubyLayout`: shims under `/usr/local/ruby/bin` that pick the release per working directory (`.ruby-version`, `RUBY_VERSION`, else `/etc/ruby-version`; a line resolves to its newest release, a missing patch level to its line) and a writable gem home per line under `/var/lib/gems/<abi>`, plus `/usr/local/ruby/current` for one fixed path. Passenger (`conf.d/mod-http-passenger.conf`) and the systemd units run through the shims; template and web image builds get the dataset bind-mounted into the chroot. `CloudModel.config.ruby_version` is the release that is built when a line nobody has built yet is asked for. `CloudModel::RubyPatch` (`rake cloudmodel:guest:patch_ruby`) still serves guests on older templates that run RVM.
+
 ### Adding a New Service
 
 1. Model: `app/models/cloud_model/services/my_service.rb` extending `Services::Base`
@@ -162,7 +166,7 @@ CloudModel.configure do |config|
   config.admin_email      = 'admin@example.com'
   config.ubuntu_version   = '22.04.4'
   config.php_version      = '8.4'
-  config.ruby_version     = '3.1'
+  config.ruby_version     = '3.4.13'   # the release to build on demand
   config.dns_servers      = %w[1.1.1.1 8.8.8.8]
   config.data_directory   = "#{Rails.root}/data"
 end

@@ -14,8 +14,10 @@ PIDFile=/tmp/delayed_job.%i.pid
 # and the rake services run with; optional, the unit starts without it.
 EnvironmentFile=-/etc/default/rails
 Environment = RAILS_ENV=<%= model.passenger_env %>
-ExecStart=/usr/local/rvm/bin/rvm default do <%= path %>/bin/delayed_job -i %i  --queue %i --pid_dir=/tmp/ start
-ExecStop=/usr/local/rvm/bin/rvm default do <%= path %>/bin/delayed_job -i %i --pid_dir=/tmp/ stop
+# The ruby shim picks the app's release (its .ruby-version, else the guest's
+# default line) and the gem home of that line.
+ExecStart=/usr/local/ruby/bin/ruby <%= path %>/bin/delayed_job -i %i  --queue %i --pid_dir=/tmp/ start
+ExecStop=/usr/local/ruby/bin/ruby <%= path %>/bin/delayed_job -i %i --pid_dir=/tmp/ stop
 User=www
 Group=www
 UMask=0002

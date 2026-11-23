@@ -43,7 +43,7 @@ passenger-install-nginx-module --auto \
 
 rm -rf $builddir
 
-export ruby_bin=`which ruby`
+export ruby_bin=/usr/local/ruby/bin/ruby
 export gem_dir=`gem env gemdir`
 export passenger_version=`passenger-config --version`
 echo >/etc/nginx/passenger.conf "# Include to config passenger

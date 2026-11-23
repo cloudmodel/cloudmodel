@@ -83,8 +83,10 @@ module CloudModel
         :forgejo_runner
       end
 
+      # The ruby component carries no version any more: the releases come
+      # from the host's dataset, the lines from #ruby_lines.
       def components_needed
-        ([:"forgejo_runner@#{effective_runner_version}"] + super).uniq
+        ([:"forgejo_runner@#{effective_runner_version}"] + super.map { |c| c.to_s.start_with?('ruby@') ? :ruby : c }).uniq
       end
 
       # The daemon only opens outbound connections (plus a cache server on a
@@ -163,7 +165,7 @@ module CloudModel
         self.labels = value.to_s.split(/[\s,]+/).reject(&:blank?)
       end
 
-      # @return [Boolean] whether the template carries an RVM ruby (`ruby@<version>` component)
+      # @return [Boolean] whether the guest carries a Ruby (`ruby` or `ruby@<line>` component)
       def ruby?
         additional_components.map(&:to_s).any? { |c| c.split('@', 2).first == 'ruby' }
       end
@@ -174,10 +176,10 @@ module CloudModel
       end
 
       # Environment every job step runs with: the tool chains the components
-      # put into the template, reachable without a login shell. RVM only
-      # wires itself into profile.d, so its default-ruby wrappers go first
-      # on the PATH; bundler installs into a directory the runner user owns
-      # (the RVM gem dir is root's). rustup likewise.
+      # put into the template, reachable without a login shell. The Ruby
+      # shims go first on the PATH (they pick the release per checkout from
+      # its .ruby-version and a gem home the runner user can write to);
+      # bundler installs into a directory the runner user owns. rustup likewise.
       #
       # @return [Hash{String => String}]
       def job_environment
@@ -185,7 +187,7 @@ module CloudModel
         env = {}
 
         if ruby?
-          path << "/usr/local/rvm/wrappers/default"
+          path << "/usr/local/ruby/bin"
           env['BUNDLE_PATH'] = "#{HOME}/gems"
         end
 

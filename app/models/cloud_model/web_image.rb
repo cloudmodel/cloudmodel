@@ -42,10 +42,11 @@ module CloudModel
     field :git_commit, type: String
 
     # @!attribute [rw] ruby_version
-    #   @return [String, nil] the Ruby the app is built against and runs on. This
-    #   is the single source of truth for the version — it selects the build
-    #   environment and the Nginx/Passenger runtime must install the SAME exact
-    #   version. nil → fall back to the build host's/template's Ruby.
+    #   @return [String, nil] the Ruby line (3.4) or release (3.4.13) the app
+    #   is built with and runs on: the build system and the Nginx/Passenger
+    #   guest resolve it against the host's release dataset
+    #   (CloudModel::RubyRelease), a line to its newest release. nil → the
+    #   line of CloudModel.config.ruby_version.
     field :ruby_version, type: String, default: nil
 
     # @!attribute [rw] os_version
@@ -215,7 +216,7 @@ module CloudModel
     # native builds would fail.
     # @return [CloudModel::GuestTemplate]
     def build_env_template(host)
-      raw = [:"ruby@#{ruby_version || CloudModel.config.ruby_version}", :nodejs, :rust] +
+      raw = [:ruby, :nodejs, :rust] +
             additional_components.map(&:to_sym)
       components = raw.flat_map do |sym|
         comp = CloudModel::Components::BaseComponent.from_sym(sym)

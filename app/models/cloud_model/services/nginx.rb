@@ -158,6 +158,13 @@ module CloudModel
         true
       end
 
+      # The Ruby line the Passenger/Capistrano app runs on: the deployed web
+      # image's, else the service's own setting.
+      def ruby_lines
+        return super unless passenger_supported or capistrano_supported
+        [deploy_web_image&.ruby_version.presence || passenger_ruby_version].compact + super
+      end
+
       def components_needed
         components = [:nginx]
 
@@ -166,11 +173,10 @@ module CloudModel
         end
 
         if passenger_supported or capistrano_supported
-          # The deployed web image's ruby_version is the source of truth — the
-          # runtime Ruby that Passenger boots must match the one the artifact was
-          # built against. Fall back to passenger_ruby_version when unset.
-          ruby = deploy_web_image&.ruby_version.presence || passenger_ruby_version
-          components = [:"ruby@#{ruby}"] + components
+          # The Ruby itself comes from the host's release dataset at run time
+          # (CloudModel::RubyRelease, #ruby_lines); the component only brings
+          # the libraries and build dependencies into the template.
+          components = [:ruby] + components
           if deploy_web_image
             # The web image's additional_components are its runtime libraries
             # (e.g. imagemagick, libxml2) and stay in the guest template — only

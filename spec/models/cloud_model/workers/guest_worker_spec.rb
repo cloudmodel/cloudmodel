@@ -10,6 +10,80 @@ describe CloudModel::Workers::GuestWorker do
     allow(host).to receive(:exec!)
   end
 
+  describe 'ensure_ruby' do
+    let(:lxc) { double 'lxc', name: 'test-lxc' }
+    let(:build_host) { double CloudModel::Host, name: 'build-host' }
+
+    before do
+      subject.instance_variable_set :@lxc, lxc
+      allow(subject).to receive(:comment_sub_step)
+      allow(guest).to receive(:os_version).and_return 'debian-12'
+      allow(CloudModel::Host).to receive(:build_host).with(host.arch).and_return build_host
+    end
+
+    it 'is in the deploy steps right after the services' do
+      allow(guest).to receive(:deploy_state).and_return(:pending)
+      allow(guest).to receive(:update_attributes)
+      allow(guest).to receive(:collection).and_return(double(update_one: true))
+      allow(guest).to receive(:id).and_return(BSON::ObjectId.new)
+      allow(guest).to receive(:services).and_return([])
+      allow(Rails.logger).to receive(:debug)
+      allow(subject).to receive(:puts)
+      expect(subject).to receive(:run_steps) do |_stage, steps, _options|
+        names = steps.map(&:first)
+        expect(names.index('Ensure Ruby')).to eq names.index('Config guest services') + 1
+      end
+      subject.deploy
+    end
+
+    it 'leaves a guest without a Ruby alone' do
+      allow(guest).to receive(:ruby_lines_needed).and_return []
+      expect(CloudModel::RubyRelease).not_to receive(:new)
+      expect(host).not_to receive(:exec!)
+      subject.ensure_ruby
+    end
+
+    it 'brings every line onto the host, attaches the dataset read-only once and writes the layout' do
+      allow(guest).to receive(:ruby_lines_needed).and_return %w(3.4 4.0)
+      allow(CloudModel::RubyRelease).to receive(:versions_on).with(build_host, 'debian-12', host.arch).and_return %w(3.4.13 4.0.1)
+      r34 = double 'release 3.4.13'
+      r40 = double 'release 4.0.1'
+      expect(CloudModel::RubyRelease).to receive(:new).with(version: '3.4.13', os_version: 'debian-12', arch: host.arch).and_return r34
+      expect(CloudModel::RubyRelease).to receive(:new).with(version: '4.0.1', os_version: 'debian-12', arch: host.arch).and_return r40
+      expect(r34).to receive(:ensure_on!).with(host, output: anything)
+      expect(r40).to receive(:ensure_on!).with(host, output: anything)
+      allow(host).to receive(:exec).with('lxc config device get test-lxc ruby source').and_return [false, '']
+      expect(host).to receive(:exec!).with("lxc config device add test-lxc ruby disk source=/cloud/ruby/debian-12-#{host.arch} path=/opt/ruby readonly=true", anything)
+      expect(subject).to receive(:write_ruby_layout).with(guest.deploy_path, os_version: 'debian-12', arch: host.arch, default_line: '3.4', lines: %w(3.4 4.0))
+      subject.ensure_ruby
+    end
+
+    it 'does not add the device twice' do
+      allow(guest).to receive(:ruby_lines_needed).and_return %w(3.4)
+      allow(CloudModel::RubyRelease).to receive(:versions_on).and_return %w(3.4.13)
+      allow(CloudModel::RubyRelease).to receive(:new).and_return double(ensure_on!: true)
+      allow(host).to receive(:exec).with(/lxc config device get/).and_return [true, "/cloud/ruby/debian-12-#{host.arch}\n"]
+      expect(host).not_to receive(:exec!).with(/lxc config device add/, anything)
+      allow(subject).to receive(:write_ruby_layout)
+      subject.ensure_ruby
+    end
+
+    it 'builds the configured release when the build host has none of the line, and names a line it cannot provide' do
+      allow(guest).to receive(:ruby_lines_needed).and_return %w(3.4)
+      allow(CloudModel::RubyRelease).to receive(:versions_on).and_return []
+      allow(CloudModel.config).to receive(:ruby_version).and_return '3.4.13'
+      release = double 'release'
+      expect(CloudModel::RubyRelease).to receive(:new).with(version: '3.4.13', os_version: 'debian-12', arch: host.arch).and_return release
+      expect(release).to receive(:ensure_on!)
+      allow(host).to receive(:exec).and_return [true, '']
+      allow(subject).to receive(:write_ruby_layout)
+      subject.ensure_ruby
+
+      allow(guest).to receive(:ruby_lines_needed).and_return %w(4.0)
+      expect { subject.ensure_ruby }.to raise_error(/no Ruby release of line 4.0 for debian-12 #{host.arch}: none built on build-host/)
+    end
+  end
+
   describe 'deploy' do
     it 'should return false if not pending and not forced' do
       allow(guest).to receive(:deploy_state).and_return(:finished)

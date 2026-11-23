@@ -286,6 +286,40 @@ describe CloudModel::Workers::GuestTemplateWorker do
       end
     end
 
+    describe 'ensure_ruby_in_build' do
+      before do
+        allow(subject).to receive(:zfs_volume).and_return(zfs_volume)
+        allow(subject).to receive(:comment_sub_step)
+        allow(CloudModel.config).to receive(:ruby_version).and_return '3.4.13'
+      end
+
+      it 'does nothing for a template without the ruby component' do
+        allow(template_type).to receive(:components).and_return [:nginx]
+        expect(subject).not_to receive(:bind_ruby_dataset)
+        subject.ensure_ruby_in_build
+      end
+
+      it 'binds the host dataset into the build system and writes the layout for the configured line' do
+        allow(template_type).to receive(:components).and_return [:ruby, :nginx]
+        allow(CloudModel::RubyRelease).to receive(:versions_on).with(host, 'ubuntu-22.04', 'amd64').and_return %w(3.4.13)
+        expect(CloudModel::RubyRelease).not_to receive(:new)
+        expect(subject).to receive(:bind_ruby_dataset).with('/cloud/build/type1/tmpl1/rootfs', os_version: 'ubuntu-22.04', arch: 'amd64').ordered
+        expect(subject).to receive(:write_ruby_layout).with('/cloud/build/type1/tmpl1/rootfs', os_version: 'ubuntu-22.04', arch: 'amd64', default_line: '3.4').ordered
+        subject.ensure_ruby_in_build
+      end
+
+      it 'builds the configured release on this host first when it has none of its line' do
+        allow(template_type).to receive(:components).and_return [:ruby]
+        allow(CloudModel::RubyRelease).to receive(:versions_on).and_return []
+        release = double 'release'
+        expect(CloudModel::RubyRelease).to receive(:new).with(version: '3.4.13', os_version: 'ubuntu-22.04', arch: 'amd64').and_return release
+        expect(release).to receive(:ensure_on!).with(host, output: anything)
+        allow(subject).to receive(:bind_ruby_dataset)
+        allow(subject).to receive(:write_ruby_layout)
+        subject.ensure_ruby_in_build
+      end
+    end
+
     describe 'install_components' do
       let(:ruby_component) { double 'ruby_component', human_name: 'Ruby' }
       let(:xml_component) { double 'xml_component', human_name: 'XML' }
@@ -489,6 +523,16 @@ describe CloudModel::Workers::GuestTemplateWorker do
         expect(subject).to receive(:run_steps) do |_name, steps, _options|
           clone_step = steps.detect { |s| s[1] == :clone_core_template }
           expect(clone_step[2]).to eq(on_skip: :reuse_build_volume)
+        end
+        allow(template).to receive(:build_state).and_return(:pending)
+
+        subject.build_template template
+      end
+
+      it 'puts the Ruby into the build system before the components' do
+        expect(subject).to receive(:run_steps) do |_name, steps, _options|
+          names = steps.map(&:first)
+          expect(names.index('Ensure Ruby in the build system')).to eq names.index('Install Components') - 1
         end
         allow(template).to receive(:build_state).and_return(:pending)
 

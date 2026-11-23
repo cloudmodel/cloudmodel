@@ -30,8 +30,10 @@ branches on `Rails.env`.
 |---|---|---|---|
 | `build_dataset` | `guests/build` | ZFS dataset path | Parent dataset that guest/core templates **and** web-image artifacts are built under. Must be in the same pool as the LXD container datasets so deploys can `zfs clone`. |
 | `build_host_name` | *(none)* | String **or** per-arch Hash | The host(s) templates and web images are built on. A String (`'core06'`) builds everything there; a Hash (`{ 'arm64' => 'host23', 'amd64' => 'host24' }`) picks a build host per architecture. An arch without an entry builds on the deploy target host itself. |
-| `bundle_command` | `/usr/local/rvm/bin/rvm default do bundle` | shell command | How bundler is invoked on the admin machine (git checkout only). Dev typically sets `'bundle'`. |
-| `ruby_version` | `3.4` | version string | Ruby version used by build components. |
+| `bundle_command` | `/usr/local/ruby/bin/bundle` | shell command | How bundler is invoked on the admin machine — the Ruby shim picks the release for the working directory (git checkout only). Dev typically sets `'bundle'`. |
+| `ruby_version` | `3.4` | version string | The Ruby release to build when a guest, template or web image asks for a line nobody has built yet (`CloudModel::RubyRelease`); a full version such as `3.4.13` is required for that. Guests name their lines (`Guest#ruby_lines`, the Nginx service's `passenger_ruby_version`, a web image's `ruby_version`). |
+| `ruby_dataset` | `guests/ruby` | ZFS dataset | Parent of the per-(os, arch) datasets that hold the Ruby releases on every host (`guests/ruby/debian-12-amd64`), built on the build host and sent host to host; mounted read-only into the guests at `/opt/ruby`. |
+| `ruby_mountpoint` | `/cloud/ruby` | path | Where those datasets are mounted on the hosts. |
 | `php_version` | `8.4` | version string | PHP major installed by the PHP components (from the ondrej/php PPA on Ubuntu, packages.sury.org on Debian). |
 
 ### `zfs_compression`

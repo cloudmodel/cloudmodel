@@ -1,0 +1,6 @@
+### Written by CloudModel in place of the Passenger package's snippet.
+# The Ruby shim picks the app's release (.ruby-version in the app root,
+# else the guest's default line in /etc/ruby-version) and the gem home of
+# that line; the releases are mounted read-only under /opt/ruby.
+passenger_root /usr/lib/ruby/vendor_ruby/phusion_passenger/locations.ini;
+passenger_ruby /usr/local/ruby/bin/ruby;

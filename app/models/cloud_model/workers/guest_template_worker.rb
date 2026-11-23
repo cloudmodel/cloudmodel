@@ -14,6 +14,7 @@ module CloudModel
     class GuestTemplateWorker < TemplateWorker
       include CloudModel::Workers::Mixins::UnattendedUpgrades
       include CloudModel::Workers::Mixins::CheckMkAgentGuestPlugins
+      include CloudModel::Workers::Mixins::RubyLayout
 
       def zfs_volume
         @zfs_volume ||= @template.build_volume @host
@@ -210,6 +211,27 @@ module CloudModel
         @host.exec! "cp /etc/resolv.conf #{build_path}/etc", "Failed to copy resolve conf"
       end
 
+      # A template with the ruby component gets the host's release dataset
+      # bind-mounted at /opt/ruby for the component builds (nginx's Passenger
+      # module looks for a ruby) and the layout — shims, default symlink,
+      # profile.d — committed into the template; the release itself is built
+      # on this host first when it has none of CloudModel.config.ruby_version's line.
+      def ensure_ruby_in_build
+        return comment_sub_step 'No ruby component' unless ruby_template?
+        line = CloudModel::RubyRelease.line_of CloudModel.config.ruby_version
+        os, arch = @template.os_version, @host.arch
+        unless CloudModel::RubyRelease.newest(line, CloudModel::RubyRelease.versions_on(@host, os, arch))
+          raise "CloudModel.config.ruby_version must be a full release to build one, got #{CloudModel.config.ruby_version.inspect}" unless CloudModel.config.ruby_version =~ CloudModel::RubyRelease::VERSION
+          CloudModel::RubyRelease.new(version: CloudModel.config.ruby_version, os_version: os, arch: arch).ensure_on! @host, output: $stdout
+        end
+        bind_ruby_dataset build_path, os_version: os, arch: arch
+        write_ruby_layout build_path, os_version: os, arch: arch, default_line: line
+      end
+
+      def ruby_template?
+        @template.template_type.components.map(&:to_s).any? { |c| c.split('@', 2).first == 'ruby' }
+      end
+
       def install_components
         chroot! build_path, "apt-get update", "Failed to update package lists"
 
@@ -234,6 +256,7 @@ module CloudModel
 
         steps = [
           ["Clone core template #{template.core_template.try(:id)}", :clone_core_template, on_skip: :reuse_build_volume],
+          ["Ensure Ruby in the build system", :ensure_ruby_in_build],
           ["Install Components", :install_components],
           ["Write LXD metadata", :write_lxd_metadata],
           # A skipped cleanup would silently commit a template with shared

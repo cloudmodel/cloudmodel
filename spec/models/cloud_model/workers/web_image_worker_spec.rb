@@ -98,6 +98,7 @@ describe CloudModel::Workers::WebImageWorker do
       allow(subject).to receive(:write_puppeteer_config)
       allow(subject).to receive(:cleanup_chroot)
       allow(subject).to receive(:chroot!)
+      allow(subject).to receive(:ensure_ruby_in_build_system)
       allow(File).to receive(:file?).and_return(true)
     end
 
@@ -118,17 +119,30 @@ describe CloudModel::Workers::WebImageWorker do
       expect(subject.build_app_volume('MOS6502')).to eq true
     end
 
-    it 'pins the ruby version before bundling, so RVM bundles on the ruby the artifact runs on' do
-      allow(subject).to receive(:chroot!).and_call_original
-      allow(subject).to receive(:prepare_chroot)
-      allow(subject).to receive(:render_to_remote)
-      allow(host).to receive(:sftp).and_return double(remove!: true)
-      allow(web_image).to receive(:ruby_version).and_return '3.4.8'
+    it 'puts the web image\'s ruby line into the build system before bundling (dataset bound, layout written) instead of pinning .ruby-version' do
+      allow(subject).to receive(:ensure_ruby_in_build_system).and_call_original
+      allow(web_image).to receive(:ruby_version).and_return '3.4'
+      allow(web_image).to receive(:build_os_version).and_return 'debian-12'
+      allow(CloudModel::RubyRelease).to receive(:versions_on).with(host, 'debian-12', 'MOS6502').and_return ['3.4.13']
+      expect(subject).to receive(:bind_ruby_dataset).with('/cloud/build/web/web42/MOS6502-buildenv/rootfs', os_version: 'debian-12', arch: 'MOS6502').ordered
+      expect(subject).to receive(:write_ruby_layout).with('/cloud/build/web/web42/MOS6502-buildenv/rootfs', os_version: 'debian-12', arch: 'MOS6502', default_line: '3.4').ordered
+      expect(subject).to receive(:bundle_image).ordered
+      expect(host).not_to receive(:exec!).with(/\.ruby-version/, anything)
 
-      expect(host).to receive(:exec!).with(/printf %s 3.4.8 > .*\.ruby-version/, anything).ordered
-      expect(host).to receive(:exec).with(/chroot .* \/root\/chroot-.*\.sh/).ordered.and_return [true, '']
-      allow(host).to receive(:exec!).with(/zfs|cp /, anything)
+      subject.build_app_volume('MOS6502')
+    end
 
+    it 'builds the configured release first when the build host has none of the line' do
+      allow(subject).to receive(:ensure_ruby_in_build_system).and_call_original
+      allow(web_image).to receive(:ruby_version).and_return nil
+      allow(web_image).to receive(:build_os_version).and_return 'debian-12'
+      allow(CloudModel.config).to receive(:ruby_version).and_return '3.4.13'
+      allow(CloudModel::RubyRelease).to receive(:versions_on).and_return []
+      release = double 'release'
+      expect(CloudModel::RubyRelease).to receive(:new).with(version: '3.4.13', os_version: 'debian-12', arch: 'MOS6502').and_return release
+      expect(release).to receive(:ensure_on!).with(host, output: anything)
+      allow(subject).to receive(:bind_ruby_dataset)
+      allow(subject).to receive(:write_ruby_layout)
       subject.build_app_volume('MOS6502')
     end
 

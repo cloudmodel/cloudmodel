@@ -1,0 +1,56 @@
+#!/bin/sh
+# Written by CloudModel. The Rubies are mounted read-only under /opt/ruby,
+# one directory per release. This shim picks the release for the working
+# directory the way a version manager would — RUBY_VERSION in the
+# environment, else the nearest .ruby-version upwards, else the guest's
+# default in /etc/ruby-version — resolves a minor line (3.4) to the newest
+# release of that line, falls back from a patch level that is not installed
+# to its line, sets a writable gem home per line and runs the real program.
+root=${RUBY_SHIM_ROOT:-/opt/ruby}
+gem_root=${RUBY_SHIM_GEM_ROOT:-/var/lib/gems}
+name=$(basename "$0")
+want=${RUBY_VERSION:-}
+if [ -z "$want" ]; then
+  dir=$PWD
+  while [ -n "$dir" ]; do
+    if [ -f "$dir/.ruby-version" ]; then
+      want=$(head -n 1 "$dir/.ruby-version" | tr -d '[:space:]')
+      break
+    fi
+    [ "$dir" = "/" ] && break
+    dir=$(dirname "$dir")
+  done
+fi
+if [ -z "$want" ] && [ -f /etc/ruby-version ]; then
+  want=$(tr -d '[:space:]' < /etc/ruby-version)
+fi
+want=${want#ruby-}
+release=""
+if [ -n "$want" ]; then
+  if [ -x "$root/ruby-$want/bin/ruby" ]; then
+    release="ruby-$want"
+  else
+    line=$(printf '%s' "$want" | cut -d. -f1,2)
+    release=$(ls -1 "$root" 2>/dev/null | grep "^ruby-$line\\.[0-9]*\$" | sort -t. -k3 -n | tail -n 1)
+    if [ -n "$release" ] && [ "$want" != "$line" ] && [ -z "$RUBY_SHIM_QUIET" ]; then
+      echo "ruby shim: $want is not installed, using $release" >&2
+    fi
+  fi
+fi
+if [ -z "$release" ]; then
+  echo "ruby shim: no Ruby ${want:+$want }installed under $root (installed: $(ls -1 "$root" 2>/dev/null | tr '\n' ' '))" >&2
+  exit 127
+fi
+abi=$(printf '%s' "${release#ruby-}" | cut -d. -f1,2).0
+gem_home=$gem_root/$abi
+[ -w "$gem_home" ] || gem_home=${HOME:-/tmp}/.gem/ruby/$abi
+export GEM_HOME=$gem_home
+export GEM_PATH=$gem_home:$root/$release/lib/ruby/gems/$abi
+export PATH=$gem_home/bin:$root/$release/bin:$PATH
+exe=$root/$release/bin/$name
+[ -x "$exe" ] || exe=$gem_home/bin/$name
+if [ ! -x "$exe" ]; then
+  echo "ruby shim: $name is neither in $release nor in $gem_home" >&2
+  exit 127
+fi
+exec "$exe" "$@"

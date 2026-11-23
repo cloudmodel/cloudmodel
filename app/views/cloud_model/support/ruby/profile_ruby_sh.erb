@@ -1,0 +1,6 @@
+# Written by CloudModel. The Ruby releases are mounted read-only under
+# /opt/ruby; the shims under /usr/local/ruby/bin pick the release per
+# project (.ruby-version, RUBY_VERSION, /etc/ruby-version) and set a
+# writable gem home per line. /usr/local/ruby/current points at the guest's
+# default release for anything that wants one fixed path.
+export PATH="/usr/local/ruby/bin:$PATH"

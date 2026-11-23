@@ -10,7 +10,7 @@ User=www
 Group=www
 EnvironmentFile=/etc/default/rails
 WorkingDirectory=/var/www/rails/current
-ExecStart=/usr/local/rvm/bin/rvm default do bundle exec rake <%= service.rake_task %>
+ExecStart=/usr/local/ruby/bin/bundle exec rake <%= service.rake_task %>
 <%- if service.rake_mode == 'restart' -%>
 Restart=always
 RestartSec=<%= service.rake_restart_sec %>

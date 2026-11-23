@@ -161,6 +161,13 @@ module CloudModel
         additional_components.map &:to_sym
       end
 
+      # The Ruby lines (or versions) the service needs on its guest; the
+      # guest mounts the releases and the shims pick them (Guest#ruby_lines_needed).
+      # @return [Array<String>]
+      def ruby_lines
+        additional_components.map(&:to_s).filter_map { |c| name, version = c.split('@', 2); version if name == 'ruby' }
+      end
+
       # @return [Hash, false] monitoring data hash, or `false` if no health check is available
       def service_status
         false

@@ -56,7 +56,9 @@ describe CloudModel::Services::ForgejoRunner do
 
     it 'should add the tool chain components of the service' do
       subject.additional_components = ['ruby@3.4.8', 'nodejs', 'rust']
-      expect(subject.components_needed).to eq [:"forgejo_runner@13.2.1", :"ruby@3.4.8", :nodejs, :rust]
+      # the ruby component carries no version: the releases come from the host's dataset
+      expect(subject.components_needed).to eq [:"forgejo_runner@13.2.1", :ruby, :nodejs, :rust]
+      expect(subject.ruby_lines).to eq ['3.4.8']
     end
   end
 
@@ -117,10 +119,10 @@ describe CloudModel::Services::ForgejoRunner do
   end
 
   describe 'job_environment' do
-    it 'should wire the RVM default ruby and a writable bundle path' do
+    it 'should wire the ruby shims and a writable bundle path' do
       subject.additional_components = ['ruby@3.4']
       env = subject.job_environment
-      expect(env['PATH']).to start_with '/usr/local/rvm/wrappers/default:'
+      expect(env['PATH']).to start_with '/usr/local/ruby/bin:'
       expect(env['BUNDLE_PATH']).to eq '/var/lib/forgejo-runner/gems'
       expect(env['HOME']).to eq '/var/lib/forgejo-runner'
     end

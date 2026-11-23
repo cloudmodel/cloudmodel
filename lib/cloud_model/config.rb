@@ -49,6 +49,11 @@ module CloudModel
     attr_writer :mongodb_unattended, :mongodb_unattended_window
     attr_writer :debian_version
     attr_writer :php_version, :ruby_version
+    # Where the guests' Ruby releases live on every host: one ZFS dataset
+    # per (os, arch) under ruby_dataset, mounted under ruby_mountpoint, one
+    # directory per release (ruby-3.4.13), mounted read-only into the guests
+    # at /opt/ruby (CloudModel::RubyRelease).
+    attr_writer :ruby_dataset, :ruby_mountpoint
 
     attr_accessor :admin_email, :email_domain
     attr_writer :dns_domains
@@ -108,8 +113,10 @@ module CloudModel
       @backup_snapshot_prefix || 'cm-bkp-'
     end
 
+    # The `bundle` the admin application calls for its own rake tasks: the
+    # shim picks the Ruby release for the working directory.
     def bundle_command
-      @bundle_command || '/usr/local/rvm/bin/rvm default do bundle'
+      @bundle_command || '/usr/local/ruby/bin/bundle'
     end
 
     # If true do not sync images on deploy
@@ -205,6 +212,14 @@ module CloudModel
 
     def ruby_version
       @ruby_version || "3.4"
+    end
+
+    def ruby_dataset
+      @ruby_dataset || 'guests/ruby'
+    end
+
+    def ruby_mountpoint
+      @ruby_mountpoint || '/cloud/ruby'
     end
 
     def dns_domains

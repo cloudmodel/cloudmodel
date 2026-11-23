@@ -124,7 +124,7 @@ describe CloudModel::RubyPatch do
       let(:build_host) { double CloudModel::Host, name: 'build-host', arch: 'amd64' }
       let(:template_type) { double 'type', components: ['nginx', 'ruby@3.4'] }
       let(:template) { double CloudModel::GuestTemplate, id: 'tpl1', template_type: template_type }
-      let(:worker) { double CloudModel::Workers::RubyBuildWorker }
+      let(:worker) { double CloudModel::Workers::RvmRubyBuildWorker }
       let(:build_volume) { double 'volume on build host', dataset_name: dataset, mountpoint: mountpoint }
       let(:host_volume) { double 'volume on host-a', dataset_name: dataset, mountpoint: mountpoint }
 
@@ -184,7 +184,7 @@ describe CloudModel::RubyPatch do
         expect(other).to receive(:exec).with(/readlink/).and_return [true, old_inventory], [true, new_inventory]
 
         expect(build_volume).to receive(:ready?).and_return false
-        expect(CloudModel::Workers::RubyBuildWorker).to receive(:new).with(build_host, template: template, version: '3.4.13', volume: build_volume, rvm_update: false).and_return worker
+        expect(CloudModel::Workers::RvmRubyBuildWorker).to receive(:new).with(build_host, template: template, version: '3.4.13', volume: build_volume, rvm_update: false).and_return worker
         expect(worker).to receive(:build!).ordered
         expect(host_volume).to receive(:ready?).and_return false
         expect(subject).to receive(:sync_zfs_dataset!).with(build_host, host, dataset).ordered
@@ -220,7 +220,7 @@ describe CloudModel::RubyPatch do
       it 'reuses a built volume, skips the sync where the volume is present, and reports a failed switch with the rollback' do
         expect(guest).to receive(:exec).with(/readlink/).and_return [true, old_inventory]
         expect(build_volume).to receive(:ready?).and_return true
-        expect(CloudModel::Workers::RubyBuildWorker).not_to receive(:new)
+        expect(CloudModel::Workers::RvmRubyBuildWorker).not_to receive(:new)
         expect(host_volume).to receive(:ready?).and_return true
         expect(subject).not_to receive(:sync_zfs_dataset!)
         expect(host_volume).to receive(:mount!)
@@ -291,7 +291,7 @@ describe CloudModel::RubyPatch do
       it 'fails the whole group when the build fails, without touching a guest' do
         expect(guest).to receive(:exec).with(/readlink/).and_return [true, old_inventory]
         expect(build_volume).to receive(:ready?).and_return false
-        expect(CloudModel::Workers::RubyBuildWorker).to receive(:new).and_return worker
+        expect(CloudModel::Workers::RvmRubyBuildWorker).to receive(:new).and_return worker
         expect(worker).to receive(:build!).and_raise "rvm install ruby-3.4.13 failed on build-host:\n\nUnknown ruby"
         expect(guest).not_to receive(:exec!)
         counts = subject.patch! [guest], dry_run: false

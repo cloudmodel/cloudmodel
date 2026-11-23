@@ -23,6 +23,7 @@ module CloudModel
     # Redeploy triggers a rolling redeploy on each nginx service that references
     # this web image.
     class WebImageWorker < BaseWorker
+      include CloudModel::Workers::Mixins::RubyLayout
       # GIT_SSH_COMMAND pointing at the injected deploy key — forces bundler's
       # git clones to use it regardless of the chroot's HOME/.ssh resolution.
       GIT_SSH_COMMAND = "GIT_SSH_COMMAND='ssh -i /root/.ssh/id_git -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
@@ -115,10 +116,6 @@ module CloudModel
             @web_image.update_attribute :build_state, :bundling
             prepare_build_env
             configure_git_credentials
-            # Pin before bundling: RVM reads .ruby-version on `cd` into the
-            # app, and the app's own pin (a patch level the build environment
-            # does not ship) would make it complain and fall back silently.
-            pin_ruby_version
             bundle_image
             write_bundle_config
             yarn_install
@@ -179,6 +176,7 @@ module CloudModel
         comment_sub_step "Clone build system from build environment #{build_env.id}"
         buildsys_volume.prepare_from! build_env.build_dataset
         @host.exec! "cp /etc/resolv.conf #{buildsys_volume.rootfs_path.shellescape}/etc/resolv.conf", "Failed to copy resolv.conf into build system"
+        ensure_ruby_in_build_system
 
         comment_sub_step "Prepare workspace"
         if app_volume.dataset_exists?
@@ -315,31 +313,26 @@ module CloudModel
         ] * ' && ', "Unable to bundle image"
       end
 
-      # The artifact's native gems are compiled against the ruby the guest
-      # template ships, so it must also RUN on that ruby. The app's own
-      # .ruby-version may pin a different patch level (e.g. 3.4.8) that is not
-      # installed in the template — RVM/Passenger then refuse to boot
-      # ("Required ruby-3.4.8 is not installed"). Overwrite it with the
-      # template's actual RUBY_VERSION so the runtime picks the matching (and
-      # ABI-compatible) interpreter.
-      def pin_ruby_version
-        return true unless File.file? "#{@web_image.build_path}/Gemfile"
-
-        if (rv = @web_image.ruby_version).present?
-          # The web image declares its Ruby — the single source of truth (the
-          # Nginx/Passenger service must install this exact version at runtime).
-          comment_sub_step "Pin .ruby-version to WebImage.ruby_version (#{rv})"
-          @host.exec! "printf %s #{rv.shellescape} > #{app_build_host_path.shellescape}/.ruby-version",
-            "Unable to pin ruby version"
-        else
-          # Fall back to whatever Ruby the build environment provides. No `cd`
-          # into the app first: RVM's cd hook would read the app's own pin and
-          # complain that that version is not installed.
-          comment_sub_step "Pin .ruby-version to the build environment's ruby"
-          chroot! buildsys_volume.rootfs_path,
-            "ruby -e 'print RUBY_VERSION' > #{CHROOT_APP_ROOT}/.ruby-version",
-            "Unable to pin ruby version"
+      # The build system gets the host's Ruby release dataset at /opt/ruby and
+      # the layout; `/usr/local/ruby/current` and `/etc/ruby-version` name the
+      # web image's line (or release), so the artifact is bundled against the
+      # same release the Passenger guest resolves that line to. The app's own
+      # .ruby-version is left alone: the shims resolve it the same way at run
+      # time (a patch level that is not installed falls back to its line).
+      def ensure_ruby_in_build_system
+        wanted = @web_image.ruby_version.presence || CloudModel::RubyRelease.line_of(CloudModel.config.ruby_version)
+        os, arch = @web_image.build_os_version, @arch
+        versions = CloudModel::RubyRelease.versions_on @host, os, arch
+        unless CloudModel::RubyRelease.resolve wanted, versions
+          version = wanted =~ CloudModel::RubyRelease::VERSION ? wanted : CloudModel.config.ruby_version
+          unless version =~ CloudModel::RubyRelease::VERSION && CloudModel::RubyRelease.line_of(version) == CloudModel::RubyRelease.line_of(wanted)
+            raise "no Ruby release of line #{CloudModel::RubyRelease.line_of wanted} for #{os} #{arch} on #{@host.name}, and CloudModel.config.ruby_version (#{CloudModel.config.ruby_version}) is not one"
+          end
+          CloudModel::RubyRelease.new(version: version, os_version: os, arch: arch).ensure_on! @host, output: $stdout
         end
+        comment_sub_step "Ruby #{wanted} in the build system"
+        bind_ruby_dataset buildsys_volume.rootfs_path, os_version: os, arch: arch
+        write_ruby_layout buildsys_volume.rootfs_path, os_version: os, arch: arch, default_line: wanted
       end
 
       # Persists bundler's deployment settings into the artifact's own

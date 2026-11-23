@@ -54,6 +54,12 @@ module CloudModel
     field :lxd_autostart_priority, type: Integer, default: 50
     field :lxd_autostart_delay, type: Integer, default: 0
 
+    # @!attribute [rw] ruby_lines
+    #   @return [Array<String>] the Ruby minor lines the guest carries
+    #     (e.g. ["3.4", "4.0"]); empty = the lines its services name
+    #     (#ruby_lines_needed). CI and build guests list theirs here.
+    field :ruby_lines, type: Array, default: []
+
     field :root_fs_size, type: Integer, default: 10737418240
     field :memory_size, type: Integer, default: 2147483648
     field :cpu_count, type: Integer, default: 2
@@ -297,6 +303,20 @@ module CloudModel
     def has_service_type?(service_type)
       service_type = service_type.to_s unless service_type.is_a? String
       services.select{|s| s._type == service_type}.count > 0
+    end
+
+    # The Ruby lines the guest gets mounted (CloudModel::RubyRelease): the
+    # explicit list, else what the services name; the first is the default
+    # line of `/usr/local/ruby/current` and `/etc/ruby-version`.
+    # @return [Array<String>]
+    def ruby_lines_needed
+      explicit = ruby_lines.to_a.map { |l| CloudModel::RubyRelease.line_of l }.reject(&:blank?).uniq
+      return explicit if explicit.any?
+      services.flat_map(&:ruby_lines).map { |l| CloudModel::RubyRelease.line_of l }.reject(&:blank?).uniq
+    end
+
+    def ruby_default_line
+      ruby_lines_needed.first
     end
 
     def components_needed

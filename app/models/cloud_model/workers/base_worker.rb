@@ -171,7 +171,9 @@ module CloudModel
         # stop the caller: what follows (rm -rf of the build path, a snapshot,
         # a container start) would otherwise run over a live bind mount of
         # the host's /dev. Error paths use {#cleanup_chroot_quietly}.
-        %w(dev/pts dev sys proc).each do |sub|
+        # opt/ruby: the host's Ruby dataset bind-mounted for a build
+        # (Mixins::RubyLayout#bind_ruby_dataset)
+        %w(opt/ruby dev/pts dev sys proc).each do |sub|
           mountpoint = "#{chroot_dir}/#{sub}"
           next unless @host.mounted_at? mountpoint
           next if @host.exec("umount #{mountpoint}").first

@@ -1,49 +1,65 @@
 module CloudModel
   module Workers
-    # Compiles a Ruby release with RVM on the build host, inside a throwaway
-    # clone of a finished guest template (the same libraries the guests run
-    # against), and commits the result as a small ZFS volume — the RVM
-    # directories of that one Ruby — that {RubyPatch} syncs host to host like
-    # a template and unpacks into the running guests. The clone is destroyed
-    # afterwards.
+    # Builds one {CloudModel::RubyRelease} on the build host: a throwaway
+    # ZFS clone of a finished core template of the os/arch (the libraries
+    # the guests run against) gets the build dependencies, the release
+    # tarball from cache.ruby-lang.org checked against the SHA256 of the
+    # release index, and a plain `--prefix=/opt/ruby/ruby-<version>`
+    # build (`--enable-shared --enable-load-relative`: the interpreter and
+    # its library find each other relative to the binary, nothing refers to
+    # the chroot). The installed tree is copied into the host's per-(os,
+    # arch) dataset, where the guests mount it read-only; the clone is
+    # destroyed. No version manager, no keyserver, no `curl | bash`.
     class RubyBuildWorker < BaseWorker
-      attr_reader :template, :version, :volume
+      attr_reader :release
 
-      # @param host [CloudModel::Host] the build host for the template's arch
-      # @param template [CloudModel::GuestTemplate] a finished template of the
-      #   target os/arch whose components include a ruby (RVM and the build
-      #   dependencies are in it)
-      # @param version [String] full release, e.g. "3.4.13"
-      # @param volume [CloudModel::BuildZfsVolume] the ruby volume to commit on `host`
-      # @param rvm_update [Boolean] `rvm get master` before the install
-      def initialize host, template:, version:, volume:, rvm_update: false
+      BUILD_PACKAGES = %w(build-essential curl ca-certificates xz-utils bison libssl-dev libyaml-dev zlib1g-dev libffi-dev libreadline-dev libgdbm-dev libgmp-dev).freeze
+
+      # @param host [CloudModel::Host] the build host for the release's arch
+      # @param release [CloudModel::RubyRelease]
+      # @param index [Hash, nil] the release index ({RubyRelease.index}),
+      #   fetched when not given
+      def initialize host, release:, index: nil
         super host
-        @template = template
-        @version = version
-        @volume = volume
-        @rvm_update = rvm_update
+        @release = release
+        @index = index
       end
 
-      def ruby_name
-        "ruby-#{version}"
+      # The release index entry: tarball url and sha256.
+      def source
+        @source ||= begin
+          entry = (@index || CloudModel::RubyRelease.index)[release.version]
+          raise "Ruby #{release.version} is not in the release index #{CloudModel::RubyRelease::INDEX_URL}" unless entry
+          entry
+        end
       end
 
-      # The template clone the Ruby is compiled in, next to the ruby volume.
+      # A finished core template of the os/arch, else a finished guest
+      # template: the libraries the release links against.
+      def base_template
+        @base_template ||= CloudModel::GuestCoreTemplate.where(os_version: release.os_version, arch: release.arch, build_state_id: 0xf0).order(created_at: :desc).first ||
+          CloudModel::GuestTemplate.where(os_version: release.os_version, arch: release.arch, build_state_id: 0xf0).order(created_at: :desc).first ||
+          raise("no finished core or guest template for #{release.os_version} #{release.arch} on which to build #{release.name}")
+      end
+
+      # The throwaway clone the release is compiled in.
       def buildenv
-        @buildenv ||= CloudModel::BuildZfsVolume.new @host, "#{volume.dataset_name}-buildenv", mountpoint: "#{volume.mountpoint}-buildenv"
+        @buildenv ||= CloudModel::BuildZfsVolume.new @host, "#{CloudModel.config.build_dataset}/ruby-build/#{release.name}-#{release.os_version}-#{release.arch}",
+          mountpoint: "/cloud/build/ruby-build/#{release.name}-#{release.os_version}-#{release.arch}"
       end
 
-      # @return [CloudModel::BuildZfsVolume] the committed ruby volume
+      # @return [CloudModel::RubyRelease] the built release, present on the host
       def build!
-        template.ensure_build_volume! @host
+        template = base_template
+        template.ensure_build_volume! @host if template.respond_to?(:ensure_build_volume!)
+        release.ensure_dataset_on! @host
         buildenv.prepare_from! template.build_dataset
-        @host.exec! "cp /etc/resolv.conf #{buildenv.rootfs_path.shellescape}/etc/resolv.conf", "Failed to copy resolv.conf into the build system"
-        chroot! buildenv.rootfs_path, build_script, "rvm install #{ruby_name} failed on #{@host.name}"
-        volume.prepare!
-        @host.exec! "cd #{buildenv.rootfs_path.shellescape}/usr/local/rvm && cp -a --parents rubies/#{ruby_name} gems/#{ruby_name}* environments/#{ruby_name}* wrappers/#{ruby_name}* #{volume.mountpoint.shellescape}/",
-          "copying #{ruby_name} into the ruby volume failed on #{@host.name}"
-        volume.commit!
-        volume
+        @host.exec! "cp /etc/resolv.conf #{buildenv.rootfs_path.shellescape}/etc/resolv.conf", 'Failed to copy resolv.conf into the build system'
+        chroot! buildenv.rootfs_path, build_script, "building #{release.name} failed on #{@host.name}"
+        @host.exec! "rm -rf #{release.dir.shellescape} && cp -a #{"#{buildenv.rootfs_path}#{release.guest_dir}".shellescape} #{release.dir.shellescape}",
+          "copying #{release.name} into #{release.mountpoint} failed on #{@host.name}"
+        @host.exec! "test -x #{release.dir.shellescape}/bin/ruby", "#{release.name} is not in #{release.mountpoint} after the copy"
+        release
       ensure
         cleanup_chroot_quietly buildenv.rootfs_path
         buildenv.destroy!
@@ -51,13 +67,23 @@ module CloudModel
 
       def build_script
         [
-          "set -e",
-          ("/usr/local/rvm/bin/rvm get master" if @rvm_update),
-          "/usr/local/rvm/bin/rvm install #{ruby_name} --disable-binary --autolibs=read-fail",
-          "test -x /usr/local/rvm/rubies/#{ruby_name}/bin/ruby",
-          # stop the gpg helpers rvm may have started so the chroot unmounts cleanly
-          "gpgconf --kill all >/dev/null 2>&1 || true"
-        ].compact.join("\n")
+          'set -e',
+          'export DEBIAN_FRONTEND=noninteractive',
+          'apt-get update -q',
+          "apt-get install -y -q --no-install-recommends #{BUILD_PACKAGES * ' '}",
+          'mkdir -p /usr/src/ruby && cd /usr/src/ruby',
+          "curl -fsSL -o ruby.tar.xz #{source[:url].shellescape}",
+          "echo #{"#{source[:sha256]}  ruby.tar.xz".shellescape} | sha256sum -c -",
+          'tar -xJf ruby.tar.xz',
+          "cd #{release.name}",
+          "./configure --prefix=#{release.guest_dir} --enable-shared --enable-load-relative --disable-install-doc --disable-install-rdoc",
+          'make -j"$(nproc)"',
+          'make install',
+          # the result runs, finds its library and the extensions the apps need
+          "#{release.guest_dir}/bin/ruby -ropenssl -ryaml -rzlib -rreadline -e 'print RUBY_VERSION' | grep -qx #{release.version.shellescape}",
+          "#{release.guest_dir}/bin/gem --version >/dev/null",
+          "#{release.guest_dir}/bin/bundle --version >/dev/null"
+        ].join("\n")
       end
     end
   end

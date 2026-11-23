@@ -79,7 +79,7 @@ CloudModel.configure do |config|
   config.ubuntu_version = '22.04.4'   # default: '22.04.4'
   config.debian_version = '12'        # default: '12'
   config.php_version    = '8.4'       # default: '8.4'
-  config.ruby_version   = '3.4'       # default: '3.4'
+  config.ruby_version   = '3.4.13'    # default: '3.4'; the release to build when a line is asked for (full version needed)
 
   # Ubuntu apt mirror
   config.ubuntu_mirror   = 'http://archive.ubuntu.com/ubuntu/'
@@ -113,8 +113,9 @@ CloudModel.configure do |config|
   # Skip syncing cloud images on deploy (useful in dev)
   config.skip_sync_images = false
 
-  # Bundle command on guests (adjust if not using RVM)
-  config.bundle_command = '/usr/local/rvm/bin/rvm default do bundle'
+  # How bundler is invoked on the admin itself; the shim picks the Ruby
+  # release for the working directory (releases are mounted under /opt/ruby)
+  config.bundle_command = '/usr/local/ruby/bin/bundle'
 end
 ```
 
