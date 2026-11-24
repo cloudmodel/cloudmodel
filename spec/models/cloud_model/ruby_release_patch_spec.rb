@@ -114,6 +114,30 @@ describe CloudModel::RubyReleasePatch do
       expect(out.string).to include 'on 3.4.13 (pinned)'
     end
 
+    it 'works the hosts in parallel and the guests of one host one after the other' do
+      host_b = double CloudModel::Host, name: 'core-b', arch: 'amd64'
+      a1 = guest_double 'a1'
+      a2 = guest_double 'a2'
+      b1 = double CloudModel::Guest, name: 'b1', host: host_b, os_version: 'debian-12', deploy_state: :finished,
+        ruby_lines_needed: ['3.4'], ruby_default_line: '3.4', ruby_lines: [], item_issues: issues
+      allow(release).to receive(:present_on?).and_return true
+      threads = {}
+      order = []
+      [a1, a2, b1].each do |g|
+        allow(g).to receive(:exec) do
+          threads[g.name] = Thread.current
+          order << g.name
+          [true, inventory_output(current: '3.4.14', installed: %w(3.4.13 3.4.14), passenger: %w(3.4.14), other: %w(3.4.14))]
+        end
+      end
+      counts = subject.patch! [b1, a2, a1], dry_run: false
+      expect(counts).to include current: 3, failed: 0
+      expect(threads['a1']).to eq threads['a2']
+      expect(threads['b1']).not_to eq threads['a1']
+      expect(order.index('a1')).to be < order.index('a2')
+      expect(out.string.lines.grep(/@core-/).map(&:strip).sort).to eq ['a1@core-a: on 3.4.14', 'a2@core-a: on 3.4.14', 'b1@core-b: on 3.4.14']
+    end
+
     it 'fails a guest whose processes still run the old release after the switch, with an issue' do
       allow(release).to receive(:present_on?).and_return true
       allow(guest).to receive(:exec).and_return [true, inventory_output(installed: %w(3.4.13 3.4.14))]

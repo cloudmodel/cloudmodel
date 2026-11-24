@@ -223,7 +223,7 @@ namespace :cloudmodel do
   end
 
   namespace :ruby do
-    desc "Patch the Rubies of the running guests on the mounted-release layout to the newest release of their lines: builds and syncs a release the index has and nobody carries, points /usr/local/ruby/current at it and restarts Passenger apps and job units; pinned guests are left alone, RVM-layout guests skipped (patch_ruby). GUEST=<name>, HOST=<name> limit the scope; UNTIL=HH:MM (UTC) starts no further guest after it. Dry run unless CONFIRM=1."
+    desc "Patch the Rubies of the running guests on the mounted-release layout to the newest release of their lines: builds and syncs a release the index has and nobody carries, points /usr/local/ruby/current at it and restarts Passenger apps and job units (hosts in parallel, one guest at a time per host); pinned guests are left alone, RVM-layout guests skipped (patch_ruby). GUEST=<name>, HOST=<name> limit the scope; UNTIL=HH:MM (UTC) starts no further guest after it. Dry run unless CONFIRM=1."
     task :patch => [:environment] do
       confirm = ENV['CONFIRM'] == '1'
       puts "\e[33mDRY RUN — set CONFIRM=1 to apply.\e[39m" unless confirm

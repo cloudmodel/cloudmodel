@@ -9,7 +9,8 @@ module CloudModel
   #    host and sent to every host with guests of that os/arch (this changes
   #    nothing a guest runs — the shims pick a release only when a program
   #    starts, and within a line the ABI is stable);
-  # 2. per guest, `/usr/local/ruby/current` is pointed at the newest release
+  # 2. per guest — the hosts in parallel, the guests of a host one after the
+  #    other — `/usr/local/ruby/current` is pointed at the newest release
   #    of the default line, and the Passenger apps and the job units are
   #    restarted so the running processes move; the inventory afterwards
   #    (what the app user's processes really execute) decides whether the
@@ -56,6 +57,7 @@ module CloudModel
       @output = output
       @deadline = deadline
       @index = index
+      @lock = Mutex.new
     end
 
     # The guests on the mounted layout the run looks at: running guests
@@ -138,14 +140,21 @@ module CloudModel
         end
       end
 
-      # 2. the guests
-      guests.sort_by { |g| [g.host.name, g.name] }.each do |guest|
-        if deadline && Time.now > deadline
-          counts[:deferred] += 1
-          next
+      # 2. the guests: the hosts in parallel, the guests of one host one
+      #    after the other (one Passenger cold start at a time per host —
+      #    core02 and core05 are I/O-bound), every line of output and every
+      #    count under @lock
+      guests.group_by(&:host).sort_by { |h, _| h.name }.map do |_host, group|
+        Thread.new do
+          group.sort_by(&:name).each do |guest|
+            if deadline && Time.now > deadline
+              count counts, :deferred
+              next
+            end
+            patch_guest guest, counts, dry_run: dry_run
+          end
         end
-        patch_guest guest, counts, dry_run: dry_run
-      end
+      end.each(&:join)
       output.puts "  \e[33m#{counts[:deferred]} guest(s) deferred\e[39m: past #{deadline.utc.strftime('%H:%M')} UTC, left for the next night" if counts[:deferred] > 0
       counts
     end
@@ -168,40 +177,41 @@ module CloudModel
     def patch_guest guest, counts, dry_run:
       inv = inventory guest
       if inv[:layout] == 'rvm'
-        counts[:skipped] += 1
-        output.puts "  #{label guest}: \e[33mskipped\e[39m: RVM layout (patch_ruby serves it until its redeploy)"
+        count counts, :skipped
+        say "  #{label guest}: \e[33mskipped\e[39m: RVM layout (patch_ruby serves it until its redeploy)"
         return
       end
       line = guest.ruby_default_line
       pinned = guest.ruby_lines.to_a.first.to_s =~ CloudModel::RubyRelease::VERSION ? guest.ruby_lines.first : nil
       newest = CloudModel::RubyRelease.newest line, inv[:installed]
       unless newest
-        counts[:failed] += 1
-        output.puts "  #{label guest}: \e[31mFAILED\e[39m: no release of line #{line} under /opt/ruby (has #{inv[:installed].join(' ').presence || 'none'})"
+        count counts, :failed
+        say "  #{label guest}: \e[31mFAILED\e[39m: no release of line #{line} under /opt/ruby (has #{inv[:installed].join(' ').presence || 'none'})"
         open_issue guest, "No Ruby release of line #{line} under /opt/ruby (has #{inv[:installed].join(' ').presence || 'none'})"
         return
       end
       target = pinned && inv[:installed].include?(pinned) ? pinned : newest
       stale = inv[:running].reject { |v| v == target }
       if inv[:current] == target && stale.empty?
-        counts[:current] += 1
-        output.puts "  #{label guest}: on #{target}#{pinned ? ' (pinned)' : ''}"
+        count counts, :current
+        say "  #{label guest}: on #{target}#{pinned ? ' (pinned)' : ''}"
         resolve_issue guest
         if pinned && newer?(newest, pinned)
           open_issue guest, "Pinned to Ruby #{pinned} while #{newest} is installed on the host — a forgotten pin?", key: :ruby_pinned_behind, severity: :info
         end
         return
       end
-      if pinned && inv[:current] == target
+      step = if pinned && inv[:current] == target
         # pinned and on its pin; only the restart of stale processes is due
-        output.puts "  #{label guest}: pinned to #{target}, still running #{stale.join(' ')}"
+        "pinned to #{target}, still running #{stale.join(' ')}"
       else
-        output.puts "  #{label guest}: #{inv[:current].presence || '?'} → #{target}#{stale.any? ? " (running #{stale.join(' ')})" : ''}"
+        "#{inv[:current].presence || '?'} → #{target}#{stale.any? ? " (running #{stale.join(' ')})" : ''}"
       end
       if dry_run
-        output.puts "    would point current at ruby-#{target} and restart #{inv[:apps].size} app(s), #{inv[:units].size} unit(s)"
+        say "  #{label guest}: #{step}; would point current at ruby-#{target} and restart #{inv[:apps].size} app(s), #{inv[:units].size} unit(s)"
         return
       end
+      say "  #{label guest}: #{step}"
       switch guest, inv, target
       after = nil
       36.times do
@@ -211,12 +221,12 @@ module CloudModel
       end
       left = after[:running].reject { |v| v == target }
       raise "still running #{left.join(' ')} after the switch" if left.any?
-      counts[:patched] += 1
+      count counts, :patched
       resolve_issue guest
-      output.puts "  #{label guest}: \e[32mpatched\e[39m to #{target}#{after[:running].empty? ? ' (no ruby process running yet)' : ''}"
+      say "  #{label guest}: \e[32mpatched\e[39m to #{target}#{after[:running].empty? ? ' (no ruby process running yet)' : ''}"
     rescue => e
-      counts[:failed] += 1
-      output.puts "  #{label guest}: \e[31mFAILED\e[39m (#{e.message.lines.last.to_s.strip[0, 200]})"
+      count counts, :failed
+      say "  #{label guest}: \e[31mFAILED\e[39m (#{e.message.lines.last.to_s.strip[0, 200]})"
       open_issue guest, "Ruby patch failed: #{e.message.lines.last.to_s.strip[0, 300]}"
     end
 
@@ -237,6 +247,15 @@ module CloudModel
       Gem::Version.new(a) > Gem::Version.new(b)
     end
 
+    # The host threads share the counts and the output.
+    def count counts, key
+      @lock.synchronize { counts[key] += 1 }
+    end
+
+    def say line
+      @lock.synchronize { output.puts line }
+    end
+
     ISSUE_KEY = :ruby_patch
 
     def open_issue guest, message, key: ISSUE_KEY, severity: :warning
@@ -245,13 +264,13 @@ module CloudModel
       issue.message = message
       issue.save
     rescue => e
-      output.puts "  (could not record the issue: #{e.message[0, 120]})"
+      say "  (could not record the issue: #{e.message[0, 120]})"
     end
 
     def resolve_issue guest
       guest.item_issues.where(key: ISSUE_KEY, resolved_at: nil).update_all resolved_at: Time.now
     rescue => e
-      output.puts "  (could not resolve the issue: #{e.message[0, 120]})"
+      say "  (could not resolve the issue: #{e.message[0, 120]})"
     end
   end
 end
