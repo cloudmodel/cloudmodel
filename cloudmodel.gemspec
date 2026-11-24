@@ -31,12 +31,10 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'netaddr', '~> 2.0', '>= 2.0.4'
   spec.add_dependency 'net-ftp'
   spec.add_dependency 'net-sftp'
-  spec.add_dependency 'net-ping'
   spec.add_dependency 'net-smtp'
   spec.add_dependency 'net-pop'
   spec.add_dependency 'net-imap'
 
   # For service checks
   spec.add_dependency 'redis'
-  spec.add_dependency 'mysql2'
 end

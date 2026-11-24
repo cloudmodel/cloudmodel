@@ -1,5 +1,3 @@
-require 'mysql2'
-
 module CloudModel
   module Services
     # MariaDB/MySQL database service embedded in a {Guest}.
@@ -33,7 +31,15 @@ module CloudModel
         60
       end
 
+      # The status comes over the mysql2 gem, which the host application adds
+      # to its Gemfile when it runs MariaDB services (it needs the MariaDB
+      # client headers to build, so the engine does not depend on it).
       def service_status
+        begin
+          require 'mysql2'
+        rescue LoadError
+          return {key: :mysql2_missing, error: "The mysql2 gem is not in the host application's bundle — add `gem 'mysql2'` to its Gemfile to monitor MariaDB", severity: :warning}
+        end
         begin
           client = Mysql2::Client.new(host: guest.private_address, username: 'monitoring');
           result = client.query("SHOW STATUS");

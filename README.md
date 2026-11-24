@@ -238,7 +238,7 @@ Services are embedded documents inside a `Guest`. Each service maps to a concret
 | `:phpfpm` | `Services::Phpfpm` | PHP-FPM process manager |
 | `:mongodb` | `Services::Mongodb` | MongoDB database |
 | `:redis` | `Services::Redis` | Redis key-value store |
-| `:mariadb` | `Services::Mariadb` | MariaDB/MySQL database |
+| `:mariadb` | `Services::Mariadb` | MariaDB/MySQL database (the status check needs the `mysql2` gem in the host application's Gemfile; the engine does not depend on it) |
 | `:neo4j` | `Services::Neo4j` | Neo4j graph database |
 | `:fuseki` | `Services::Fuseki` | Apache Jena Fuseki (RDF/SPARQL) |
 | `:solr` | `Services::Solr` | Apache Solr search |

@@ -1,5 +1,3 @@
-require 'net/ping'
-
 module CloudModel
   # An LXD container (guest) running on a {Host}.
   #

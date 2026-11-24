@@ -1,6 +1,7 @@
 # encoding: UTF-8
 
 require 'spec_helper'
+require 'mysql2'
 
 describe CloudModel::Services::Mariadb do
   it { expect(subject).to be_a CloudModel::Services::Base }
@@ -53,6 +54,12 @@ describe CloudModel::Services::Mariadb do
     it 'should close the mysql client connection' do
       expect(client).to receive(:close)
       subject.service_status
+    end
+
+    it 'should ask for the mysql2 gem when the host application has none' do
+      allow(subject).to receive(:require).with('mysql2').and_raise LoadError
+      expect(subject.service_status).to include(key: :mysql2_missing, severity: :warning)
+      expect(subject.service_status[:error]).to include "gem 'mysql2'"
     end
 
     it 'should return error with exception' do

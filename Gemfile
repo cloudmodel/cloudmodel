@@ -5,6 +5,9 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 gemspec
 
 group :test do
+  # The MariaDB status check loads mysql2 when the host application has it;
+  # the specs stub Mysql2::Client.
+  gem 'mysql2'
   gem "rspec-rails"
   gem "mongoid-rspec"
   gem "fuubar"

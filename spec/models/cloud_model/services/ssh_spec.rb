@@ -27,9 +27,7 @@ describe CloudModel::Services::Ssh do
     before { allow(subject).to receive(:guest).and_return(guest) }
 
     it 'should return ping time on success' do
-      tcp = double 'tcp'
-      allow(Net::Ping::TCP).to receive(:new).with('10.42.0.1', 22).and_return(tcp)
-      allow(tcp).to receive(:ping).and_return(true)
+      expect(Socket).to receive(:tcp).with('10.42.0.1', 22, connect_timeout: 5)
 
       result = subject.service_status
       expect(result).to have_key(:ping)
@@ -37,9 +35,7 @@ describe CloudModel::Services::Ssh do
     end
 
     it 'should return error hash on failure' do
-      tcp = double 'tcp'
-      allow(Net::Ping::TCP).to receive(:new).with('10.42.0.1', 22).and_return(tcp)
-      allow(tcp).to receive(:ping).and_return(false)
+      expect(Socket).to receive(:tcp).with('10.42.0.1', 22, connect_timeout: 5).and_raise Errno::ETIMEDOUT
 
       result = subject.service_status
       expect(result[:key]).to eq :not_reachable

@@ -1,5 +1,3 @@
-require 'net/ping'
-
 module CloudModel
   module Monitoring
     module Services

@@ -19,6 +19,7 @@ describe CloudModel::Monitoring::Services::MariadbChecks do
       subject.check
 
       expect(subject).to have_received(:do_check_for_errors_on).with(test_data, {
+        mysql2_missing: 'mysql2 gem in the host application',
         not_reachable: 'service reachable'
       })
     end

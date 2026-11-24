@@ -12,10 +12,8 @@ PATH
       bcrypt-ruby (~> 3.0, >= 3.0.0)
       mongoid (>= 7.1.2)
       mongoid-grid_fs (~> 2.3)
-      mysql2
       net-ftp
       net-imap
-      net-ping
       net-pop
       net-sftp
       net-smtp
@@ -111,7 +109,6 @@ GEM
       debug_inspector (>= 1.2.0)
     bson (5.2.0)
     builder (3.3.0)
-    cap2 (0.2.2)
     coderay (1.1.3)
     concurrent-ruby (1.3.8)
     connection_pool (3.0.2)
@@ -208,9 +205,6 @@ GEM
     net-imap (0.6.8)
       date
       net-protocol
-    net-ping (2.2.0)
-    net-ping (2.2.0-universal-linux)
-      cap2 (>= 0.2.2)
     net-pop (0.1.2)
       net-protocol
     net-protocol (0.4.0)
@@ -370,6 +364,7 @@ DEPENDENCIES
   listen
   miniskirt
   mongoid-rspec
+  mysql2
   pry
   rspec-rails
   ruby-lsp

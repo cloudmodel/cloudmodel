@@ -11,6 +11,8 @@ Open-source Rails engine gem (MIT license) providing ActiveModel representations
 - **License:** MIT
 - **GitHub:** `cloudmodel/cloudmodel`
 
+Native extensions the engine itself does not force on the host application: the SSH reachability check is a `Socket.tcp` connect (no net-ping, whose cap2 needs libcap headers), and the MariaDB status check loads `mysql2` only when the host application has it in its bundle (otherwise the `mysql2_missing` check fires). A host application that runs MariaDB services adds `gem 'mysql2'` itself.
+
 ## Running Tests
 
 ```bash

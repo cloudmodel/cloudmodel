@@ -31,14 +31,18 @@ module CloudModel
         super # ssh is default to core
       end
 
+      # Reachability of the SSH port: a TCP connect with a timeout, no
+      # third-party ping library (net-ping pulls in cap2, which needs the
+      # libcap headers on every host application).
       def service_status
         t = Time.now
-        if Net::Ping::TCP.new(guest.private_address, port).ping
-          return {ping: Time.now - t}
-        else
-          return {key: :not_reachable, error: "Ping timeout", severity: :critical}
-        end
+        Socket.tcp(guest.private_address, port, connect_timeout: PING_TIMEOUT) { }
+        {ping: Time.now - t}
+      rescue SystemCallError, SocketError, IO::TimeoutError => e
+        {key: :not_reachable, error: "Ping timeout (#{e.class})", severity: :critical}
       end
+
+      PING_TIMEOUT = 5
     end
   end
 end
