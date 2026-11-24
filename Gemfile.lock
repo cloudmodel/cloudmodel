@@ -183,10 +183,10 @@ GEM
       drb (~> 2.0)
       prism (~> 1.5)
     mize (0.6.1)
-    mongo (2.24.1)
+    mongo (2.26.2)
       base64
       bson (>= 4.14.1, < 6.0.0)
-    mongoid (9.1.0)
+    mongoid (9.1.2)
       activemodel (>= 5.1, < 8.2, != 7.0.0)
       concurrent-ruby (>= 1.0.5, < 2.0)
       mongo (>= 2.18.0, < 3.0.0)
@@ -219,7 +219,8 @@ GEM
       net-ssh (>= 5.0.0, < 8.0.0)
     net-smtp (0.5.2)
       net-protocol
-    net-ssh (7.3.6)
+    net-ssh (7.3.10)
+      logger
     netaddr (2.0.6)
     nio4r (2.7.5)
     nokogiri (1.19.7)

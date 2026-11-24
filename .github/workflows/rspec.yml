@@ -28,3 +28,9 @@ jobs:
         gem install bundler
         bundle install --jobs 4 --retry 3
         bundle exec rspec
+    - name: Gem CVE audit (bundle-audit, ruby-advisory-db)
+      # Dependabot covers the GitHub advisory database only; the ruby
+      # advisory database lists more (mongo, mongoid, net-ssh on 2026-11-24).
+      run: |
+        gem install bundler-audit
+        bundle-audit check --update
