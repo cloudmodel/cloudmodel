@@ -685,6 +685,44 @@ describe CloudModel::Workers::Services::NginxWorker do
     end
   end
 
+  describe 'basic auth user file' do
+    let(:ba_model) { CloudModel::Services::Nginx.new guest: guest, basic_auth_supported: true }
+    let(:ba_worker) { described_class.new lxc, ba_model }
+
+    before do
+      ba_model.basic_auth_users.build name: 'demo', password: 'opensesame'
+      allow(ba_worker).to receive(:upload_to_guest)
+      allow(ba_worker).to receive(:chroot!)
+      allow(ba_worker).to receive(:render) { |template, _locals| "rendered #{template}" }
+    end
+
+    it 'writes the htpasswd on deploy, readable by www only' do
+      expect(ba_worker).to receive(:upload_to_guest).with(ba_model.basic_auth_htpasswd, '/etc/nginx/.htpasswd', '0640')
+      expect(ba_worker).to receive(:chroot!).with('/path/to/install', 'chgrp www /etc/nginx/.htpasswd', anything)
+
+      ba_worker.write_basic_auth_user_file
+    end
+
+    it 'writes nothing while the option is off' do
+      ba_model.basic_auth_supported = false
+      expect(ba_worker).not_to receive(:upload_to_guest)
+
+      ba_worker.write_basic_auth_user_file
+    end
+
+    it 'puts the htpasswd into the live sync plan with its mode and group' do
+      file = ba_worker.config_sync_plan(certbot_cert_available: false).detect { |f| f[:path] == '/etc/nginx/.htpasswd' }
+
+      expect(file).to include template: '/cloud_model/guest/etc/nginx/htpasswd', mode: '0640', group: 'www'
+    end
+
+    it 'leaves the htpasswd out of the plan while the option is off' do
+      ba_model.basic_auth_supported = false
+
+      expect(ba_worker.config_sync_plan(certbot_cert_available: false).map { |f| f[:path] }).not_to include '/etc/nginx/.htpasswd'
+    end
+  end
+
   describe '#sync_config' do
     let(:nginx_conf) { '/etc/nginx/nginx.conf' }
     let(:site_conf) { '/etc/nginx/sites-available/cloudmodel.conf' }
@@ -731,8 +769,8 @@ describe CloudModel::Workers::Services::NginxWorker do
       allow(subject).to receive(:remote_file_hash).with(site_conf).and_return 'hash-edited'
       allow(subject).to receive(:guest_sh).and_return [true, '']
       allow(subject).to receive(:upload_to_guest)
-      expect(subject).not_to receive(:upload_to_guest).with(anything, site_conf)
-      expect(subject).to receive(:upload_to_guest).with("a\n", nginx_conf)
+      expect(subject).not_to receive(:upload_to_guest).with(anything, site_conf, anything)
+      expect(subject).to receive(:upload_to_guest).with("a\n", nginx_conf, '0600')
       expect(subject).to receive(:write_config_manifest).with [hash_including(path: nginx_conf, hash: 'hash-a'), hash_including(path: site_conf, hash: 'hash-old')]
       expect(subject.sync_config(only: ['nginx.conf'])).to eq state: :applied, applied: [nginx_conf], blocked: []
     end

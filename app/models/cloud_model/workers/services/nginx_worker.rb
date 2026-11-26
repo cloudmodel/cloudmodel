@@ -402,6 +402,16 @@ module CloudModel
           clean
         end
 
+        BASIC_AUTH_USER_FILE_TEMPLATE = '/cloud_model/guest/etc/nginx/htpasswd'.freeze
+
+        # The htpasswd file of the basic auth (Nginx#basic_auth?): readable by
+        # the www workers that check it, not by anyone else.
+        def write_basic_auth_user_file
+          return unless @model.basic_auth?
+          upload_to_guest @model.basic_auth_htpasswd, CloudModel::Services::Nginx::BASIC_AUTH_USER_FILE, '0640'
+          chroot! @guest.deploy_path, "chgrp www #{CloudModel::Services::Nginx::BASIC_AUTH_USER_FILE.shellescape}", "Failed to hand the basic auth users to www"
+        end
+
         def write_config
           comment_sub_step "Config nginx"
 
@@ -413,6 +423,7 @@ module CloudModel
           chroot @guest.deploy_path, "ln -s /etc/nginx/sites-available/cloudmodel.conf etc/nginx/sites-enabled/cloudmodel.conf"
 
           ensure_www_user!
+          write_basic_auth_user_file
 
           comment_sub_step "Make nginx root"
           mkdir_p "#{@guest.deploy_path}#{@model.www_root}"
@@ -584,6 +595,9 @@ module CloudModel
               files << {template: '/cloud_model/guest/etc/nginx/server.d/cap-deployed.conf', path: '/etc/nginx/server.d/cap-deployed.conf'}
             end
           end
+          if @model.basic_auth?
+            files << {template: BASIC_AUTH_USER_FILE_TEMPLATE, path: CloudModel::Services::Nginx::BASIC_AUTH_USER_FILE, mode: '0640', group: 'www'}
+          end
 
           certbot_cert = certbot_cert_available.nil? ? certbot_cert_available? : certbot_cert_available
           files.each do |file|
@@ -673,7 +687,8 @@ module CloudModel
           to_write.each do |file|
             bak = backup_path(file[:path]).shellescape
             guest_sh "if [ -f #{file[:path].shellescape} ]; then mkdir -p $(dirname #{bak}) && cp -a #{file[:path].shellescape} #{bak}; fi"
-            upload_to_guest file[:content], file[:path]
+            upload_to_guest file[:content], file[:path], file[:mode] || '0600'
+            guest_sh "chgrp #{file[:group].shellescape} #{file[:path].shellescape}" if file[:group]
           end
 
           success, output = guest_sh 'nginx -t 2>&1'

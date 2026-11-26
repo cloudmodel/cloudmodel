@@ -49,7 +49,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       stub_manifest '/etc/nginx/a.conf' => 'old-a', '/etc/nginx/b.conf' => hash_b
       stub_remote_hashes '/etc/nginx/a.conf' => 'old-a', '/etc/nginx/b.conf' => hash_b
 
-      expect(subject).to receive(:upload_to_guest).with(conf_a, '/etc/nginx/a.conf')
+      expect(subject).to receive(:upload_to_guest).with(conf_a, '/etc/nginx/a.conf', '0600')
       expect(subject).to receive(:guest_sh).with('nginx -t 2>&1').and_return [true, '']
       expect(subject).to receive(:guest_sh).with('systemctl reload nginx 2>&1').and_return [true, '']
       expect(subject).to receive(:write_config_manifest).with(plan)
@@ -90,7 +90,7 @@ describe CloudModel::Workers::Services::NginxWorker do
       stub_manifest({})
       stub_remote_hashes '/etc/nginx/a.conf' => 'something', '/etc/nginx/b.conf' => hash_b
 
-      expect(subject).to receive(:upload_to_guest).with(conf_a, '/etc/nginx/a.conf')
+      expect(subject).to receive(:upload_to_guest).with(conf_a, '/etc/nginx/a.conf', '0600')
       expect(subject.sync_config(force: true)[:state]).to eq :applied
     end
 
@@ -106,6 +106,17 @@ describe CloudModel::Workers::Services::NginxWorker do
       result = subject.sync_config
       expect(result[:state]).to eq :failed
       expect(result[:output]).to eq 'nginx: broken'
+    end
+
+    it 'writes a file with its own mode and group (the htpasswd for www)' do
+      plan << {template: 't/h', path: '/etc/nginx/.htpasswd', content: "demo:{SSHA}x\n", hash: 'hash-h', mode: '0640', group: 'www'}
+      stub_manifest '/etc/nginx/a.conf' => hash_a, '/etc/nginx/b.conf' => hash_b
+      stub_remote_hashes '/etc/nginx/a.conf' => hash_a, '/etc/nginx/b.conf' => hash_b
+
+      expect(subject).to receive(:upload_to_guest).with("demo:{SSHA}x\n", '/etc/nginx/.htpasswd', '0640')
+      expect(subject).to receive(:guest_sh).with('chgrp www /etc/nginx/.htpasswd').and_return [true, '']
+
+      expect(subject.sync_config[:state]).to eq :applied
     end
   end
 end

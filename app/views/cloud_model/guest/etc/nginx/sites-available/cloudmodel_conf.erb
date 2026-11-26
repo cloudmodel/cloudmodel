@@ -1,5 +1,20 @@
 
 index                           index.html;
+<%- if model.basic_auth? -%>
+
+# Basic auth: the realm per request, "off" for the ACME challenge (certbot)<%= ' and for the private network' if model.basic_auth_private_network_bypass? %>.
+geo $cloudmodel_basic_auth_network {
+  default                       outside;
+<%- if model.basic_auth_private_network_bypass? -%>
+  <%= CloudModel.config.tinc_network.ljust(29) %> private;
+<%- end -%>
+}
+map "$cloudmodel_basic_auth_network:$uri" $cloudmodel_basic_auth {
+  ~^private:                    off;
+  ~^outside:/\.well-known/acme-challenge/ off;
+  default                       "<%=raw model.basic_auth_realm %>";
+}
+<%- end -%>
 
 <%-
 protocols = []
@@ -36,6 +51,12 @@ server {
   more_clear_headers 'Server' 'X-Powered-By' 'X-Runtime';
   add_header Content-Security-Policy "<%=raw model.content_security_policy %>" always;
   add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" always;
+<%- if model.basic_auth? -%>
+
+  # Basic auth in front of the site (realm map above)
+  auth_basic                    $cloudmodel_basic_auth;
+  auth_basic_user_file          <%= CloudModel::Services::Nginx::BASIC_AUTH_USER_FILE %>;
+<%- end -%>
 
   # Remove X-Powered-By, which is an information leak
   fastcgi_hide_header X-Powered-By;
@@ -94,6 +115,9 @@ server {
   location /nginx_status {
     stub_status                 on;
     access_log                  off;
+<%- if model.basic_auth? -%>
+    auth_basic                  off;
+<%- end -%>
     allow                       <%= model.host.private_network.ip %>/16;
     deny all;
   }

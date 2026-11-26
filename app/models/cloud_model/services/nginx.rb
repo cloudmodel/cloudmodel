@@ -60,12 +60,32 @@ module CloudModel
       field :reverse_proxy_supported, type: Mongoid::Boolean, default: false
       field :reverse_proxy_for, type: String, default: nil
 
+      # HTTP basic auth in front of the whole site (both listeners), e.g. to
+      # keep a staging site out of public view. The logins are
+      # basic_auth_users, written to BASIC_AUTH_USER_FILE. With
+      # basic_auth_private_network_bypass, requests from the private network
+      # (CloudModel.config.tinc_network: CI runners, monitoring, other guests,
+      # VPN clients) pass without a login. The ACME challenge path always stays
+      # open, so certbot can renew.
+      field :basic_auth_supported, type: Mongoid::Boolean, default: false
+      field :basic_auth_realm, type: String, default: 'Restricted'
+      field :basic_auth_private_network_bypass, type: Mongoid::Boolean, default: true
+      embeds_many :basic_auth_users, class_name: CloudModel::Services::Nginx::BasicAuthUser, inverse_of: :service
+      accepts_nested_attributes_for :basic_auth_users, allow_destroy: true, reject_if: ->(attrs) { attrs['id'].blank? && attrs['name'].blank? && attrs['password'].blank? }
+      # The realm lands in a quoted nginx string that also expands variables.
+      validates :basic_auth_realm, presence: true, format: { with: /\A[^"\\$\r\n{};]+\z/ }, if: :basic_auth_supported?
+      validate :basic_auth_users_present, if: :basic_auth_supported?
+
+      BASIC_AUTH_USER_FILE = '/etc/nginx/.htpasswd'.freeze
+
       # Attribute changes fully covered by the rendered config files —
       # NginxWorker#sync_config can push them to the running guest without a
       # redeploy. Everything else (ports/firewall, SSL certs, systemd units,
       # web image, dependencies, web locations, …) only takes effect on the
-      # next deploy. Changes to embedded location_overwrites are live-syncable
-      # too; embedded web_locations are not (their app confs render at deploy).
+      # next deploy. Changes to embedded location_overwrites and
+      # basic_auth_users are live-syncable too (the htpasswd file is part of
+      # the sync); embedded web_locations are not (their app confs render at
+      # deploy).
       # passenger_env and passenger_env_vars also render into /etc/default/rails,
       # which the sync writes as well; the nginx reload restarts the Passenger
       # app with the new environment, the job workers read the file on their
@@ -75,6 +95,7 @@ module CloudModel
         unsafe_inline_script_allowed unsafe_eval_script_allowed
         google_analytics_supported hubspot_forms_supported pingdom_supported
         reverse_proxy_for passenger_env passenger_env_vars passenger_max_pool_size passenger_min_instances rails_cable_supported
+        basic_auth_supported basic_auth_realm basic_auth_private_network_bypass
       ).freeze
 
       # Passenger support
@@ -503,6 +524,28 @@ module CloudModel
 
       def clear_ssl_cert_for_certbot
         self.ssl_cert_id = nil if ssl_certbot?
+      end
+
+      # The logins that stay after this save (rows marked for removal in a
+      # nested form are still in the relation until then).
+      # @return [Array<BasicAuthUser>]
+      def active_basic_auth_users
+        basic_auth_users.reject(&:marked_for_destruction?)
+      end
+
+      # Whether the rendered config puts basic auth in front of the site.
+      # @return [Boolean]
+      def basic_auth?
+        !!basic_auth_supported? && active_basic_auth_users.any?
+      end
+
+      # @return [String] htpasswd file content, one `name:{SSHA}…` line per login
+      def basic_auth_htpasswd
+        active_basic_auth_users.map(&:htpasswd_line).join("\n") + "\n"
+      end
+
+      def basic_auth_users_present
+        errors.add :basic_auth_users, :blank if active_basic_auth_users.empty?
       end
 
       def redeploy!(options = {})
