@@ -649,6 +649,9 @@ de:
         capistrano_supported: Capistrano unterstützen
         capistrano_ssh_groups: Capistrano SSH Gruppen
         capistrano_ssh_group_ids: Capistrano SSH Gruppen
+        static_spa_fallback: Unbekannte Pfade mit /index.html beantworten (Single-Page-App)
+        static_error_page_prefixes: Bereiche mit eigener 404-Seite
+        static_error_page_prefixes_string: Bereiche mit eigener 404-Seite
 
         deploy_web_image: Web Image installieren
 

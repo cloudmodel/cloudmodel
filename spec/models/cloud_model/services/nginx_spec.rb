@@ -34,6 +34,30 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:basic_auth_private_network_bypass).of_type(Mongoid::Boolean).with_default_value_of(true) }
   it { expect(subject).to embed_many(:basic_auth_users).of_type(CloudModel::Services::Nginx::BasicAuthUser).as_inverse_of(:service) }
 
+  it { expect(subject).to have_field(:static_spa_fallback).of_type(Mongoid::Boolean).with_default_value_of(true) }
+  it { expect(subject).to have_field(:static_error_page_prefixes).of_type(Array).with_default_value_of([]) }
+
+  describe 'static error page prefixes' do
+    it 'takes them as text and stores bare paths' do
+      subject.static_error_page_prefixes_string = '/de/, fr  en/'
+      subject.valid?
+
+      expect(subject.static_error_page_prefixes).to eq %w(de fr en)
+      expect(subject.static_error_page_prefixes_string).to eq 'de, fr, en'
+    end
+
+    it 'rejects prefixes that are no plain paths' do
+      subject.static_error_page_prefixes = ['de;', '../x', 'a b']
+      subject.valid?
+
+      expect(subject.errors[:static_error_page_prefixes]).to be_present
+    end
+
+    it 'goes live without a redeploy' do
+      expect(CloudModel::Services::Nginx::LIVE_SYNCABLE_ATTRIBUTES).to include 'static_spa_fallback', 'static_error_page_prefixes'
+    end
+  end
+
   describe 'basic auth' do
     def add_user name, password
       subject.basic_auth_users.build name: name, password: password

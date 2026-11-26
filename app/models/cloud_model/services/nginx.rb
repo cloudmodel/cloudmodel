@@ -96,6 +96,7 @@ module CloudModel
         google_analytics_supported hubspot_forms_supported pingdom_supported
         reverse_proxy_for passenger_env passenger_env_vars passenger_max_pool_size passenger_min_instances rails_cable_supported
         basic_auth_supported basic_auth_realm basic_auth_private_network_bypass
+        static_spa_fallback static_error_page_prefixes
       ).freeze
 
       # Passenger support
@@ -129,6 +130,15 @@ module CloudModel
       # Deploy via capistrano
       field :capistrano_supported, type: Mongoid::Boolean, default: false
       has_and_belongs_to_many :capistrano_ssh_groups, class_name: CloudModel::SshGroup, inverse_of: :services
+      # Unknown paths of a static (Capistrano, no Passenger) site: with the
+      # fallback (default, single-page apps) they get /index.html with 200;
+      # without it a real 404 with the site's own /404.html. A path prefix in
+      # static_error_page_prefixes (e.g. "de" for a German section) gets its
+      # own <prefix>/404.html.
+      field :static_spa_fallback, type: Mongoid::Boolean, default: true
+      field :static_error_page_prefixes, type: Array, default: []
+      before_validation :normalize_static_error_page_prefixes
+      validate :static_error_page_prefixes_are_paths
 
       # WebLocation support
       embeds_many :web_locations, class_name: CloudModel::WebLocation, inverse_of: :service
@@ -542,6 +552,26 @@ module CloudModel
       # @return [String] htpasswd file content, one `name:{SSHA}…` line per login
       def basic_auth_htpasswd
         active_basic_auth_users.map(&:htpasswd_line).join("\n") + "\n"
+      end
+
+      # Accepts "de", "/de/" or "de, fr" and stores ["de", "fr"].
+      # @param value [String, Array<String>]
+      def static_error_page_prefixes_string= value
+        self.static_error_page_prefixes = value.to_s.split(/[\s,]+/)
+      end
+
+      # @return [String] the prefixes as the form shows them
+      def static_error_page_prefixes_string
+        Array(static_error_page_prefixes).join(', ')
+      end
+
+      def normalize_static_error_page_prefixes
+        self.static_error_page_prefixes = Array(static_error_page_prefixes).map { |p| p.to_s.strip.delete_prefix('/').delete_suffix('/') }.reject(&:blank?).uniq
+      end
+
+      def static_error_page_prefixes_are_paths
+        bad = Array(static_error_page_prefixes).reject { |p| p.match?(%r{\A[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\z}) }
+        errors.add :static_error_page_prefixes, :invalid if bad.any?
       end
 
       def basic_auth_users_present
