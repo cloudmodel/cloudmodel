@@ -49,4 +49,9 @@ RSpec.describe 'fleet guest templates', type: :view do
     guest.services << CloudModel::Services::Mysql.new(port: 3307)
     expect(YAML.safe_load(render_template('etc/fleet/fleet_yml'))['mysql']['address']).to eq '127.0.0.1:3307'
   end
+
+  it 'points fleet at the port of the guest´s Redis' do
+    guest.services << CloudModel::Services::Redis.new(port: 6380)
+    expect(YAML.safe_load(render_template('etc/fleet/fleet_yml'))['redis']['address']).to eq '127.0.0.1:6380'
+  end
 end

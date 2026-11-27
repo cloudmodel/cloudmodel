@@ -44,6 +44,22 @@ describe CloudModel::Workers::Services::BaseWorker do
     end
   end
 
+  describe 'render_to_guest' do
+    it 'uploads the rendered template with the given octal mode' do
+      expect(subject).to receive(:render).with('/cloud_model/guest/etc/x.conf', {a: 1}).and_return 'rendered'
+      expect(subject).to receive(:upload_to_guest).with('rendered', '/etc/x.conf', '0644')
+
+      subject.render_to_guest '/cloud_model/guest/etc/x.conf', '/etc/x.conf', 0644, a: 1
+    end
+
+    it 'defaults to a root-only file' do
+      expect(subject).to receive(:render).with('/cloud_model/guest/etc/x.conf', {a: 1}).and_return 'rendered'
+      expect(subject).to receive(:upload_to_guest).with('rendered', '/etc/x.conf', '0600')
+
+      subject.render_to_guest '/cloud_model/guest/etc/x.conf', '/etc/x.conf', a: 1
+    end
+  end
+
   describe 'upload_to_guest' do
     let(:sftp_file) { double 'sftp file' }
 

@@ -68,9 +68,11 @@ module CloudModel
         # Renders a template and pushes the result into the running container.
         # @param template [String] view template path
         # @param remote_file [String] absolute path inside the container
+        # @param param_array [Array] an optional octal mode first (as
+        #   render_to_remote takes it, default 0600), then the locals hash
         def render_to_guest template, remote_file, *param_array
-          perm = if false and param_array.first.is_a? Integer
-            param_array.shift
+          perm = if param_array.first.is_a? Integer
+            format('%04o', param_array.shift)
           else
             "0600"
           end

@@ -18,6 +18,10 @@ module CloudModel
       #   @return [CloudModel::MariadbGaleraCluster, nil] the Galera cluster this node belongs to
       belongs_to :mariadb_galera_cluster, optional: true
 
+      # The mirror of Mysql's check: both install the `mysql` unit,
+      # /etc/mysql and /var/lib/mysql.
+      validate :guest_must_not_have_mysql
+
       def kind
         :mariadb
       end
@@ -113,6 +117,15 @@ module CloudModel
         success, out = guest.exec "mysql -e #{sql.shellescape}"
         Rails.logger.error "Could not ensure mariadb backup user on #{guest.name}: #{out}" unless success
         success
+      end
+
+      private
+
+      def guest_must_not_have_mysql
+        return unless guest
+        return unless guest.services.any? { |s| s.is_a?(CloudModel::Services::Mysql) }
+
+        errors.add :base, :mariadb_beside_mysql
       end
     end
   end

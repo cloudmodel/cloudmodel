@@ -15,7 +15,11 @@ module CloudModel
         def write_config
           comment_sub_step "Config fleet #{@model.effective_fleet_version} (usage statistics #{@model.telemetry ? 'on' : 'off'})"
 
-          @model.save if @model.generate_secrets
+          # Never render a secret the database does not hold: the next deploy
+          # would generate another one and lock the administrator out.
+          if @model.generate_secrets
+            @model.save or raise "Could not store the generated Fleet secrets: #{@model.errors.full_messages.join(', ')}"
+          end
 
           render_to_guest "/cloud_model/guest/etc/fleet/fleet.yml", "/etc/fleet/fleet.yml", 0640, guest: @guest, model: @model
           render_to_guest "/cloud_model/guest/etc/fleet/prepare_db.sh", "/etc/fleet/prepare_db.sh", 0700, guest: @guest, model: @model

@@ -15,13 +15,21 @@ describe CloudModel::Workers::Services::FleetWorker do
       allow(subject).to receive(:chroot!)
       allow(subject).to receive(:render_to_guest)
       allow(host).to receive(:exec!)
-      allow(model).to receive(:save)
+      allow(model).to receive(:save).and_return true
     end
 
     it 'should generate and save missing secrets' do
       expect(model).to receive(:save)
       subject.write_config
       expect(model.enroll_secret).to be_present
+    end
+
+    it 'should raise instead of rendering secrets the database does not hold' do
+      allow(model).to receive(:save).and_return false
+      allow(model).to receive_message_chain(:errors, :full_messages).and_return ['Admin email can\'t be blank']
+      expect(subject).not_to receive(:render_to_guest)
+
+      expect { subject.write_config }.to raise_error(/Could not store the generated Fleet secrets: Admin email/)
     end
 
     it 'should not save when all secrets are present' do

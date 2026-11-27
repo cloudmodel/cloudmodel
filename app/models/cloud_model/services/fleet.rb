@@ -91,6 +91,8 @@ module CloudModel
 
       validates :admin_email, presence: true, format: { with: /\A[^@\s]+@[^@\s]+\z/ }
       validate :guest_must_have_database_and_redis
+      # root_url, api_email and the SAML entity id are built from it.
+      validate :guest_must_have_external_hostname
       validate :host_arch_must_have_a_fleet_server, if: :new_record?
 
       def kind
@@ -123,6 +125,16 @@ module CloudModel
       # @return [Integer] port of the database server on localhost
       def database_port
         database_service&.port || 3306
+      end
+
+      # @return [CloudModel::Services::Redis, nil] the Redis in the guest
+      def redis_service
+        guest&.services&.to_a&.detect { |s| s.is_a?(CloudModel::Services::Redis) }
+      end
+
+      # @return [Integer] port of the Redis on localhost
+      def redis_port
+        redis_service&.port || 6379
       end
 
       # @return [String] organisation name configured in Fleet
@@ -223,7 +235,12 @@ module CloudModel
         return unless guest
 
         errors.add :base, :fleet_needs_mysql unless database_service
-        errors.add :base, :fleet_needs_redis unless guest.services.any? { |s| s.is_a?(CloudModel::Services::Redis) }
+        errors.add :base, :fleet_needs_redis unless redis_service
+      end
+
+      def guest_must_have_external_hostname
+        return unless guest
+        errors.add :base, :fleet_needs_external_hostname if guest.external_hostname.blank?
       end
     end
   end

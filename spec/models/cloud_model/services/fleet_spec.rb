@@ -57,6 +57,21 @@ describe CloudModel::Services::Fleet do
       expect(subject.database_port).to eq 3307
     end
 
+    it 'should need a guest with an external hostname (the server URL)' do
+      guest.services << CloudModel::Services::Mysql.new
+      guest.services << CloudModel::Services::Redis.new
+      allow(guest).to receive(:external_hostname).and_return ''
+
+      expect(subject).not_to be_valid
+      expect(subject.errors[:base]).to include 'needs a guest with an external address (its hostname is Fleet\'s server URL)'
+    end
+
+    it 'should use the port of the guest´s Redis' do
+      expect(subject.redis_port).to eq 6379
+      guest.services << CloudModel::Services::Redis.new(port: 6380)
+      expect(subject.redis_port).to eq 6380
+    end
+
     it 'should refuse a host without a Fleet server build' do
       guest.services << CloudModel::Services::Redis.new
       guest.services << CloudModel::Services::Mysql.new

@@ -146,6 +146,8 @@ de:
         not_published: "%{component} %{version} gibt es nicht für %{os} auf %{arch} (hier verfügbar: %{alternatives})"
         fleet_needs_mysql: braucht einen MySQL-Dienst im selben Gast (Fleet läuft nicht auf MariaDB)
         mysql_beside_mariadb: kann nicht in einem Gast mit MariaDB-Dienst laufen
+        mariadb_beside_mysql: kann nicht in einem Gast mit MySQL-Dienst laufen
+        fleet_needs_external_hostname: braucht einen Gast mit externer Adresse (ihr Hostname ist die Server-URL von Fleet)
 
     models:
       cloud_model/host:

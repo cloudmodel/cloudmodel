@@ -19,6 +19,21 @@ describe CloudModel::Services::Mariadb do
     end
   end
 
+  describe 'validation' do
+    let(:guest) { CloudModel::Guest.new name: 'db06' }
+    before { allow(subject).to receive(:guest).and_return guest }
+
+    it 'should refuse a guest with a MySQL service (the mirror of MySQL´s check)' do
+      guest.services << CloudModel::Services::Mysql.new
+      expect(subject).not_to be_valid
+      expect(subject.errors[:base]).to include 'cannot run in a guest with a MySQL service'
+    end
+
+    it 'should be valid on its own' do
+      expect(subject).to be_valid
+    end
+  end
+
   describe 'components_needed' do
     it 'should require only mariadb' do
       expect(subject.components_needed).to eq [:mariadb]

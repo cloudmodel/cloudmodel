@@ -277,13 +277,21 @@ module CloudModel
       "#{service.guest.name}@#{service.guest.host.name}"
     end
 
+    # Package versions of both repositories: `7.0.48` (MongoDB) and
+    # `8.0.38-16.bookworm` (Percona: upstream, build, codename). Upstream
+    # release first, then the build; strings neither form fits only count
+    # as "different".
     def newer? a, b
       return false if a.blank? || b.blank?
-      if a =~ /\A[\d.]+\z/ && b =~ /\A[\d.]+\z/
-        Gem::Version.new(a) > Gem::Version.new(b)
-      else
-        a != b
-      end
+      pa, pb = package_version(a), package_version(b)
+      return a != b unless pa && pb
+      (pa <=> pb) > 0
+    end
+
+    # @return [Array(Gem::Version, Integer), nil] upstream release and build
+    def package_version v
+      m = v.to_s.match(/\A(\d+(?:\.\d+)*)(?:-(\d+))?/)
+      m && [Gem::Version.new(m[1]), m[2].to_i]
     end
 
     # The replica set this admin application itself reads from: its members

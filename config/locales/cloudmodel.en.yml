@@ -146,6 +146,8 @@ en:
         not_published: "%{component} %{version} is not published for %{os} on %{arch} (available here: %{alternatives})"
         fleet_needs_mysql: needs a MySQL service in the same guest (Fleet does not run on MariaDB)
         mysql_beside_mariadb: cannot run in a guest with a MariaDB service
+        mariadb_beside_mysql: cannot run in a guest with a MySQL service
+        fleet_needs_external_hostname: needs a guest with an external address (its hostname is Fleet's server URL)
 
     models:
       cloud_model/host:

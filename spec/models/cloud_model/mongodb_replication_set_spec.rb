@@ -484,6 +484,15 @@ describe CloudModel::MongodbReplicationSet do
       expect(result).to eq false
     end
 
+    it 'should stop with a message when the set is on a release outside the path (a minor such as 8.2)' do
+      allow(subject).to receive(:services).and_return([double('service')])
+      allow(subject).to receive(:feature_compatibility_version).and_return('8.2')
+
+      result = nil
+      expect { result = subject.update_feature_compatibility_version!('9.0') }.to output(/8\.2 is not in the version path/).to_stdout
+      expect(result).to eq false
+    end
+
     it 'should upgrade one step, redeploy outdated services and set new FCV' do
       guest = double 'guest', name: 'g1'
       allow(guest).to receive(:host).and_return(double('host', name: 'h1'))

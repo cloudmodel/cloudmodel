@@ -98,6 +98,13 @@ describe CloudModel::MongodbPatch do
         expect(subject.behind?(installed: '8.0.38-16.bookworm', candidate: '8.0.38-16.bookworm', running: '8.0.38-16')).to be false
       end
 
+      it 'compares Percona´s package versions by upstream release and build, not as strings' do
+        expect(subject.behind?(installed: '8.0.38-16.bookworm', candidate: '8.0.37-15.bookworm', running: '8.0.38-16')).to be false
+        expect(subject.behind?(installed: '8.0.38-16.bookworm', candidate: '8.0.38-17.bookworm', running: '8.0.38-16')).to be true
+        expect(subject.behind?(installed: '8.0.9-5.bookworm', candidate: '8.0.10-1.bookworm', running: '8.0.9-5')).to be true
+        expect(subject.send(:newer?, '8.0.38-16.bookworm', '8.0.38-16.bullseye')).to be false
+      end
+
       it 'names Percona´s package when it is missing' do
         expect(primary.guest).to receive(:exec).and_return [true, "installed=\ncandidate=(none)\npackages=\n"]
         expect { subject.inventory primary }.to raise_error(/no percona-server-mongodb-server/)

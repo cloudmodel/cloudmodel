@@ -323,6 +323,10 @@ module CloudModel
         puts "You can not downgrade a replication set (#{features} => #{version})"
         return false
       end
+      unless CloudModel::mongodb_version_path.index(features)
+        puts "Current feature level #{features} is not in the version path (#{CloudModel::mongodb_version_path * ', '}): a minor release — set the next major by hand first"
+        return false
+      end
 
       if latest_compatible_version = CloudModel::mongodb_version_path[CloudModel::mongodb_version_path.index(features) + 1]
         puts "# Check if version of current services is #{latest_compatible_version}"
