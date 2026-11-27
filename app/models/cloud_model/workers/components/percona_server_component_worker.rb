@@ -28,6 +28,7 @@ module CloudModel
         def build build_path
           PerconaRepository.add! self, build_path, @template, [repository]
           chroot! build_path, "DEBIAN_FRONTEND=noninteractive apt-get install percona-server-server -y", "Failed to install Percona Server #{series}"
+          MysqlConfigFile.select! self, build_path
         end
       end
     end

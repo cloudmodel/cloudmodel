@@ -50,5 +50,11 @@ describe CloudModel::Workers::Components::MysqlComponentWorker do
       expect(subject).to receive(:chroot!).with('/tmp/build', 'DEBIAN_FRONTEND=noninteractive apt-get install mysql-community-server -y', 'Failed to install MySQL 8.4')
       subject.build '/tmp/build'
     end
+
+    it "should make the server's mysql.cnf the my.cnf after the install" do
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'DEBIAN_FRONTEND=noninteractive apt-get install mysql-community-server -y', 'Failed to install MySQL 8.4').ordered
+      expect(subject).to receive(:chroot!).with('/tmp/build', %r{\Aupdate-alternatives --install /etc/mysql/my\.cnf my\.cnf /etc/mysql/mysql\.cnf 300 }, 'Failed to make /etc/mysql/mysql.cnf the my.cnf').ordered
+      subject.build '/tmp/build'
+    end
   end
 end

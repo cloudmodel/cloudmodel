@@ -52,6 +52,7 @@ module CloudModel
 
           chroot! build_path, "apt-get update", "Failed to update packages"
           chroot! build_path, "DEBIAN_FRONTEND=noninteractive apt-get install mysql-community-server -y", "Failed to install MySQL #{series}"
+          MysqlConfigFile.select! self, build_path
         end
       end
     end

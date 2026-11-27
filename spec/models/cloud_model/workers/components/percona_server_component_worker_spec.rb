@@ -42,5 +42,11 @@ describe CloudModel::Workers::Components::PerconaServerComponentWorker do
       expect(subject).to receive(:chroot!).with('/tmp/build', 'DEBIAN_FRONTEND=noninteractive apt-get install percona-server-server -y', 'Failed to install Percona Server 8.4').ordered
       subject.build '/tmp/build'
     end
+
+    it "should make the server's mysql.cnf the my.cnf after the install (mariadb-common would win otherwise)" do
+      expect(subject).to receive(:chroot!).with('/tmp/build', 'DEBIAN_FRONTEND=noninteractive apt-get install percona-server-server -y', 'Failed to install Percona Server 8.4').ordered
+      expect(subject).to receive(:chroot!).with('/tmp/build', %r{\Aupdate-alternatives --install /etc/mysql/my\.cnf my\.cnf /etc/mysql/mysql\.cnf 300 && test .*readlink -f /etc/mysql/my\.cnf.* = /etc/mysql/mysql\.cnf\z}, 'Failed to make /etc/mysql/mysql.cnf the my.cnf').ordered
+      subject.build '/tmp/build'
+    end
   end
 end
