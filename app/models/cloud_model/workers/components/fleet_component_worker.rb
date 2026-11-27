@@ -43,7 +43,9 @@ module CloudModel
             chroot! build_path, "cd /tmp/fleet && grep -E #{"  #{Regexp.escape asset}\\.tar\\.gz$".shellescape} checksums.txt | sha256sum -c --strict -", "Checksum of #{asset}.tar.gz does not match the release's checksums.txt"
           end
           chroot! build_path, "cd /tmp/fleet && tar xzf #{server}.tar.gz && tar xzf #{cli}.tar.gz && install -m 755 #{server}/fleet /usr/bin/fleet && install -m 755 #{cli}/fleetctl /usr/bin/fleetctl && cd / && rm -rf /tmp/fleet", "Failed to install fleet binaries"
-          chroot! build_path, "/usr/bin/fleet version && /usr/bin/fleetctl --version", "Fleet binaries not runnable"
+          # `fleet` reads further arguments from a stdin that is not a terminal
+          # and would wait for the SSH channel to close.
+          chroot! build_path, "/usr/bin/fleet version </dev/null && /usr/bin/fleetctl --version </dev/null", "Fleet binaries not runnable"
 
           mkdir_p "#{build_path}/lib/systemd/system"
           render_to_remote "/cloud_model/guest/lib/systemd/system/fleet.service", "#{build_path}/lib/systemd/system/fleet.service"
