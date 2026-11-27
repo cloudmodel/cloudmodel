@@ -33,6 +33,53 @@ RSpec.describe 'cloud_model/guest/etc/nginx/sites-available/cloudmodel_conf', ty
     expect(rendered).not_to include 'http2'
   end
 
+  describe 'additional MIME types' do
+    it 'adds them in an http-level types block' do
+      model.additional_mime_types = { 'xsd' => 'application/xml' }
+      render_conf
+
+      expect(rendered).to match(%r{^types \{\n\s+application/xml\s+xsd;\n\}$})
+      expect(rendered.index('types {')).to be < rendered.index('server {')
+    end
+
+    it 'renders no types block without them' do
+      render_conf
+
+      expect(rendered).not_to include 'types {'
+    end
+  end
+
+  describe 'ssl_enforce exceptions' do
+    before do
+      model.ssl_enforce = true
+      model.ssl_enforce_exceptions = ['/schema/']
+    end
+
+    it 'serves the listed prefixes on plain http from the document root, the rest still redirects' do
+      render_conf
+      http_server = rendered[/server \{\n\s*listen\s+80;.*?\n\}/m]
+
+      expect(http_server).to include 'rewrite'
+      expect(http_server).to match(%r{location \^~ /schema/ \{\n\s*root\s+/var/www/rails/current/public/;\n\s*try_files\s+\$uri =404;\n\s*\}})
+    end
+
+    it 'keeps the basic auth on the exception' do
+      model.basic_auth_supported = true
+      model.basic_auth_users.build name: 'demo', password: 'opensesame'
+      render_conf
+      http_server = rendered[/server \{\n\s*listen\s+80;.*?\n\}/m]
+
+      expect(http_server).to match(%r!location \^~ /schema/ \{[^}]*auth_basic\s+\$cloudmodel_basic_auth;!m)
+    end
+
+    it 'renders no exception location while https is not enforced (http serves everything anyway)' do
+      model.ssl_enforce = false
+      render_conf
+
+      expect(rendered).not_to include 'location ^~ /schema/'
+    end
+  end
+
   describe 'basic auth' do
     before do
       allow(CloudModel.config).to receive(:tinc_network).and_return '10.44.0.0/16'

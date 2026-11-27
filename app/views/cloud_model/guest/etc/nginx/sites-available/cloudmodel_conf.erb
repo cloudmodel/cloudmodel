@@ -1,5 +1,14 @@
 
 index                           index.html;
+<%- if model.additional_mime_types.present? -%>
+
+# In addition to mime.types (a types block at http level adds, inside server it would replace)
+types {
+<%- model.additional_mime_types.each do |ext, type| -%>
+  <%= type.to_s.ljust(29) %> <%= ext %>;
+<%- end -%>
+}
+<%- end -%>
 <%- if model.basic_auth? -%>
 
 # Basic auth: the realm per request, "off" for the ACME challenge (certbot)<%= ' and for the private network' if model.basic_auth_private_network_bypass? %>.
@@ -38,6 +47,18 @@ server {
     rewrite                     ^/(.*)$  https://<%= guest.external_hostname %>/$1  permanent;
     return                      444;
   }
+<%- model.ssl_enforce_exceptions.each do |path| -%>
+
+  # Served on plain http as well (clients that do not follow the switch to https)
+  location ^~ <%= path %> {
+    root                        <%= model.www_root %>/current/public/;
+    try_files                   $uri =404;
+<%- if model.basic_auth? -%>
+    auth_basic                  $cloudmodel_basic_auth;
+    auth_basic_user_file        <%= CloudModel::Services::Nginx::BASIC_AUTH_USER_FILE %>;
+<%- end -%>
+  }
+<%- end -%>
 <%- else -%>
   root                          <%= model.www_root %>/current/public/;
 

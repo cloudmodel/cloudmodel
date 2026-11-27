@@ -622,6 +622,10 @@ de:
         ssl_cert: SSL Zertifikat
         ssl_certbot: Let's Encrypt Zertifikat nutzen
         http2: HTTP/2
+        ssl_enforce_exceptions: Pfade, die auch per http ausgeliefert werden
+        ssl_enforce_exceptions_string: Pfade, die auch per http ausgeliefert werden
+        additional_mime_types: Zusätzliche MIME-Typen
+        additional_mime_types_string: Zusätzliche MIME-Typen
         basic_auth: HTTP-Basic-Auth
         basic_auth_supported: Mit HTTP-Basic-Auth schützen
         basic_auth_realm: Realm (steht im Login-Dialog)

@@ -37,6 +37,48 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:static_spa_fallback).of_type(Mongoid::Boolean).with_default_value_of(true) }
   it { expect(subject).to have_field(:static_error_page_prefixes).of_type(Array).with_default_value_of([]) }
 
+  it { expect(subject).to have_field(:ssl_enforce_exceptions).of_type(Array).with_default_value_of([]) }
+  it { expect(subject).to have_field(:additional_mime_types).of_type(Hash).with_default_value_of({}) }
+
+  describe 'ssl_enforce exceptions' do
+    it 'takes them as text and stores them as /path/ prefixes' do
+      subject.ssl_enforce_exceptions_string = 'schema, /feeds  /a/b'
+      subject.valid?
+
+      expect(subject.ssl_enforce_exceptions).to eq %w(/schema/ /feeds/ /a/b/)
+      expect(subject.ssl_enforce_exceptions_string).to eq '/schema/, /feeds/, /a/b/'
+    end
+
+    it 'rejects prefixes that are no plain paths' do
+      ['/../etc/', '/a b/', '/x;/', '/{x}/'].each do |path|
+        subject.ssl_enforce_exceptions = [path]
+        subject.valid?
+        expect(subject.errors[:ssl_enforce_exceptions]).to be_present, "expected #{path.inspect} to be rejected"
+      end
+    end
+  end
+
+  describe 'additional MIME types' do
+    it 'takes them as ext=type text' do
+      subject.additional_mime_types_string = '.XSD=application/xml, rss=application/rss+xml'
+
+      expect(subject.additional_mime_types).to eq('xsd' => 'application/xml', 'rss' => 'application/rss+xml')
+      expect(subject.additional_mime_types_string).to eq 'xsd=application/xml, rss=application/rss+xml'
+    end
+
+    it 'rejects what nginx could not read as a type' do
+      [{ 'xsd' => 'xml' }, { 'x;y' => 'application/xml' }, { 'xsd' => 'application/xml;' }].each do |types|
+        subject.additional_mime_types = types
+        subject.valid?
+        expect(subject.errors[:additional_mime_types]).to be_present, "expected #{types.inspect} to be rejected"
+      end
+    end
+
+    it 'goes live without a redeploy, as do the exceptions' do
+      expect(CloudModel::Services::Nginx::LIVE_SYNCABLE_ATTRIBUTES).to include 'additional_mime_types', 'ssl_enforce_exceptions'
+    end
+  end
+
   describe 'static error page prefixes' do
     it 'takes them as text and stores bare paths' do
       subject.static_error_page_prefixes_string = '/de/, fr  en/'

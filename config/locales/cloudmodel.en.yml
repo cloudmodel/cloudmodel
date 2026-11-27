@@ -620,6 +620,10 @@ en:
         ssl_cert: SSL Certificate
         ssl_certbot: Use Let's Encrypt Certificate?
         http2: HTTP/2
+        ssl_enforce_exceptions: Paths served on plain http as well
+        ssl_enforce_exceptions_string: Paths served on plain http as well
+        additional_mime_types: Additional MIME types
+        additional_mime_types_string: Additional MIME types
         basic_auth: HTTP Basic Auth
         basic_auth_supported: Protect with HTTP basic auth?
         basic_auth_realm: Realm (shown in the login dialog)

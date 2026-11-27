@@ -41,6 +41,19 @@ module CloudModel
       # nginx HTTP/2 vulnerability has no distribution fix yet, and come back
       # once it has — both without a redeploy, through the live config sync.
       field :http2, type: Mongoid::Boolean, default: true
+      # Path prefixes (e.g. "/schema/") the plain-http listener serves itself
+      # from the document root although ssl_enforce redirects everything else
+      # to https: for clients that fetch over http and do not follow a switch
+      # to https (XML validators loading schemas).
+      field :ssl_enforce_exceptions, type: Array, default: []
+      before_validation :normalize_ssl_enforce_exceptions
+      validate :ssl_enforce_exceptions_are_paths
+      # Content types nginx's mime.types lacks, extension => type (e.g.
+      # "xsd" => "application/xml"). Rendered as an additional `types` block
+      # at http level, which adds to mime.types (one inside `server` would
+      # replace them).
+      field :additional_mime_types, type: Hash, default: {}
+      validate :additional_mime_types_are_valid
       belongs_to :ssl_cert, class_name: CloudModel::Certificate, inverse_of: :services, optional: true
       # With Let's Encrypt the cert is certbot's business: no preselected
       # certificate — the deploy bootstraps a self-signed one so nginx comes
@@ -97,6 +110,7 @@ module CloudModel
         reverse_proxy_for passenger_env passenger_env_vars passenger_max_pool_size passenger_min_instances rails_cable_supported
         basic_auth_supported basic_auth_realm basic_auth_private_network_bypass
         static_spa_fallback static_error_page_prefixes
+        ssl_enforce_exceptions additional_mime_types
       ).freeze
 
       # Passenger support
@@ -552,6 +566,45 @@ module CloudModel
       # @return [String] htpasswd file content, one `name:{SSHA}…` line per login
       def basic_auth_htpasswd
         active_basic_auth_users.map(&:htpasswd_line).join("\n") + "\n"
+      end
+
+      # Accepts "/schema/, /feeds" and stores ["/schema/", "/feeds/"].
+      # @param value [String]
+      def ssl_enforce_exceptions_string= value
+        self.ssl_enforce_exceptions = value.to_s.split(/[\s,]+/)
+      end
+
+      # @return [String] the prefixes as the form shows them
+      def ssl_enforce_exceptions_string
+        Array(ssl_enforce_exceptions).join(', ')
+      end
+
+      def normalize_ssl_enforce_exceptions
+        self.ssl_enforce_exceptions = Array(ssl_enforce_exceptions).map { |p| p.to_s.strip }.reject(&:blank?).map { |p| "/#{p.delete_prefix('/').delete_suffix('/')}/" }.uniq
+      end
+
+      def ssl_enforce_exceptions_are_paths
+        bad = Array(ssl_enforce_exceptions).reject { |p| p.match?(%r{\A/([A-Za-z0-9._-]+/)+\z}) && !p.include?('/../') && !p.include?('/./') }
+        errors.add :ssl_enforce_exceptions, :invalid if bad.any?
+      end
+
+      # Accepts "xsd=application/xml, rss=application/rss+xml".
+      # @param value [String]
+      def additional_mime_types_string= value
+        self.additional_mime_types = value.to_s.split(/[\s,]+/).reject(&:blank?).to_h do |pair|
+          ext, type = pair.split('=', 2)
+          [ext.to_s.strip.delete_prefix('.').downcase, type.to_s.strip]
+        end
+      end
+
+      # @return [String] the types as the form shows them
+      def additional_mime_types_string
+        (additional_mime_types || {}).map { |ext, type| "#{ext}=#{type}" }.join(', ')
+      end
+
+      def additional_mime_types_are_valid
+        bad = (additional_mime_types || {}).reject { |ext, type| ext.to_s.match?(/\A[a-z0-9]+\z/) && type.to_s.match?(%r{\A[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+\z}) }
+        errors.add :additional_mime_types, :invalid if bad.any?
       end
 
       # Accepts "de", "/de/" or "de, fr" and stores ["de", "fr"].
