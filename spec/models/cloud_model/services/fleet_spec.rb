@@ -20,6 +20,17 @@ describe CloudModel::Services::Fleet do
 
   it { expect(subject.kind).to eq :fleet }
 
+  it { expect(subject).to have_field(:cisa_known_exploits_url).of_type(String).with_default_value_of(nil) }
+
+  it 'should accept a blank or an http(s) URL for the CISA known exploits catalog only' do
+    subject.cisa_known_exploits_url = 'ftp://example.com/kev.json'
+    subject.valid?
+    expect(subject.errors[:cisa_known_exploits_url]).not_to be_empty
+    subject.cisa_known_exploits_url = 'https://example.com/kev.json'
+    subject.valid?
+    expect(subject.errors[:cisa_known_exploits_url]).to be_empty
+  end
+
   it 'should never be public itself (nginx in front is)' do
     expect(subject.allow_public_service?).to eq false
   end

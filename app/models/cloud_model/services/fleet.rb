@@ -83,12 +83,20 @@ module CloudModel
       #   @return [Boolean] create Fleet users on their first SSO login
       field :sso_jit_provisioning, type: Mongoid::Boolean, default: true
 
+      # @!attribute [rw] cisa_known_exploits_url
+      #   @return [String, nil] where Fleet downloads CISA's catalog of known
+      #     exploited vulnerabilities; blank uses Fleet's default (cisa.gov).
+      #     Set it to a mirror when the host's network is refused there, e.g.
+      #     CISA's own copy on GitHub (cisagov/kev-data)
+      field :cisa_known_exploits_url, type: String, default: nil
+
       # Provisioning token and vulnerability feeds; meant to be a data volume.
       DATA_DIR = '/var/lib/fleet'.freeze
 
       DATABASE_NAME = 'fleet'.freeze
       DATABASE_USER = 'fleet'.freeze
 
+      validates :cisa_known_exploits_url, format: { with: %r{\Ahttps?://\S+\z} }, allow_blank: true
       validates :admin_email, presence: true, format: { with: /\A[^@\s]+@[^@\s]+\z/ }
       validate :guest_must_have_database_and_redis
       # root_url, api_email and the SAML entity id are built from it.

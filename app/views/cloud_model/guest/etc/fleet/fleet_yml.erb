@@ -18,3 +18,6 @@ filesystem:
   enable_log_rotation: true
 vulnerabilities:
   databases_path: <%== "#{CloudModel::Services::Fleet::DATA_DIR}/vulndb".to_json %>
+<% if model.cisa_known_exploits_url.present? -%>
+  cisa_known_exploits_url: <%== model.cisa_known_exploits_url.to_json %>
+<% end -%>

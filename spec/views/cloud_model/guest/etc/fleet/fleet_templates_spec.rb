@@ -24,6 +24,12 @@ RSpec.describe 'fleet guest templates', type: :view do
     expect(config['vulnerabilities']).to eq('databases_path' => '/var/lib/fleet/vulndb')
   end
 
+  it 'points fleet at a mirror of the CISA known exploits catalog when one is set' do
+    model.cisa_known_exploits_url = 'https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json'
+    config = YAML.safe_load render_template('etc/fleet/fleet_yml')
+    expect(config['vulnerabilities']).to eq('databases_path' => '/var/lib/fleet/vulndb', 'cisa_known_exploits_url' => 'https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json')
+  end
+
   it 'renders the database preparation with quoted password and the migrations' do
     script = render_template('etc/fleet/prepare_db_sh')
     expect(script).to include "CREATE USER IF NOT EXISTS 'fleet'@'127.0.0.1' IDENTIFIED BY 'pa''ss';"
