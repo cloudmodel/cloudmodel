@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fleet: Google Chrome profiles are no longer read (`chrome_profiles`, off
+  by default): Fleet's `google_chrome_profiles` detail query maps a host to
+  the e-mail addresses of every local user's Chrome profiles, not only the
+  owner's. The provisioning sends a `detail_query_overrides` entry of
+  `null`; mappings stored before stay in Fleet's `host_emails` until removed.
 - **MySQL service** (`:mysql`) next to MariaDB, with the server distribution
   as a field like the MongoDB service: `mysql_distribution: percona`
   (default) installs Percona Server for MySQL (component

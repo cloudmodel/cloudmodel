@@ -17,6 +17,7 @@ describe CloudModel::Services::Fleet do
   it { expect(subject).to have_field(:fleet_version).of_type(String) }
   it { expect(subject).to have_field(:telemetry).of_type(Mongoid::Boolean).with_default_value_of false }
   it { expect(subject).to have_field(:sso_jit_provisioning).of_type(Mongoid::Boolean).with_default_value_of true }
+  it { expect(subject).to have_field(:chrome_profiles).of_type(Mongoid::Boolean).with_default_value_of false }
 
   it { expect(subject.kind).to eq :fleet }
 
@@ -121,15 +122,27 @@ describe CloudModel::Services::Fleet do
   describe 'provision_specs' do
     before { subject.enroll_secret = 'enroll-me' }
 
-    it 'should converge enroll secret, organisation, server url and switch analytics off' do
+    it 'should converge enroll secret, organisation, server url, switch analytics off and leave Chrome profiles unread' do
       expect(subject.provision_specs).to eq [
         { 'apiVersion' => 'v1', 'kind' => 'enroll_secret', 'spec' => { 'secrets' => [{ 'secret' => 'enroll-me' }] } },
         { 'apiVersion' => 'v1', 'kind' => 'config', 'spec' => {
           'org_info' => { 'org_name' => 'fleet06' },
           'server_settings' => { 'server_url' => 'https://fleet.example.com', 'enable_analytics' => false },
+          'features' => { 'detail_query_overrides' => { 'google_chrome_profiles' => nil } },
           'sso_settings' => { 'enable_sso' => false }
         } }
       ]
+    end
+
+    it 'should restore Fleet´s own Chrome profiles query when the switch is on' do
+      subject.chrome_profiles = true
+      expect(subject.provision_specs.last['spec']['features']['detail_query_overrides']['google_chrome_profiles']).to eq "SELECT email FROM google_chrome_profiles WHERE NOT ephemeral AND email <> ''"
+    end
+
+    it 'should render the disabled query as YAML null for fleetctl' do
+      yaml = subject.provision_specs.last.to_yaml
+      expect(yaml).to match(/^    detail_query_overrides:\n      google_chrome_profiles:\s*$/)
+      expect(YAML.safe_load(yaml)['spec']['features']['detail_query_overrides']).to eq('google_chrome_profiles' => nil)
     end
 
     it 'should switch analytics on with telemetry' do

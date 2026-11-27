@@ -90,6 +90,20 @@ module CloudModel
       #     CISA's own copy on GitHub (cisagov/kev-data)
       field :cisa_known_exploits_url, type: String, default: nil
 
+      # @!attribute [rw] chrome_profiles
+      #   @return [Boolean] read the Google Chrome profiles of a device's
+      #     users (Fleet's `google_chrome_profiles` detail query, which maps a
+      #     host to the e-mail addresses signed into Chrome). It reads every
+      #     local user's profiles, not only the device owner's, so it is off
+      #     by default; switching it off does not remove what Fleet stored
+      #     before (`host_emails`, source `google_chrome_profiles`).
+      field :chrome_profiles, type: Mongoid::Boolean, default: false
+
+      # Fleet's built-in query behind {#chrome_profiles}, sent back as the
+      # override when the switch is turned on again (an override of `null`
+      # disables the query and stays until replaced).
+      CHROME_PROFILES_QUERY = "SELECT email FROM google_chrome_profiles WHERE NOT ephemeral AND email <> ''".freeze
+
       # Provisioning token and vulnerability feeds; meant to be a data volume.
       DATA_DIR = '/var/lib/fleet'.freeze
 
@@ -188,7 +202,8 @@ module CloudModel
       def provision_specs
         config = {
           'org_info' => { 'org_name' => effective_org_name },
-          'server_settings' => { 'server_url' => root_url, 'enable_analytics' => !!telemetry }
+          'server_settings' => { 'server_url' => root_url, 'enable_analytics' => !!telemetry },
+          'features' => { 'detail_query_overrides' => { 'google_chrome_profiles' => chrome_profiles ? CHROME_PROFILES_QUERY : nil } }
         }
         config['sso_settings'] = if sso?
           {
