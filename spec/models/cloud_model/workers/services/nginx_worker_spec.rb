@@ -716,10 +716,17 @@ describe CloudModel::Workers::Services::NginxWorker do
       expect(file).to include template: '/cloud_model/guest/etc/nginx/htpasswd', mode: '0640', group: 'www'
     end
 
-    it 'leaves the htpasswd out of the plan while the option is off' do
+    it 'leaves the htpasswd out of the plan while the option is off and the guest never had one' do
       ba_model.basic_auth_supported = false
 
       expect(ba_worker.config_sync_plan(certbot_cert_available: false).map { |f| f[:path] }).not_to include '/etc/nginx/.htpasswd'
+    end
+
+    it 'keeps a recorded htpasswd in the plan while the option is off, so switching it on again stays live-syncable' do
+      ba_model.basic_auth_supported = false
+
+      paths = ba_worker.config_sync_plan(certbot_cert_available: false, manifest: {'/etc/nginx/.htpasswd' => 'hash-old'}).map { |f| f[:path] }
+      expect(paths).to include '/etc/nginx/.htpasswd'
     end
   end
 
@@ -738,6 +745,11 @@ describe CloudModel::Workers::Services::NginxWorker do
       allow(subject).to receive(:read_config_manifest).and_return(nginx_conf => 'hash-a', site_conf => 'hash-old')
       allow(subject).to receive(:remote_file_hash).with(nginx_conf).and_return 'hash-a'
       allow(subject).to receive(:remote_file_hash).with(site_conf).and_return 'hash-old'
+    end
+
+    it 'builds the plan against the recorded manifest' do
+      expect(subject).to receive(:config_sync_plan).with(manifest: {nginx_conf => 'hash-a', site_conf => 'hash-old'}).and_return plan
+      subject.sync_config(dry_run: true)
     end
 
     it 'only reports the files it would write on a dry run' do

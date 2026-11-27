@@ -30,6 +30,17 @@ describe CloudModel::Services::Nginx::BasicAuthUser do
     expect(subject.password_matches?('demo')).to eq false
   end
 
+  it 'does not match a malformed or foreign hash' do
+    subject.password_hash = '{SSHA}AAAA'
+    expect(subject.password_matches?('opensesame')).to eq false
+
+    subject.password_hash = '{SSHA}not base64!'
+    expect(subject.password_matches?('opensesame')).to eq false
+
+    subject.password_hash = '$apr1$abc'
+    expect(subject.password_matches?('opensesame')).to eq false
+  end
+
   it 'keeps the stored hash when a blank password is assigned' do
     subject.password = 'opensesame'
     hash = subject.password_hash
@@ -47,7 +58,7 @@ describe CloudModel::Services::Nginx::BasicAuthUser do
 
   it 'rejects names the htpasswd format cannot hold' do
     subject.password = 'opensesame'
-    ['de:mo', 'de mo', ''].each do |name|
+    ['de:mo', 'de mo', '#demo', ''].each do |name|
       subject.name = name
       expect(subject).not_to be_valid
       expect(subject.errors[:name]).to be_present

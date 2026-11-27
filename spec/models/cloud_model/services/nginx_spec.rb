@@ -148,6 +148,18 @@ describe CloudModel::Services::Nginx do
       expect(subject.errors[:basic_auth_realm]).to be_empty
     end
 
+    it 'rejects the realm "off", which nginx would read as no auth' do
+      subject.basic_auth_supported = true
+      add_user 'demo', 'opensesame'
+      subject.basic_auth_realm = 'off'
+      subject.valid?
+      expect(subject.errors[:basic_auth_realm]).to be_present
+
+      subject.basic_auth_realm = 'Off limits'
+      subject.valid?
+      expect(subject.errors[:basic_auth_realm]).to be_empty
+    end
+
     it 'renders one htpasswd line per login' do
       subject.basic_auth_supported = true
       a = add_user 'demo', 'opensesame'

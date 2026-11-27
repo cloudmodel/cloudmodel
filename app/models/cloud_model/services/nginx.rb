@@ -87,6 +87,9 @@ module CloudModel
       accepts_nested_attributes_for :basic_auth_users, allow_destroy: true, reject_if: ->(attrs) { attrs['id'].blank? && attrs['name'].blank? && attrs['password'].blank? }
       # The realm lands in a quoted nginx string that also expands variables.
       validates :basic_auth_realm, presence: true, format: { with: /\A[^"\\$\r\n{};]+\z/ }, if: :basic_auth_supported?
+      # nginx reads the evaluated value `off` as "no auth": a realm of that
+      # name would switch the protection off while the form shows it on.
+      validates :basic_auth_realm, exclusion: { in: %w(off) }, if: :basic_auth_supported?
       validate :basic_auth_users_present, if: :basic_auth_supported?
 
       BASIC_AUTH_USER_FILE = '/etc/nginx/.htpasswd'.freeze

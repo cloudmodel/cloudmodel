@@ -53,6 +53,9 @@ server {
   location ^~ <%= path %> {
     root                        <%= model.www_root %>/current/public/;
     try_files                   $uri =404;
+    # Not the redirect's 90 days above: a file served here is current content.
+    expires                     off;
+    add_header                  Cache-Control "no-cache";
 <%- if model.basic_auth? -%>
     auth_basic                  $cloudmodel_basic_auth;
     auth_basic_user_file        <%= CloudModel::Services::Nginx::BASIC_AUTH_USER_FILE %>;

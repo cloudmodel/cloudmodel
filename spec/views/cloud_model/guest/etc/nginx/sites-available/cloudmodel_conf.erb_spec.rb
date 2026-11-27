@@ -60,7 +60,18 @@ RSpec.describe 'cloud_model/guest/etc/nginx/sites-available/cloudmodel_conf', ty
       http_server = rendered[/server \{\n\s*listen\s+80;.*?\n\}/m]
 
       expect(http_server).to include 'rewrite'
-      expect(http_server).to match(%r{location \^~ /schema/ \{\n\s*root\s+/var/www/rails/current/public/;\n\s*try_files\s+\$uri =404;\n\s*\}})
+      expect(http_server).to match(%r{location \^~ /schema/ \{\n\s*root\s+/var/www/rails/current/public/;\n\s*try_files\s+\$uri =404;})
+    end
+
+    it 'does not let the exception inherit the redirect server\'s 90-day caching' do
+      render_conf
+      http_server = rendered[/server \{\n\s*listen\s+80;.*?\n\}/m]
+      location = http_server[%r!location \^~ /schema/ \{[^}]*\}!m]
+
+      expect(http_server).to include 'expires                       90d;'
+      expect(location).to include 'expires                     off;'
+      expect(location).to include 'add_header                  Cache-Control "no-cache";'
+      expect(location).not_to include 'Strict-Transport-Security'
     end
 
     it 'keeps the basic auth on the exception' do

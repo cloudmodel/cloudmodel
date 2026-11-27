@@ -15,14 +15,15 @@ class CloudModel::Services::Nginx::BasicAuthUser
   include Mongoid::Timestamps
 
   # @!attribute [rw] name
-  #   @return [String] login name (no colon, no whitespace — htpasswd format)
+  #   @return [String] login name (no colon, no whitespace, no leading `#` —
+  #     htpasswd format, where a `#` line is a comment)
   field :name, type: String
 
   # @!attribute [rw] password_hash
   #   @return [String] `{SSHA}` hash of the password as nginx reads it
   field :password_hash, type: String
 
-  validates :name, presence: true, uniqueness: true, format: { with: /\A[^:\s]+\z/ }
+  validates :name, presence: true, uniqueness: true, format: { with: /\A[^:\s#][^:\s]*\z/ }
   validates :password, presence: true, if: -> { password_hash.blank? }
 
   embedded_in :service, class_name: "::CloudModel::Services::Nginx"
@@ -51,6 +52,7 @@ class CloudModel::Services::Nginx::BasicAuthUser
   def password_matches? password
     return false unless password_hash.to_s.start_with? '{SSHA}'
     raw = Base64.strict_decode64(password_hash.delete_prefix('{SSHA}'))
+    return false unless raw.bytesize > 20 # SHA-1 digest plus at least one salt byte
     salt = raw[20..]
     ActiveSupport::SecurityUtils.secure_compare(self.class.hash_password(password, salt), password_hash)
   rescue ArgumentError
