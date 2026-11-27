@@ -402,6 +402,16 @@ module CloudModel
           clean
         end
 
+        BASIC_AUTH_USER_FILE_TEMPLATE = '/cloud_model/guest/etc/nginx/htpasswd'.freeze
+
+        # The htpasswd file of the basic auth (Nginx#basic_auth?): readable by
+        # the www workers that check it, not by anyone else.
+        def write_basic_auth_user_file
+          return unless @model.basic_auth?
+          upload_to_guest @model.basic_auth_htpasswd, CloudModel::Services::Nginx::BASIC_AUTH_USER_FILE, '0640'
+          chroot! @guest.deploy_path, "chgrp www #{CloudModel::Services::Nginx::BASIC_AUTH_USER_FILE.shellescape}", "Failed to hand the basic auth users to www"
+        end
+
         def write_config
           comment_sub_step "Config nginx"
 
@@ -413,6 +423,7 @@ module CloudModel
           chroot @guest.deploy_path, "ln -s /etc/nginx/sites-available/cloudmodel.conf etc/nginx/sites-enabled/cloudmodel.conf"
 
           ensure_www_user!
+          write_basic_auth_user_file
 
           comment_sub_step "Make nginx root"
           mkdir_p "#{@guest.deploy_path}#{@model.www_root}"
@@ -568,8 +579,11 @@ module CloudModel
         # app's environment file /etc/default/rails is included: it carries the
         # same passenger_env and passenger_env_vars as passenger.conf, and the
         # job workers read it on their next restart.
+        # @param manifest [Hash] the guest's recorded manifest (path => hash):
+        #   a file it lists stays managed even when the current options no
+        #   longer render it (today the htpasswd)
         # @return [Array<Hash>] {template:, path:, content:, hash:}
-        def config_sync_plan certbot_cert_available: nil
+        def config_sync_plan certbot_cert_available: nil, manifest: {}
           files = [
             {template: '/cloud_model/guest/etc/nginx/nginx.conf', path: '/etc/nginx/nginx.conf'},
             {template: '/cloud_model/guest/etc/nginx/sites-available/cloudmodel.conf', path: '/etc/nginx/sites-available/cloudmodel.conf'}
@@ -583,6 +597,13 @@ module CloudModel
             elsif @model.capistrano_supported?
               files << {template: '/cloud_model/guest/etc/nginx/server.d/cap-deployed.conf', path: '/etc/nginx/server.d/cap-deployed.conf'}
             end
+          end
+          # Once the guest carries a recorded htpasswd it stays in the plan
+          # while basic auth is off: the sync keeps the file and its manifest
+          # entry current instead of orphaning it, so switching basic auth on
+          # again is a plain live sync and not a blocked "unrecorded" file.
+          if @model.basic_auth? || manifest.key?(CloudModel::Services::Nginx::BASIC_AUTH_USER_FILE)
+            files << {template: BASIC_AUTH_USER_FILE_TEMPLATE, path: CloudModel::Services::Nginx::BASIC_AUTH_USER_FILE, mode: '0640', group: 'www'}
           end
 
           certbot_cert = certbot_cert_available.nil? ? certbot_cert_available? : certbot_cert_available
@@ -627,7 +648,7 @@ module CloudModel
         #   output: String}
         def sync_config force: false, dry_run: false, only: nil
           manifest = read_config_manifest
-          full_plan = config_sync_plan
+          full_plan = config_sync_plan(manifest: manifest)
           skipped = only ? full_plan.reject { |f| only.include?(f[:path]) or only.include?(File.basename f[:path]) } : []
           # Skipped files stay in the manifest as they were recorded.
           kept = skipped.select { |f| manifest[f[:path]] }.map { |f| f.merge(hash: manifest[f[:path]]) }
@@ -673,7 +694,8 @@ module CloudModel
           to_write.each do |file|
             bak = backup_path(file[:path]).shellescape
             guest_sh "if [ -f #{file[:path].shellescape} ]; then mkdir -p $(dirname #{bak}) && cp -a #{file[:path].shellescape} #{bak}; fi"
-            upload_to_guest file[:content], file[:path]
+            upload_to_guest file[:content], file[:path], file[:mode] || '0600'
+            guest_sh "chgrp #{file[:group].shellescape} #{file[:path].shellescape}" if file[:group]
           end
 
           success, output = guest_sh 'nginx -t 2>&1'

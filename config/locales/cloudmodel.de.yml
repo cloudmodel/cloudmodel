@@ -248,6 +248,9 @@ de:
       cloud_model/services/nginx:
         one: Nginx-Dienst
         other: Nginx-Dienste
+      cloud_model/services/nginx/basic_auth_user:
+        one: Zugang
+        other: Zugänge
       cloud_model/services/redis:
         one: Redis-Dienst
         other: Redis-Dienste
@@ -618,6 +621,10 @@ de:
         redis_sentinel_port: Replikationsport
         redis_sentinel_master?: Primärknoten
         redis_sentinel_set_version: Replikationsversion
+      cloud_model/services/nginx/basic_auth_user:
+        name: Login-Name
+        password: Passwort
+        password_hash: Passwort-Hash
       cloud_model/services/nginx:
         port: HTTP Port
         limits: Grenzen
@@ -630,6 +637,15 @@ de:
         ssl_cert: SSL Zertifikat
         ssl_certbot: Let's Encrypt Zertifikat nutzen
         http2: HTTP/2
+        ssl_enforce_exceptions: Pfade, die auch per http ausgeliefert werden
+        ssl_enforce_exceptions_string: Pfade, die auch per http ausgeliefert werden
+        additional_mime_types: Zusätzliche MIME-Typen
+        additional_mime_types_string: Zusätzliche MIME-Typen
+        basic_auth: HTTP-Basic-Auth
+        basic_auth_supported: Mit HTTP-Basic-Auth schützen
+        basic_auth_realm: Realm (steht im Login-Dialog)
+        basic_auth_private_network_bypass: Privates Netz ohne Login durchlassen
+        basic_auth_users: Zugänge
 
         secure_headers: Sichere Header
         unsafe_inline_script_allowed: Unsichere Inline-Skripte erlauben
@@ -652,6 +668,9 @@ de:
         capistrano_supported: Capistrano unterstützen
         capistrano_ssh_groups: Capistrano SSH Gruppen
         capistrano_ssh_group_ids: Capistrano SSH Gruppen
+        static_spa_fallback: Unbekannte Pfade mit /index.html beantworten (Single-Page-App)
+        static_error_page_prefixes: Bereiche mit eigener 404-Seite
+        static_error_page_prefixes_string: Bereiche mit eigener 404-Seite
 
         deploy_web_image: Web Image installieren
 

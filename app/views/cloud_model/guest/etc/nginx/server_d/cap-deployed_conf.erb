@@ -1,5 +1,21 @@
+<%- not_found = model.static_spa_fallback? ? '/index.html' : '=404' -%>
 location / {
   root /var/www/rails/current/public;
-  try_files $uri $uri/ /index.html;
-  index index.html index.htm;
+  try_files $uri $uri/ <%= not_found %>;
+  # index.xml: directory index of the feeds static site generators write (e.g. /feed/index.xml)
+  index index.html index.htm index.xml;
+<%- unless model.static_spa_fallback? -%>
+  error_page 404 /404.html;
+<%- end -%>
 }
+<%- unless model.static_spa_fallback? -%>
+<%- model.static_error_page_prefixes.each do |prefix| -%>
+
+location /<%= prefix %>/ {
+  root /var/www/rails/current/public;
+  try_files $uri $uri/ =404;
+  index index.html index.htm index.xml;
+  error_page 404 /<%= prefix %>/404.html;
+}
+<%- end -%>
+<%- end -%>

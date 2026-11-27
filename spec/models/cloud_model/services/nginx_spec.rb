@@ -29,6 +29,156 @@ describe CloudModel::Services::Nginx do
   it { expect(subject).to have_field(:passenger_min_instances).of_type(Integer).with_default_value_of(3) }
   it { expect(subject).to validate_numericality_of(:passenger_min_instances).greater_than(0) }
 
+  it { expect(subject).to have_field(:basic_auth_supported).of_type(Mongoid::Boolean).with_default_value_of(false) }
+  it { expect(subject).to have_field(:basic_auth_realm).of_type(String).with_default_value_of('Restricted') }
+  it { expect(subject).to have_field(:basic_auth_private_network_bypass).of_type(Mongoid::Boolean).with_default_value_of(true) }
+  it { expect(subject).to embed_many(:basic_auth_users).of_type(CloudModel::Services::Nginx::BasicAuthUser).as_inverse_of(:service) }
+
+  it { expect(subject).to have_field(:static_spa_fallback).of_type(Mongoid::Boolean).with_default_value_of(true) }
+  it { expect(subject).to have_field(:static_error_page_prefixes).of_type(Array).with_default_value_of([]) }
+
+  it { expect(subject).to have_field(:ssl_enforce_exceptions).of_type(Array).with_default_value_of([]) }
+  it { expect(subject).to have_field(:additional_mime_types).of_type(Hash).with_default_value_of({}) }
+
+  describe 'ssl_enforce exceptions' do
+    it 'takes them as text and stores them as /path/ prefixes' do
+      subject.ssl_enforce_exceptions_string = 'schema, /feeds  /a/b'
+      subject.valid?
+
+      expect(subject.ssl_enforce_exceptions).to eq %w(/schema/ /feeds/ /a/b/)
+      expect(subject.ssl_enforce_exceptions_string).to eq '/schema/, /feeds/, /a/b/'
+    end
+
+    it 'rejects prefixes that are no plain paths' do
+      ['/../etc/', '/a b/', '/x;/', '/{x}/'].each do |path|
+        subject.ssl_enforce_exceptions = [path]
+        subject.valid?
+        expect(subject.errors[:ssl_enforce_exceptions]).to be_present, "expected #{path.inspect} to be rejected"
+      end
+    end
+  end
+
+  describe 'additional MIME types' do
+    it 'takes them as ext=type text' do
+      subject.additional_mime_types_string = '.XSD=application/xml, rss=application/rss+xml'
+
+      expect(subject.additional_mime_types).to eq('xsd' => 'application/xml', 'rss' => 'application/rss+xml')
+      expect(subject.additional_mime_types_string).to eq 'xsd=application/xml, rss=application/rss+xml'
+    end
+
+    it 'rejects what nginx could not read as a type' do
+      [{ 'xsd' => 'xml' }, { 'x;y' => 'application/xml' }, { 'xsd' => 'application/xml;' }].each do |types|
+        subject.additional_mime_types = types
+        subject.valid?
+        expect(subject.errors[:additional_mime_types]).to be_present, "expected #{types.inspect} to be rejected"
+      end
+    end
+
+    it 'goes live without a redeploy, as do the exceptions' do
+      expect(CloudModel::Services::Nginx::LIVE_SYNCABLE_ATTRIBUTES).to include 'additional_mime_types', 'ssl_enforce_exceptions'
+    end
+  end
+
+  describe 'static error page prefixes' do
+    it 'takes them as text and stores bare paths' do
+      subject.static_error_page_prefixes_string = '/de/, fr  en/'
+      subject.valid?
+
+      expect(subject.static_error_page_prefixes).to eq %w(de fr en)
+      expect(subject.static_error_page_prefixes_string).to eq 'de, fr, en'
+    end
+
+    it 'rejects prefixes that are no plain paths' do
+      subject.static_error_page_prefixes = ['de;', '../x', 'a b']
+      subject.valid?
+
+      expect(subject.errors[:static_error_page_prefixes]).to be_present
+    end
+
+    it 'goes live without a redeploy' do
+      expect(CloudModel::Services::Nginx::LIVE_SYNCABLE_ATTRIBUTES).to include 'static_spa_fallback', 'static_error_page_prefixes'
+    end
+  end
+
+  describe 'basic auth' do
+    def add_user name, password
+      subject.basic_auth_users.build name: name, password: password
+    end
+
+    it 'is off without the option, even with logins' do
+      add_user 'demo', 'opensesame'
+
+      expect(subject.basic_auth?).to eq false
+    end
+
+    it 'is on with the option and a login' do
+      subject.basic_auth_supported = true
+      add_user 'demo', 'opensesame'
+
+      expect(subject.basic_auth?).to eq true
+    end
+
+    it 'needs a login when switched on' do
+      subject.basic_auth_supported = true
+      subject.valid?
+
+      expect(subject.errors[:basic_auth_users]).to be_present
+    end
+
+    it 'does not count logins marked for removal' do
+      subject.basic_auth_supported = true
+      add_user('demo', 'opensesame').flagged_for_destroy = true
+
+      expect(subject.basic_auth?).to eq false
+      subject.valid?
+      expect(subject.errors[:basic_auth_users]).to be_present
+    end
+
+    it 'rejects realms that would break out of the quoted nginx string' do
+      subject.basic_auth_supported = true
+      add_user 'demo', 'opensesame'
+      ['a"b', 'a$host', "a\nb", 'a;b', 'a{b', ''].each do |realm|
+        subject.basic_auth_realm = realm
+        subject.valid?
+        expect(subject.errors[:basic_auth_realm]).to be_present, "expected #{realm.inspect} to be rejected"
+      end
+
+      subject.basic_auth_realm = 'Staging (preview)'
+      subject.valid?
+      expect(subject.errors[:basic_auth_realm]).to be_empty
+    end
+
+    it 'rejects the realm "off", which nginx would read as no auth' do
+      subject.basic_auth_supported = true
+      add_user 'demo', 'opensesame'
+      subject.basic_auth_realm = 'off'
+      subject.valid?
+      expect(subject.errors[:basic_auth_realm]).to be_present
+
+      subject.basic_auth_realm = 'Off limits'
+      subject.valid?
+      expect(subject.errors[:basic_auth_realm]).to be_empty
+    end
+
+    it 'renders one htpasswd line per login' do
+      subject.basic_auth_supported = true
+      a = add_user 'demo', 'opensesame'
+      b = add_user 'review', 'secret'
+
+      expect(subject.basic_auth_htpasswd).to eq "demo:#{a.password_hash}\nreview:#{b.password_hash}\n"
+    end
+
+    it 'goes live without a redeploy' do
+      expect(CloudModel::Services::Nginx::LIVE_SYNCABLE_ATTRIBUTES).to include 'basic_auth_supported', 'basic_auth_realm', 'basic_auth_private_network_bypass'
+    end
+
+    it 'takes logins through nested attributes, skipping empty rows' do
+      subject.basic_auth_users_attributes = { '0' => { name: 'demo', password: 'opensesame' }, '1' => { name: '', password: '' } }
+
+      expect(subject.basic_auth_users.map(&:name)).to eq ['demo']
+    end
+  end
+
   describe 'passenger_min_instances within the pool' do
     it 'rejects more minimum instances than the pool holds' do
       subject.passenger_max_pool_size = 4

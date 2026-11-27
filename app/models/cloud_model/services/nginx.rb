@@ -41,6 +41,19 @@ module CloudModel
       # nginx HTTP/2 vulnerability has no distribution fix yet, and come back
       # once it has — both without a redeploy, through the live config sync.
       field :http2, type: Mongoid::Boolean, default: true
+      # Path prefixes (e.g. "/schema/") the plain-http listener serves itself
+      # from the document root although ssl_enforce redirects everything else
+      # to https: for clients that fetch over http and do not follow a switch
+      # to https (XML validators loading schemas).
+      field :ssl_enforce_exceptions, type: Array, default: []
+      before_validation :normalize_ssl_enforce_exceptions
+      validate :ssl_enforce_exceptions_are_paths
+      # Content types nginx's mime.types lacks, extension => type (e.g.
+      # "xsd" => "application/xml"). Rendered as an additional `types` block
+      # at http level, which adds to mime.types (one inside `server` would
+      # replace them).
+      field :additional_mime_types, type: Hash, default: {}
+      validate :additional_mime_types_are_valid
       belongs_to :ssl_cert, class_name: CloudModel::Certificate, inverse_of: :services, optional: true
       # With Let's Encrypt the cert is certbot's business: no preselected
       # certificate — the deploy bootstraps a self-signed one so nginx comes
@@ -60,12 +73,35 @@ module CloudModel
       field :reverse_proxy_supported, type: Mongoid::Boolean, default: false
       field :reverse_proxy_for, type: String, default: nil
 
+      # HTTP basic auth in front of the whole site (both listeners), e.g. to
+      # keep a staging site out of public view. The logins are
+      # basic_auth_users, written to BASIC_AUTH_USER_FILE. With
+      # basic_auth_private_network_bypass, requests from the private network
+      # (CloudModel.config.tinc_network: CI runners, monitoring, other guests,
+      # VPN clients) pass without a login. The ACME challenge path always stays
+      # open, so certbot can renew.
+      field :basic_auth_supported, type: Mongoid::Boolean, default: false
+      field :basic_auth_realm, type: String, default: 'Restricted'
+      field :basic_auth_private_network_bypass, type: Mongoid::Boolean, default: true
+      embeds_many :basic_auth_users, class_name: CloudModel::Services::Nginx::BasicAuthUser, inverse_of: :service
+      accepts_nested_attributes_for :basic_auth_users, allow_destroy: true, reject_if: ->(attrs) { attrs['id'].blank? && attrs['name'].blank? && attrs['password'].blank? }
+      # The realm lands in a quoted nginx string that also expands variables.
+      validates :basic_auth_realm, presence: true, format: { with: /\A[^"\\$\r\n{};]+\z/ }, if: :basic_auth_supported?
+      # nginx reads the evaluated value `off` as "no auth": a realm of that
+      # name would switch the protection off while the form shows it on.
+      validates :basic_auth_realm, exclusion: { in: %w(off) }, if: :basic_auth_supported?
+      validate :basic_auth_users_present, if: :basic_auth_supported?
+
+      BASIC_AUTH_USER_FILE = '/etc/nginx/.htpasswd'.freeze
+
       # Attribute changes fully covered by the rendered config files —
       # NginxWorker#sync_config can push them to the running guest without a
       # redeploy. Everything else (ports/firewall, SSL certs, systemd units,
       # web image, dependencies, web locations, …) only takes effect on the
-      # next deploy. Changes to embedded location_overwrites are live-syncable
-      # too; embedded web_locations are not (their app confs render at deploy).
+      # next deploy. Changes to embedded location_overwrites and
+      # basic_auth_users are live-syncable too (the htpasswd file is part of
+      # the sync); embedded web_locations are not (their app confs render at
+      # deploy).
       # passenger_env and passenger_env_vars also render into /etc/default/rails,
       # which the sync writes as well; the nginx reload restarts the Passenger
       # app with the new environment, the job workers read the file on their
@@ -75,6 +111,9 @@ module CloudModel
         unsafe_inline_script_allowed unsafe_eval_script_allowed
         google_analytics_supported hubspot_forms_supported pingdom_supported
         reverse_proxy_for passenger_env passenger_env_vars passenger_max_pool_size passenger_min_instances rails_cable_supported
+        basic_auth_supported basic_auth_realm basic_auth_private_network_bypass
+        static_spa_fallback static_error_page_prefixes
+        ssl_enforce_exceptions additional_mime_types
       ).freeze
 
       # Passenger support
@@ -108,6 +147,15 @@ module CloudModel
       # Deploy via capistrano
       field :capistrano_supported, type: Mongoid::Boolean, default: false
       has_and_belongs_to_many :capistrano_ssh_groups, class_name: CloudModel::SshGroup, inverse_of: :services
+      # Unknown paths of a static (Capistrano, no Passenger) site: with the
+      # fallback (default, single-page apps) they get /index.html with 200;
+      # without it a real 404 with the site's own /404.html. A path prefix in
+      # static_error_page_prefixes (e.g. "de" for a German section) gets its
+      # own <prefix>/404.html.
+      field :static_spa_fallback, type: Mongoid::Boolean, default: true
+      field :static_error_page_prefixes, type: Array, default: []
+      before_validation :normalize_static_error_page_prefixes
+      validate :static_error_page_prefixes_are_paths
 
       # WebLocation support
       embeds_many :web_locations, class_name: CloudModel::WebLocation, inverse_of: :service
@@ -503,6 +551,87 @@ module CloudModel
 
       def clear_ssl_cert_for_certbot
         self.ssl_cert_id = nil if ssl_certbot?
+      end
+
+      # The logins that stay after this save (rows marked for removal in a
+      # nested form are still in the relation until then).
+      # @return [Array<BasicAuthUser>]
+      def active_basic_auth_users
+        basic_auth_users.reject(&:marked_for_destruction?)
+      end
+
+      # Whether the rendered config puts basic auth in front of the site.
+      # @return [Boolean]
+      def basic_auth?
+        !!basic_auth_supported? && active_basic_auth_users.any?
+      end
+
+      # @return [String] htpasswd file content, one `name:{SSHA}…` line per login
+      def basic_auth_htpasswd
+        active_basic_auth_users.map(&:htpasswd_line).join("\n") + "\n"
+      end
+
+      # Accepts "/schema/, /feeds" and stores ["/schema/", "/feeds/"].
+      # @param value [String]
+      def ssl_enforce_exceptions_string= value
+        self.ssl_enforce_exceptions = value.to_s.split(/[\s,]+/)
+      end
+
+      # @return [String] the prefixes as the form shows them
+      def ssl_enforce_exceptions_string
+        Array(ssl_enforce_exceptions).join(', ')
+      end
+
+      def normalize_ssl_enforce_exceptions
+        self.ssl_enforce_exceptions = Array(ssl_enforce_exceptions).map { |p| p.to_s.strip }.reject(&:blank?).map { |p| "/#{p.delete_prefix('/').delete_suffix('/')}/" }.uniq
+      end
+
+      def ssl_enforce_exceptions_are_paths
+        bad = Array(ssl_enforce_exceptions).reject { |p| p.match?(%r{\A/([A-Za-z0-9._-]+/)+\z}) && !p.include?('/../') && !p.include?('/./') }
+        errors.add :ssl_enforce_exceptions, :invalid if bad.any?
+      end
+
+      # Accepts "xsd=application/xml, rss=application/rss+xml".
+      # @param value [String]
+      def additional_mime_types_string= value
+        self.additional_mime_types = value.to_s.split(/[\s,]+/).reject(&:blank?).to_h do |pair|
+          ext, type = pair.split('=', 2)
+          [ext.to_s.strip.delete_prefix('.').downcase, type.to_s.strip]
+        end
+      end
+
+      # @return [String] the types as the form shows them
+      def additional_mime_types_string
+        (additional_mime_types || {}).map { |ext, type| "#{ext}=#{type}" }.join(', ')
+      end
+
+      def additional_mime_types_are_valid
+        bad = (additional_mime_types || {}).reject { |ext, type| ext.to_s.match?(/\A[a-z0-9]+\z/) && type.to_s.match?(%r{\A[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+\z}) }
+        errors.add :additional_mime_types, :invalid if bad.any?
+      end
+
+      # Accepts "de", "/de/" or "de, fr" and stores ["de", "fr"].
+      # @param value [String, Array<String>]
+      def static_error_page_prefixes_string= value
+        self.static_error_page_prefixes = value.to_s.split(/[\s,]+/)
+      end
+
+      # @return [String] the prefixes as the form shows them
+      def static_error_page_prefixes_string
+        Array(static_error_page_prefixes).join(', ')
+      end
+
+      def normalize_static_error_page_prefixes
+        self.static_error_page_prefixes = Array(static_error_page_prefixes).map { |p| p.to_s.strip.delete_prefix('/').delete_suffix('/') }.reject(&:blank?).uniq
+      end
+
+      def static_error_page_prefixes_are_paths
+        bad = Array(static_error_page_prefixes).reject { |p| p.match?(%r{\A[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\z}) }
+        errors.add :static_error_page_prefixes, :invalid if bad.any?
+      end
+
+      def basic_auth_users_present
+        errors.add :basic_auth_users, :blank if active_basic_auth_users.empty?
       end
 
       def redeploy!(options = {})
