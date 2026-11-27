@@ -1,0 +1,39 @@
+#!/bin/bash
+# Rendered by cloudmodel, do not edit on the guest. Run by
+# fleet_provision.service after Fleet is up. First boot: administrator and an
+# API-only provisioning user, whose token is kept on the data volume. Every
+# boot: enroll secret and settings (fleetctl apply).
+set -euo pipefail
+
+export HOME=/root
+state=<%== "#{CloudModel::Services::Fleet::DATA_DIR}/provision".shellescape %>
+cfg="$state/fleetctl.yml"
+fleetctl() { /usr/bin/fleetctl "$@" --config "$cfg"; }
+
+for i in $(seq 1 120); do
+  if curl -fsS -o /dev/null http://127.0.0.1:<%== model.port %>/healthz; then break; fi
+  if [ "$i" = 120 ]; then echo "fleet did not become healthy, giving up" >&2; exit 1; fi
+  sleep 5
+done
+
+install -d -m 700 -o root -g root "$state"
+
+if [ ! -s "$cfg" ]; then
+  fleetctl config set --address http://127.0.0.1:<%== model.port %> >/dev/null
+  if ! out=$(fleetctl setup --email <%== model.admin_email.to_s.shellescape %> --name Administrator \
+      --password <%== model.admin_password.to_s.shellescape %> --org-name <%== model.effective_org_name.shellescape %> 2>&1); then
+    rm -f "$cfg"
+    echo "$out" >&2
+    echo "fleet is set up but $cfg is missing: create an API-only admin user and store its token with 'fleetctl config set --config $cfg --address http://127.0.0.1:<%== model.port %> --token <token>'" >&2
+    exit 1
+  fi
+  echo "first start: administrator <%== model.admin_email %> created"
+  token=$(fleetctl user create --api-only --global-role admin --name cloudmodel --email <%== model.api_email.shellescape %> \
+    --password "$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')-1aA" | sed -n 's/^The API token for your new user is: //p')
+  if [ -z "$token" ]; then echo "could not create the API-only provisioning user" >&2; rm -f "$cfg"; exit 1; fi
+  fleetctl config set --token "$token" >/dev/null
+  chmod 600 "$cfg"
+fi
+
+fleetctl apply -f /etc/fleet/provision.yml
+echo "fleet provisioning done"

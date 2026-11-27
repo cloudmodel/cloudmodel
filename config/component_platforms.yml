@@ -1,0 +1,124 @@
+# Release lines per guest OS and arch, from the vendors' apt indexes.
+# Checked by `rake cloudmodel:components:platforms` (WRITE=1 rewrites it)
+# on 2026-11-27.
+mongodb:
+  '4.4':
+    ubuntu-18.04:
+    - amd64
+    - arm64
+  '5.0':
+    ubuntu-18.04:
+    - amd64
+    - arm64
+  '6.0':
+    ubuntu-18.04:
+    - amd64
+    - arm64
+    ubuntu-22.04:
+    - amd64
+    - arm64
+  '7.0':
+    debian-12:
+    - amd64
+    ubuntu-18.04:
+    - amd64
+    - arm64
+    ubuntu-22.04:
+    - amd64
+    - arm64
+  '8.0':
+    debian-12:
+    - amd64
+    ubuntu-22.04:
+    - amd64
+    - arm64
+    ubuntu-24.04:
+    - amd64
+    - arm64
+  '9.0':
+    debian-12:
+    - amd64
+    debian-13:
+    - amd64
+    ubuntu-22.04:
+    - amd64
+    - arm64
+    ubuntu-24.04:
+    - amd64
+    - arm64
+percona_server_mongodb:
+  '6.0':
+    ubuntu-18.04:
+    - amd64
+    ubuntu-22.04:
+    - amd64
+    - arm64
+    ubuntu-24.04:
+    - amd64
+    - arm64
+  '7.0':
+    debian-12:
+    - amd64
+    ubuntu-22.04:
+    - amd64
+    - arm64
+    ubuntu-24.04:
+    - amd64
+    - arm64
+  '8.0':
+    debian-12:
+    - amd64
+    debian-13:
+    - amd64
+    - arm64
+    ubuntu-22.04:
+    - amd64
+    - arm64
+    ubuntu-24.04:
+    - amd64
+    - arm64
+percona_server:
+  '8.0':
+    debian-12:
+    - amd64
+    - arm64
+    ubuntu-18.04:
+    - amd64
+    ubuntu-22.04:
+    - amd64
+    - arm64
+    ubuntu-24.04:
+    - amd64
+    - arm64
+  '8.4':
+    debian-12:
+    - amd64
+    - arm64
+    debian-13:
+    - amd64
+    - arm64
+    ubuntu-22.04:
+    - amd64
+    - arm64
+    ubuntu-24.04:
+    - amd64
+    - arm64
+mysql:
+  '8.0':
+    debian-12:
+    - amd64
+    ubuntu-18.04:
+    - amd64
+    ubuntu-22.04:
+    - amd64
+    ubuntu-24.04:
+    - amd64
+  '8.4':
+    debian-12:
+    - amd64
+    debian-13:
+    - amd64
+    ubuntu-22.04:
+    - amd64
+    ubuntu-24.04:
+    - amd64

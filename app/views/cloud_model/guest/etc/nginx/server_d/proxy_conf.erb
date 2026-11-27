@@ -6,5 +6,10 @@ proxy_set_header X-Real-IP $remote_addr;
 
 location <%= location %> {
   proxy_redirect off;
+  # HTTP/1.1 upstream with the client's Upgrade/Connection headers passed on,
+  # so websockets reach the backend (plain requests are unaffected).
+  proxy_http_version 1.1;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection $http_connection;
   proxy_pass <%= model.reverse_proxy_for %>;
 }

@@ -1,6 +1,12 @@
 module CloudModel
+  # The release lines a set steps through, one featureCompatibilityVersion
+  # at a time (#update_feature_compatibility_version!). Major releases only:
+  # MongoDB stops patching a minor release (8.2, 8.3) once the next one is
+  # out, and before 9.0 a set on a minor cannot leave it but through every
+  # later minor; 8.0 upgrades to 9.0 directly. From 9.0 on, self-managed
+  # deployments get majors and the yearly x.5 Feature Update release only.
   def self.mongodb_version_path
-    ["3.2", "3.4", "3.6", "4.0", "4.2", "4.4", "5.0", "6.0", "7.0", "8.0", "8.2"]
+    ["3.2", "3.4", "3.6", "4.0", "4.2", "4.4", "5.0", "6.0", "7.0", "8.0", "9.0"]
   end
 
   # Manages a MongoDB replica set across multiple {Services::Mongodb} instances.
@@ -338,7 +344,11 @@ module CloudModel
           sleep 60
         end
         puts "# Set Feature Compatibility Version to #{latest_compatible_version}"
-        puts db_command(setFeatureCompatibilityVersion: latest_compatible_version)
+        # From 7.0 on mongod refuses an FCV upgrade without the explicit
+        # confirmation that there is no downgrade afterwards.
+        fcv = { setFeatureCompatibilityVersion: latest_compatible_version }
+        fcv[:confirm] = true if Gem::Version.new(latest_compatible_version) >= Gem::Version.new('7.0')
+        puts db_command(fcv)
       else
         puts "There is no newer version available as the current compatibility version (#{features})"
         return false

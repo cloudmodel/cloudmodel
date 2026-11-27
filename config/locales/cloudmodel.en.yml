@@ -141,6 +141,11 @@ en:
         branch_not_pulled: not found or pullable
         bundle_failed: Bundling Gemfile failed
         building_assets_failed: Building Assets failed
+        fleet_needs_redis: needs a Redis service in the same guest
+        fleet_needs_server_arch: "Fleet publishes its server for %{arches} only, this host is %{arch}"
+        not_published: "%{component} %{version} is not published for %{os} on %{arch} (available here: %{alternatives})"
+        fleet_needs_mysql: needs a MySQL service in the same guest (Fleet does not run on MariaDB)
+        mysql_beside_mariadb: cannot run in a guest with a MariaDB service
 
     models:
       cloud_model/host:
@@ -266,6 +271,12 @@ en:
       cloud_model/services/forgejo:
         one: Forgejo Service
         other: Forgejo Services
+      cloud_model/services/mysql:
+        one: MySQL Service
+        other: MySQL Services
+      cloud_model/services/fleet:
+        one: Fleet Service
+        other: Fleet Services
       cloud_model/services/forgejo_runner:
         one: Forgejo Actions Runner
         other: Forgejo Actions Runners
@@ -583,6 +594,8 @@ en:
       cloud_model/services/mongodb:
         replication: Replication
         mongodb_version: MongoDB Version
+        mongodb_distribution: Server distribution
+        telemetry: Usage telemetry to Percona
         mongodb_replication_set: Replication Set
         mongodb_replication_set_id: Replication Set
         mongodb_replication_priority: Replication Priority
@@ -731,6 +744,11 @@ en:
       not_reachable: Service not reachable
     cloud_model/services/mariadb:
       not_reachable: Service not reachable
+    cloud_model/services/mysql:
+      not_reachable: Service not reachable
+    cloud_model/services/fleet:
+      not_reachable: Service not reachable
+      not_healthy: Fleet health check failed (database or Redis)
     cloud_model/services/mongodb:
       not_reachable: Service not reachable
     cloud_model/services/nginx:

@@ -1,0 +1,11 @@
+# Rendered by cloudmodel, do not edit on the guest.
+[mysqld]
+port = <%= model.port %>
+bind-address = 127.0.0.1
+mysqlx-bind-address = 127.0.0.1
+# root logs in through the socket only (a freshly initialised data directory
+# does not have the plugin registered).
+plugin-load-add = auth_socket.so
+<%- if model.percona? -%>
+percona_telemetry_disable = <%= model.telemetry ? 0 : 1 %>
+<%- end -%>

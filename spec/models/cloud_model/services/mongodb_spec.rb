@@ -3,10 +3,31 @@
 require 'spec_helper'
 
 describe CloudModel::Services::Mongodb do
+  describe 'distribution' do
+    it { expect(subject).to have_field(:mongodb_distribution).of_type(String).with_default_value_of 'mongodb' }
+    it { expect(subject).to have_field(:telemetry).of_type(Mongoid::Boolean).with_default_value_of false }
+    it { expect(subject).to validate_inclusion_of(:mongodb_distribution).to_allow('mongodb', 'percona') }
+
+    it 'installs MongoDB´s packages, run as mongodb, by default' do
+      subject.mongodb_version = '8.0'
+      expect(subject.components_needed).to eq [:"mongodb@8.0"]
+      expect(subject.mongodb_user).to eq 'mongodb'
+      expect(subject.server_package).to eq 'mongodb-org-server'
+    end
+
+    it 'installs Percona Server for MongoDB of the same line, run as mongod' do
+      subject.mongodb_version = '8.0'
+      subject.mongodb_distribution = 'percona'
+      expect(subject.components_needed).to eq [:"percona_server_mongodb@8.0"]
+      expect(subject.mongodb_user).to eq 'mongod'
+      expect(subject.server_package).to eq 'percona-server-mongodb-server'
+    end
+  end
+
   it { expect(subject).to be_a CloudModel::Services::Base }
 
   it { expect(subject).to have_field(:port).of_type(Integer).with_default_value_of 27017 }
-  it { expect(subject).to have_field(:mongodb_version).of_type(String).with_default_value_of "5.0" }
+  it { expect(subject).to have_field(:mongodb_version).of_type(String).with_default_value_of "8.0" }
   it { expect(subject).to have_field(:mongodb_replication_priority).of_type(Integer).with_default_value_of 50 }
   it { expect(subject).to have_field(:mongodb_replication_arbiter_only).of_type(Mongoid::Boolean).with_default_value_of false }
 
@@ -52,7 +73,7 @@ describe CloudModel::Services::Mongodb do
 
   describe 'components_needed' do
     it 'should require mongodb with default version' do
-      expect(subject.components_needed).to eq [:'mongodb@5.0']
+      expect(subject.components_needed).to eq [:'mongodb@8.0']
     end
 
     it 'should require mongodb with custom version' do

@@ -10,10 +10,17 @@ net:
     bindIp: 0.0.0.0
     ssl:
         mode: disabled
-<%- if model.mongodb_replication_set -%>
+<%- if model.mongodb_replication_set or model.percona? -%>
 
 setParameter:
+<%- if model.mongodb_replication_set -%>
    disableSplitHorizonIPCheck: true
+<%- end -%>
+<%- if model.percona? -%>
+   perconaTelemetry: <%= model.telemetry ? 'true' : 'false' %>
+<%- end -%>
+<%- end -%>
+<%- if model.mongodb_replication_set -%>
 
 replication:
    replSetName: <%= model.mongodb_replication_set.name %>

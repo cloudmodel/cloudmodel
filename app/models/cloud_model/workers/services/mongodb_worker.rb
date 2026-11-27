@@ -6,6 +6,8 @@ module CloudModel
       # Renders `mongod.conf` and writes a fix-permissions systemd drop-in so
       # the MongoDB data directory is owned correctly on startup.
       class MongodbWorker < CloudModel::Workers::Services::BaseWorker
+        include PerconaTelemetry
+
         def service_name
           "mongod"
         end
@@ -17,6 +19,7 @@ module CloudModel
           @host.sftp.file.open("#{@guest.deploy_path.shellescape}/etc/mongod.conf", 'w') do |f|
             f.write render("/cloud_model/guest/etc/mongodb_conf", guest: @guest, model: @model)
           end
+          write_percona_telemetry_agent @model.telemetry if @model.percona?
         end
 
         def auto_restart
@@ -48,7 +51,7 @@ module CloudModel
 
         def auto_start
           mkdir_p overlay_path
-          render_to_remote "/cloud_model/guest/etc/systemd/system/mongodb_service_d/fix_perms_conf", "#{overlay_path}/fix_perms.conf"
+          render_to_remote "/cloud_model/guest/etc/systemd/system/mongodb_service_d/fix_perms_conf", "#{overlay_path}/fix_perms.conf", model: @model
           super
         end
       end

@@ -1,0 +1,20 @@
+# Rendered by cloudmodel, do not edit on the guest.
+mysql:
+  address: <%== "127.0.0.1:#{model.database_port}".to_json %>
+  database: <%== CloudModel::Services::Fleet::DATABASE_NAME.to_json %>
+  username: <%== CloudModel::Services::Fleet::DATABASE_USER.to_json %>
+  password: <%== model.database_password.to_s.to_json %>
+redis:
+  address: "127.0.0.1:6379"
+server:
+  address: <%== "0.0.0.0:#{model.port}".to_json %>
+  tls: false
+  private_key: <%== model.server_private_key.to_s.to_json %>
+logging:
+  json: true
+filesystem:
+  status_log_file: /var/log/fleet/osquery_status
+  result_log_file: /var/log/fleet/osquery_result
+  enable_log_rotation: true
+vulnerabilities:
+  databases_path: <%== "#{CloudModel::Services::Fleet::DATA_DIR}/vulndb".to_json %>

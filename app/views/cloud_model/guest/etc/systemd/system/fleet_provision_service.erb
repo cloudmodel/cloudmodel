@@ -1,0 +1,13 @@
+[Unit]
+Description=Fleet provisioning (administrator, enroll secret, settings)
+After=fleet.service network-online.target
+Requires=fleet.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=15min
+ExecStart=/etc/fleet/provision.sh
+
+[Install]
+WantedBy=multi-user.target

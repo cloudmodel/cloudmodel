@@ -10,7 +10,7 @@ describe CloudModel::MongodbReplicationSet do
 
   describe 'CloudModel.mongodb_version_path' do
     it 'should return known versions of mongodb' do
-      expect(CloudModel.mongodb_version_path).to eq ["3.2", "3.4", "3.6", "4.0", "4.2", "4.4", "5.0", "6.0", "7.0", "8.0", "8.2"]
+      expect(CloudModel.mongodb_version_path).to eq ["3.2", "3.4", "3.6", "4.0", "4.2", "4.4", "5.0", "6.0", "7.0", "8.0", "9.0"]
     end
   end
 
@@ -507,6 +507,23 @@ describe CloudModel::MongodbReplicationSet do
       expect(guest).to have_received(:redeploy!).with(force: true, debug: nil)
       expect(subject).to have_received(:db_command).with(setFeatureCompatibilityVersion: '6.0')
       expect(result).to eq true
+    end
+
+    it 'should step 8.0 straight to 9.0 (no minor release in between) and confirm the FCV' do
+      guest = double 'guest', name: 'g1'
+      allow(guest).to receive(:host).and_return(double('host', name: 'h1'))
+      service = double 'service', name: 'mongo', guest: guest, service_status: {'version' => '8.0.38'}, mongodb_version: '9.0'
+      allow(service).to receive(:update_attribute)
+      allow(guest).to receive(:redeploy!)
+      allow(subject).to receive(:services).and_return([service])
+      allow(subject).to receive(:feature_compatibility_version).and_return('8.0')
+      allow(subject).to receive(:sleep)
+      allow(subject).to receive(:db_command).and_return([{'ok' => 1}])
+
+      expect { subject.update_feature_compatibility_version!('9.0') }.to output(/Set Feature Compatibility Version to 9.0/).to_stdout
+
+      expect(service).to have_received(:update_attribute).with(:mongodb_version, '9.0')
+      expect(subject).to have_received(:db_command).with(setFeatureCompatibilityVersion: '9.0', confirm: true)
     end
 
     it 'should not redeploy when service version already matches target step' do

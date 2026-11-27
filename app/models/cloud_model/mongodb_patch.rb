@@ -30,7 +30,8 @@ module CloudModel
   # `backup_max_age` (36 h) — the previous night's backup is the "backup
   # before the change" (the patch itself changes no data; patch releases of
   # a line are binary compatible, and the rollback is a package downgrade
-  # within the line, `apt-get install mongodb-org-server=<old>` plus restart,
+  # within the line, `apt-get install mongodb-org-server=<old>` (or
+  # `percona-server-mongodb-server=<old>`) plus restart,
   # not a restore) — and the unattended run starts no new set after
   # `deadline`, so a long patch night does not push the backups and their
   # I/O into the day; what is left waits for the next night.
@@ -47,18 +48,47 @@ module CloudModel
   class MongodbPatch
     attr_reader :output, :lag_limit, :member_timeout, :deadline, :backup_max_age, :require_backup
 
-    # Refreshes the package list of the MongoDB repository alone (the nightly
-    # apt-daily run refreshes the rest), then reports what is installed, what
-    # apt would install and which packages of the family are there.
-    INVENTORY_SCRIPT = <<~SH
-      list=$(ls /etc/apt/sources.list.d/mongodb-org-*.list 2>/dev/null | head -1)
-      if [ -n "$list" ]; then
-        apt-get update -qq -o Dir::Etc::sourcelist="$list" -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0 >/dev/null 2>&1 || echo "update_failed=1"
-      fi
-      echo "installed=$(dpkg-query -W -f='${Version}' mongodb-org-server 2>/dev/null)"
-      echo "candidate=$(apt-cache policy mongodb-org-server 2>/dev/null | awk '/Candidate:/ { print $2 }')"
-      echo "packages=$(dpkg-query -W -f='${Package} ' 'mongodb-org*' 2>/dev/null)"
-    SH
+    # Package family per server distribution (see
+    # Services::Mongodb#mongodb_distribution): the server package, the glob of
+    # the family and the apt source of the minor line.
+    DISTRIBUTIONS = {
+      'mongodb' => { server: 'mongodb-org-server', family: 'mongodb-org*', list: '/etc/apt/sources.list.d/mongodb-org-*.list' },
+      'percona' => { server: 'percona-server-mongodb-server', family: 'percona-server-mongodb*', list: '/etc/apt/sources.list.d/percona-psmdb-*.list' }
+    }.freeze
+
+    # Refreshes the package list of the server's repository alone (the
+    # nightly apt-daily run refreshes the rest), then reports what is
+    # installed, what apt would install and which packages of the family are
+    # there.
+    # @param service [CloudModel::Services::Mongodb]
+    # @return [String] shell script
+    def self.inventory_script service
+      dist = distribution(service)
+      <<~SH
+        list=$(ls #{dist[:list]} 2>/dev/null | head -1)
+        if [ -n "$list" ]; then
+          apt-get update -qq -o Dir::Etc::sourcelist="$list" -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0 >/dev/null 2>&1 || echo "update_failed=1"
+        fi
+        echo "installed=$(dpkg-query -W -f='${Version}' #{dist[:server]} 2>/dev/null)"
+        echo "candidate=$(apt-cache policy #{dist[:server]} 2>/dev/null | awk '/Candidate:/ { print $2 }')"
+        echo "packages=$(dpkg-query -W -f='${Package} ' '#{dist[:family]}' 2>/dev/null)"
+      SH
+    end
+
+    # @return [Hash] the package family of the service's distribution
+    def self.distribution service
+      DISTRIBUTIONS.fetch(service.percona? ? 'percona' : 'mongodb')
+    end
+
+    # The release a package version stands for, comparable with what mongod
+    # reports: Percona's packages carry the distribution codename
+    # (`8.0.38-16.bookworm` for a server reporting `8.0.38-16`), MongoDB's
+    # do not (`8.0.38`).
+    # @param version [String, nil]
+    # @return [String, nil]
+    def self.release version
+      version&.sub(/\.[a-z]+\z/, '')
+    end
 
     # The package's postinst restarts mongod; confold keeps the rendered
     # mongod.conf, the lock timeout rides out a running apt-daily job.
@@ -69,7 +99,6 @@ module CloudModel
     # primary may take the primary role back by priority as soon as it has
     # caught up, the step-down freeze does not survive its restart.
     MEMBER_STATES = %w(PRIMARY SECONDARY ARBITER).freeze
-    INSTALLED = "dpkg-query -W -f='${Version}' mongodb-org-server".freeze
 
     # @param lag_limit [Integer] seconds of replication lag a set may have
     #   before and after each member
@@ -146,14 +175,14 @@ module CloudModel
 
     # @return [Hash] installed, candidate, packages and the running version
     def inventory service
-      success, out = service.guest.exec "sh -c #{INVENTORY_SCRIPT.shellescape}"
+      success, out = service.guest.exec "sh -c #{self.class.inventory_script(service).shellescape}"
       raise "inventory failed: #{out.to_s.lines.last.to_s.strip[0, 160]}" unless success
       inv = {}
       out.to_s.each_line do |line|
         key, value = line.chomp.split('=', 2)
         inv[key.to_sym] = value.to_s.strip if key
       end
-      raise 'no mongodb-org-server package installed' if inv[:installed].blank?
+      raise "no #{self.class.distribution(service)[:server]} package installed" if inv[:installed].blank?
       inv[:candidate] = nil if inv[:candidate].blank? || inv[:candidate] == '(none)'
       inv[:packages] = inv[:packages].to_s.split
       inv[:update_failed] = inv[:update_failed] == '1'
@@ -166,7 +195,7 @@ module CloudModel
     # happened).
     def behind? inv
       return false unless inv[:candidate]
-      newer?(inv[:candidate], inv[:installed]) || (inv[:running] && newer?(inv[:installed], inv[:running]))
+      newer?(inv[:candidate], inv[:installed]) || (inv[:running] && newer?(self.class.release(inv[:installed]), inv[:running]))
     end
 
     # @param services [Array<CloudModel::Services::Mongodb>]
@@ -417,7 +446,7 @@ module CloudModel
       step_down_member service if role[:set] && role[:primary]
       upgrade service, inv
       wait_until(member_timeout, "mongod on #{label service} did not come back on #{inv[:candidate]}") do
-        running_version(service) == inv[:candidate] && (role[:set].nil? || member_role(service)[:member])
+        running_version(service) == self.class.release(inv[:candidate]) && (role[:set].nil? || member_role(service)[:member])
       end
       counts[:patched] += 1
       resolve_issue service.guest
@@ -501,21 +530,22 @@ module CloudModel
     end
 
     def upgrade service, inv
-      packages = inv[:packages].any? ? inv[:packages] : %w(mongodb-org-server)
+      server = self.class.distribution(service)[:server]
+      packages = inv[:packages].any? ? inv[:packages] : [server]
       output.puts "  #{label service}: upgrading #{packages.size} package(s) to #{inv[:candidate]} (mongod restarts)"
       service.guest.exec! "sh -c #{"#{UPGRADE} #{packages.map(&:shellescape) * ' '}".shellescape}", 'apt-get install failed'
       # apt exits 0 when it keeps a package back (a hold, a broken
       # dependency) — check the package before touching mongod.
-      installed = service.guest.exec!("sh -c #{INSTALLED.shellescape}", 'dpkg-query failed').to_s.strip
+      installed = service.guest.exec!("sh -c #{"dpkg-query -W -f='${Version}' #{server}".shellescape}", 'dpkg-query failed').to_s.strip
       unless installed == inv[:candidate]
-        raise "package not upgraded: mongodb-org-server is #{installed.presence || 'missing'}, apt offered #{inv[:candidate]} (held back?)"
+        raise "package not upgraded: #{server} is #{installed.presence || 'missing'}, apt offered #{inv[:candidate]} (held back?)"
       end
       # The postinst restarts mongod; where it did not (a masked unit, a
       # policy-rc.d), restart it here.
       restarted = false
       wait_until(120, "mongod on #{label service} not reachable after the upgrade") do
         version = running_version service
-        if version && version != inv[:candidate] && !restarted
+        if version && version != self.class.release(inv[:candidate]) && !restarted
           output.puts "  #{label service}: still running #{version}, restarting mongod"
           service.guest.exec! '/bin/systemctl restart mongod', 'failed to restart mongod'
           restarted = true

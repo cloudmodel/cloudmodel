@@ -1,0 +1,4 @@
+[Service]
+# Database, user and migrations before every start ("+": as root).
+ExecStartPre=+/etc/fleet/prepare_db.sh
+TimeoutStartSec=30min

@@ -897,3 +897,29 @@ namespace :cloudmodel do
   # end
 
 end
+namespace :cloudmodel do
+  namespace :components do
+    desc "Check config/component_platforms.yml against the vendors' apt indexes (VERBOSE=1 lists every probe, WRITE=1 rewrites the file)"
+    task :platforms => :environment do
+      log = ENV['VERBOSE'] ? ->(line) { puts line } : nil
+      probed = CloudModel::ComponentPlatforms.probe(log: log)
+      stored = CloudModel::ComponentPlatforms.table
+      changes = []
+      (probed.keys | stored.keys).sort.each do |component|
+        lines = (probed[component].to_h.keys | stored[component].to_h.keys).sort_by { |l| Gem::Version.new(l) }
+        lines.each do |line|
+          CloudModel::ComponentPlatforms::OS_VERSIONS.each do |os|
+            now = Array(probed.dig(component, line, os)); was = Array(stored.dig(component, line, os))
+            (now - was).each { |arch| changes << "+ #{component} #{line} #{os} #{arch}" }
+            (was - now).each { |arch| changes << "- #{component} #{line} #{os} #{arch}" }
+          end
+        end
+      end
+      puts changes.empty? ? "component_platforms.yml matches the vendors' indexes" : changes
+      if ENV['WRITE']
+        File.write CloudModel::ComponentPlatforms::FILE, CloudModel::ComponentPlatforms.to_yaml(probed)
+        puts "written #{CloudModel::ComponentPlatforms::FILE}"
+      end
+    end
+  end
+end

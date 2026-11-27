@@ -1,0 +1,18 @@
+[Unit]
+Description=Fleet device management server
+After=network.target mysql.service redis-server.service
+Requires=mysql.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=fleet
+Group=fleet
+WorkingDirectory=/var/lib/fleet
+ExecStart=/usr/bin/fleet serve --config /etc/fleet/fleet.yml
+Restart=always
+RestartSec=5s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

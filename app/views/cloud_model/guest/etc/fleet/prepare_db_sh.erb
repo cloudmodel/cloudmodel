@@ -1,0 +1,25 @@
+#!/bin/bash
+# Rendered by cloudmodel, do not edit on the guest. Run as root before every
+# start of fleet.service: Fleet's database and user in the guest's Percona
+# Server (root over the socket; idempotent), then the migrations as the fleet
+# user.
+set -euo pipefail
+
+# A fresh data volume is root-owned; Fleet keeps its vulnerability feeds there.
+install -d -m 755 -o fleet -g fleet <%== CloudModel::Services::Fleet::DATA_DIR %>
+install -d -m 750 -o fleet -g fleet <%== CloudModel::Services::Fleet::DATA_DIR %>/vulndb
+
+for i in $(seq 1 60); do
+  if mysqladmin ping --silent 2>/dev/null; then break; fi
+  if [ "$i" = 60 ]; then echo "database server did not come up, giving up" >&2; exit 1; fi
+  sleep 2
+done
+
+mysql <<'SQL'
+CREATE DATABASE IF NOT EXISTS `<%== CloudModel::Services::Fleet::DATABASE_NAME %>`;
+CREATE USER IF NOT EXISTS '<%== CloudModel::Services::Fleet::DATABASE_USER %>'@'127.0.0.1' IDENTIFIED BY '<%== model.database_password.to_s.gsub("'", "''") %>';
+ALTER USER '<%== CloudModel::Services::Fleet::DATABASE_USER %>'@'127.0.0.1' IDENTIFIED BY '<%== model.database_password.to_s.gsub("'", "''") %>';
+GRANT ALL PRIVILEGES ON `<%== CloudModel::Services::Fleet::DATABASE_NAME %>`.* TO '<%== CloudModel::Services::Fleet::DATABASE_USER %>'@'127.0.0.1';
+SQL
+
+runuser -u fleet -- /usr/bin/fleet prepare db --config /etc/fleet/fleet.yml --no-prompt

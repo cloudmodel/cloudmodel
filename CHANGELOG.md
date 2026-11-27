@@ -1,5 +1,55 @@
 # Changelog
 
+## Unreleased
+
+- **MySQL service** (`:mysql`) next to MariaDB, with the server distribution
+  as a field like the MongoDB service: `mysql_distribution: percona`
+  (default) installs Percona Server for MySQL (component
+  `percona_server@<series>`), `mysql` MySQL Community from MySQL's own
+  repository (component `mysql@<series>`, amd64 only); default series 8.4 LTS, for applications in the same guest (localhost only, root
+  over `auth_socket`, an empty data volume at `var/lib/mysql` is initialised
+  on the first start, backups by `mysqldump`). Cannot share a guest with
+  MariaDB.
+- **Percona Server for MongoDB** as a choice of the MongoDB service
+  (`mongodb_distribution: percona`, component `percona_server_mongodb@<line>`):
+  a drop-in replacement of the same line, so a member switches by a redeploy
+  (the data directory is handed to Percona's `mongod` user). The nightly
+  `MongodbPatch` knows both package families. Percona publishes no arm64
+  packages for Debian 12 (Ubuntu 22.04 has them).
+- Percona's repositories share one setup (`PerconaRepository`: packaging key
+  pinned by fingerprint, the `telemetry` repository the server packages
+  depend on). Usage telemetry to Percona is a switch of each Percona service,
+  off by default (server setting and telemetry agent).
+- **Fleet service** (`:fleet`): the Fleet device management server (osquery).
+  Its database comes from a `:mysql` service in the same guest
+  (Fleet's migrations need MySQL 8, MariaDB fails them), Redis from a
+  `:redis` service. Fleet creates its database and user, runs
+  `fleet prepare db` before every start and provisions administrator, enroll
+  secret and SAML settings itself; provisioning token and vulnerability feeds
+  live at `var/lib/fleet`. Its usage statistics are a switch of the service,
+  off by default. amd64 only (Fleet publishes no arm64 server).
+- **Which server exists where**: `config/component_platforms.yml` lists per
+  component (MongoDB, Percona Server for MongoDB, MySQL, Percona Server) the
+  release lines the vendors publish per guest OS and architecture, read from
+  their apt indexes by `rake cloudmodel:components:platforms` (prints the
+  differences, `WRITE=1` rewrites the file). The MongoDB and MySQL services
+  offer `available_servers` / `server` (`"<distribution>:<line>"`) for forms
+  and reject a combination the vendor does not publish — only when it is
+  chosen or changed, or the guest's OS changes, so guests from before stay
+  editable. Notably: MongoDB publishes no server for Debian 13 (Percona
+  Server for MongoDB 8.0 does, amd64 and arm64) and none for arm64 on
+  Debian 12; MySQL and Fleet publish amd64 only.
+- The MongoDB service defaults to the 8.0 line (was 5.0, which no current
+  guest OS has).
+- `CloudModel.mongodb_version_path` lists major releases only and ends with
+  9.0 instead of 8.2: MongoDB stops patching a minor release once the next
+  is out and, before 9.0, a set on a minor can only leave it through every
+  later minor, while 8.0 upgrades to 9.0 directly. The FCV step
+  (`MongodbReplicationSet#update_feature_compatibility_version!`) now sends
+  `confirm: true`, which mongod requires from 7.0 on.
+- Nginx reverse proxy (`proxy_conf`) talks HTTP/1.1 to the backend and passes
+  the `Upgrade`/`Connection` headers on, so websockets work through it.
+
 ## 0.5.0 — ZFS-volume deploys
 
 Guest templates, guest containers and web-image releases moved from image

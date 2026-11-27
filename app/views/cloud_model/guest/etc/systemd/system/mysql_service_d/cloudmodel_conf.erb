@@ -1,0 +1,9 @@
+<%- dir = CloudModel::Services::Mysql::DATA_DIR -%>
+[Service]
+# The data directory is the data volume, empty on a fresh guest: initialise
+# it before the first start ("+": as root).
+ExecStartPre=+/bin/sh -c 'chown mysql:mysql <%= dir %> && chmod 750 <%= dir %> && { test -d <%= dir %>/mysql || /usr/sbin/mysqld --initialize-insecure --user=mysql --datadir=<%= dir %>; }'
+# A fresh data directory has root without a password: root logs in over the
+# socket only (idempotent, after every start).
+ExecStartPost=+/usr/bin/mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH auth_socket"
+TimeoutStartSec=600

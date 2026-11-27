@@ -24,6 +24,17 @@ describe CloudModel::Workers::Services::MongodbWorker do
       subject.write_config
     end
 
+    it 'should leave the telemetry agent alone for MongoDB´s own packages' do
+      expect(host).not_to receive(:exec!)
+      subject.write_config
+    end
+
+    it 'should mask the Percona telemetry agent for Percona Server for MongoDB' do
+      model.mongodb_distribution = 'percona'
+      expect(host).to receive(:exec!).with('rm -f /var/lib/lxc/test/rootfs/etc/systemd/system/multi-user.target.wants/percona-telemetry-agent.service && ln -sf /dev/null /var/lib/lxc/test/rootfs/etc/systemd/system/percona-telemetry-agent.service', 'Failed to mask percona telemetry agent')
+      subject.write_config
+    end
+
     it 'should render mongodb config template' do
       expect(subject).to receive(:render).with('/cloud_model/guest/etc/mongodb_conf', guest: guest, model: model)
       subject.write_config
@@ -95,7 +106,7 @@ describe CloudModel::Workers::Services::MongodbWorker do
     end
 
     it 'should render fix_perms.conf drop-in' do
-      expect(subject).to receive(:render_to_remote).with('/cloud_model/guest/etc/systemd/system/mongodb_service_d/fix_perms_conf', "#{subject.overlay_path}/fix_perms.conf")
+      expect(subject).to receive(:render_to_remote).with('/cloud_model/guest/etc/systemd/system/mongodb_service_d/fix_perms_conf', "#{subject.overlay_path}/fix_perms.conf", model: model)
       subject.auto_start
     end
 

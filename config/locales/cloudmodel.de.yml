@@ -141,6 +141,11 @@ de:
         branch_not_pulled: nicht gefunden oder nicht ladbar
         bundle_failed: Packen des Gemfiles fehlgeschlagen
         building_assets_failed: Erstellen fehlgeschlagen
+        fleet_needs_redis: braucht einen Redis-Dienst im selben Gast
+        fleet_needs_server_arch: "Fleet veröffentlicht den Server nur für %{arches}, dieser Host ist %{arch}"
+        not_published: "%{component} %{version} gibt es nicht für %{os} auf %{arch} (hier verfügbar: %{alternatives})"
+        fleet_needs_mysql: braucht einen MySQL-Dienst im selben Gast (Fleet läuft nicht auf MariaDB)
+        mysql_beside_mariadb: kann nicht in einem Gast mit MariaDB-Dienst laufen
 
     models:
       cloud_model/host:
@@ -268,6 +273,12 @@ de:
       cloud_model/services/forgejo:
         one: Forgejo-Dienst
         other: Forgejo-Dienste
+      cloud_model/services/mysql:
+        one: MySQL-Dienst
+        other: MySQL-Dienste
+      cloud_model/services/fleet:
+        one: Fleet-Dienst
+        other: Fleet-Dienste
       cloud_model/services/forgejo_runner:
         one: Forgejo-Actions-Runner
         other: Forgejo-Actions-Runner
@@ -585,6 +596,8 @@ de:
       cloud_model/services/mongodb:
         replication: Replikation
         mongodb_version: MongoDB Version
+        mongodb_distribution: Server-Distribution
+        telemetry: Nutzungstelemetrie an Percona
         mongodb_replication_set: Replikationset
         mongodb_replication_set_id: Replikationset
         mongodb_replication_priority: Replikationspriorität
@@ -734,6 +747,11 @@ de:
       not_reachable: Dienst nicht erreichbar
     cloud_model/services/mariadb:
       not_reachable: Dienst nicht erreichbar
+    cloud_model/services/mysql:
+      not_reachable: Dienst nicht erreichbar
+    cloud_model/services/fleet:
+      not_reachable: Dienst nicht erreichbar
+      not_healthy: Fleet-Gesundheitsprüfung fehlgeschlagen (Datenbank oder Redis)
     cloud_model/services/mongodb:
       not_reachable: Dienst nicht erreichbar
     cloud_model/services/nginx:

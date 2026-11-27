@@ -238,6 +238,7 @@ Services are embedded documents inside a `Guest`. Each service maps to a concret
 | `:phpfpm` | `Services::Phpfpm` | PHP-FPM process manager |
 | `:mongodb` | `Services::Mongodb` | MongoDB database |
 | `:redis` | `Services::Redis` | Redis key-value store |
+| `:mysql` | `Services::Mysql` | MySQL 8, `mysql_distribution` `percona` (Percona Server, default) or `mysql` (MySQL Community, amd64); localhost only |
 | `:mariadb` | `Services::Mariadb` | MariaDB/MySQL database (the status check needs the `mysql2` gem in the host application's Gemfile; the engine does not depend on it) |
 | `:neo4j` | `Services::Neo4j` | Neo4j graph database |
 | `:fuseki` | `Services::Fuseki` | Apache Jena Fuseki (RDF/SPARQL) |
@@ -246,6 +247,7 @@ Services are embedded documents inside a `Guest`. Each service maps to a concret
 | `:collabora` | `Services::Collabora` | Collabora Online (LibreOffice) |
 | `:jitsi` | `Services::Jitsi` | Jitsi Meet video conferencing |
 | `:forgejo` | `Services::Forgejo` | Forgejo Git forge |
+| `:fleet` | `Services::Fleet` | Fleet device management (osquery); needs `:mysql` and `:redis` in the guest |
 | `:rake` | `Services::Rake` | Scheduled Rake task runner |
 | `:backup` | `Services::Backup` | Backup service |
 | `:monitoring` | `Services::Monitoring` | Monitoring agent |
@@ -303,7 +305,7 @@ Component symbols follow the pattern `name` or `name@version`:
 
 **Available components**
 
-`collabora`, `forgejo`, `fuseki`, `imagemagick`, `java`, `jitsi`, `libfcgi`, `mariadb`, `mariadb_client`, `mongodb`, `ms_core_fonts`, `neo4j`, `nginx`, `php`, `php_imagemagick`, `php_imap`, `php_mysql`, `redis`, `ruby`, `solr`, `tomcat`, `wkhtmltopdf`, `xml`, `nextcloud_spreed_signaling`
+`collabora`, `fleet`, `forgejo`, `fuseki`, `imagemagick`, `java`, `jitsi`, `libfcgi`, `mariadb`, `mariadb_client`, `mongodb`, `mysql`, `ms_core_fonts`, `neo4j`, `nginx`, `percona_server`, `percona_server_mongodb`, `php`, `php_imagemagick`, `php_imap`, `php_mysql`, `redis`, `ruby`, `solr`, `tomcat`, `wkhtmltopdf`, `xml`, `nextcloud_spreed_signaling`
 
 **Resolving components programmatically**
 
@@ -409,7 +411,7 @@ config.monitoring_notifiers = [
 ]
 ```
 
-Service checks are implemented in `lib/cloud_model/monitoring/` for SSH, Nginx, MongoDB, Redis, MariaDB, PHP-FPM, Solr, Tomcat, Fuseki, and Forgejo.
+Service checks are implemented in `lib/cloud_model/monitoring/` for SSH, Nginx, MongoDB, Redis, MariaDB, PHP-FPM, Solr, Tomcat, Fuseki, Forgejo, Fleet, and Percona Server.
 
 Rake Tasks
 ----------

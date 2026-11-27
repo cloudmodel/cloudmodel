@@ -7,13 +7,26 @@ module CloudModel
     # `mongodb_replication_arbiter_only` fields control this node's role within
     # the set. Backups use `mongodump --gzip`.
     class Mongodb < Base
+      include CloudModel::Mixins::ServerPlatform
       # @!attribute [rw] port
       #   @return [Integer] MongoDB listen port (default: 27017)
       field :port, type: Integer, default: 27017
 
       # @!attribute [rw] mongodb_version
-      #   @return [String] MongoDB version to install, e.g. `"6.0"` (default: `"5.0"`)
-      field :mongodb_version, type: String, default: '5.0'
+      #   @return [String] release line to install, e.g. `"8.0"` (default: `"8.0"`)
+      field :mongodb_version, type: String, default: '8.0'
+
+      # @!attribute [rw] mongodb_distribution
+      #   @return [String] server packages: `"mongodb"` (MongoDB Community from
+      #     MongoDB's repository) or `"percona"` (Percona Server for MongoDB, a
+      #     drop-in replacement from Percona's repository; same data files, so
+      #     a member can be switched by a redeploy). Default `"mongodb"`.
+      field :mongodb_distribution, type: String, default: 'mongodb'
+
+      # @!attribute [rw] telemetry
+      #   @return [Boolean] Percona Server for MongoDB only: send usage
+      #     telemetry to Percona (server parameter and telemetry agent). Off by default.
+      field :telemetry, type: Mongoid::Boolean, default: false
 
       # @!attribute [rw] mongodb_replication_priority
       #   @return [Integer] replica-set election priority (0–100; 0 = never elected)
@@ -95,7 +108,47 @@ module CloudModel
         super(Array(value).map { |v| v.to_s.strip }.reject(&:blank?))
       end
 
+      DISTRIBUTIONS = %w(mongodb percona).freeze
+
       validates :mongodb_replication_priority, inclusion: {in: 0..100}
+      validates :mongodb_distribution, inclusion: {in: DISTRIBUTIONS}
+
+      # @return [Boolean] whether the server comes from Percona
+      def percona?
+        mongodb_distribution == 'percona'
+      end
+
+      def self.server_distribution_field
+        :mongodb_distribution
+      end
+
+      def self.server_version_field
+        :mongodb_version
+      end
+
+      # Lines offered where the platform table knows nothing.
+      def self.default_lines distribution
+        distribution == 'percona' ? %w(7.0 8.0) : CloudModel.mongodb_version_path
+      end
+
+      # @return [Symbol] component name of the distribution (without line)
+      def component_for distribution
+        distribution == 'percona' ? :percona_server_mongodb : :mongodb
+      end
+
+      # System user the server packages run mongod as (and own the data
+      # directory): `mongodb` for MongoDB's packages, `mongod` for Percona's.
+      # @return [String]
+      def mongodb_user
+        percona? ? 'mongod' : 'mongodb'
+      end
+
+      # Server package of the distribution; the others of the family share
+      # its name as prefix (`mongodb-org*`, `percona-server-mongodb*`).
+      # @return [String]
+      def server_package
+        percona? ? 'percona-server-mongodb-server' : 'mongodb-org-server'
+      end
 
       # Replica-set members are backed up ONCE at the set level, so enabling
       # backups on a member toggles the set instead; the member stores/reports
@@ -123,7 +176,8 @@ module CloudModel
       end
 
       def components_needed
-        (["mongodb@#{mongodb_version}".to_sym] + super).uniq
+        server = percona? ? :"percona_server_mongodb@#{mongodb_version}" : :"mongodb@#{mongodb_version}"
+        ([server] + super).uniq
       end
 
       def sanitize_service_data data

@@ -1,8 +1,10 @@
 require 'spec_helper'
 
 RSpec.describe 'cloud_model/guest/etc/systemd/system/mongodb_service_d/fix_perms_conf', type: :view do
+  let(:model) { CloudModel::Services::Mongodb.new }
+
   def rendered_lines
-    render template: 'cloud_model/guest/etc/systemd/system/mongodb_service_d/fix_perms_conf'
+    render template: 'cloud_model/guest/etc/systemd/system/mongodb_service_d/fix_perms_conf', locals: { model: model }
     rendered.lines.map(&:strip).reject { |l| l.empty? || l.start_with?('#') }
   end
 
@@ -18,6 +20,13 @@ RSpec.describe 'cloud_model/guest/etc/systemd/system/mongodb_service_d/fix_perms
     expect(pre.first).not_to include '&'
     expect(pre.first).not_to include '\\'
     expect(lines).to include 'TimeoutStartSec=600'
+  end
+
+  it 'hands the data directory to the mongod user of Percona Server for MongoDB' do
+    model.mongodb_distribution = 'percona'
+    lines = rendered_lines
+    expect(lines).to include 'ExecStartPre=/bin/chown mongod:mongod /var/lib/mongodb'
+    expect(lines.grep(/\AExecStartPre=\/bin\/sh -c /).first).to include 'find /var/lib/mongodb ! -user mongod -exec chown -h mongod {} +'
   end
 
   it 'keeps the resource limits' do

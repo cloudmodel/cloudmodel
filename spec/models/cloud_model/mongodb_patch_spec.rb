@@ -14,7 +14,7 @@ describe CloudModel::MongodbPatch do
   def member_service name, ip, priority: 50, arbiter: false
     guest = double CloudModel::Guest, name: name, host: host, deploy_state: :finished, item_issues: issues
     service = double CloudModel::Services::Mongodb, id: BSON::ObjectId.new, guest: guest, server_uri: "#{ip}:27017",
-      mongodb_replication_set: set, mongodb_replication_priority: priority, mongodb_replication_arbiter_only: arbiter
+      mongodb_replication_set: set, mongodb_replication_priority: priority, mongodb_replication_arbiter_only: arbiter, percona?: false
     allow(service).to receive(:is_a?) { |klass| klass == CloudModel::Services::Mongodb }
     service
   end
@@ -79,6 +79,29 @@ describe CloudModel::MongodbPatch do
 
     it 'is behind when the package is new but the running mongod is still the old one' do
       expect(subject.behind?(installed: '7.0.48', candidate: '7.0.48', running: '7.0.28')).to be true
+    end
+
+    context 'with Percona Server for MongoDB' do
+      before { allow(primary).to receive(:percona?).and_return true }
+
+      it 'reads Percona´s server package from Percona´s repository' do
+        expect(primary.guest).to receive(:exec).with(/percona-psmdb-.*percona-server-mongodb-server/m).and_return [true, "installed=8.0.28-11.bookworm\ncandidate=8.0.38-16.bookworm\npackages=percona-server-mongodb percona-server-mongodb-server\n"]
+        expect(subject).to receive(:running_version).with(primary).and_return '8.0.28-11'
+        inv = subject.inventory primary
+        expect(inv[:candidate]).to eq '8.0.38-16.bookworm'
+        expect(subject.behind?(inv)).to be true
+      end
+
+      it 'compares the package with the running mongod without the codename' do
+        expect(described_class.release('8.0.38-16.bookworm')).to eq '8.0.38-16'
+        expect(described_class.release('8.0.38')).to eq '8.0.38'
+        expect(subject.behind?(installed: '8.0.38-16.bookworm', candidate: '8.0.38-16.bookworm', running: '8.0.38-16')).to be false
+      end
+
+      it 'names Percona´s package when it is missing' do
+        expect(primary.guest).to receive(:exec).and_return [true, "installed=\ncandidate=(none)\npackages=\n"]
+        expect { subject.inventory primary }.to raise_error(/no percona-server-mongodb-server/)
+      end
     end
 
     it 'fails a guest without the server package' do
@@ -243,7 +266,7 @@ describe CloudModel::MongodbPatch do
 
     it 'upgrades a standalone service and waits for the new version' do
       guest = double CloudModel::Guest, name: 'web', host: host, deploy_state: :finished, item_issues: issues
-      service = double CloudModel::Services::Mongodb, id: BSON::ObjectId.new, guest: guest, server_uri: '10.0.0.9:27017', mongodb_replication_set: nil, has_backups: true, last_successful_backup_at: last_backup
+      service = double CloudModel::Services::Mongodb, id: BSON::ObjectId.new, guest: guest, server_uri: '10.0.0.9:27017', mongodb_replication_set: nil, percona?: false, has_backups: true, last_successful_backup_at: last_backup
       allow(guest).to receive(:exec).and_return [true, inventory_output(installed: '7.0.28', candidate: '7.0.48')]
       running = '7.0.28'
       allow(subject).to receive(:running_version) { running }
@@ -258,7 +281,7 @@ describe CloudModel::MongodbPatch do
 
     it 'steps a primary down whose set the admin does not know, and waits until it is a member again' do
       guest = double CloudModel::Guest, name: 'admin', host: host, deploy_state: :finished, item_issues: issues
-      service = double CloudModel::Services::Mongodb, id: BSON::ObjectId.new, guest: guest, server_uri: '10.0.0.8:27017', mongodb_replication_set: nil, has_backups: true, last_successful_backup_at: last_backup
+      service = double CloudModel::Services::Mongodb, id: BSON::ObjectId.new, guest: guest, server_uri: '10.0.0.8:27017', mongodb_replication_set: nil, percona?: false, has_backups: true, last_successful_backup_at: last_backup
       allow(guest).to receive(:exec).and_return [true, inventory_output(installed: '7.0.28', candidate: '7.0.48')]
       running = '7.0.28'
       primary = true
