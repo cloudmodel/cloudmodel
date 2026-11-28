@@ -219,6 +219,25 @@ describe CloudModel::Monitoring::HostChecks do
       subject.check_smart
     end
 
+    it 'finds system disks configured by id through the id links of the agent' do
+      allow(host).to receive(:system_disks).and_return(['disk/by-id/ata-Micron_191721A218FF', 'disk/by-id/ata-SAMSUNG_S6ERNE0R906690'])
+      allow(subject).to receive(:data).and_return({system: {'smart' => {
+        'sdc' => {'smart_status' => 'PASSED', 'id_links' => ['disk/by-id/ata-SAMSUNG_S6ERNE0R906690', 'disk/by-id/wwn-0x5002']},
+        'sdd' => {'smart_status' => 'PASSED', 'id_links' => ['disk/by-id/ata-Micron_191721A218FF']}
+      }}})
+      expect(subject).to receive(:do_check).with(:smart, 'SMART', {critical: false}, message: '')
+
+      subject.check_smart
+    end
+
+    it 'reports a system disk by id that no disk links to' do
+      allow(host).to receive(:system_disks).and_return(['disk/by-id/ata-Micron_191721A218FF'])
+      allow(subject).to receive(:data).and_return({system: {'smart' => {'sdc' => {'smart_status' => 'PASSED'}}}})
+      expect(subject).to receive(:do_check).with(:smart, 'SMART', {critical: true}, message: 'disk/by-id/ata-Micron_191721A218FF not found')
+
+      subject.check_smart
+    end
+
     it 'should report failed SMART test' do
       allow(subject).to receive(:data).and_return({system: {'smart' => {'sda' => {'smart_status' => 'FAILED'}, 'sdb' => {'smart_status' => 'PASSED'}}}})
       expect(subject).to receive(:do_check).with(:smart, 'SMART', {critical: true}, hash_including(:message))

@@ -10,6 +10,13 @@ for dev in /dev/sd[a-z] /dev/nvme*n1; do
     smart_state_id="SMART overall-health self-assessment test result: "
 
     echo "[$dev]"
+    # Stable names of the disk: system disks may be configured by id
+    links=""
+    for l in /dev/disk/by-id/*; do
+      case "$l" in *-part*) continue;; esac
+      [ "$(readlink -f "$l")" = "$dev" ] && links="$links ${l#/dev/}"
+    done
+    [ -n "$links" ] && echo "  Id Links:$links"
     echo "$res" | grep "$smart_state_id" | sed "s|$smart_state_id|  SMART Status: |"
     # Get SATA smart values
     echo "$res" | grep Always | sed "s|^[ 0-9]*\([A-Za-z_-]*\).*  \(.*\)$|  \1: \2|" | sed "s|_| |g"

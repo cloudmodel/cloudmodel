@@ -222,7 +222,10 @@ module CloudModel
         if sys_info = data[:system] and sys_info['smart']
           failures = []
 
-          (@subject.system_disks - sys_info['smart'].keys).each do |v|
+          # System disks are kernel names (sda) or stable links
+          # (disk/by-id/…), which the agent reports per disk as id_links.
+          known = sys_info['smart'].flat_map { |dev, values| [dev, *Array(values['id_links'])] }
+          (@subject.system_disks - known).each do |v|
             failures << "#{v} not found"
           end
 

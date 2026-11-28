@@ -269,6 +269,8 @@ module CloudModel
 
                 hash[context][dev][k] = if v.nil?
                   '-'
+                elsif k == 'id_links'
+                  v.split
                 elsif %w(device_model model_number model_family).include? k
                   # Keep full model names ("Samsung SSD 860") — used to label
                   # the physical disk in wear alerts.

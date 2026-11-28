@@ -191,6 +191,12 @@ describe CloudModel::CheckMkParser do
         expect(result['smart']['sda']['reallocated_sector_ct']).to eq '0'
       end
 
+      it 'keeps all id links of a disk' do
+        input = "<<<smart>>>\n[/dev/sdc]\n  Id Links: disk/by-id/ata-SAMSUNG_S6ERNE0R906690 disk/by-id/wwn-0x5002\n"
+        result = CloudModel::CheckMkParser.parse input
+        expect(result['smart']['sdc']['id_links']).to eq ['disk/by-id/ata-SAMSUNG_S6ERNE0R906690', 'disk/by-id/wwn-0x5002']
+      end
+
       it 'should use dash when value missing' do
         input = "<<<smart>>>\n[/dev/sdb]\nSomeKeyOnly\n"
         result = CloudModel::CheckMkParser.parse input
